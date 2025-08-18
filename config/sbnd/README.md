@@ -10,6 +10,31 @@ These weights have been trained using the following files at Polaris:
 
 ...using the configs in the [sbnd_spine_train](https://github.com/bear-is-asleep/sbnd_spine_train/tree/master) repo.
 
+## August 18th 2025
+
+```shell
+sbnd_full_chain_250818.cfg
+sbnd_full_chain_data_250818.cfg
+```
+
+Training samples MPVMPR using `sbndcode v10_04_01` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_04_01) . The training samples are generated using the following fcls:
+```
+run_mpvmpr_sbnd.fcl
+g4_sce_lite.fcl
+detsim_sce_lite.fcl
+reco1_mpvmpr.fcl
+```
+
+The following modifications were made w.r.t. the March configurations
+- Add a logical containment post-processor
+- Do not move cathode crosser depositions to fix the truth matching
+- Restrict FM interaction candidates to those not clearly out-of-time
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - The `*_data_*` declination is tailored for data (no labels)
+
 ## March 28th 2025
 
 ```shell
