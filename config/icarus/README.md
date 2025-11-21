@@ -129,3 +129,59 @@ Description:
 Known issue(s):
   - Moved all calibrations upstream of the full chain (for the better!)
   - No other known issue
+
+
+## Configurations for MPV/MPR v04
+
+These weights have been trained/validated using the following files:
+- Training set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v4/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v4/test_file_list.txt`
+
+This dataset is a superset of v03, with the additional of samples with different
+electron lifetimes (4 ms and 8 ms) to match what was recorded during ICARUS run 2.
+
+### June 25th 2025 
+
+```shell
+icarus_full_chain_co_250625.cfg
+icarus_full_chain_co_lite_250625.cfg
+icarus_full_chain_co_numi_250625.cfg
+icarus_full_chain_co_4ms_lite_250625.cfg
+icarus_full_chain_co_8ms_lite_250625.cfg
+icarus_full_chain_co_transp_lite_250625.cfg
+icarus_full_chain_data_co_250625.cfg
+icarus_full_chain_data_co_lite_250625.cfg
+icarus_full_chain_data_co_lowbs_lite_250625.cfg
+icarus_full_chain_data_co_unblind_lite_250625.cfg
+icarus_full_chain_data_co_numi_250625.cfg
+icarus_full_chain_single_co_250625.cfg
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - The `*_co_*` declinations only use collection charge
+  - The `*_numi_*` declinations are tailored for NuMI (10 us beam window for FM)
+  - The `*_4ms_*` declinations are tailored for 4ms lifetime variations
+  - The `*_8ms_*` declinations are tailored for 8ms lifetime variations
+  - The `*_transp_*` declinations are tailored for the YZ transparency variations
+  - The `*_data_*` declinations are tailored for data (no labels)
+  - The `*_lite_*` declinations output directly to lite files
+  - The `*_lowbs_*` declinations with low batch size to reduce memory consumption (1)
+  - The `*_unblind_*` declination only processes unblinded data
+  - The `*_single_*` declination works on single-cryostat simulations
+
+Changes:
+  - Weights trained on a mixture of lifetimes (3, 4 and 8 ms)
+  - Multiple shower quality cuts added (for nue analysis)
+    - Cut on Michel KE of 100 MeV (anything above that is not a Michel)
+    - Shower start merge (merge start with track stubs, if present)
+    - Shower start point correction (based on vertex distance)
+    - Exclude EM activity from containment checks
+    - 50 MeV visibility threshold on electron showers (for topology)
+    - Compute start dE/dx
+    - Compute start straightness
+    - Compute particle spread
+    - Compute EM shower conversion distance
+  - Use true energy depoisitions (SED) for the contaiment check
+  - Use the vertex to update the track orientations (fix track flipping)
