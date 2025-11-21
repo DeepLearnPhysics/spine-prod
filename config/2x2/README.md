@@ -32,6 +32,7 @@ Known issue(s):
 2x2_full_chain_flash_240819.cfg
 2x2_full_chain_data_240819.cfg
 2x2_full_chain_data_flash_240819.cfg
+2x2_single_full_chain_data_flash_240819.cfg
 ```
 
 Description:
@@ -39,6 +40,7 @@ Description:
   - The `*_flash_*` declination includes flash parsing
   - The `*_data_*` declination is tailored for data (no labels)
   - The `*_data_flash_*` declination is tailored for data (no labels) and includes flash parsing
+  - The `*_single_*` declination is tailored to single-module reconstruction
 
 Known issue(s):
   - Module 2 packets have been fixed w.r.t. to the previous set of weights
