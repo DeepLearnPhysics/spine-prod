@@ -50,7 +50,6 @@ Description:
 Known issues:
   - No flash matching
 
-
 ### May 15th 2025
 
 ```shell
@@ -67,3 +66,20 @@ Known issues:
 Changes:
   - Changed fiducial definition (10 cm from module boundaries now)
   - Relaxed maximum edge lengths in the GrapPAs
+
+### August 6th 2025
+
+```shell
+ndlar_full_chain_250806.cfg
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Includes flash parsing
+
+Known issues:
+  - No flash matching
+
+Changes:
+  - Trained on overlays (4x images per event)
+  - Improves interaction clusering purity as some cost to efficiency
