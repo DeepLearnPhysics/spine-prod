@@ -31,7 +31,7 @@ Known issues with the simulation:
   - Wrong KE range produced for protons (and possibly electrons)
   - Unrealistically low pile-up (interaction multiplicity)
 
-### May 5th 2024
+### May 5th 2025
 
 ```shell
 ndlar_full_chain_250505.cfg
@@ -49,3 +49,21 @@ Description:
 
 Known issues:
   - No flash matching
+
+
+### May 15th 2025
+
+```shell
+ndlar_full_chain_250515.cfg
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Includes flash parsing
+
+Known issues:
+  - No flash matching
+
+Changes:
+  - Changed fiducial definition (10 cm from module boundaries now)
+  - Relaxed maximum edge lengths in the GrapPAs
