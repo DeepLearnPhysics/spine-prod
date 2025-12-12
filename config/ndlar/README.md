@@ -71,11 +71,13 @@ Changes:
 
 ```shell
 ndlar_full_chain_250806.cfg
+ndlar_full_chain_ovl_250806.cfg
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Includes flash parsing
+  - The `*_ovl_*` declination is meant to run overlays (4x spills)
 
 Known issues:
   - No flash matching
