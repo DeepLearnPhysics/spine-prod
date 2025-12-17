@@ -9,7 +9,7 @@ These configurations have been trained using 2x2 and are not expected to work pr
 ### August 19th 2024
 
 ```shell
-ndlar_full_chain_flash_nersc_240819.cfg
+nd-lar_full_chain_flash_nersc_240819.cfg
 ```
 
 Description:
@@ -34,17 +34,14 @@ Known issues with the simulation:
 ### May 5th 2025
 
 ```shell
-ndlar_full_chain_250505.cfg
-ndlar_full_chain_nersc_250505.cfg
-ndlar_single_full_chain_250505.cfg
-ndlar_single_full_chain_data_250505.cfg
+nd-lar_full_chain_250505.cfg
+nd-lar_full_chain_nersc_250505.cfg
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Includes flash parsing
   - The `*_nersc_*` declination points to a weight path at NERSC (as opposed to S3DF)
-  - The `*_single_*` declination is meant to run on FSD (single module of ND-LAr)
   - The `*_data_*` declination is meant to run on real data (no labels)
 
 Known issues:
@@ -53,7 +50,7 @@ Known issues:
 ### May 15th 2025
 
 ```shell
-ndlar_full_chain_250515.cfg
+nd-lar_full_chain_250515.cfg
 ```
 
 Description:
@@ -70,8 +67,8 @@ Changes:
 ### August 6th 2025
 
 ```shell
-ndlar_full_chain_250806.cfg
-ndlar_full_chain_ovl_250806.cfg
+nd-lar_full_chain_250806.cfg
+nd-lar_full_chain_ovl_250806.cfg
 ```
 
 Description:
