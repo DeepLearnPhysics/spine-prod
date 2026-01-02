@@ -36,8 +36,6 @@ Variants built by combining base versions with modifiers:
   ↳ 2x2_flash_mod.cfg
 ```
 
-**Size reduction:** ~496 lines → 5-14 lines per config (97-99% reduction)
-
 ### Latest Configs
 
 Symlinks pointing to the most recent versions:

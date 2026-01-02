@@ -2,6 +2,38 @@
 
 The configurations below have been trained on ND-LAr MPV/MPR datasets. This summary is divided by training/validation dataset.
 
+## Configuration Structure
+
+All ND-LAr configurations follow a hierarchical include structure to minimize duplication:
+
+- **nd-lar_base.cfg**: Common base configuration with all shared settings (IO loaders, models, post-processing)
+- **nd-lar_ovl_mod.cfg**: Overlay modifier that adapts for overlay processing (4x spills)
+- **nd-lar_full_chain_240819.cfg**: Frankenstein version using 2x2 weights (for benchmarking only)
+- **nd-lar_full_chain_250505.cfg**: May 5th 2025 version with MPV/MPR v00 weights
+- **nd-lar_full_chain_250515.cfg**: May 15th 2025 version with updated fiducial and edge lengths
+- **nd-lar_full_chain_250806.cfg**: August 6th 2025 version trained on overlays
+- **nd-lar_full_chain_ovl_250806.cfg**: Includes 250806 + ovl_mod for overlay processing
+
+**Inheritance chain:**
+```
+nd-lar_base.cfg
+  ↓ includes
+nd-lar_full_chain_240819.cfg
+nd-lar_full_chain_250505.cfg
+nd-lar_full_chain_250515.cfg
+nd-lar_full_chain_250806.cfg
+  ↓ includes
+nd-lar_full_chain_ovl_250806.cfg + nd-lar_ovl_mod.cfg
+```
+
+This eliminates duplication across date declinations.
+
+**Runtime composition:**
+```shell
+python submit.py nd-lar_full_chain_250806.cfg --apply-mods ovl  # Equivalent to nd-lar_full_chain_ovl_250806.cfg
+python submit.py nd-lar_full_chain_250806.cfg --list-mods       # Show available modifiers
+```
+
 ## Frankenstein configurations
 
 These configurations have been trained using 2x2 and are not expected to work properly. These configurations are to be exclusively used to benchmark SPINE's resource usage at ND-LAr but are not to be used to benchmark reconstruction performance or produce physics results.

@@ -28,8 +28,6 @@ All 2x2-single configs now use a **hierarchical include system** with composable
   ↳ 2x2-single_data_mod.cfg
 ```
 
-**Size reduction:** ~500 lines → 4-7 lines per config (99% reduction)
-
 **Runtime Composition:**
 You can also compose configs at runtime using the orchestrator:
 ```bash

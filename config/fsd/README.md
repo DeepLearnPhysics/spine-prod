@@ -19,7 +19,7 @@ fsd_full_chain_data_250505.cfg
   ↳ fsd_data_mod.cfg
 ```
 
-This reduces total lines from ~1000 to ~530 (47% reduction) and eliminates duplication across variants.
+This eliminates duplication across variants.
 
 **Runtime composition:**
 ```shell
