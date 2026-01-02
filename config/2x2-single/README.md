@@ -9,23 +9,23 @@ The configurations below have been trained on 2x2 MPV/MPR datasets. This summary
 All 2x2-single configs now use a **hierarchical include system** with composable modifiers:
 
 ### Base Configuration
-- **`2x2-single_base.cfg`** (470 lines): Main base config with all common settings (IO, model architecture, post-processing)
+- **`2x2-single_base.cfg`**: Main base config with all common settings (IO, model architecture, post-processing)
 
 ### Modifier Configs
-- **`2x2-single_data_mod.cfg`** (47 lines): Transforms any config to data-only mode (removes truth labels, sets reco-only)
+- **`2x2-single_data_mod.cfg`**: Transforms any config to data-only mode (removes truth labels, sets reco-only)
 
 ### Version-Specific Configs
-- **`2x2-single_full_chain_240819.cfg`** (7 lines): Latest v2 weights → `2x2-single_base.cfg` + overrides
+- **`2x2-single_full_chain_240819.cfg`**: Latest v2 weights → `2x2-single_base.cfg` + overrides
 
 ### Composed Configs
-- **`2x2-single_full_chain_data_240819.cfg`** (4 lines): `240819` + `data_mod`
+- **`2x2-single_full_chain_data_240819.cfg`**: `240819` + `data_mod`
 
 **Inheritance Example:**
 ```
-2x2-single_full_chain_data_240819.cfg (4 lines)
-  ↳ 2x2-single_full_chain_240819.cfg (7 lines)
-      ↳ 2x2-single_base.cfg (470 lines)
-  ↳ 2x2-single_data_mod.cfg (47 lines)
+2x2-single_full_chain_data_240819.cfg
+  ↳ 2x2-single_full_chain_240819.cfg
+      ↳ 2x2-single_base.cfg
+  ↳ 2x2-single_data_mod.cfg
 ```
 
 **Size reduction:** ~500 lines → 4-7 lines per config (99% reduction)
