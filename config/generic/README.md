@@ -2,6 +2,26 @@
 
 The configurations below have been trained on generic datasets, i.e datasets which do not include any detector simulation. This summary is divided by training/validation dataset.
 
+## Configuration Structure
+
+The configurations have been refactored to use SPINE's include mechanism to reduce duplication:
+
+- **`generic_base.cfg`**: Common base configuration shared across all generic configs (base settings, IO, model architecture, build, post-processors)
+- **`generic_full_chain_*.cfg`**: Version-specific configs that include the base and override only what's different
+
+Each version-specific config uses the `include:` directive and `overrides:` block to specify only the parameters that differ from the base configuration. This makes it easy to see what's unique about each version and maintain consistency across configurations.
+
+### Key Differences Between Versions
+
+| Parameter | 240718 | 240805 |
+|-----------|--------|--------|
+| Weight Path | `.../default/snapshot-4999.ckpt` | `.../restrict/snapshot-4999.ckpt` |
+| PPN Classify Endpoints | `true` | `false` |
+| PPN Include Point Tagging | (default) | `false` |
+| GraphSPICE Spatial Size | 6144 | 768 |
+| GraphSPICE Graph Type | knn (k=5) | radius (r=1.9) |
+| GraPPA Inter Layer Width | 64 | 128 |
+
 ## Configurations for MPV/MPR v04
 
 These weights have been trained/validated using the following files:
