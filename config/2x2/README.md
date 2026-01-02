@@ -1,6 +1,50 @@
 # Summary of 2x2 full chain configurations and their characteristics
 
+**NOTE: These configurations have been refactored to use the `include:` mechanism to avoid duplication. See the "Configuration Structure" section below for details.**
+
 The configurations below have been trained on 2x2 MPV/MPR datasets. This summary is divided by training/validation dataset.
+
+## Configuration Structure
+
+All 2x2 configs now use a **hierarchical include system** with composable modifiers:
+
+### Base Configuration
+- **`2x2_base.cfg`**: Main base config with all common settings (IO, model architecture, post-processing)
+
+### Modifier Configs
+- **`2x2_data_mod.cfg`**: Transforms any config to data-only mode (removes truth labels, sets reco-only)
+- **`2x2_flash_mod.cfg`**: Adds flash parsing to any config
+
+### Version-Specific Configs
+- **`2x2_full_chain_240819.cfg`**: Latest v2 weights → `2x2_base.cfg`
+- **`2x2_full_chain_240719.cfg`**: Older v1 weights + legacy settings → `2x2_base.cfg` + overrides
+
+### Composed Configs
+Variants built by combining base versions with modifiers:
+- **`2x2_full_chain_flash_240819.cfg`**: `240819` + `flash_mod`
+- **`2x2_full_chain_data_240819.cfg`**: `240819` + `data_mod`
+- **`2x2_full_chain_data_flash_240819.cfg`**: `data_240819` + `flash_mod`
+- (Same pattern for 240719 versions)
+
+**Inheritance Example:**
+```
+2x2_full_chain_data_flash_240819.cfg
+  ↳ 2x2_full_chain_data_240819.cfg
+      ↳ 2x2_full_chain_240819.cfg
+          ↳ 2x2_base.cfg
+      ↳ 2x2_data_mod.cfg
+  ↳ 2x2_flash_mod.cfg
+```
+
+**Size reduction:** ~496 lines → 5-14 lines per config (97-99% reduction)
+
+### Latest Configs
+
+Symlinks pointing to the most recent versions:
+- `latest.cfg` → `2x2_full_chain_LATEST.cfg`
+- `latest_data.cfg` → `2x2_full_chain_data_LATEST.cfg`
+- `latest_flash.cfg` → `2x2_full_chain_flash_LATEST.cfg`
+- `latest_data_flash.cfg` → `2x2_full_chain_data_flash_LATEST.cfg`
 
 ## Configurations for MPV/MPR v01
 
