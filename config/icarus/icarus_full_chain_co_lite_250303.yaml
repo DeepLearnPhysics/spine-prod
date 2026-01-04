@@ -1,0 +1,6 @@
+# Lite-output configuration for ICARUS 
+# Revision date: March 3, 2025
+
+include: 
+  - icarus_full_chain_co_250303.yaml
+  - patch/lite/patch_lite_240719.yaml

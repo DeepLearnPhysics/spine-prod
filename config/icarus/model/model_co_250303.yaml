@@ -1,0 +1,32 @@
+# ICARUS model configuration
+# Revision date: January 15, 2025
+include: model_common.yaml
+
+override:
+  # Path to the v3 restricted, collection-only, calibrated model weights
+  model.weight_path: /sdf/data/neutrino/icarus/spine/train/mpvmpr_v03/weights/full_chain/calib_v4/snapshot-1999.ckpt
+
+  # Calibration handled before the semantic segmentation stage
+  model.modules.chain.calibration: apply
+  model.modules.calibration:
+    stage: segmentation
+    gain:
+      gain: 82.03 # e-/ADC
+    recombination:
+      model: mbox
+      efield: 0.4938 # kV/cm
+      mip_dedx: 2.105168 # MeV/cm
+    lifetime:
+      lifetime: 3000 # us
+      driftv: 0.157565 # cm/us
+
+  # Charge rescaling uses collection-only charge
+  model.modules.chain.charge_rescaling: collection
+
+  # Older PPN/GrapPA loss settings
+  model.modules.uresnet_ppn.ppn.classify_endpoints: false
+  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
+  model.modules.grappa_shower_loss.node_loss.use_closest: false
+
+  # Interaction grouping restriction applied
+  model.modules.grappa_inter.nodes.grouping_through_track: true

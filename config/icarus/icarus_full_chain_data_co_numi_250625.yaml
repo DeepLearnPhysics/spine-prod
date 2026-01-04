@@ -1,0 +1,7 @@
+# NuMI-specific configuration for ICARUS 
+# Revision date: June 25, 2025
+
+include: 
+  - icarus_full_chain_co_250625.yaml
+  - patch/data/patch_data_250303.yaml
+  - patch/numi/patch_numi_250303.yaml

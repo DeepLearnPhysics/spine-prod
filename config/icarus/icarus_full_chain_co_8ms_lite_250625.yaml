@@ -1,0 +1,7 @@
+# 8ms-lifetime configuration for ICARUS 
+# Revision date: June 25, 2025
+
+include:
+  - icarus_full_chain_co_250625.yaml
+  - patch/lite/patch_lite_240719.yaml
+  - patch/8ms/patch_8ms_250303.yaml

@@ -1,0 +1,8 @@
+# Transparency-correction modification for ICARUS configs
+# Revision date: March 3, 2025
+
+override:
+  # Add transparency correction
+  model.modules.calibration.transparency:
+    run_id: 9435
+    transparency_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_yz_correction_data.db

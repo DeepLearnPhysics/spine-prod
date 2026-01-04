@@ -1,0 +1,8 @@
+# ICARUS full chain configuration
+# Revision date: August 12, 2024
+
+include:
+  - base/base_240719.yaml
+  - io/io_240812.yaml
+  - model/model_240812.yaml
+  - post/post_240719.yaml

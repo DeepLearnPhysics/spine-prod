@@ -1,0 +1,6 @@
+# 8ms-lifetime modification for ICARUS configs
+# Revision date: July 19, 2024
+
+override:
+  # Change calibration lifetime to 8 ms
+  post.apply_calibrations.lifetime.lifetime: 8000 # us

@@ -1,0 +1,6 @@
+# Single-cryostat full chain configuration for ICARUS, collection-only
+# Revision date: June 25, 2025
+
+include:
+  - icarus_full_chain_co_250625.yaml
+  - patch/single/patch_single_250303.yaml

@@ -1,0 +1,60 @@
+# Post-processing configuration for ICARUS
+# Revision date: January 15, 2025
+include: post_common.yaml
+
+override:
+  # Apply calibrations during post-processing
+  post.apply_calibrations:
+    gain:
+      gain: 84.2408 # e-/ADC
+    recombination:
+      efield: 0.4938 # kV/cm
+      model: mbox
+    lifetime:
+      lifetime: 3000
+      driftv: 0.157565
+    priority: 7
+
+  # Flash matching configuration
+  post.flash_match:
+    cfg: flashmatch/flashmatch_230930.cfg
+    legacy: true
+    flash_key: flashes
+    volume: module
+    ref_volume_id: 0
+    scaling: 1/350
+    method: likelihood
+
+  # Containment configuration
+  post.containment:
+    run_mode: both
+    mode: source
+    margin: 5.0
+    cathode_margin: -5.0
+    min_particle_sizes:
+      0: 25
+      1: 25
+    priority: 1
+  
+  # Custom primary score thresholding
+  post.particle_threshold:
+    primary_threshold: 0.1
+    priority: 4
+  
+  # Radius restriction in direction estimate
+  post.direction.radius: 60.0 # cm
+  
+  # Shower fudge factor
+  post.calo_ke.shower_fudge: 1/0.83
+  
+  # No threshold on maximum michel KE
+  post.shape_logic-: maximum_michel_ke
+
+  # Visibility thresholds
+  post.topology_threshold-: truth_ke_mode
+  post.topology_threshold.ke_thresholds:
+    4: 50
+    default: 25
+
+  # No orientation updates after vertexing
+  post.vertex-: update_orientations

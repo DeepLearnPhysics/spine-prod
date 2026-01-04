@@ -1,0 +1,6 @@
+# NuMI-specific modification for ICARUS configs
+# Revision date: July 19, 2024
+
+override:
+  # Use NuMI-specific flash matching configuration
+  post.flash_match.cfg: flashmatch/flashmatch_numi_230930.cfg

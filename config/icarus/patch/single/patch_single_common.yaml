@@ -1,0 +1,43 @@
+# Single-cryostat modification for ICARUS configs, common settings
+# Include this after the main config to transform to data-only mode (no truth labels)
+
+override:
+  # Collate function does not have to split by cryostat
+  io.loader.collate_fn: all
+
+  # Adjust parsers to only operate on cryostat E
+  io.loader.dataset.schema.data:
+    parser: sparse3d
+    sparse_event_list:
+      - sparse3d_reco_cryoE                                               
+      - sparse3d_reco_cryoE_chi2                                          
+      - sparse3d_reco_cryoE_hit_charge0                                   
+      - sparse3d_reco_cryoE_hit_charge1                                   
+      - sparse3d_reco_cryoE_hit_charge2                                   
+      - sparse3d_reco_cryoE_hit_key0                                      
+      - sparse3d_reco_cryoE_hit_key1                                      
+      - sparse3d_reco_cryoE_hit_key2
+  
+  io.loader.dataset.schema.sources:
+    parser: sparse3d
+    feature_only: true
+    sparse_event_list:
+      - sparse3d_reco_cryoE_cryo
+      - sparse3d_reco_cryoE_tpc
+
+  io.loader.dataset.schema.charge_label:
+    parser: sparse3d
+    sparse_event: sparse3d_reco_cryoE_rescaled
+
+  io.loader.dataset.schema.flashes.flash_event_list: [opflash_cryoE]
+
+  # Node orientation can be predicted (coord_label works when no split)
+  model.modules.grappa_inter_loss.node_loss.orient:
+    name: orient
+    loss: ce
+
+  # Remove threshold-based adjustments to primary
+  post-: particle_threshold
+
+  # Use the NuMI-specific flashmatch configuration (MPV generation window matches NuMI)
+  # post.flash_match.cfg varies by config - override in specific configs

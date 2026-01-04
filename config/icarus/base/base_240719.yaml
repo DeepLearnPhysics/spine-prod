@@ -1,0 +1,3 @@
+# Base common configuration for ICARUS (includes geometry and builder)
+# Revision date: July 19, 2024
+include: base_common.yaml

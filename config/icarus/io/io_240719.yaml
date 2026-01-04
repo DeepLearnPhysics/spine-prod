@@ -1,0 +1,7 @@
+# IO configuration for ICARUS
+# Revision date: July 19, 2024
+include: io_common.yaml
+
+override:
+  # Include point tagging in PPN label parser
+  io.loader.dataset.schema.ppn_label.include_point_tagging: true

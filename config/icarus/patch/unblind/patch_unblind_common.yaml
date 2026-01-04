@@ -1,0 +1,8 @@
+# Unblind-data modification for ICARUS configs, common settings
+# Include this after the main config to transform to only process unblinded data
+
+override:
+  # Restrict event list of unblinded events (BNB + NuMI run 2)
+  io.loader.dataset.run_event_list: /sdf/data/neutrino/icarus/db/blinding/unblinded_event_list_run2_all.txt
+  io.loader.dataset.allow_missing: true
+  io.loader.dataset.run_info_key: sparse3d_reco_cryoE

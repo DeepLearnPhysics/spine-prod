@@ -1,0 +1,21 @@
+# Data-only modification for ICARUS configs
+# Revision date: July 19, 2024
+include: patch_data_common.yaml
+
+override:
+  ### Post-processing overrides ###
+  # Set calibration parameters for data (post-processor)
+  post.apply_calibrations:
+    gain:
+      gain: [76.02, 75.29, 77.36, 77.1] # e-/ADC for the collection planes
+    recombination:
+      model: mbox
+      efield: 0.4938 # kV/cm
+    lifetime:
+      lifetime_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_elifetime_data.db
+      driftv_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_edriftvelocity_data.db
+    transparency:
+      transparency_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_yz_correction_data.db
+  
+  # Change the flash matching scale
+  post.flash_match.scaling: 1/1400
