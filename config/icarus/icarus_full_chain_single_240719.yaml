@@ -3,4 +3,4 @@
 
 include:
   - icarus_full_chain_240719.yaml
-  - patch/single/patch_single_240719.yaml
+  - modifier/single/mod_single_240719.yaml

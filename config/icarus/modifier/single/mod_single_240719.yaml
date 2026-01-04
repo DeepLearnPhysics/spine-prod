@@ -1,7 +1,7 @@
 # Single-cryostat modification for ICARUS configs
 # Revision date: July 19, 2024
 
-include: patch_single_common.yaml
+include: mod_single_common.yaml
 
 override:
   # Use the NuMI-specific flashmatch configuration (MPV generation window matches NuMI)

@@ -1,4 +1,4 @@
 # Unblinded-data modification for ICARUS configs
 # Revision date: July 19, 2024
 
-include: patch_unblind_common.yaml
+include: mod_unblind_common.yaml

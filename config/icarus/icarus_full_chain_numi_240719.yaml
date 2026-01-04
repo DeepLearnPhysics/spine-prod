@@ -3,4 +3,4 @@
 
 include:
   - icarus_full_chain_240719.yaml
-  - patch/numi/patch_numi_240719.yaml
+  - modifier/numi/mod_numi_240719.yaml

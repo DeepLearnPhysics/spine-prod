@@ -3,8 +3,8 @@
 
 include: 
   - icarus_full_chain_co_250625.yaml
-  - patch/data/patch_data_250303.yaml
-  - patch/lite/patch_lite_240719.yaml
+  - modifier/data/mod_data_250303.yaml
+  - modifier/lite/mod_lite_240719.yaml
 
 override:
   # Exists for legacy reasons, this is trivial enough to use CLI arguments

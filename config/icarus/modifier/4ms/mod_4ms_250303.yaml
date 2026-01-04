@@ -1,5 +1,5 @@
 # 4ms-lifetime modification for ICARUS configs
-# Revision date: July 19, 2024
+# Revision date: March 3, 2025
 
 override:
   # Change calibration lifetime to 4 ms

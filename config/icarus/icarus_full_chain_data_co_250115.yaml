@@ -1,6 +1,6 @@
-# Lite-output configuration for ICARUS, collection-only
+# Data-only configuration for ICARUS, collection-only
 # Revision date: January 15, 2025
 
 include: 
   - icarus_full_chain_co_250115.yaml
-  - patch/data/patch_data_250115.yaml
+  - modifier/data/mod_data_250115.yaml

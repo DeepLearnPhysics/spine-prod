@@ -1,7 +1,7 @@
-# 8ms-lifetime configuration for ICARUS 
+# 8ms-lifetime lite-output configuration for ICARUS, collection-only
 # Revision date: January 15, 2025
 
 include:
   - icarus_full_chain_co_250115.yaml
-  - patch/lite/patch_lite_240719.yaml
-  - patch/8ms/patch_8ms_240719.yaml
+  - modifier/lite/mod_lite_240719.yaml
+  - modifier/8ms/mod_8ms_240719.yaml

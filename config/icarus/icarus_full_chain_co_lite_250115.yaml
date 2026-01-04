@@ -1,6 +1,6 @@
-# Lite-output configuration for ICARUS 
+# Lite-output configuration for ICARUS, collection-only
 # Revision date: January 15, 2025
 
 include: 
   - icarus_full_chain_co_250115.yaml
-  - patch/lite/patch_lite_240719.yaml
+  - modifier/lite/mod_lite_240719.yaml

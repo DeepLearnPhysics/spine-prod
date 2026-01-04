@@ -1,4 +1,4 @@
 # Lite-output modification for ICARUS configs
 # Revision date: July 19, 2024
 
-include: patch_lite_common.yaml
+include: mod_lite_common.yaml
