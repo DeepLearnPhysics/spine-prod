@@ -1,6 +1,0 @@
-# NuMI-specific full chain configuration for ICARUS
-# Revision date: July 19, 2024
-
-include:
-  - icarus_full_chain_240719.yaml
-  - modifier/numi/mod_numi_240719.yaml

@@ -1,7 +1,0 @@
-# Data-only, NuMI-specific configuration for ICARUS, collection-only
-# Revision date: March 3, 2025
-
-include: 
-  - icarus_full_chain_co_250303.yaml
-  - modifier/data/mod_data_250303.yaml
-  - modifier/numi/mod_numi_250303.yaml

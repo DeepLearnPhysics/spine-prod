@@ -1,0 +1,6 @@
+# Single-cryostat full chain configuration for ICARUS
+# Revision date: July 19, 2024
+
+include:
+  - ../icarus_full_chain_240719.yaml
+  - ../modifier/single/mod_single_240719.yaml

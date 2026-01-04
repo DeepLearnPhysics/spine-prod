@@ -1,6 +1,0 @@
-# Data-only configuration for ICARUS with collection-only model
-# Revision date: August 12, 2024
-
-include: 
-  - icarus_full_chain_co_240812.yaml
-  - modifier/data/mod_data_240719.yaml

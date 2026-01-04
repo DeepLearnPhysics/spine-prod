@@ -1,0 +1,6 @@
+# Data-only configuration for ICARUS, collection-only
+# Revision date: June 25, 2025
+
+include: 
+  - ../icarus_full_chain_co_250625.yaml
+  - ../modifier/data/mod_data_250303.yaml

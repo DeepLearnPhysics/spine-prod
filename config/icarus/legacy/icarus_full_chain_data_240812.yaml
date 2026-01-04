@@ -1,0 +1,6 @@
+# Data-only configuration for ICARUS
+# Revision date: August 12, 2024
+
+include: 
+  - ../icarus_full_chain_240812.yaml
+  - ../modifier/data/mod_data_240719.yaml
