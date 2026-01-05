@@ -19,36 +19,12 @@ SPINE is a deep learning-based reconstruction framework for liquid argon time pr
 git clone https://github.com/DeepLearnPhysics/spine-prod.git
 cd spine-prod
 
-# Create a virtual environment (recommended)
-python -m venv .venv
-source .venv/bin/activate  # On Linux/Mac
-# .venv\Scripts\activate   # On Windows
-
-# Install SPINE and dependencies
-pip install "spine-ml @ git+https://github.com/DeepLearnPhysics/SPINE.git@main"
-
-# Source the environment (required before every use)
+# Configure environment to point to your SPINE installation
+# Edit configure.sh to set SPINE_BASEDIR to your SPINE install location
 source configure.sh
 ```
 
-### 1a. Development Setup (Optional)
-
-For contributors running tests and development tools:
-
-```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Run tests
-pytest tests/
-
-# Run pre-commit hooks
-pre-commit install
-pre-commit run --all-files
-```
-
-**Note:** This repository contains configuration files only, not a Python package. 
-Dependencies are managed via `requirements-dev.txt` rather than `pip install -e .`
+**Note:** This repository contains SPINE configuration files for production runs. You need an existing SPINE installation - either a system-wide installation or a local build. The `configure.sh` script should be edited to point `SPINE_PROD_BASEDIR` to your SPINE installation directory.
 
 ### 2. Basic Job Submission
 
@@ -521,13 +497,24 @@ detectors:
 
 ### Installation for Development
 
+For contributors who need to run tests and development tools:
+
 ```bash
-# Install with dev dependencies (includes SPINE, pytest, pre-commit)
-pip install -e .[dev]
+# Create a virtual environment (recommended)
+python -m venv .venv
+source .venv/bin/activate  # On Linux/Mac
+
+# Install SPINE (required for running parsing tests)
+pip install "spine-ml @ git+https://github.com/DeepLearnPhysics/SPINE.git@main"
+
+# Install development dependencies
+pip install -r requirements-dev.txt
 
 # Install pre-commit hooks
 pre-commit install
 ```
+
+**Note:** SPINE installation is only required for development if you want to run the configuration parsing tests. Production users only need to point to an existing SPINE installation via `configure.sh`.
 
 ### Running Tests
 
