@@ -15,7 +15,7 @@ stages:
     # This saves disk space by removing intermediate files
     cleanup:
       - output_reco
-  
+
   # Stage 2: Run analysis on reconstructed data
   # This stage depends on reconstruction completing successfully
   - name: analysis

@@ -24,7 +24,7 @@ import pytest
 import yaml
 
 try:
-    from spine.config import load_config
+    from spine.utils.factory import module_dict  # noqa: F401
 
     SPINE_AVAILABLE = True
 except ImportError:

@@ -17,4 +17,3 @@ rules:
     indent-sequences: consistent
 
   document-start: disable
-

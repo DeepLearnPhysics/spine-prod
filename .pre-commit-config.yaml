@@ -8,10 +8,10 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
-        exclude: '\.md$'  # Allow trailing spaces in Markdown
+        exclude: '\.md$' # Allow trailing spaces in Markdown
       - id: end-of-file-fixer
       - id: check-yaml
-        args: ["--unsafe"]  # Allow custom tags
+        args: ["--unsafe"] # Allow custom tags
       - id: check-toml
       - id: check-json
       - id: check-added-large-files
@@ -39,10 +39,7 @@ repos:
     rev: 7.1.1
     hooks:
       - id: flake8
-        args: [
-          --max-line-length=88,
-          '--extend-ignore=E203,W503,E501'
-        ]
+        args: [--max-line-length=88, "--extend-ignore=E203,W503,E501"]
         files: \.py$
 
   # YAML-specific linting (spine-prod specific)

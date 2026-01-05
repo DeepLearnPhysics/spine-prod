@@ -1,0 +1,21 @@
+# Codecov configuration for SPINE-prod
+# Aligned with SPINE repository: https://github.com/DeepLearnPhysics/SPINE
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1% # Allow up to 1% drop in coverage
+        informational: false # Set to true to make status informational only
+    patch:
+      default:
+        target: 0% # No minimum coverage required for patches
+        threshold: 1% # Allow up to 1% drop in coverage for patches
+        informational: false
+
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: false

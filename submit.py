@@ -15,8 +15,8 @@ import argparse
 import glob
 import json
 import os
-import subprocess
 import re
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -302,7 +302,11 @@ class SlurmSubmitter:
         return selected
 
     def _create_composite_config(
-        self, base_config: str, modifiers: List[str], job_dir: Path, detector: Optional[str] = None
+        self,
+        base_config: str,
+        modifiers: List[str],
+        job_dir: Path,
+        detector: Optional[str] = None,
     ) -> str:
         """Create a composite config that includes base + modifiers.
 
@@ -332,7 +336,7 @@ class SlurmSubmitter:
             modifier_search_path = str(self.basedir / "config" / detector)
         else:
             modifier_search_path = base_config
-        
+
         available_mods = self._discover_modifiers(modifier_search_path)
 
         # Parse modifier specs and resolve versions
@@ -639,12 +643,14 @@ fi
 
             if yaml_files:
                 # Sort by version and take the latest
-                latest = sorted(yaml_files, key=lambda p: self._extract_version(p) or "")[-1]
+                latest = sorted(
+                    yaml_files, key=lambda p: self._extract_version(p) or ""
+                )[-1]
                 latest_components[component] = latest
                 version = self._extract_version(latest)
                 version_str = version or latest.stem
                 print(f"  {component:8} -> {version_str}")
-                
+
                 # Track the latest version number for naming
                 if version and (not latest_version or version > latest_version):
                     latest_version = version
@@ -791,14 +797,14 @@ fi
 
         # Detect detector first
         detector = self._detect_detector(config)
-        
+
         # Create job directory first (needed for composite/latest config generation)
         config_path = Path(config)
         config_name = config_path.stem
-        
+
         # Check if this is a "latest" request
         is_latest = config_name == "latest" or "latest" in config_path.parts
-        
+
         if not job_name:
             job_name = f"spine_{detector}_{config_name}"
 
@@ -809,7 +815,7 @@ fi
             print(f"\nDetected 'latest' config request for {detector}")
             config = self._create_latest_config(detector, job_dir)
             config_name = Path(config).stem
-        
+
         # Apply modifiers if specified
         original_config = config
         if apply_mods:
@@ -1020,23 +1026,23 @@ def main():
 Examples:
   # Basic submission
   %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files file_list.txt
-  
+
   # With custom profile
   %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --profile gpu_large
-  
+
   # Apply modifiers at runtime
   %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --apply-mods data
   %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --apply-mods data lite
-  
+
   # List available modifiers for a config
   %(prog)s --list-mods config/icarus/icarus_full_chain_co_250625.yaml
-  
+
   # Multiple files per task
   %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files files.txt --files-per-task 5 --ntasks 20
-  
+
   # Pipeline mode
   %(prog)s --pipeline pipelines/icarus_production.yaml
-  
+
   # Dry run
   %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files test.root --dry-run
         """,
