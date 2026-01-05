@@ -4,7 +4,7 @@
 [![CI](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/DeepLearnPhysics/spine-prod/branch/main/graph/badge.svg)](https://codecov.io/gh/DeepLearnPhysics/spine-prod)
 
-A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPINE) (Scalable Pipeline for Imaging NEutrinos) reconstruction on SLURM-based HPC clusters.
+A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPINE) (Scalable Particle Imaging with Neural Embeddings) reconstruction on SLURM-based HPC clusters.
 
 ## Overview
 
