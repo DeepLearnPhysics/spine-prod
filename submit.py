@@ -7,7 +7,7 @@ on SLURM-based HPC systems.
 
 Usage:
     ./submit.py --config infer/icarus/latest.cfg --source-list file_list.txt
-    ./submit.py --config infer/icarus/latest_data.cfg --source data/*.root --profile gpu_large
+    ./submit.py --config infer/icarus/latest_data.cfg --source data/*.root --profile s3df_ampere
     ./submit.py --pipeline pipelines/icarus_production.yaml
 """
 
@@ -1045,7 +1045,7 @@ Examples:
   %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root
 
   # With custom profile
-  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root --profile gpu_large
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root --profile s3df_ampere
 
   # Apply modifiers at runtime
   %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root --apply-mods data

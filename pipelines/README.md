@@ -11,7 +11,7 @@ stages:
   - name: stage_name
     config: path/to/config.cfg
     files: [input files or pattern]
-    profile: gpu_inference  # optional
+    profile: s3df_ampere    # optional (default: auto-detect)
     ntasks: 50              # optional
     files_per_task: 1       # optional
     depends_on: []          # optional list of stage names

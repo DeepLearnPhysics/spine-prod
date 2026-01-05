@@ -6,7 +6,7 @@ stages:
   - name: reconstruction
     config: infer/icarus/latest_data.cfg
     files: /sdf/data/neutrino/icarus/run2/data/*.root
-    profile: gpu_inference
+    profile: s3df_ampere
     ntasks: 100
     files_per_task: 1
     output: output_reco/icarus_reco.h5
@@ -22,7 +22,7 @@ stages:
     depends_on: [reconstruction]
     config: infer/icarus/analysis.cfg
     files: output_reco/*.h5
-    profile: cpu_analysis
+    profile: s3df_milano
     ntasks: 20
     files_per_task: 5
     output: output_analysis/icarus_analysis.h5

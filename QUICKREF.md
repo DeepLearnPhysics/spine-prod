@@ -125,7 +125,7 @@ infer/icarus/latest.cfg
 | Out of memory | Use `--profile s3df_ampere` or `--mem-per-cpu 16g` |
 | Job timeout | Use `--time 4:00:00` |
 | Unknown modifier | Use `--list-mods CONFIG` to see available modifiersa2 pyyaml` |
-| Out of memory | Use `-p gpu_highmem` or `--mem-per-cpu 16g` |
+| Out of memory | Use `--profile s3df_ampere` or `--mem-per-cpu 16g` |
 | Job timeout | Use `--time 4:00:00` |
 | Need more info | Check `jobs/*/job_metadata.json` |
 

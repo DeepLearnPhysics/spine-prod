@@ -174,14 +174,14 @@ stages:
   - name: reconstruction
     config: infer/icarus/latest_data.cfg
     files: /path/to/raw/*.root
-    profile: gpu_inference
+    profile: s3df_ampere
     ntasks: 100
   
   - name: analysis
     depends_on: [reconstruction]  # Wait for reconstruction to complete
     config: infer/icarus/analysis.cfg
     files: output_reco/*.h5
-    profile: cpu_analysis
+    profile: s3df_milano
     ntasks: 20
 ```
 
@@ -234,7 +234,7 @@ Each job saves complete metadata for reproducibility:
   "job_name": "spine_icarus_latest",
   "detector": "icarus",
   "config": "infer/icarus/latest.cfg",
-  "profile": "gpu_inference",
+  "profile": "s3df_ampere",
   "num_files": 100,
   "job_ids": ["12345", "12346"],
   "submitted": "2026-01-01T14:30:22",
@@ -332,7 +332,7 @@ ICARUS uses split cryostat processing with cosmic overlay:
 2x2 uses higher resource requirements:
 
 ```bash
-./submit.py --config infer/2x2/latest.cfg --source data.root --profile gpu_large
+./submit.py --config infer/2x2/latest.cfg --source data.root --profile s3df_ampere
 ```
 
 ### ND-LAr
@@ -374,9 +374,9 @@ pip install jinja2 pyyaml
 
 ### Out of Memory
 
-**Solution:** Use a profile with more memory:
+**Solution:** Use a profile with more memory or override memory:
 ```bash
-./submit.py --config infer/icarus/latest.cfg --source data.root --profile gpu_highmem
+./submit.py --config infer/icarus/latest.cfg --source data.root --profile s3df_ampere
 ```
 
 Or override memory:
@@ -423,9 +423,9 @@ Always test configurations on a small sample:
 
 ### 2. Use Appropriate Profiles
 
-- Use `gpu_inference` for standard production
-- Use `gpu_large` for high-resolution or large events
-- Use `cpu_analysis` for post-processing without GPU
+- Use `s3df_ampere` for high-performance GPU processing (default)
+- Use `s3df_turing` for cheaper GPU inference
+- Use `s3df_milano` or `s3df_roma` for CPU-only analysis
 
 ### 3. Optimize File Batching
 
@@ -488,7 +488,7 @@ Edit `templates/profiles.yaml`:
 ```yaml
 detectors:
   my_detector:
-    default_profile: gpu_inference
+    default_profile: s3df_ampere
     configs_dir: infer/my_detector
     account: "my:account"
 ```
