@@ -1,0 +1,25 @@
+# Development dependencies for spine-prod
+# Install with: pip install -r requirements-dev.txt
+# Aligned with SPINE repository standards
+
+# Base requirements
+jinja2>=3.0.0
+pyyaml>=5.0.0
+
+# SPINE from main branch for config validation
+spine-ml @ git+https://github.com/DeepLearnPhysics/SPINE.git@main
+
+# Testing
+pytest>=6.0.0
+pytest-cov>=2.10.0
+
+# Code formatting and linting
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+
+# Pre-commit hooks
+pre-commit>=3.0.0
+
+# YAML linting (spine-prod specific)
+yamllint>=1.35

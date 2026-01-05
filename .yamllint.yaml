@@ -1,0 +1,20 @@
+extends: default
+
+rules:
+  line-length:
+    max: 140
+    level: warning
+
+  comments:
+    require-starting-space: true
+
+  truthy:
+    allowed-values: ["true", "false", "on", "off", "yes", "no"]
+    check-keys: false
+
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+
+  document-start: disable
+

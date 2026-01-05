@@ -1,5 +1,15 @@
 # Data-only modification for ICARUS configs
 # Revision date: January 15, 2025
+
+__meta__:
+  name: "data"
+  version: "250115"
+  date: "2025-01-15"
+  description: "Data-only configuration"
+  applies_to: [data]
+  compatible_with:
+    post: "<=250115"
+
 include: mod_data_common.yaml
 
 override:
@@ -16,6 +26,6 @@ override:
       driftv_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_edriftvelocity_data.db
     transparency:
       transparency_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_yz_correction_data.db
-  
+
   # Change the flash matching scale
   post.flash_match.scaling: 1/1400

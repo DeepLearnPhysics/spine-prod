@@ -1,6 +1,16 @@
 # Transparency-correction modification for ICARUS configs
 # Revision date: July 19, 2024
 
+__meta__:
+  name: "transp"
+  version: "240719"
+  date: "2024-07-19"
+  description: "Transparency correction"
+  applies_to: [mc]
+  compatible_with:
+    post: "<=250115"
+  conflicts_with: [data]
+
 override:
   # Add transparency correction
   post.apply_calibrations.transparency:

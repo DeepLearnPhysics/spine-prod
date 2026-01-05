@@ -1,0 +1,28 @@
+# Example ICARUS Production Pipeline
+# This demonstrates a two-stage pipeline: reconstruction followed by analysis
+
+stages:
+  # Stage 1: Run SPINE reconstruction on raw data
+  - name: reconstruction
+    config: config/icarus/latest_data.cfg
+    files: /sdf/data/neutrino/icarus/run2/data/*.root
+    profile: gpu_inference
+    ntasks: 100
+    files_per_task: 1
+    output: output_reco/icarus_reco.h5
+    flashmatch: true
+    # Clean up reconstruction output after analysis completes
+    # This saves disk space by removing intermediate files
+    cleanup:
+      - output_reco
+  
+  # Stage 2: Run analysis on reconstructed data
+  # This stage depends on reconstruction completing successfully
+  - name: analysis
+    depends_on: [reconstruction]
+    config: config/icarus/analysis.cfg
+    files: output_reco/*.h5
+    profile: cpu_analysis
+    ntasks: 20
+    files_per_task: 5
+    output: output_analysis/icarus_analysis.h5

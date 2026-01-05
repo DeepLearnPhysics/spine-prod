@@ -3,7 +3,7 @@
 # Model configuration
 model:
   name: full_chain
-  weight_path: 
+  weight_path:
   # weight_path varies by config - override in specific configs
   to_numpy: true
 

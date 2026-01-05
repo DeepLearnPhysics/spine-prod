@@ -1,1 +1,0 @@
-slurm/run_slurm.sh

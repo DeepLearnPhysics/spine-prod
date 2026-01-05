@@ -45,7 +45,7 @@ post:
   fiducial:
     run_mode: both
     mode: module
-    margin: [[25,25],[25,25],[30,50]]
+    margin: [[25, 25], [25, 25], [30, 50]]
   topology_threshold:
     run_mode: both
     ke_thresholds:

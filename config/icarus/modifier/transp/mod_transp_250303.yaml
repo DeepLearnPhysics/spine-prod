@@ -1,6 +1,17 @@
 # Transparency-correction modification for ICARUS configs
 # Revision date: March 3, 2025
 
+__meta__:
+  name: "transp"
+  version: "250303"
+  date: "2025-03-03"
+  description: "Transparency correction"
+  priority: 25
+  applies_to: [mc]
+  compatible_with:
+    post: ">=250303"
+  conflicts_with: [data]
+
 override:
   # Add transparency correction
   model.modules.calibration.transparency:

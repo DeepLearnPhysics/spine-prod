@@ -1,5 +1,16 @@
 # ICARUS model configuration
 # Revision date: August 12, 2024
+
+__meta__:
+  version: "240812"
+  date: "2024-08-12"
+  description: "ICARUS collection-only model, v2 dataset"
+  compatible_with:
+    base: ">=240719"
+    io: ">=240812"
+  tags: [collection-only]
+  training_set: "v2"
+
 include: model_common.yaml
 
 override:
@@ -8,22 +19,22 @@ override:
 
   # Change the input data to collection-only (for deghosting)
   io.loader.dataset.schema.data.sparse_event_list:
-    - sparse3d_reco_cryoE_hit_charge2                                   
-    - sparse3d_reco_cryoE_chi2                                           
-    - sparse3d_reco_cryoE_hit_charge0                                    
-    - sparse3d_reco_cryoE_hit_charge1                                    
-    - sparse3d_reco_cryoE_hit_charge2                                    
-    - sparse3d_reco_cryoE_hit_key0                                       
-    - sparse3d_reco_cryoE_hit_key1                                       
-    - sparse3d_reco_cryoE_hit_key2                                      
-    - sparse3d_reco_cryoW_hit_charge2                                    
-    - sparse3d_reco_cryoW_chi2                                           
-    - sparse3d_reco_cryoW_hit_charge0                                    
-    - sparse3d_reco_cryoW_hit_charge1                                    
-    - sparse3d_reco_cryoW_hit_charge2                                    
-    - sparse3d_reco_cryoW_hit_key0                                       
-    - sparse3d_reco_cryoW_hit_key1                                      
-    - sparse3d_reco_cryoW_hit_key2 
+    - sparse3d_reco_cryoE_hit_charge2
+    - sparse3d_reco_cryoE_chi2
+    - sparse3d_reco_cryoE_hit_charge0
+    - sparse3d_reco_cryoE_hit_charge1
+    - sparse3d_reco_cryoE_hit_charge2
+    - sparse3d_reco_cryoE_hit_key0
+    - sparse3d_reco_cryoE_hit_key1
+    - sparse3d_reco_cryoE_hit_key2
+    - sparse3d_reco_cryoW_hit_charge2
+    - sparse3d_reco_cryoW_chi2
+    - sparse3d_reco_cryoW_hit_charge0
+    - sparse3d_reco_cryoW_hit_charge1
+    - sparse3d_reco_cryoW_hit_charge2
+    - sparse3d_reco_cryoW_hit_key0
+    - sparse3d_reco_cryoW_hit_key1
+    - sparse3d_reco_cryoW_hit_key2
 
   # No calibration applied in the chain, handled in post-processing
   model.modules.chain.calibration: null

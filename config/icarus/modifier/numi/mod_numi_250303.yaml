@@ -1,6 +1,15 @@
 # NuMI-specific modification for ICARUS configs
 # Revision date: March 3, 2025
 
+__meta__:
+  name: "numi"
+  version: "250303"
+  date: "2025-03-03"
+  description: "NuMI-specific settings (wider flash matching window)"
+  applies_to: [mc, data]
+  compatible_with:
+    post: ">=250303"
+
 override:
   # Use NuMI-specific flash matching configuration
   post.flash_match.cfg: flashmatch/flashmatch_numi_250214.cfg

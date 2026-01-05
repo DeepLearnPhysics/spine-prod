@@ -1,5 +1,16 @@
 # ICARUS model configuration
 # Revision date: January 15, 2025
+
+__meta__:
+  version: "250303"
+  date: "2025-03-03"
+  description: "ICARUS collection-only model with in-chain calibration, v4 dataset"
+  compatible_with:
+    base: ">=240719"
+    io: ">=240812"
+  tags: [collection-only, pre-calibration, ppn-restrict]
+  training_set: "v3"
+
 include: model_common.yaml
 
 override:

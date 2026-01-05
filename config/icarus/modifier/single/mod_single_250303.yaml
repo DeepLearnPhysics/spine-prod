@@ -1,8 +1,20 @@
 # Single-cryostat modification for ICARUS configs
 # Revision date: March 3, 2025
 
+__meta__:
+  name: "single"
+  version: "250303"
+  date: "2025-03-03"
+  description: "Single-cryostat configuration"
+  applies_to: [mc]
+  compatible_with:
+    io: ">=240719"
+    model: ">=240719"
+    post: ">=250303"
+  conflicts_with: [data, numi]
+
 include: mod_single_common.yaml
 
 override:
   # Use the NuMI-specific flashmatch configuration (MPV generation window matches NuMI)
-  post.flash_match.cfg: flashmatch/flashmatch_numi_250214.cfg 
+  post.flash_match.cfg: flashmatch/flashmatch_numi_250214.cfg

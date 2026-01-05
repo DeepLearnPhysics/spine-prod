@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SLURM job directories (generated at runtime)
+jobs/
+
+# Node modules (if any)
+node_modules/
+
+# Logs
+*.log
+batch_logs/
+
+# Temporary files
+*.tmp
+*.temp
+file_map_*.txt
+submit_prod_*.sh
+output_*/
+
+# YAML linting cache
+.yamllint-cache/

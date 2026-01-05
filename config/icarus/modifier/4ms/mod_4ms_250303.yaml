@@ -1,6 +1,16 @@
 # 4ms-lifetime modification for ICARUS configs
 # Revision date: March 3, 2025
 
+__meta__:
+  name: "4ms"
+  version: "250303"
+  date: "2025-03-03"
+  description: "4ms lifetime calibration"
+  applies_to: [mc]
+  compatible_with:
+    model: ">=250303"
+  conflicts_with: [data, 8ms]
+
 override:
   # Change calibration lifetime to 4 ms
   model.modules.calibration.lifetime.lifetime: 4000 # us

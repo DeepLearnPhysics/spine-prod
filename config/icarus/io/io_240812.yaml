@@ -1,5 +1,14 @@
 # IO configuration for ICARUS
 # Revision date: August 12, 2024
+
+__meta__:
+  version: "240812"
+  date: "2024-08-12"
+  description: "IO configuration for ICARUS August 2024 (removed PPN point tagging)"
+  compatible_with:
+    base: ">=240719"
+  tags: [no-ppn-point-tagging]
+
 include: io_common.yaml
 
 override:

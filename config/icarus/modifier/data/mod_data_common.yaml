@@ -6,7 +6,7 @@ override:
   # Use hits sparse event instead of pcluster
   io.loader.dataset.schema.meta.sparse_event: sparse3d_reco_cryoE
   io.loader.dataset.schema.run_info.sparse_event: sparse3d_reco_cryoE
-  
+
   # Remove truth label parsers
   io.loader.dataset.schema-:
     - seg_label
@@ -18,7 +18,7 @@ override:
     - graph_label
     - particles
     - neutrinos
-  
+
   # Remove truth label writers, add trigger info
   io.writer.keys-:
     - points_label
@@ -31,7 +31,7 @@ override:
     - truth_interactions
   io.writer.keys+:
     - trigger
-  
+
   ### Model overrides ###
   # Remove seg_label from network input
   model.network_input-: seg_label
@@ -47,7 +47,7 @@ override:
     correct_flash_times: true
     flash_time_corr_us: 4
     priority: 7
-  
+
   # Set build/post to reco-only mode
   build.mode: reco
   post.direction.run_mode: reco
@@ -56,7 +56,7 @@ override:
   post.time_containment.run_mode: reco
   post.topology_threshold.run_mode: reco
   post.fiducial.run_mode: reco
-  
+
   # Remove match post-processor (no truth)
   post-:
     - match

@@ -9,15 +9,15 @@ override:
   io.loader.dataset.schema.data:
     parser: sparse3d
     sparse_event_list:
-      - sparse3d_reco_cryoE                                               
-      - sparse3d_reco_cryoE_chi2                                          
-      - sparse3d_reco_cryoE_hit_charge0                                   
-      - sparse3d_reco_cryoE_hit_charge1                                   
-      - sparse3d_reco_cryoE_hit_charge2                                   
-      - sparse3d_reco_cryoE_hit_key0                                      
-      - sparse3d_reco_cryoE_hit_key1                                      
+      - sparse3d_reco_cryoE
+      - sparse3d_reco_cryoE_chi2
+      - sparse3d_reco_cryoE_hit_charge0
+      - sparse3d_reco_cryoE_hit_charge1
+      - sparse3d_reco_cryoE_hit_charge2
+      - sparse3d_reco_cryoE_hit_key0
+      - sparse3d_reco_cryoE_hit_key1
       - sparse3d_reco_cryoE_hit_key2
-  
+
   io.loader.dataset.schema.sources:
     parser: sparse3d
     feature_only: true

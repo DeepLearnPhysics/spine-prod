@@ -1,5 +1,16 @@
 # ICARUS model configuration
 # Revision date: July 19, 2024
+
+__meta__:
+  version: "240719"
+  date: "2024-07-19"
+  description: "ICARUS model with average charge rescaling"
+  compatible_with:
+    base: ">=240719"
+    io: "==240719"
+  tags: [average-charge]
+  training_set: "v2"
+
 include: model_common.yaml
 
 override:

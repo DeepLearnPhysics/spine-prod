@@ -1,3 +1,10 @@
 # Base common configuration for ICARUS (includes geometry and builder)
 # Revision date: July 19, 2024
+
+__meta__:
+  version: "240719"
+  date: "2024-07-19"
+  description: "Base ICARUS configuration for July 2024 weights"
+  tags: []
+
 include: base_common.yaml

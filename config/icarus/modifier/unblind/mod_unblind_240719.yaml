@@ -1,4 +1,14 @@
 # Unblinded-data modification for ICARUS configs
 # Revision date: July 19, 2024
 
+__meta__:
+  name: "unblind"
+  version: "240719"
+  date: "2024-07-19"
+  description: "Unblinded-data-only configuration"
+  applies_to: [data]
+  compatible_with:
+    io: ">=240719"
+  requires: [data]
+
 include: mod_unblind_common.yaml

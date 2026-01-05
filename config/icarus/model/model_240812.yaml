@@ -1,5 +1,16 @@
 # ICARUS model configuration
 # Revision date: August 12, 2024
+
+__meta__:
+  version: "240812"
+  date: "2024-08-12"
+  description: "ICARUS model with average charge rescaling, fixed PPN"
+  compatible_with:
+    base: ">=240719"
+    io: ">=240812"
+  tags: [average-charge, ppn-restrict]
+  training_set: "v2"
+
 include: model_common.yaml
 
 override:

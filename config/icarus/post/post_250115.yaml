@@ -1,5 +1,16 @@
 # Post-processing configuration for ICARUS
 # Revision date: January 15, 2025
+
+__meta__:
+  version: "250115"
+  date: "2025-01-15"
+  description: "ICARUS post-processing with updated calibrations"
+  compatible_with:
+    base: ">=240719"
+    io: ">=240719"
+    model: "<=250115"
+  tags: [post-calibration, absolute-fm]
+
 include: post_common.yaml
 
 override:
@@ -35,18 +46,18 @@ override:
       0: 25
       1: 25
     priority: 1
-  
+
   # Custom primary score thresholding
   post.particle_threshold:
     primary_threshold: 0.1
     priority: 4
-  
+
   # Radius restriction in direction estimate
   post.direction.radius: 60.0 # cm
-  
+
   # Shower fudge factor
   post.calo_ke.shower_fudge: 1/0.83
-  
+
   # No threshold on maximum michel KE
   post.shape_logic-: maximum_michel_ke
 
