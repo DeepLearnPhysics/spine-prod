@@ -122,7 +122,8 @@ infer/icarus/latest.cfg
 ```
 
 | Problem | Solution |
-|---------dependencies | `pip install -r requirements.txt` |
+|---------|----------|
+| Dependencies | `pip install -r requirements.txt` |
 | Out of memory | Use `--profile s3df_ampere` or `--mem-per-cpu 16g` |
 | Job timeout | Use `--time 4:00:00` |
 | Unknown modifier | Use `--list-mods CONFIG` to see available modifier |
