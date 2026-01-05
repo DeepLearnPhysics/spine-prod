@@ -59,42 +59,42 @@ profiles:
 detectors:
   icarus:
     default_profile: s3df_ampere
-    configs_dir: config/icarus
+    configs_dir: infer/icarus
     account: "neutrino:icarus-ml"
 
   sbnd:
     default_profile: s3df_ampere
-    configs_dir: config/sbnd
+    configs_dir: infer/sbnd
     account: "neutrino:icarus-ml"
 
   2x2:
     default_profile: s3df_ampere
-    configs_dir: config/2x2
+    configs_dir: infer/2x2
     account: "neutrino:dune-ml"
 
   2x2-single:
     default_profile: s3df_ampere
-    configs_dir: config/2x2-single
+    configs_dir: infer/2x2-single
     account: "neutrino:dune-ml"
 
   fsd:
     default_profile: s3df_ampere
-    configs_dir: config/fsd
+    configs_dir: infer/fsd
     account: "neutrino:dune-ml"
 
   nd-lar:
     default_profile: s3df_ampere
-    configs_dir: config/nd-lar
+    configs_dir: infer/nd-lar
     account: "neutrino:dune-ml"
 
   generic:
     default_profile: s3df_ampere
-    configs_dir: config/generic
+    configs_dir: infer/generic
     account: "neutrino:ml-dev"
 
   common:
     default_profile: s3df_milano
-    configs_dir: config/common
+    configs_dir: infer/common
     account: "neutrino:ml-dev"
 
 # Default settings

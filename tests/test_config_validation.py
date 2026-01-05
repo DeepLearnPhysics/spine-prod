@@ -75,8 +75,8 @@ class TestConfigValidation:
 
     @pytest.fixture
     def config_root(self):
-        """Return path to config directory."""
-        return Path(__file__).parent.parent / "config"
+        """Return path to infer directory."""
+        return Path(__file__).parent.parent / "infer"
 
     # Detectors to test - will auto-discover YAML files in each
     DETECTORS = ["icarus", "sbnd", "2x2", "nd-lar", "fsd", "generic"]

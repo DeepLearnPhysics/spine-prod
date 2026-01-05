@@ -4,7 +4,7 @@
 stages:
   # Stage 1: Run SPINE reconstruction on raw data
   - name: reconstruction
-    config: config/icarus/latest_data.cfg
+    config: infer/icarus/latest_data.cfg
     files: /sdf/data/neutrino/icarus/run2/data/*.root
     profile: gpu_inference
     ntasks: 100
@@ -20,7 +20,7 @@ stages:
   # This stage depends on reconstruction completing successfully
   - name: analysis
     depends_on: [reconstruction]
-    config: config/icarus/analysis.cfg
+    config: infer/icarus/analysis.cfg
     files: output_reco/*.h5
     profile: cpu_analysis
     ntasks: 20

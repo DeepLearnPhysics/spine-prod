@@ -32,11 +32,11 @@ All 2x2-single configs now use a **hierarchical include system** with composable
 You can also compose configs at runtime using the orchestrator:
 ```bash
 # Apply modifiers at runtime instead of using pre-composed configs
-./submit.py --config config/2x2-single/2x2-single_full_chain_240819.cfg \
+./submit.py --config infer/2x2-single/2x2-single_full_chain_240819.cfg \
             --files data.root --apply-mods data
 
 # List available modifiers
-./submit.py --list-mods config/2x2-single/2x2-single_full_chain_240819.cfg
+./submit.py --list-mods infer/2x2-single/2x2-single_full_chain_240819.cfg
 ```
 
 ## Configurations for MPV/MPR v02

@@ -6,8 +6,8 @@ A modern, flexible job submission orchestrator for SPINE reconstruction
 on SLURM-based HPC systems.
 
 Usage:
-    ./submit.py --config config/icarus/latest.cfg --files file_list.txt
-    ./submit.py --config config/icarus/latest_data.cfg --files data/*.root --profile gpu_large
+    ./submit.py --config infer/icarus/latest.cfg --files file_list.txt
+    ./submit.py --config infer/icarus/latest_data.cfg --files data/*.root --profile gpu_large
     ./submit.py --pipeline pipelines/icarus_production.yaml
 """
 
@@ -617,7 +617,7 @@ fi
         str
             Path to the generated latest config file
         """
-        config_dir = self.basedir / "config" / detector
+        config_dir = self.basedir / "infer" / detector
 
         if not config_dir.exists():
             raise ValueError(f"Detector config directory not found: {config_dir}")
@@ -1025,26 +1025,26 @@ def main():
         epilog="""
 Examples:
   # Basic submission
-  %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files file_list.txt
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files file_list.txt
 
   # With custom profile
-  %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --profile gpu_large
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --profile gpu_large
 
   # Apply modifiers at runtime
-  %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --apply-mods data
-  %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --apply-mods data lite
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --apply-mods data
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --apply-mods data lite
 
   # List available modifiers for a config
-  %(prog)s --list-mods config/icarus/icarus_full_chain_co_250625.yaml
+  %(prog)s --list-mods infer/icarus/icarus_full_chain_co_250625.yaml
 
   # Multiple files per task
-  %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files files.txt --files-per-task 5 --ntasks 20
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files files.txt --files-per-task 5 --ntasks 20
 
   # Pipeline mode
   %(prog)s --pipeline pipelines/icarus_production.yaml
 
   # Dry run
-  %(prog)s --config config/icarus/icarus_full_chain_co_250625.yaml --files test.root --dry-run
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files test.root --dry-run
         """,
     )
 

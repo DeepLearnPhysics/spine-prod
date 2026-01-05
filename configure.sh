@@ -8,7 +8,7 @@ else
     export SPINE_PROD_BASEDIR=$FORCE_SPINE_PROD_BASEDIR
 fi
 
-export SPINE_PROD_CFGDIR=$SPINE_PROD_BASEDIR/config
+export SPINE_PROD_CFGDIR=$SPINE_PROD_BASEDIR/infer
 
 # Define path to SPINE
 export SPINE_BASEDIR=/sdf/data/neutrino/software/spine

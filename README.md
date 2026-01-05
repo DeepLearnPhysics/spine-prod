@@ -54,32 +54,32 @@ Dependencies are managed via `requirements-dev.txt` rather than `pip install -e 
 
 ```bash
 # Run on a single file
-./submit.py --config config/icarus/latest.cfg --files /path/to/data.root
+./submit.py --config infer/icarus/latest.cfg --files /path/to/data.root
 
 # Run on multiple files
-./submit.py --config config/icarus/latest_data.cfg --files /path/to/data/*.root
+./submit.py --config infer/icarus/latest_data.cfg --files /path/to/data/*.root
 
 # Run from a file list
-./submit.py --config config/2x2/latest.cfg --files file_list.txt
+./submit.py --config infer/2x2/latest.cfg --files file_list.txt
 ```
 
 ### 3. Advanced Usage
 
 ```bash
 # Use a specific resource profile
-./submit.py --config config/icarus/latest.cfg --files data/*.root --profile s3df_turing
+./submit.py --config infer/icarus/latest.cfg --files data/*.root --profile s3df_turing
 
 # Process multiple files per job
-./submit.py --config config/icarus/latest.cfg --files data/*.root --files-per-task 5
+./submit.py --config infer/icarus/latest.cfg --files data/*.root --files-per-task 5
 
 # Limit parallel tasks
-./submit.py --config config/icarus/latest.cfg --files data/*.root --ntasks 50
+./submit.py --config infer/icarus/latest.cfg --files data/*.root --ntasks 50
 
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
 
 # Dry run (see what would be submitted)
-./submit.py --config config/icarus/latest.cfg --files test.root --dry-run
+./submit.py --config infer/icarus/latest.cfg --files test.root --dry-run
 ```
 
 ## Directory Structure
@@ -91,7 +91,7 @@ spine-prod/
 ├── run.sh                    # Legacy submission script
 ├── README.md                 # This file
 │
-├── config/                   # SPINE configurations
+├── infer/                   # SPINE configurations
 │   ├── icarus/              # ICARUS detector configs
 │   ├── sbnd/                # SBND detector configs
 │   ├── 2x2/                 # 2x2 detector configs
@@ -117,7 +117,7 @@ SPINE uses a hierarchical configuration system where configs can include and ove
 ### Config Organization
 
 ```
-config/<detector>/
+infer/<detector>/
 ├── <detector>_base.cfg           # Base MC configuration
 ├── <detector>_base_data.cfg      # Base data-only configuration
 └── <detector>_full_chain_*.cfg   # Version-specific configs
@@ -127,16 +127,16 @@ config/<detector>/
 
 ```bash
 # Latest MC configuration
-config/icarus/latest.cfg
+infer/icarus/latest.cfg
 
 # Latest data-only configuration
-config/icarus/latest_data.cfg
+infer/icarus/latest_data.cfg
 
 # Specific version with cosmic overlay
-config/icarus/icarus_full_chain_co_250625.cfg
+infer/icarus/icarus_full_chain_co_250625.cfg
 
 # Data with lite outputs
-config/icarus/icarus_full_chain_data_co_lite_250625.cfg
+infer/icarus/icarus_full_chain_data_co_lite_250625.cfg
 ```
 
 See individual config directories for detector-specific documentation.
@@ -176,13 +176,13 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 
 ```bash
 # Auto-detect (default)
-./submit.py --config config/icarus/latest.cfg --files data.root
+./submit.py --config infer/icarus/latest.cfg --files data.root
 
 # Explicit profile
-./submit.py --config config/icarus/latest.cfg --files data.root --profile s3df_turing
+./submit.py --config infer/icarus/latest.cfg --files data.root --profile s3df_turing
 
 # Override specific resources
-./submit.py --config config/icarus/latest.cfg --files data.root --time 2:00:00 --cpus-per-task 8
+./submit.py --config infer/icarus/latest.cfg --files data.root --time 2:00:00 --cpus-per-task 8
 ```
 
 ## Pipeline Mode
@@ -196,14 +196,14 @@ Create a YAML file in `pipelines/`:
 ```yaml
 stages:
   - name: reconstruction
-    config: config/icarus/latest_data.cfg
+    config: infer/icarus/latest_data.cfg
     files: /path/to/raw/*.root
     profile: gpu_inference
     ntasks: 100
   
   - name: analysis
     depends_on: [reconstruction]  # Wait for reconstruction to complete
-    config: config/icarus/analysis.cfg
+    config: infer/icarus/analysis.cfg
     files: output_reco/*.h5
     profile: cpu_analysis
     ntasks: 20
@@ -257,7 +257,7 @@ Each job saves complete metadata for reproducibility:
 {
   "job_name": "spine_icarus_latest",
   "detector": "icarus",
-  "config": "config/icarus/latest.cfg",
+  "config": "infer/icarus/latest.cfg",
   "profile": "gpu_inference",
   "num_files": 100,
   "job_ids": ["12345", "12346"],
@@ -273,7 +273,7 @@ Pipelines can automatically clean up intermediate outputs once downstream stages
 ```yaml
 stages:
   - name: reconstruction
-    config: config/icarus/latest.cfg
+    config: infer/icarus/latest.cfg
     files: /path/to/input/*.root
     output: output_reco
     # Clean up output_reco/ after all dependent stages finish
@@ -283,7 +283,7 @@ stages:
   
   - name: analysis
     depends_on: [reconstruction]
-    config: config/icarus/analysis.cfg
+    config: infer/icarus/analysis.cfg
     files: output_reco/*.h5
     output: output_analysis
 ```
@@ -302,27 +302,27 @@ This is especially useful for large-scale production to save disk space by remov
 
 ```bash
 # Use custom LArCV installation
-./submit.py --config config/icarus/latest.cfg --files data.root --larcv /path/to/larcv
+./submit.py --config infer/icarus/latest.cfg --files data.root --larcv /path/to/larcv
 
 # Enable flash matching
-./submit.py --config config/icarus/latest.cfg --files data.root --flashmatch
+./submit.py --config infer/icarus/latest.cfg --files data.root --flashmatch
 ```
 
 ### Job Dependencies
 
 ```bash
 # Submit with dependency on another job
-./submit.py --config config/icarus/stage2.cfg --files output/*.h5 --dependency afterok:12345
+./submit.py --config infer/icarus/stage2.cfg --files output/*.h5 --dependency afterok:12345
 ```
 
 ### Array Job Optimization
 
 ```bash
 # Process 5 files per job (reduces overhead)
-./submit.py --config config/icarus/latest.cfg --files data/*.root --files-per-task 5
+./submit.py --config infer/icarus/latest.cfg --files data/*.root --files-per-task 5
 
 # Limit concurrent tasks to 50
-./submit.py --config config/icarus/latest.cfg --files data/*.root --ntasks 50
+./submit.py --config infer/icarus/latest.cfg --files data/*.root --ntasks 50
 ```
 
 ## Detector-Specific Guides
@@ -333,22 +333,22 @@ ICARUS uses split cryostat processing with cosmic overlay:
 
 ```bash
 # Standard cosmic overlay processing
-./submit.py --config config/icarus/latest.cfg --files data.root
+./submit.py --config infer/icarus/latest.cfg --files data.root
 
 # Data-only mode (no truth labels)
-./submit.py --config config/icarus/latest_data.cfg --files data.root
+./submit.py --config infer/icarus/latest_data.cfg --files data.root
 
 # NuMI beam configuration
-./submit.py --config config/icarus/latest_numi.cfg --files data.root
+./submit.py --config infer/icarus/latest_numi.cfg --files data.root
 
 # Lite output (reduced file size)
-./submit.py --config config/icarus/icarus_full_chain_data_co_lite_250625.cfg --files data.root
+./submit.py --config infer/icarus/icarus_full_chain_data_co_lite_250625.cfg --files data.root
 ```
 
 ### SBND
 
 ```bash
-./submit.py --config config/sbnd/latest.cfg --files data.root
+./submit.py --config infer/sbnd/latest.cfg --files data.root
 ```
 
 ### 2x2
@@ -356,13 +356,13 @@ ICARUS uses split cryostat processing with cosmic overlay:
 2x2 uses higher resource requirements:
 
 ```bash
-./submit.py --config config/2x2/latest.cfg --files data.root --profile gpu_large
+./submit.py --config infer/2x2/latest.cfg --files data.root --profile gpu_large
 ```
 
 ### ND-LAr
 
 ```bash
-./submit.py --config config/nd-lar/nd-lar_base.cfg --files data.root
+./submit.py --config infer/nd-lar/nd-lar_base.cfg --files data.root
 ```
 
 ## Troubleshooting
@@ -400,19 +400,19 @@ pip install jinja2 pyyaml
 
 **Solution:** Use a profile with more memory:
 ```bash
-./submit.py --config config/icarus/latest.cfg --files data.root --profile gpu_highmem
+./submit.py --config infer/icarus/latest.cfg --files data.root --profile gpu_highmem
 ```
 
 Or override memory:
 ```bash
-./submit.py --config config/icarus/latest.cfg --files data.root --mem-per-cpu 16g
+./submit.py --config infer/icarus/latest.cfg --files data.root --mem-per-cpu 16g
 ```
 
 ### Job Time Limit
 
 **Solution:** Request more time:
 ```bash
-./submit.py --config config/icarus/latest.cfg --files data.root --time 4:00:00
+./submit.py --config infer/icarus/latest.cfg --files data.root --time 4:00:00
 ```
 
 ## Legacy Scripts
@@ -423,12 +423,12 @@ The original submission system (`run.sh`, `slurm/run_slurm.sh`) is still availab
 
 Old:
 ```bash
-./run.sh -c config/icarus/latest.cfg -n 50 -t 2:00:00 file_list.txt
+./run.sh -c infer/icarus/latest.cfg -n 50 -t 2:00:00 file_list.txt
 ```
 
 New:
 ```bash
-./submit.py --config config/icarus/latest.cfg --files file_list.txt --ntasks 50 --time 2:00:00
+./submit.py --config infer/icarus/latest.cfg --files file_list.txt --ntasks 50 --time 2:00:00
 ```
 
 ## Best Practices
@@ -439,10 +439,10 @@ Always test configurations on a small sample:
 
 ```bash
 # Test with dry run
-./submit.py --config config/icarus/latest.cfg --files test.root --dry-run
+./submit.py --config infer/icarus/latest.cfg --files test.root --dry-run
 
 # Test with single file
-./submit.py --config config/icarus/latest.cfg --files test.root
+./submit.py --config infer/icarus/latest.cfg --files test.root
 ```
 
 ### 2. Use Appropriate Profiles
@@ -455,10 +455,10 @@ Always test configurations on a small sample:
 
 ```bash
 # For many small files, batch them
-./submit.py --config config/icarus/latest.cfg --files small_files/*.root --files-per-task 10
+./submit.py --config infer/icarus/latest.cfg --files small_files/*.root --files-per-task 10
 
 # For large files, process individually
-./submit.py --config config/icarus/latest.cfg --files large_files/*.root --files-per-task 1
+./submit.py --config infer/icarus/latest.cfg --files large_files/*.root --files-per-task 1
 ```
 
 ### 4. Monitor Resource Usage
@@ -513,7 +513,7 @@ Edit `templates/profiles.yaml`:
 detectors:
   my_detector:
     default_profile: gpu_inference
-    configs_dir: config/my_detector
+    configs_dir: infer/my_detector
     account: "my:account"
 ```
 
@@ -562,7 +562,7 @@ All configuration files are automatically validated in CI to ensure they parse c
 
 ```python
 from config import load_config
-config = load_config('config/icarus/latest.yaml')
+config = load_config('infer/icarus/latest.yaml')
 ```
 
 ## Support
