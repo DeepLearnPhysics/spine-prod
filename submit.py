@@ -120,13 +120,18 @@ class SlurmSubmitter:
 
         return self.profiles["profiles"][profile_name]
 
-    def _parse_files(self, file_input: List[str]) -> List[str]:
+    def _parse_files(
+        self, file_input: List[str], source_type: str = "source"
+    ) -> List[str]:
         """Parse file input (paths, globs, or txt file).
 
         Parameters
         ----------
         file_input : List[str]
-            List of file paths, glob patterns, or text file paths
+            List of file paths, glob patterns, or text file path
+        source_type : str, optional
+            Either 'source' (direct paths/globs) or 'source_list' (text file),
+            by default 'source'
 
         Returns
         -------
@@ -135,20 +140,25 @@ class SlurmSubmitter:
         """
         files = []
 
-        for item in file_input:
-            if item.endswith(".txt"):
-                # Read file list
-                with open(item, "r", encoding="utf-8") as f:
-                    files.extend([line.strip() for line in f if line.strip()])
-            elif "*" in item or "?" in item:
-                # Expand glob
-                files.extend(glob.glob(item))
-            else:
-                # Direct file path
-                if os.path.exists(item):
-                    files.append(item)
+        if source_type == "source_list":
+            # Read from a single text file (one file path per line)
+            if len(file_input) != 1:
+                raise ValueError("--source-list/-S accepts exactly one text file")
+            source_list_path = file_input[0]
+            with open(source_list_path, "r", encoding="utf-8") as f:
+                files.extend([line.strip() for line in f if line.strip()])
+        else:
+            # Handle direct sources (paths, globs)
+            for item in file_input:
+                if "*" in item or "?" in item:
+                    # Expand glob
+                    files.extend(glob.glob(item))
                 else:
-                    print(f"WARNING: File not found: {item}")
+                    # Direct file path
+                    if os.path.exists(item):
+                        files.append(item)
+                    else:
+                        print(f"WARNING: File not found: {item}")
 
         return files
 
@@ -740,6 +750,7 @@ fi
         self,
         config: str,
         files: List[str],
+        source_type: str = "source",
         profile: str = "auto",
         job_name: Optional[str] = None,
         output: Optional[str] = None,
@@ -759,7 +770,10 @@ fi
         config : str
             Path to SPINE configuration file
         files : List[str]
-            List of input files (paths, globs, or txt file)
+            List of input files (direct paths/globs or source list path)
+        source_type : str, optional
+            Either 'source' (direct paths/globs) or 'source_list' (text file),
+            by default 'source'
         profile : str, optional
             Resource profile name or 'auto', by default 'auto'
         job_name : str, optional
@@ -789,7 +803,7 @@ fi
             List of submitted job IDs
         """
         # Parse input files
-        file_list = self._parse_files(files)
+        file_list = self._parse_files(files, source_type)
         if not file_list:
             raise ValueError("No input files found")
 
@@ -1024,27 +1038,30 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic submission
-  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files file_list.txt
+  # Basic submission with source list (recommended)
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source-list file_list.txt
+
+  # Direct sources with glob pattern
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root
 
   # With custom profile
-  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --profile gpu_large
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root --profile gpu_large
 
   # Apply modifiers at runtime
-  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --apply-mods data
-  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files data/*.root --apply-mods data lite
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root --apply-mods data
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root --apply-mods data lite
 
   # List available modifiers for a config
   %(prog)s --list-mods infer/icarus/icarus_full_chain_co_250625.yaml
 
   # Multiple files per task
-  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files files.txt --files-per-task 5 --ntasks 20
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source-list files.txt --files-per-task 5 --ntasks 20
 
   # Pipeline mode
   %(prog)s --pipeline pipelines/icarus_production.yaml
 
   # Dry run
-  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --files test.root --dry-run
+  %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source test.root --dry-run
         """,
     )
 
@@ -1058,9 +1075,19 @@ Examples:
         help="List available modifiers for a configuration",
     )
 
-    # Input files (required for --config mode)
-    parser.add_argument(
-        "--files", "-f", nargs="+", help="Input files (paths, globs, or txt file)"
+    # Input files (required for --config mode) - mutually exclusive
+    source_group = parser.add_mutually_exclusive_group()
+    source_group.add_argument(
+        "--source",
+        "-s",
+        nargs="+",
+        help="Input files as direct paths or glob patterns (e.g., data/*.root)",
+    )
+    source_group.add_argument(
+        "--source-list",
+        "-S",
+        nargs=1,
+        help="Text file containing input file paths (one per line)",
     )
 
     # Configuration modifiers
@@ -1155,8 +1182,8 @@ Examples:
         return 0
 
     # Validate arguments
-    if args.config and not args.files:
-        parser.error("--config requires --files")
+    if args.config and not (args.source or args.source_list):
+        parser.error("--config requires either --source/-s or --source-list/-S")
 
     # Build profile overrides
     profile_overrides = {}
@@ -1174,9 +1201,14 @@ Examples:
                 print(f"{stage}: {', '.join(job_ids)}")
         else:
             # Single job mode
+            # Determine which source type was provided
+            files = args.source if args.source else args.source_list
+            source_type = "source" if args.source else "source_list"
+
             job_ids = submitter.submit_job(
                 config=args.config,
-                files=args.files,
+                files=files,
+                source_type=source_type,
                 profile=args.profile,
                 job_name=args.job_name,
                 output=args.output,

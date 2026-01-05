@@ -14,40 +14,13 @@ These tests exercise the actual Python code to provide meaningful coverage metri
 
 import json
 import os
-
-# Add parent directory to path to import submit
-import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import yaml
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from submit import SlurmSubmitter  # noqa: E402
-
-
-@pytest.fixture
-def workspace_root():
-    """Return path to workspace root."""
-    return Path(__file__).parent.parent
-
-
-@pytest.fixture
-def infer_root(workspace_root):
-    """Return path to infer directory."""
-    return workspace_root / "infer"
-
-
-@pytest.fixture
-def mock_submitter(workspace_root, tmp_path):
-    """Create a SlurmSubmitter instance with mocked paths."""
-    # Use real basedir but mock job_dir - pass Path not str
-    submitter = SlurmSubmitter(basedir=workspace_root)
-    submitter.job_dir = tmp_path / "test_job"
-    submitter.job_dir.mkdir(parents=True, exist_ok=True)
-    return submitter
+from submit import SlurmSubmitter
 
 
 class TestModifierDiscovery:
@@ -353,7 +326,7 @@ class TestFileHandling:
         assert all(f.endswith(".root") for f in files)
 
     def test_parse_files_from_list(self, mock_submitter, tmp_path):
-        """Test parsing files from a list file."""
+        """Test parsing files from a source list file."""
         # Create test files
         test_files = []
         for i in range(3):
@@ -365,23 +338,22 @@ class TestFileHandling:
         file_list = tmp_path / "files.txt"
         file_list.write_text("\n".join(test_files))
 
-        files = mock_submitter._parse_files([str(file_list)])
+        files = mock_submitter._parse_files([str(file_list)], source_type="source_list")
         assert len(files) == 3
         assert all(f.endswith(".root") for f in files)
 
-    def test_parse_files_mixed(self, mock_submitter, tmp_path):
-        """Test parsing mixed file inputs."""
-        # Create individual file
-        single_file = tmp_path / "single.root"
-        single_file.touch()
+    def test_parse_files_direct_paths(self, mock_submitter, tmp_path):
+        """Test parsing direct file paths."""
+        # Create test files
+        files_to_create = []
+        for i in range(3):
+            f = tmp_path / f"file_{i}.root"
+            f.touch()
+            files_to_create.append(str(f))
 
-        # Create glob files
-        for i in range(2):
-            (tmp_path / f"glob_{i}.root").touch()
-
-        inputs = [str(single_file), str(tmp_path / "glob_*.root")]
-        files = mock_submitter._parse_files(inputs)
+        files = mock_submitter._parse_files(files_to_create, source_type="source")
         assert len(files) == 3
+        assert all(f.endswith(".root") for f in files)
 
 
 class TestFileChunking:

@@ -38,16 +38,24 @@ if [ -z $${SPINE_PROD_BASEDIR+x} ]; then
     source {{ basedir }}/configure.sh
 fi
 
-# Get input file(s) for this array task
-FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" {{ file_list }})
+# Get file list for this array task
+# Each line in the chunk file contains comma-separated files for one task
+FILE_GROUP=$(sed -n "${SLURM_ARRAY_TASK_ID}p" {{ file_list }})
 
-# Verify file exists
-if [[ ! -f $${FILE%%,*} ]]; then
-    echo "ERROR: Input file not found: $${FILE%%,*}"
+# Create a temporary file list for this task
+TASK_FILE_LIST="{{ log_dir }}/task_files_${SLURM_JOB_ID}_${SLURM_ARRAY_TASK_ID}.txt"
+echo "$FILE_GROUP" | tr ',' '\n' > "$TASK_FILE_LIST"
+
+# Verify first file exists
+FIRST_FILE=$(head -n 1 "$TASK_FILE_LIST")
+if [[ ! -f "$FIRST_FILE" ]]; then
+    echo "ERROR: Input file not found: $FIRST_FILE"
     exit 1
 fi
 
-echo "Processing file(s): $FILE"
+echo "Processing file list: $TASK_FILE_LIST"
+echo "Files in this task:"
+cat "$TASK_FILE_LIST"
 echo
 
 # Build singularity command
@@ -63,8 +71,8 @@ SINGULARITY_CMD="$${SINGULARITY_CMD}unset which; source {{ larcv_basedir }}/conf
 SINGULARITY_CMD="$${SINGULARITY_CMD}source $$FMATCH_BASEDIR/configure.sh; "
 {% endif %}
 
-# Add SPINE execution command
-SINGULARITY_CMD="$${SINGULARITY_CMD}python3 $$SPINE_BASEDIR/bin/run.py -s $$FILE -o {{ output }} -c {{ config }}\""
+# Add SPINE execution command (using -S for source list)
+SINGULARITY_CMD="$${SINGULARITY_CMD}python3 $$SPINE_BASEDIR/bin/run.py -S $$TASK_FILE_LIST -o {{ output }} -c {{ config }}\""
 
 # Execute
 echo "Running: $SINGULARITY_CMD"
