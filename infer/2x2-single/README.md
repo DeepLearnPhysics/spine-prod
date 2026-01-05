@@ -33,7 +33,7 @@ You can also compose configs at runtime using the orchestrator:
 ```bash
 # Apply modifiers at runtime instead of using pre-composed configs
 ./submit.py --config infer/2x2-single/2x2-single_full_chain_240819.cfg \
-            --files data.root --apply-mods data
+            --source data.root --apply-mods data
 
 # List available modifiers
 ./submit.py --list-mods infer/2x2-single/2x2-single_full_chain_240819.cfg

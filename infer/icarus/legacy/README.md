@@ -12,12 +12,12 @@ Instead of using these legacy configs, compose them dynamically:
 
 **Old way (legacy):**
 ```bash
-spine-prod --config icarus/legacy/icarus_full_chain_data_co_lite_250625.yaml --files data/*.root
+spine-prod --config icarus/legacy/icarus_full_chain_data_co_lite_250625.yaml --source data/*.root
 ```
 
 **New way (recommended):**
 ```bash
-spine-prod --config icarus/icarus_full_chain_co_250625 --modifier data,lite --files data/*.root
+spine-prod --config icarus/icarus_full_chain_co_250625 --modifier data,lite --source data/*.root
 ```
 
 ### Migration Examples

@@ -6,8 +6,8 @@ A modern, flexible job submission orchestrator for SPINE reconstruction
 on SLURM-based HPC systems.
 
 Usage:
-    ./submit.py --config infer/icarus/latest.cfg --files file_list.txt
-    ./submit.py --config infer/icarus/latest_data.cfg --files data/*.root --profile gpu_large
+    ./submit.py --config infer/icarus/latest.cfg --source-list file_list.txt
+    ./submit.py --config infer/icarus/latest_data.cfg --source data/*.root --profile gpu_large
     ./submit.py --pipeline pipelines/icarus_production.yaml
 """
 

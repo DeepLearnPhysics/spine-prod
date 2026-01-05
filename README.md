@@ -30,32 +30,32 @@ source configure.sh
 
 ```bash
 # Run on a single file
-./submit.py --config infer/icarus/latest.cfg --files /path/to/data.root
+./submit.py --config infer/icarus/latest.cfg --source /path/to/data.root
 
-# Run on multiple files
-./submit.py --config infer/icarus/latest_data.cfg --files /path/to/data/*.root
+# Run on multiple files (glob)
+./submit.py --config infer/icarus/latest_data.cfg --source /path/to/data/*.root
 
-# Run from a file list
-./submit.py --config infer/2x2/latest.cfg --files file_list.txt
+# Run from a file list (recommended)
+./submit.py --config infer/2x2/latest.cfg --source-list file_list.txt
 ```
 
 ### 3. Advanced Usage
 
 ```bash
 # Use a specific resource profile
-./submit.py --config infer/icarus/latest.cfg --files data/*.root --profile s3df_turing
+./submit.py --config infer/icarus/latest.cfg --source data/*.root --profile s3df_turing
 
 # Process multiple files per job
-./submit.py --config infer/icarus/latest.cfg --files data/*.root --files-per-task 5
+./submit.py --config infer/icarus/latest.cfg --source data/*.root --files-per-task 5
 
 # Limit parallel tasks
-./submit.py --config infer/icarus/latest.cfg --files data/*.root --ntasks 50
+./submit.py --config infer/icarus/latest.cfg --source data/*.root --ntasks 50
 
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
 
 # Dry run (see what would be submitted)
-./submit.py --config infer/icarus/latest.cfg --files test.root --dry-run
+./submit.py --config infer/icarus/latest.cfg --source test.root --dry-run
 ```
 
 ## Directory Structure
@@ -152,13 +152,13 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 
 ```bash
 # Auto-detect (default)
-./submit.py --config infer/icarus/latest.cfg --files data.root
+./submit.py --config infer/icarus/latest.cfg --source data.root
 
 # Explicit profile
-./submit.py --config infer/icarus/latest.cfg --files data.root --profile s3df_turing
+./submit.py --config infer/icarus/latest.cfg --source data.root --profile s3df_turing
 
 # Override specific resources
-./submit.py --config infer/icarus/latest.cfg --files data.root --time 2:00:00 --cpus-per-task 8
+./submit.py --config infer/icarus/latest.cfg --source data.root --time 2:00:00 --cpus-per-task 8
 ```
 
 ## Pipeline Mode
@@ -278,27 +278,27 @@ This is especially useful for large-scale production to save disk space by remov
 
 ```bash
 # Use custom LArCV installation
-./submit.py --config infer/icarus/latest.cfg --files data.root --larcv /path/to/larcv
+./submit.py --config infer/icarus/latest.cfg --source data.root --larcv /path/to/larcv
 
 # Enable flash matching
-./submit.py --config infer/icarus/latest.cfg --files data.root --flashmatch
+./submit.py --config infer/icarus/latest.cfg --source data.root --flashmatch
 ```
 
 ### Job Dependencies
 
 ```bash
 # Submit with dependency on another job
-./submit.py --config infer/icarus/stage2.cfg --files output/*.h5 --dependency afterok:12345
+./submit.py --config infer/icarus/stage2.cfg --source output/*.h5 --dependency afterok:12345
 ```
 
 ### Array Job Optimization
 
 ```bash
 # Process 5 files per job (reduces overhead)
-./submit.py --config infer/icarus/latest.cfg --files data/*.root --files-per-task 5
+./submit.py --config infer/icarus/latest.cfg --source data/*.root --files-per-task 5
 
 # Limit concurrent tasks to 50
-./submit.py --config infer/icarus/latest.cfg --files data/*.root --ntasks 50
+./submit.py --config infer/icarus/latest.cfg --source data/*.root --ntasks 50
 ```
 
 ## Detector-Specific Guides
@@ -309,22 +309,22 @@ ICARUS uses split cryostat processing with cosmic overlay:
 
 ```bash
 # Standard cosmic overlay processing
-./submit.py --config infer/icarus/latest.cfg --files data.root
+./submit.py --config infer/icarus/latest.cfg --source data.root
 
 # Data-only mode (no truth labels)
-./submit.py --config infer/icarus/latest_data.cfg --files data.root
+./submit.py --config infer/icarus/latest_data.cfg --source data.root
 
 # NuMI beam configuration
-./submit.py --config infer/icarus/latest_numi.cfg --files data.root
+./submit.py --config infer/icarus/latest_numi.cfg --source data.root
 
 # Lite output (reduced file size)
-./submit.py --config infer/icarus/icarus_full_chain_data_co_lite_250625.cfg --files data.root
+./submit.py --config infer/icarus/icarus_full_chain_data_co_lite_250625.cfg --source data.root
 ```
 
 ### SBND
 
 ```bash
-./submit.py --config infer/sbnd/latest.cfg --files data.root
+./submit.py --config infer/sbnd/latest.cfg --source data.root
 ```
 
 ### 2x2
@@ -332,13 +332,13 @@ ICARUS uses split cryostat processing with cosmic overlay:
 2x2 uses higher resource requirements:
 
 ```bash
-./submit.py --config infer/2x2/latest.cfg --files data.root --profile gpu_large
+./submit.py --config infer/2x2/latest.cfg --source data.root --profile gpu_large
 ```
 
 ### ND-LAr
 
 ```bash
-./submit.py --config infer/nd-lar/nd-lar_base.cfg --files data.root
+./submit.py --config infer/nd-lar/nd-lar_base.cfg --source data.root
 ```
 
 ## Troubleshooting
@@ -376,19 +376,19 @@ pip install jinja2 pyyaml
 
 **Solution:** Use a profile with more memory:
 ```bash
-./submit.py --config infer/icarus/latest.cfg --files data.root --profile gpu_highmem
+./submit.py --config infer/icarus/latest.cfg --source data.root --profile gpu_highmem
 ```
 
 Or override memory:
 ```bash
-./submit.py --config infer/icarus/latest.cfg --files data.root --mem-per-cpu 16g
+./submit.py --config infer/icarus/latest.cfg --source data.root --mem-per-cpu 16g
 ```
 
 ### Job Time Limit
 
 **Solution:** Request more time:
 ```bash
-./submit.py --config infer/icarus/latest.cfg --files data.root --time 4:00:00
+./submit.py --config infer/icarus/latest.cfg --source data.root --time 4:00:00
 ```
 
 ## Legacy Scripts
@@ -404,7 +404,7 @@ Old:
 
 New:
 ```bash
-./submit.py --config infer/icarus/latest.cfg --files file_list.txt --ntasks 50 --time 2:00:00
+./submit.py --config infer/icarus/latest.cfg --source-list file_list.txt --ntasks 50 --time 2:00:00
 ```
 
 ## Best Practices
@@ -415,10 +415,10 @@ Always test configurations on a small sample:
 
 ```bash
 # Test with dry run
-./submit.py --config infer/icarus/latest.cfg --files test.root --dry-run
+./submit.py --config infer/icarus/latest.cfg --source test.root --dry-run
 
 # Test with single file
-./submit.py --config infer/icarus/latest.cfg --files test.root
+./submit.py --config infer/icarus/latest.cfg --source test.root
 ```
 
 ### 2. Use Appropriate Profiles
@@ -431,10 +431,10 @@ Always test configurations on a small sample:
 
 ```bash
 # For many small files, batch them
-./submit.py --config infer/icarus/latest.cfg --files small_files/*.root --files-per-task 10
+./submit.py --config infer/icarus/latest.cfg --source small_files/*.root --files-per-task 10
 
 # For large files, process individually
-./submit.py --config infer/icarus/latest.cfg --files large_files/*.root --files-per-task 1
+./submit.py --config infer/icarus/latest.cfg --source large_files/*.root --files-per-task 1
 ```
 
 ### 4. Monitor Resource Usage
