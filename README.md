@@ -24,7 +24,7 @@ cd spine-prod
 source configure.sh
 ```
 
-**Note:** This repository contains SPINE configuration files for production runs. You need an existing SPINE installation - either a system-wide installation or a local build. The `configure.sh` script should be edited to point `SPINE_PROD_BASEDIR` to your SPINE installation directory.
+**Note:** This repository contains SPINE configuration files for production runs. You need an existing SPINE installation - either a system-wide installation or a local build. The `configure.sh` script should be edited to point `SPINE_BASEDIR` to your SPINE installation directory.
 
 ### 2. Basic Job Submission
 
