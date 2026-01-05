@@ -4,7 +4,7 @@
 [![CI](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/DeepLearnPhysics/spine-prod/branch/main/graph/badge.svg)](https://codecov.io/gh/DeepLearnPhysics/spine-prod)
 
-A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPINE) (Scalable Pipeline for Imaging NEutrinos) reconstruction on SLURM-based HPC clusters.
+A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPINE) (Scalable Particle Imaging with Neural Embeddings) reconstruction on SLURM-based HPC clusters.
 
 ## Overview
 
@@ -24,7 +24,7 @@ cd spine-prod
 source configure.sh
 ```
 
-**Note:** This repository contains SPINE configuration files for production runs. You need an existing SPINE installation - either a system-wide installation or a local build. The `configure.sh` script should be edited to point `SPINE_PROD_BASEDIR` to your SPINE installation directory.
+**Note:** This repository contains SPINE configuration files for production runs. You need an existing SPINE installation - either a system-wide installation or a local build. The `configure.sh` script should be edited to point `SPINE_BASEDIR` to your SPINE installation directory.
 
 ### 2. Basic Job Submission
 
