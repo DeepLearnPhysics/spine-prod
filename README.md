@@ -81,8 +81,11 @@ spine-prod/
 ├── pipelines/              # Multi-stage pipeline definitions
 │   └── icarus_production_example.yaml
 │
+├── spine_db/               # Standalone metadata database (see spine_db/README.md)
+│
 ├── scripts/                # Utility scripts
 ├── slurm/                  # Legacy SLURM scripts
+├── tests/                  # Test suite
 └── jobs/                   # Job artifacts (auto-created)
 ```
 
@@ -552,10 +555,16 @@ from config import load_config
 config = load_config('infer/icarus/latest.yaml')
 ```
 
+## Related Tools
+
+### Production Database (spine-db)
+
+A companion tool for indexing and browsing SPINE production metadata. See [spine_db/README.md](spine_db/README.md) for documentation.
+
 ## Support
 
 - **Issues:** https://github.com/DeepLearnPhysics/spine-prod/issues
-- **SPINE Documentation:** https://github.com/DeepLearnPhysics/SPINE
+- **SPINE Documentation:** https://github.com/DeepLearnPhysics/spine
 - **Contact:** SPINE development team
 
 ## License

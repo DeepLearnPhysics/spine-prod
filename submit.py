@@ -23,12 +23,9 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import yaml
+from jinja2 import Template
 
-try:
-    from jinja2 import Template
-except ImportError:
-    print("ERROR: jinja2 is required. Install with: pip install jinja2")
-    sys.exit(1)
+from version import __version__
 
 
 class SlurmSubmitter:
@@ -38,8 +35,8 @@ class SlurmSubmitter:
         self.basedir = basedir or Path(__file__).parent
         self.profiles = self._load_profiles()
         self.template = self._load_template()
-        self.jobs_dir = self.basedir / "jobs"
-        self.jobs_dir.mkdir(exist_ok=True)
+        self.job_dir = self.basedir / "jobs"
+        self.job_dir.mkdir(exist_ok=True)
 
         # Check environment
         if not os.getenv("SPINE_PROD_BASEDIR"):
@@ -475,7 +472,7 @@ class SlurmSubmitter:
             Path to created job directory
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        job_dir = self.jobs_dir / f"{timestamp}_{job_name}"
+        job_dir = self.job_dir / f"{timestamp}_{job_name}"
         job_dir.mkdir(parents=True, exist_ok=True)
         (job_dir / "logs").mkdir(exist_ok=True)
         (job_dir / "output").mkdir(exist_ok=True)
@@ -591,7 +588,7 @@ fi
 
         # Write cleanup script
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        cleanup_dir = self.jobs_dir / f"{timestamp}_cleanup_{job_name}"
+        cleanup_dir = self.job_dir / f"{timestamp}_cleanup_{job_name}"
         cleanup_dir.mkdir(parents=True, exist_ok=True)
 
         script_path = cleanup_dir / "cleanup.sbatch"
@@ -912,6 +909,7 @@ fi
 
         # Save metadata
         metadata = {
+            "spine_prod_version": __version__,
             "job_name": job_name,
             "detector": detector,
             "config": config,
