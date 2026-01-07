@@ -559,7 +559,7 @@ config = load_config('infer/icarus/latest.yaml')
 
 ### Production Database (spine-db)
 
-A companion tool for indexing and browsing SPINE production metadata. See [spine_db/README.md](spine_db/README.md) for documentation.
+A companion tool for indexing and browsing SPINE production metadata. See [spine-db](https://github.com/DeepLearnPhysics/spine-db) for documentation.
 
 ## Support
 
