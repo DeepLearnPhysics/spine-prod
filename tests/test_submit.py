@@ -140,7 +140,7 @@ class TestLatestConfigGeneration:
 
         # Test with icarus detector
         config_path = mock_submitter._create_latest_config(
-            detector="icarus", job_dir=mock_submitter.job_dir
+            detector="icarus", job_dir=mock_submitter.jobs_dir
         )
 
         # Should create a config file in job_dir
@@ -162,7 +162,7 @@ class TestLatestConfigGeneration:
             pytest.skip("ICARUS configs not found")
 
         config_path = mock_submitter._create_latest_config(
-            detector="icarus", job_dir=mock_submitter.job_dir
+            detector="icarus", job_dir=mock_submitter.jobs_dir
         )
 
         config_path_obj = Path(config_path)
