@@ -81,8 +81,6 @@ spine-prod/
 ├── pipelines/              # Multi-stage pipeline definitions
 │   └── icarus_production_example.yaml
 │
-├── spine_db/               # Standalone metadata database (see spine_db/README.md)
-│
 ├── scripts/                # Utility scripts
 ├── slurm/                  # Legacy SLURM scripts
 ├── tests/                  # Test suite
