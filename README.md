@@ -62,29 +62,31 @@ source configure.sh
 
 ```
 spine-prod/
-├── configure.sh              # Environment setup script
-├── submit.py                 # Main submission orchestrator (NEW!)
-├── run.sh                    # Legacy submission script
-├── README.md                 # This file
+├── configure.sh             # Environment setup script
+├── submit.py                # Main submission orchestrator (NEW!)
+├── README.md                # This file
 │
-├── infer/                   # SPINE configurations
+├── infer/                   # SPINE inference configurations
 │   ├── icarus/              # ICARUS detector configs
 │   ├── sbnd/                # SBND detector configs
 │   ├── 2x2/                 # 2x2 detector configs
+│   ├── 2x2-single/          # 2x2 single-module detector configs
+│   ├── fsd/                 # Full scale demonstrator configs
 │   ├── nd-lar/              # ND-LAr detector configs
-│   └── generic/             # Generic configs
+│   └── generic/             # Generic (no detector) configs
+│   └── common/              # Shared configs
 │
 ├── templates/               # Job templates
-│   ├── profiles.yaml       # Resource profiles
-│   └── job_template.sbatch # SLURM job template
+│   ├── profiles.yaml        # Resource profiles
+│   └── job_template.sbatch  # SLURM job template
 │
-├── pipelines/              # Multi-stage pipeline definitions
+├── pipelines/               # Multi-stage pipeline definitions
 │   └── icarus_production_example.yaml
 │
-├── scripts/                # Utility scripts
-├── slurm/                  # Legacy SLURM scripts
-├── tests/                  # Test suite
-└── jobs/                   # Job artifacts (auto-created)
+├── scripts/                 # Utility scripts
+├── slurm/                   # Legacy SLURM scripts
+├── tests/                   # Test suite
+└── jobs/                    # Job artifacts (auto-created)
 ```
 
 ## Configuration System
