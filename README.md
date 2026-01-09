@@ -1,8 +1,8 @@
 # SPINE Production System
 
-[![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
 [![CI](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/DeepLearnPhysics/spine-prod/branch/main/graph/badge.svg)](https://codecov.io/gh/DeepLearnPhysics/spine-prod)
+[![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
 
 A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPINE) (Scalable Particle Imaging with Neural Embeddings) reconstruction on SLURM-based HPC clusters.
 
