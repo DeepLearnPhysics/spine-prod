@@ -73,7 +73,7 @@ spine-prod/
 │   ├── 2x2-single/          # 2x2 single-module detector configs
 │   ├── fsd/                 # Full scale demonstrator configs
 │   ├── nd-lar/              # ND-LAr detector configs
-│   └── generic/             # Generic (no detector) configs
+│   ├── generic/             # Generic (no detector) configs
 │   └── common/              # Shared configs
 │
 ├── templates/               # Job templates
