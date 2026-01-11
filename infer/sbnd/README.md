@@ -2,6 +2,36 @@
 
 The configurations below have been trained on SBND MPV/MPR datasets. This summary is divided by training/validation dataset.
 
+## Directory Structure
+
+The SBND configurations now follow a modular structure where each full chain configuration is built from reusable components:
+
+- **`base/`**: Common base configurations including detector geometry and builder settings
+- **`io/`**: Input/output configurations defining data schema and dataset parameters
+- **`model/`**: Model architecture and weights paths for different training iterations
+- **`modifier/`**: Configuration modifiers that transform base configs (e.g., data-only mode)
+- **`post/`**: Post-processing configurations including flash matching and analysis modules
+- **`legacy/`**: Archived configurations for backward compatibility
+
+Each top-level configuration file (e.g., `sbnd_full_chain_co_250901.yaml`) includes the appropriate modular components to build the complete chain. This structure makes it easier to:
+- Mix and match components from different versions
+- Update individual parts without duplicating settings
+- Maintain consistency across similar configurations
+
+### Configuration Composition
+
+Features that previously required separate config files (e.g., `*_data_*`) are now handled through:
+
+1. **Modifiers** in the `modifier/` directory that can be applied to any base configuration
+2. **CLI options** when running inference (e.g., `--data`, `--lite`)
+3. **Include statements** that compose functionality from different modules
+
+For example:
+- Data-only mode (no truth labels): Apply `modifier/data/mod_data_*.yaml` or use CLI flag
+- Lite output: Use CLI flag for direct lite file output
+
+Legacy `.yaml files have been moved to the `legacy/` directory.
+
 ## Configurations for MPVMPR v02
 
 These weights have been trained using the following files at Polaris:
@@ -13,8 +43,7 @@ These weights have been trained using the following files at Polaris:
 ## September 1st 2025
 
 ```shell
-sbnd_full_chain_250901.cfg
-sbnd_full_chain_data_250901.cfg
+sbnd_full_chain_co_250901.yaml
 ```
 
 Training samples MPVMPR using `sbndcode v10_04_01` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_04_01) . The training samples are generated using the following fcls:
@@ -35,13 +64,13 @@ The following modifications were made w.r.t. the August configurations
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_data_*` declination is tailored for data (no labels)
+
+**Note:** Legacy `.yaml` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 ## August 18th 2025
 
 ```shell
-sbnd_full_chain_250818.cfg
-sbnd_full_chain_data_250818.cfg
+sbnd_full_chain_co_250818.cfg
 ```
 
 Training samples MPVMPR using `sbndcode v10_04_01` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_04_01) . The training samples are generated using the following fcls:
@@ -60,13 +89,13 @@ The following modifications were made w.r.t. the March configurations
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_data_*` declination is tailored for data (no labels)
+
+**Note:** Legacy `.cfg` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 ## March 28th 2025
 
 ```shell
-sbnd_full_chain_250328.cfg
-sbnd_full_chain_data_250328.cfg
+sbnd_full_chain_co_250328.cfg
 ```
 
 Training samples MPVMPR using `sbndcode v10_04_01` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_04_01) . The training samples are generated using the following fcls:
@@ -86,7 +115,8 @@ The following modifications were made to the `sbndcode` configuration:
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_data_*` declination is tailored for data (no labels)
+
+**Note:** Legacy `.cfg` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 ## Configurations for MPV/MPR v01
 
@@ -98,13 +128,13 @@ These weights have been trained/validated using the following files:
 
 ```shell
 sbnd_full_chain_240720.cfg
-sbnd_full_chain_data_240720.cfg
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_data_*` declination is tailored for data (no labels)
+
+**Note:** Legacy `.cfg` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 Known issue(s):
   - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
@@ -114,13 +144,13 @@ Known issue(s):
 
 ```shell
 sbnd_full_chain_240814.cfg
-sbnd_full_chain_data_240814.cfg
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_data_*` declination is tailored for data (no labels)
+
+**Note:** Legacy `.cfg` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 Known issue(s):
   - Resolves the issue with the PPN target in the previous set of weights
@@ -131,14 +161,14 @@ Known issue(s):
 
 ```shell
 sbnd_full_chain_240918.cfg
-sbnd_full_chain_data_240918.cfg
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_data_*` declination is tailored for data (no labels)
   - This is the first configuration which **includes flash matching**
+
+**Note:** Legacy `.yaml` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 Known issue(s):
   - Includes flash matching

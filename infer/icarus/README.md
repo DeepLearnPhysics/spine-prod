@@ -2,6 +2,39 @@
 
 The configurations below have been trained on ICARUS MPV/MPR datasets. This summary is divided by training/validation dataset.
 
+## Directory Structure
+
+The ICARUS configurations now follow a modular structure where each full chain configuration is built from reusable components:
+
+- **`base/`**: Common base configurations including detector geometry and builder settings
+- **`io/`**: Input/output configurations defining data schema and dataset parameters
+- **`model/`**: Model architecture and weights paths for different training iterations
+- **`modifier/`**: Configuration modifiers that transform base configs (e.g., data-only mode)
+- **`post/`**: Post-processing configurations including flash matching and analysis modules
+- **`legacy/`**: Archived configurations for backward compatibility
+
+Each top-level configuration file (e.g., `icarus_full_chain_co_250625.yaml`) includes the appropriate modular components to build the complete chain. This structure makes it easier to:
+- Mix and match components from different versions
+- Update individual parts without duplicating settings
+- Maintain consistency across similar configurations
+
+### Configuration Composition
+
+Features that previously required separate config files (e.g., `*_data_*`, `*_lite_*`, `*_numi_*`) are now handled through:
+
+1. **Modifiers** in the `modifier/` directory that can be applied to any base configuration
+2. **CLI options** when running inference (e.g., `--data`, `--lite`, `--beam-window`)
+3. **Include statements** that compose functionality from different modules
+
+For example:
+- Data-only mode (no truth labels): Apply `modifier/data/mod_data_*.yaml` or use CLI flag
+- Lite output: Use CLI flag for direct lite file output
+- NuMI beam window: Specify beam window timing via CLI or post-processing config
+- Single cryostat: Use appropriate geometry configuration
+- Calibration variations (4ms, 8ms, transparency): Handled upstream or via modifiers
+
+Legacy `.yaml` files have been moved to the `legacy/` directory.
+
 ## Configurations for MPV/MPR v02
 
 These weights have been trained/validated using the following files:
@@ -11,18 +44,14 @@ These weights have been trained/validated using the following files:
 ### July 19th 2024
 
 ```shell
-icarus_full_chain_240719.cfg
-icarus_full_chain_single_240719.cfg
-icarus_full_chain_numi_240719.cfg
-icarus_full_chain_data_240719.cfg
+icarus_full_chain_240719.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_single_*` declination works on single-cryostat simulations
-  - The `*_numi_*` declination has a wider flash matching window (10 us)
-  - The `*_data_*` declination is tailored for data (no labels)
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, NuMI beam windows, and single cryostat processing are now handled through modular composition and CLI options.
 
 Known issue(s):
   - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
@@ -30,24 +59,16 @@ Known issue(s):
 ### August 12th 2024
 
 ```shell
-icarus_full_chain_240812.cfg
-icarus_full_chain_single_240812.cfg
-icarus_full_chain_numi_240812.cfg
-icarus_full_chain_data_240812.cfg
-icarus_full_chain_data_numi_240812.cfg
-icarus_full_chain_co_240812.cfg
-icarus_full_chain_data_co_240812.cfg
+icarus_full_chain_240812.yaml
+icarus_full_chain_co_240812.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_single_*` declination works on single-cryostat simulations
-  - The `*_numi_*` declination has a wider flash matching window (10 us)
-  - The `*_data_*` declination is tailored for BNB data (no labels)
-  - The `*_data_numi_*` declination is tailored for NuMI data (no labels)
-  - The `*_co_*` declination only uses collection charge
-  - The `*_data_co_*` is tailored for data and only uses collection charge
+  - Collection charge configurations available
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, NuMI beam windows, and single cryostat processing are now handled through modular composition and CLI options.
 
 Known issue(s):
   - Resolves the issue with the PPN target in the previous set of weights
@@ -65,31 +86,16 @@ These weights have been trained/validated using the following files:
 ### January 15th 2025 
 
 ```shell
-icarus_full_chain_250115.cfg
-icarus_full_chain_co_250115.cfg
-icarus_full_chain_co_lite_250115.cfg
-icarus_full_chain_numi_250115.cfg
-icarus_full_chain_co_numi_250115.cfg
-icarus_full_chain_single_250115.cfg
-icarus_full_chain_single_co_250115.cfg
-icarus_full_chain_co_4ms_lite_250115.cfg
-icarus_full_chain_co_8ms_lite_250115.cfg
-icarus_full_chain_data_250115.cfg
-icarus_full_chain_data_co_250115.cfg
-icarus_full_chain_data_co_lite_250115.cfg
-icarus_full_chain_data_co_unblind_lite_250115.cfg
-icarus_full_chain_data_numi_250115.cfg
+icarus_full_chain_250115.yaml
+icarus_full_chain_co_250115.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_co_*` declinations only use collection charge
-  - The `*_numi_*` declinations are tailored for NuMI (10 us beam window for FM)
-  - The `*_data_*` declinations are tailored for data (no labels)
-  - The `*_lite_*` declinations output directly to lite files
-  - The `*_single_*` declination works on single-cryostat simulations
-  - The `*_unblind_*` declination only processes unblinded data
+  - Collection charge configurations available
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, and unblind mode are now handled through modular composition and CLI options.
 
 Known issue(s):
   - Resolves the issue with the first induction plane gain
@@ -99,32 +105,16 @@ Known issue(s):
 ### March 3rd 2025 
 
 ```shell
-icarus_full_chain_co_250303.cfg
-icarus_full_chain_co_lite_250303.cfg
-icarus_full_chain_co_numi_250303.cfg
-icarus_full_chain_single_co_250303.cfg
-icarus_full_chain_co_4ms_lite_250303.cfg
-icarus_full_chain_co_8ms_lite_250303.cfg
-icarus_full_chain_co_transp_lite_250303.cfg
-icarus_full_chain_data_250303.cfg
-icarus_full_chain_data_co_250303.cfg
-icarus_full_chain_data_co_lite_250303.cfg
-icarus_full_chain_data_co_unblind_lite_250303.cfg
-icarus_full_chain_data_co_numi_250303.cfg
+icarus_full_chain_co_250303.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_co_*` declinations only use collection charge
-  - The `*_numi_*` declinations are tailored for NuMI (10 us beam window for FM)
-  - The `*_4ms_*` declinations are tailored for 4ms lifetime variations
-  - The `*_8ms_*` declinations are tailored for 8ms lifetime variations
-  - The `*_transp_*` declinations are tailored for the YZ transparency variations
-  - The `*_data_*` declinations are tailored for data (no labels)
-  - The `*_lite_*` declinations output directly to lite files
-  - The `*_single_*` declination works on single-cryostat simulations
-  - The `*_unblind_*` declination only processes unblinded data
+  - Collection charge configurations available
+  - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, calibration variations, and unblind mode are now handled through modular composition and CLI options.
 
 Known issue(s):
   - Moved all calibrations upstream of the full chain (for the better!)
@@ -143,33 +133,16 @@ electron lifetimes (4 ms and 8 ms) to match what was recorded during ICARUS run 
 ### June 25th 2025 
 
 ```shell
-icarus_full_chain_co_250625.cfg
-icarus_full_chain_co_lite_250625.cfg
-icarus_full_chain_co_numi_250625.cfg
-icarus_full_chain_co_4ms_lite_250625.cfg
-icarus_full_chain_co_8ms_lite_250625.cfg
-icarus_full_chain_co_transp_lite_250625.cfg
-icarus_full_chain_data_co_250625.cfg
-icarus_full_chain_data_co_lite_250625.cfg
-icarus_full_chain_data_co_lowbs_lite_250625.cfg
-icarus_full_chain_data_co_unblind_lite_250625.cfg
-icarus_full_chain_data_co_numi_250625.cfg
-icarus_full_chain_single_co_250625.cfg
+icarus_full_chain_co_250625.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
-  - The `*_co_*` declinations only use collection charge
-  - The `*_numi_*` declinations are tailored for NuMI (10 us beam window for FM)
-  - The `*_4ms_*` declinations are tailored for 4ms lifetime variations
-  - The `*_8ms_*` declinations are tailored for 8ms lifetime variations
-  - The `*_transp_*` declinations are tailored for the YZ transparency variations
-  - The `*_data_*` declinations are tailored for data (no labels)
-  - The `*_lite_*` declinations output directly to lite files
-  - The `*_lowbs_*` declinations with low batch size to reduce memory consumption (1)
-  - The `*_unblind_*` declination only processes unblinded data
-  - The `*_single_*` declination works on single-cryostat simulations
+  - Collection charge configurations available
+  - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, calibration variations, low batch size, and unblind mode are now handled through modular composition and CLI options.
 
 Changes:
   - Weights trained on a mixture of lifetimes (3, 4 and 8 ms)
