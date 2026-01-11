@@ -1,6 +1,8 @@
-# Data-only modification for SBND configs
+# Data-only modification for SBND configs, common settings
 # Include this after the main config to transform to data-only mode (no truth labels)
+
 override:
+  ### IO overrides ###
   # Use hits sparse event instead of pcluster
   io.loader.dataset.schema.meta.sparse_event: sparse3d_reco
   io.loader.dataset.schema.run_info.sparse_event: sparse3d_reco
@@ -16,9 +18,9 @@ override:
     - graph_label
     - particles
     - neutrinos
-    - flashes_xa # not built in data
+    - flashes_xa # not built for data
 
-  # Remove truth label writers, add trigger info
+  # Remove truth label writers
   io.writer.keys-:
     - points_label
     - depositions_label
@@ -28,22 +30,16 @@ override:
     - depositions_g4
     - truth_particles
     - truth_interactions
-    - flashes_xa # not build in data
+    - flashes_xa # not built for data
 
+  ### Model overrides ###
   # Remove seg_label from network input
   model.network_input-: seg_label
 
   # Modify calibration parameters for data
-  post.apply_calibrations:
-    gain:
-      gain: 46.478 # e-/ADC for the collection planes
-    recombination:
-      model: mbox
-      efield: 0.5 # kV/cm
-    lifetime:
-      lifetime: 35000 # us
-      driftv: 0.1563 # cm/us
+  # model.modules.calibration varies by config - override in specific configs
 
+  ### Post-processing overrides ###
   # Set build/post to reco-only mode
   build.mode: reco
   post.direction.run_mode: reco
@@ -61,3 +57,6 @@ override:
   # Remove irrelevant arguments
   post.containment-: truth_point_mode
   post.topology_threshold-: truth_ke_mode
+
+  # Modify calibration parameters for data
+  # post.apply_calibrations varies by config - override in specific configs

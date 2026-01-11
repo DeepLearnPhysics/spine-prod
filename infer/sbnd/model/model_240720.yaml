@@ -1,0 +1,38 @@
+# SBND model configuration
+# Revision date: July 20, 2024
+
+__meta__:
+  version: "240720"
+  date: "2024-07-20"
+  description: "SBND model with average charge rescaling"
+  compatible_with:
+    base: ">=240720"
+    io: ">=240720"
+  tags: [average-charge, graph-spice-knn]
+  training_set: "v1"
+
+include: model_common.yaml
+
+override:
+  # Path to the v1 model weights
+  model.weight_path: /sdf/data/neutrino/sbnd/spine/train/mpvmpr_v01/weights/full_chain/default/snapshot-1999.ckpt
+
+  # Charge rescaling uses average charge
+  model.modules.chain.charge_rescaling: average
+
+  # Older PPN/GrapPA loss settings
+  model.modules.uresnet_ppn.ppn.classify_endpoints: true
+  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: false
+  model.modules.grappa_shower_loss.node_loss.use_closest: false
+
+  # Graph-SPICE uses a kNN graph with k=10
+  model.modules.graph_spice.embedder.uresnet.spatial_size: 1728
+  model.modules.graph_spice.constructor.graph:
+    name: knn
+    k: 10
+
+  # Interaction grouping dE/dx computation radius set to 5 pixels
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: 5
+
+  # Interaction grouping restriction not applied
+  model.modules.grappa_inter.nodes.grouping_through_track: false

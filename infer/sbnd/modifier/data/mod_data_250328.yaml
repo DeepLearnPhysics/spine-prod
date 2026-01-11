@@ -1,0 +1,26 @@
+# Data-only modification for SBND configs
+# Revision date: March 28, 2025
+
+__meta__:
+  name: "data"
+  version: "250328"
+  date: "2025-03-28"
+  description: "Data-only configuration"
+  applies_to: [data]
+  compatible_with:
+    post: ">=240720"
+
+include: mod_data_common.yaml
+
+override:
+  ### Post-processing overrides ###
+  # Set calibration parameters for data (post-processor)
+  post.apply_calibrations:
+    gain:
+      gain: 46.533 # e-/ADC for the collection planes
+    recombination:
+      model: mbox
+      efield: 0.5 # kV/cm
+    lifetime:
+      lifetime: 35000 # us
+      driftv: 0.1563 # cm/us

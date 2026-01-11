@@ -1,0 +1,58 @@
+# Post-processing configuration for SBND
+# Revision date: July 20, 2024
+
+__meta__:
+  version: "240720"
+  date: "2024-07-20"
+  description: "SBND post-processing for July 2024 weights"
+  compatible_with:
+    base: ">=240720"
+    io: ">=240720"
+    model: ">=240720"
+  tags: [post-calibration]
+
+include: post_common.yaml
+
+override:
+  # Apply calibrations during post-processing
+  post.apply_calibrations:
+    gain:
+      gain: 50.0 # e-/ADC
+    recombination:
+      efield: 0.5 # kV/cm
+      model: mbox
+    lifetime:
+      lifetime: 50000 # us
+      driftv: 0.1563 # cm/us
+    priority: 2
+
+  # MCS configuration
+  post.mcs_ke:
+    run_mode: reco
+    tracking_mode: bin_pca
+    segment_length: 14.0
+    fill_per_pid: true
+    priority: 1
+
+  # Containment configuration
+  post.containment:
+    run_mode: both
+    mode: source
+    margin: 5.0
+    cathode_margin: -5.0
+    min_particle_sizes:
+      0: 25
+      1: 25
+    priority: 1
+
+  # Shower fudge factor
+  post.calo_ke.shower_fudge: 1/0.83
+
+  # Visibility thresholds
+  post.topology_threshold-: truth_ke_mode
+  post.topology_threshold.ke_thresholds:
+    4: 50
+    default: 25
+
+  # No orientation updates after vertexing
+  post.vertex-: update_orientations

@@ -8,7 +8,7 @@ __meta__:
   compatible_with:
     base: ">=240719"
     io: ">=240812"
-  tags: [collection-only, ppn-restrict]
+  tags: [collection-only, ppn-restrict, grouping-through-track]
   training_set: "v3"
 
 include: model_common.yaml

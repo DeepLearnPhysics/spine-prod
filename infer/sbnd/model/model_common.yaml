@@ -1,141 +1,9 @@
-# Base configuration for SBND detector
-# Common settings shared across all SBND full chain configs
-# Include this file and override specific settings as needed
-
-# Base configuration
-base:
-  world_size: 1
-  iterations: -1
-  seed: 0
-  dtype: float32
-  unwrap: true
-  log_dir: logs
-  prefix_log: true
-  overwrite_log: true
-  log_step: 1
-  split_output: true
-
-# Geometry configuration
-geo:
-  detector: sbnd
-  tag: sbndv2
-
-# IO configuration
-io:
-  loader:
-    batch_size: 8
-    shuffle: false
-    num_workers: 8
-    collate_fn: all
-    dataset:
-      name: larcv
-      file_keys: null
-      schema:
-        data:
-          parser: sparse3d
-          sparse_event_list:
-            - sparse3d_reco
-            - sparse3d_reco_chi2
-            - sparse3d_reco_hit_charge0
-            - sparse3d_reco_hit_charge1
-            - sparse3d_reco_hit_charge2
-            - sparse3d_reco_hit_key0
-            - sparse3d_reco_hit_key1
-            - sparse3d_reco_hit_key2
-        sources:
-          parser: sparse3d
-          sparse_event_list:
-            - sparse3d_reco_cryo
-            - sparse3d_reco_tpc
-          feature_only: true
-        seg_label:
-          parser: sparse3d
-          sparse_event: sparse3d_pcluster_semantics_ghost
-        ppn_label:
-          parser: particle_points
-          sparse_event: sparse3d_pcluster
-          particle_event: particle_corrected
-          include_point_tagging: false
-        clust_label:
-          parser: cluster3d
-          cluster_event: cluster3d_pcluster
-          particle_event: particle_corrected
-          neutrino_event: neutrino_mpv
-          sparse_semantics_event: sparse3d_pcluster_semantics
-          add_particle_info: true
-          clean_data: true
-        clust_label_g4:
-          parser: cluster3d
-          cluster_event: cluster3d_sed
-          particle_event: particle_corrected
-          add_particle_info: true
-        charge_label:
-          parser: sparse3d
-          sparse_event: sparse3d_reco_rescaled
-        coord_label:
-          parser: particle_coords
-          particle_event: particle_corrected
-          cluster_event: cluster3d_pcluster
-        graph_label:
-          parser: particle_graph
-          particle_event: particle_corrected
-        particles:
-          parser: particle
-          particle_event: particle_corrected
-          neutrino_event: neutrino_mpv
-          cluster_event: cluster3d_pcluster
-        neutrinos:
-          parser: neutrino
-          neutrino_event: neutrino_mpv
-          cluster_event: cluster3d_pcluster
-        flashes:
-          parser: flash
-          flash_event_list:
-            - opflash_tpc0
-            - opflash_tpc1
-        flashes_xa:
-          parser: flash
-          flash_event_list:
-            - opflash_tpc0xa
-            - opflash_tpc1xa
-        crthits:
-          parser: crthit
-          crthit_event: crthit_crthit
-        meta:
-          parser: meta
-          sparse_event: sparse3d_pcluster
-        run_info:
-          parser: run_info
-          sparse_event: sparse3d_pcluster
-
-  writer:
-    name: hdf5
-    file_name: null
-    overwrite: true
-    keys:
-      - run_info
-      - meta
-      - points
-      - points_label
-      - points_g4
-      - depositions
-      - depositions_label
-      - depositions_q_label
-      - depositions_g4
-      - sources
-      - sources_label
-      - reco_particles
-      - truth_particles
-      - reco_interactions
-      - truth_interactions
-      - flashes
-      - flashes_xa
-      - crthits
+# Model common configuration for SBND
 
 # Model configuration
 model:
   name: full_chain
-  # weight_path is overridden in specific configs
+  # weight_path varies by config - override in specific configs
   to_numpy: true
 
   network_input:
@@ -147,7 +15,7 @@ model:
     # General chain configuration
     chain:
       deghosting: uresnet
-      charge_rescaling: collection
+      # charge_rescaling varies by config - override in specific configs
       segmentation: uresnet
       point_proposal: ppn
       fragmentation: graph_spice
@@ -159,7 +27,7 @@ model:
       particle_identification: grappa
       primary_identification: grappa
       orientation_identification: grappa
-      calibration: null
+      # calibration varies by config - override in specific configs
 
     # Deghosting
     uresnet_deghost:
@@ -179,6 +47,9 @@ model:
 
     uresnet_deghost_loss:
       balance_loss: false
+
+    # Calibration
+    # calibration varies by config - override in specific configs
 
     # Semantic segmentation + point proposal
     uresnet_ppn:
@@ -226,7 +97,7 @@ model:
           input_kernel: 5
           depth: 5
           reps: 2
-          spatial_size: 6144
+          # spatial_size varies by config - override in specific configs
           allow_bias: false
           activation:
             name: lrelu
@@ -242,9 +113,7 @@ model:
         edge_threshold: 0.1
         min_size: 3
         label_edges: false
-        graph:
-          name: radius
-          r: 1.9
+        # graph varies by config - override in specific configs
         orphan:
           mode: radius
           radius: 1.9
@@ -316,7 +185,7 @@ model:
     grappa_shower_loss:
       node_loss:
         name: shower_primary
-        use_closest: true
+        # use_closest varies by config - override in specific configs
         high_purity: true
         use_group_pred: true
       edge_loss:
@@ -406,7 +275,7 @@ model:
         add_local_dirs: true
         dir_max_dist: 5
         add_local_dedxs: true
-        dedx_max_dist: 10
+        # dedx_max_dist varies by config - override in specific configs
       edge_encoder:
         name: geo
         use_numpy: true
@@ -418,8 +287,6 @@ model:
           type: 5
           primary: 2
           orient: 2
-          #momentum: 1
-          #vertex: 5
         edge_pred: 2
         edge_layer:
           name: mlp
@@ -467,133 +334,3 @@ model:
       edge_loss:
         name: channel
         target: interaction
-
-# Build output representations
-build:
-  mode: both
-  units: cm
-  fragments: false
-  particles: true
-  interactions: true
-
-# Run post-processors
-post:
-  direction:
-    obj_type: particle
-    optimize: true
-    run_mode: both
-    priority: 6
-    radius: 60
-  cathode_crosser:
-    run_mode: reco
-    crossing_point_tolerance: 15
-    offset_tolerance: 15
-    angle_tolerance: 0.26
-    merge_crossers: true
-    adjust_crossers: false
-    adjust_method: distance
-    priority: 5
-  time_containment:
-    logical: true
-    mode: source
-    margin: 0.
-    cathode_margin: -5.0
-    exclude_pids: [0, 1]
-    min_particle_sizes: 25
-    priority: 4
-  flash_match:
-    flash_key: flashes
-    volume: module
-    method: likelihood
-    cfg: flashmatch_250408.cfg
-    scaling: 1./555. # If reprocessing data that's already been scaled, use 1
-    alpha: 0.21 # Light yield calculation - https://arxiv.org/pdf/1909.07920
-    recombination_mip: 0.6 # 0.65 used in studies - https://sbn-docdb.fnal.gov/cgi-bin/sso/ShowDocument?docid=38164
-    time_contained: true
-    max_cathode_offset: 5
-    merge:
-      threshold: 1.0 #Merge threshold in us, if two flashes occur within this window and are in opposite volumes, they are merged
-      window: [-2.0,2.0] #Time window (us) to merge flashes. If flash times are outside of this window they are not considered for merging.
-      combine_volumes: true #If true, combine flashes that are within the window. If false, do not combine flashes.
-    update_flashes: false #store the original flashes in the output
-    priority: 3
-  shape_logic:
-    enforce_pid: true
-    enforce_primary: true
-    priority: 3
-  apply_calibrations:
-    gain:
-      gain: 49.819 # e/adc
-    recombination:
-      efield: 0.5 # kV/cm
-      model: mbox
-    lifetime:
-      lifetime: 100000 # us
-      driftv: 0.1563 # cm/us
-    priority: 2
-  calo_ke:
-    run_mode: both
-    scaling: 1.
-    shower_fudge: 1.306
-    priority: 1
-  csda_ke:
-    run_mode: reco
-    tracking_mode: step_next
-    segment_length: 5.0
-    fill_per_pid: true
-    priority: 1
-  mcs_ke:
-    run_mode: reco
-    tracking_mode: bin_pca
-    segment_length: 14.0
-    fill_per_pid: true
-    res_a: 0.21265598
-    res_b: 1.40789473
-    res_mixture: true
-    res_weight_ratio: 1.0
-    res_scale_ratio: 2.5
-    priority: 1
-  containment:
-    mode: source
-    margin: 5.0
-    cathode_margin: -5.0
-    exclude_pids: [0, 1]
-    min_particle_sizes: 25
-    priority: 1
-  end_dedx:
-    radius: 4.0
-    mode: default
-    include_pids: [2, 3, 4]
-  vertex:
-    use_primaries: true
-    update_primaries: false
-    update_orientations: true
-    priority: 2
-    run_mode: reco
-  topology_threshold:
-    ke_thresholds:
-      4: 50
-      default: 25
-  fiducial:
-    mode: module
-    margin: [[20,20],[20,20],[10,50]] # TODO: add 5cm pad either side of the cathode
-  children_count:
-    mode: shape
-  match:
-    match_mode: both
-    ghost: true
-    truth_point_mode: points
-    fragment: false
-    particle: true
-    interaction: true
-  start_dedx:
-    radius: 3.0
-    mode: default
-  start_straightness:
-    radius: 3.0
-    n_components: 3
-  particle_spread:
-    start_mode: start_point
-    use_start_dir: false
-  shower_conversion_distance:
-    mode: vertex_to_points

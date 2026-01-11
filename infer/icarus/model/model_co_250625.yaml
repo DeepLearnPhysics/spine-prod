@@ -8,7 +8,14 @@ __meta__:
   compatible_with:
     base: ">=240719"
     io: ">=240812"
-  tags: [collection-only, pre-calibration, ppn-restrict, grappa-use-closest]
+  tags:
+    [
+      collection-only,
+      pre-calibration,
+      ppn-restrict,
+      grappa-use-closest,
+      grouping-through-track,
+    ]
   training_set: "v4"
 
 include: model_common.yaml

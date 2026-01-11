@@ -1,0 +1,13 @@
+# Lite-output modification for SBND configs
+# Revision date: July 20, 2024
+
+__meta__:
+  name: "lite"
+  version: "240720"
+  date: "2024-07-20"
+  description: "Lite-output configuration"
+  applies_to: [mc, data]
+  compatible_with:
+    io: ">=240720"
+
+include: mod_lite_common.yaml

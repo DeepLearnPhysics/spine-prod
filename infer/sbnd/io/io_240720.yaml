@@ -1,0 +1,17 @@
+# IO configuration for SBND
+# Revision date: July 20, 2024
+
+__meta__:
+  version: "240720"
+  date: "2024-07-20"
+  description: "IO configuration for SBND July 2024"
+  compatible_with:
+    base: ">=240720"
+  tags: [without-crt]
+
+include: io_common.yaml
+
+override:
+  # Remove CRT information from the IO loader/writer
+  io.loader.dataset.schema-: crthits
+  io.writer.keys-: crthits

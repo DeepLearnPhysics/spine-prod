@@ -1,0 +1,59 @@
+# Post-processing common configuration for SBND
+
+# Post-processors
+post:
+  direction:
+    obj_type: particle
+    optimize: true
+    run_mode: both
+    # radius varies by config - override in specific configs
+    priority: 6
+  # cathode_crosser varies by config - override in specific configs
+  # time_containment varies by config - override in specific configs
+  # particle_threshold varies by config - override in specific configs
+  # flash_match varies by config - override in specific configs
+  shape_logic:
+    enforce_pid: true
+    enforce_primary: true
+    priority: 3
+  # apply_calibrations varies by config - override in specific configs
+  calo_ke:
+    run_mode: both
+    scaling: 1.
+    shower_fudge: 1.306
+    priority: 1
+  csda_ke:
+    run_mode: reco
+    tracking_mode: step_next
+    segment_length: 5.0
+    fill_per_pid: true
+    priority: 1
+  # mcs_ke varies by config - override in specific configs
+  # containment varies by config - override in specific configs
+  vertex:
+    use_primaries: true
+    update_primaries: false
+    update_orientations: true
+    priority: 2
+    run_mode: reco
+  topology_threshold:
+    ke_thresholds:
+      4: 50
+      default: 25
+  fiducial:
+    mode: module
+    margin: [[20, 20], [20, 20], [10, 50]] # TODO: add 5cm pad either side of the cathode
+  children_count:
+    mode: shape
+  match:
+    match_mode: both
+    ghost: true
+    truth_point_mode: points
+    fragment: false
+    particle: true
+    interaction: true
+  # start_dedx varies by config - override in specific configs
+  # end_dedx varies by config - override in specific configs
+  # start_straightness varies by config - override in specific configs
+  # particle_spread varies by config - override in specific configs
+  # shower_conversion_distance varies by config - override in specific configs

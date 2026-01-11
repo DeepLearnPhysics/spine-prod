@@ -1,0 +1,14 @@
+# Base common configuration for SBND (includes geometry and builder)
+# Revision date: July 20, 2024
+
+__meta__:
+  version: "240720"
+  date: "2024-07-20"
+  description: "Base SBND configuration for July 2024 weights"
+  tags: [sbndv2-4]
+
+include: base_common.yaml
+
+override:
+  # Geometry tag for SBND before the gen 1 and earlier productions
+  geo.tag: sbndv2-4

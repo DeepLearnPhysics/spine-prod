@@ -1,0 +1,110 @@
+# Post-processing configuration for SBND
+# Revision date: August 18, 2025
+
+__meta__:
+  version: "250818"
+  date: "2025-08-18"
+  description: "SBND post-processing"
+  compatible_with:
+    base: ">=240720"
+    io: ">=240720"
+    model: ">=240720"
+  tags: [post-calibration, normalized-fm, shower-pp]
+
+include: post_common.yaml
+
+override:
+  # Cathode crosser configuration
+  post.cathode_crosser:
+    run_mode: reco
+    crossing_point_tolerance: 565.685
+    offset_tolerance: 15
+    angle_tolerance: 0.26
+    merge_crossers: true
+    adjust_crossers: false
+    adjust_method: distance
+    priority: 5
+
+  # Time containment configuration
+  post.time_containment:
+    logical: true
+    mode: source
+    margin: 0.
+    cathode_margin: -5.0
+    exclude_pids: [0, 1]
+    min_particle_sizes: 25
+    priority: 4
+
+  # Flash matching configuration
+  post.flash_match:
+    flash_key: flashes
+    volume: module
+    method: likelihood
+    cfg: flashmatch/flashmatch_250408.cfg
+    scaling: 1./555. # If reprocessing data that's already been scaled, use 1
+    alpha: 0.21 # Light yield calculation - https://arxiv.org/pdf/1909.07920
+    recombination_mip: 0.6 # 0.65 used in studies - https://sbn-docdb.fnal.gov/cgi-bin/sso/ShowDocument?docid=38164
+    max_cathode_offset: 5
+    time_contained: true
+    merge:
+      threshold: 1.0 #Merge threshold in us, if two flashes occur within this window and are in opposite volumes, they are merged
+      window: [-2.0, 2.0] #Time window (us) to merge flashes. If flash times are outside of this window they are not considered for merging.
+      combine_volumes: true #If true, combine flashes that are within the window. If false, do not combine flashes.
+    update_flashes: false #store the original flashes in the output
+    priority: 3
+
+  # Apply calibrations during post-processing
+  post.apply_calibrations:
+    gain:
+      gain: 49.826 # e-/ADC
+    recombination:
+      efield: 0.5 # kV/cm
+      model: mbox
+    lifetime:
+      lifetime: 100000 # us
+      driftv: 0.1563 # cm/us
+    priority: 2
+
+  # MCS configuration
+  post.mcs_ke:
+    run_mode: reco
+    tracking_mode: bin_pca
+    segment_length: 14.0
+    fill_per_pid: true
+    res_a: 0.315
+    res_b: 1.197
+    priority: 1
+
+  # Containment configuration
+  post.containment:
+    run_mode: both
+    mode: source
+    margin: 5.0
+    cathode_margin: -5.0
+    min_particle_sizes:
+      0: 25
+      1: 25
+    priority: 1
+
+  # Radius restriction in direction estimate
+  post.direction.radius: 60.0 # cm
+
+  # Shower fudge factor
+  post.calo_ke.shower_fudge: 1.306
+
+  # Introduces all the shower-specific post-processors
+  post.start_dedx:
+    radius: 3.0
+    mode: default
+  post.end_dedx:
+    radius: 4.0
+    mode: default
+    include_pids: [2, 3, 4]
+  post.start_straightness:
+    radius: 3.0
+    n_components: 3
+  post.particle_spread:
+    start_mode: start_point
+    use_start_dir: false
+  post.shower_conversion_distance:
+    mode: vertex_to_points

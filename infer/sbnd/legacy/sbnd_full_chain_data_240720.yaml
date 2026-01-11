@@ -1,0 +1,6 @@
+# SBND data full chain configuration
+# Revision date: July 20, 2024
+
+include:
+  - ../sbnd_full_chain_240720.yaml
+  - ../modifier/data/mod_data_240720.yaml

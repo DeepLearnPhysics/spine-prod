@@ -1,0 +1,12 @@
+# IO configuration for SBND
+# Revision date: March 28, 2025
+
+__meta__:
+  version: "250328"
+  date: "2025-03-28"
+  description: "IO configuration for SBND March 2025 (removed PPN point tagging)"
+  compatible_with:
+    base: ">=240720"
+  tags: [with-crt]
+
+include: io_common.yaml
