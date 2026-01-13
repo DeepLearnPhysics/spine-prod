@@ -130,12 +130,14 @@ Understanding the available resources on each partition helps justify the profil
 
 | Partition | GPUs/Node | GPU Type | CPUs/Node | RAM/Node | Resources per GPU |
 |-----------|-----------|----------|-----------|----------|------------------|
-| `ampere` | 4 | A100 (40GB) | 112 | 952 GB | 28 CPUs, 238 GB |
-| `turing` | 10 | RTX 2080 Ti (11GB) | 40 | 160 GB | 4 CPUs, 16 GB |
+| `hopper` | 4 | H200 (141 GB) | 224 | 1344 GB | 56 CPUs, 336 GB |
+| `ampere` | 4 | A100 (40 GB) | 112 | 952 GB | 28 CPUs, 238 GB |
+| `turing` | 10 | RTX 2080 Ti (11 GB) | 40 | 160 GB | 4 CPUs, 16 GB |
 | `milano` | 0 | - | 120 | 480 GB | - |
 | `roma` | 0 | - | 120 | 480 GB | - |
 
 Profile allocations are designed to:
+- **Hopper**: Request full resources per GPU (56 CPUs x 6 GB/CPU = 336 GB per GPU)
 - **Ampere**: Request full resources per GPU (28 CPUs × 8 GB/CPU = 224 GB per GPU)
 - **Turing**: Request full resources per GPU (4 CPUs × 4 GB/CPU = 16 GB per GPU)
 - **CPU nodes**: Request minimal resources (1 CPU × 4 GB = 4 GB) for flexible scheduling
@@ -144,10 +146,11 @@ Profile allocations are designed to:
 
 | Profile | Partition | GPU Type | GPU Memory | GPUs | CPUs | Memory | Time | Use Case |
 |---------|-----------|----------|------------|------|------|--------|------|----------|
-| `s3df_ampere` | ampere | A100 | 40GB | 1 | 28 | 8GB/CPU | 2h | High-performance GPU processing (default) |
-| `s3df_turing` | turing | RTX 2080 Ti | 11GB | 1 | 4 | 4GB/CPU | 2h | Cheaper GPU inference |
-| `s3df_milano` | milano | - | - | 0 | 1 | 4GB/CPU | 2h | CPU-only analysis |
-| `s3df_roma` | roma | - | - | 0 | 1 | 4GB/CPU | 2h | CPU-only analysis |
+| `s3df_hopper` | hopper | H200 | 141 GB | 1 | 28 | 8 GB/CPU | 2h | Highest-performance GPU processing |
+| `s3df_ampere` | ampere | A100 | 40 GB | 1 | 28 | 8 GB/CPU | 2h | High-performance GPU processing (default) |
+| `s3df_turing` | turing | RTX 2080 Ti | 11 GB | 1 | 4 | 4GB/CPU | 2h | Cheaper GPU inference |
+| `s3df_milano` | milano | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
+| `s3df_roma` | roma | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
 
 ### Profile Selection
 

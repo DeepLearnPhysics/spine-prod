@@ -2,7 +2,20 @@
 # Define common resource configurations for different use cases
 
 profiles:
-  # Large GPU jobs (fastest, default) at S3DF
+  # Extremely high-demanding GPU jobs (fastest) at S3DF
+  # Node resources: 4 GPUs, 224 CPUs, 1344 GB RAM
+  # -> 56 CPU per GPU, 6 GB per CPU
+  s3df_hopper:
+    partition: hopper
+    gpu_type: h200
+    gpu_mem: 141g
+    gpus: 1
+    cpus_per_task: 56
+    mem_per_cpu: 6g
+    time: "2:00:00"
+    description: "Highest-performance GPU processing on Hopper partition"
+
+  # Large GPU jobs (default) at S3DF
   # This is used to optimize batch sizes for training and inference.
   # Node resources: 4 GPUs, 112 CPUs, 952 GB RAM
   # -> 28 CPU per GPU, 8 GB per CPU
