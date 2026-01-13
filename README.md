@@ -146,7 +146,7 @@ Profile allocations are designed to:
 
 | Profile | Partition | GPU Type | GPU Memory | GPUs | CPUs | Memory | Time | Use Case |
 |---------|-----------|----------|------------|------|------|--------|------|----------|
-| `s3df_hopper` | hopper | H200 | 141 GB | 1 | 28 | 8 GB/CPU | 2h | Highest-performance GPU processing |
+| `s3df_hopper` | hopper | H200 | 141 GB | 1 | 56 | 6 GB/CPU | 2h | Highest-performance GPU processing |
 | `s3df_ampere` | ampere | A100 | 40 GB | 1 | 28 | 8 GB/CPU | 2h | High-performance GPU processing (default) |
 | `s3df_turing` | turing | RTX 2080 Ti | 11 GB | 1 | 4 | 4GB/CPU | 2h | Cheaper GPU inference |
 | `s3df_milano` | milano | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
