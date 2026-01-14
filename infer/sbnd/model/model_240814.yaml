@@ -17,6 +17,9 @@ override:
   # Path to the v1 restrcited model weights
   model.weight_path: /sdf/data/neutrino/sbnd/spine/train/mpvmpr_v01/weights/full_chain/restrict/snapshot-2999.ckpt
 
+  # No pre-calibration
+  model.modules.chain.calibration: null
+
   # Charge rescaling uses average charge
   model.modules.chain.charge_rescaling: average
 

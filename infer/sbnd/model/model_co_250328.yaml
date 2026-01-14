@@ -18,6 +18,9 @@ override:
   model.weight_path: /sdf/data/neutrino/sbnd/train/mpvmpr_v02/weights/full_chain/restrict_250516/snapshot-6499.ckpt # S3DF
   #model.weight_path: /lus/eagle/projects/neutrinoGPU/bearc/spine_weights/mpvmpr_v02/weights/full_chain/grappa_inter/restrict_250516/snapshot-6499.ckpt # Polaris
 
+  # No pre-calibration
+  model.modules.chain.calibration: null
+
   # Charge rescaling uses collection-only charge
   model.modules.chain.charge_rescaling: collection
 
