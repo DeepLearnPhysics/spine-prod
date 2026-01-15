@@ -1,0 +1,76 @@
+# Post-processing common configuration for ND-LAr
+
+# Run post-processors
+post:
+  shape_logic:
+    enforce_pid: true
+    enforce_primary: true
+    priority: 3
+  direction:
+    run_mode: reco
+    obj_type: particle
+    optimize: true
+    radius: 60
+    priority: 2
+  calibration:
+    do_tracking: false
+    gain:
+      gain: 42372.8813559322 # e-/MeV
+    recombination:
+      efield: 0.5 # kV/cm
+      model: birks
+      birks_a: 0.800
+      birks_k: 0.0486
+      segment_length: 5 # cm
+      min_count: 10
+    lifetime:
+      lifetime: 2200 # us
+      driftv: 0.164 # cm/us
+    priority: 2
+  calo_ke:
+    run_mode: both
+    scaling: 1.
+    shower_fudge: 1/0.77
+    priority: 1
+  csda_ke:
+    run_mode: reco
+    tracking_mode: step_next
+    segment_length: 5.0
+    priority: 1
+  mcs_ke:
+    run_mode: reco
+    tracking_mode: bin_pca
+    segment_length: 14.0
+    res_a: 0.24388893
+    res_b: 1.39055786
+    res_mixture: true
+    res_scale_ratio: 2.0
+    res_weight_ratio: 0.5
+  containment:
+    run_mode: both
+    margin: 5.0
+    mode: detector
+    priority: 1
+  vertex:
+    run_mode: reco
+    use_primaries: true
+    update_primaries: false
+    priority: 1
+  topology_threshold:
+    run_mode: both
+    ke_thresholds:
+      4: 50
+      default: 25
+  fiducial:
+    run_mode: both
+    margin: 10.0
+    mode: module
+  children_count:
+    mode: shape
+  match:
+    match_mode: both
+    ghost: false
+    truth_point_mode: points
+    fragment: false
+    particle: true
+    interaction: true

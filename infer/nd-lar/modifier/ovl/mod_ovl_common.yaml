@@ -1,5 +1,6 @@
 # Overlay modification for ND-LAr configs
-# Include this after the main config to set up overlay with multiplicity 4
+# Include this after the main config to transform to lite-output mode (no heavy data products)
+
 override:
   # Overlay collate function
   io.loader.collate_fn:

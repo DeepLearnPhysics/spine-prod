@@ -1,99 +1,4 @@
-# Base configuration for ND-LAr detector
-# Common settings shared across all ND-LAr full chain configs
-# Include this file and override specific settings as needed
-
-# Base configuration
-base:
-  world_size: 1
-  iterations: -1
-  seed: 0
-  dtype: float32
-  unwrap: true
-  log_dir: logs
-  prefix_log: true
-  overwrite_log: true
-  log_step: 1
-  split_output: true
-
-# Geometry configuration
-geo:
-  detector: nd-lar
-  tag: up4.1
-
-# IO configuration
-io:
-  loader:
-    batch_size: 4
-    shuffle: false
-    num_workers: 8
-    collate_fn: all
-    dataset:
-      name: larcv
-      file_keys: null
-      schema:
-        data:
-          parser: sparse3d
-          sparse_event: sparse3d_pcluster
-        seg_label:
-          parser: sparse3d
-          sparse_event: sparse3d_pcluster_semantics
-        ppn_label:
-          parser: particle_points
-          sparse_event: sparse3d_pcluster
-          particle_event: particle_pcluster
-          include_point_tagging: false
-        clust_label:
-          parser: cluster3d
-          cluster_event: cluster3d_pcluster
-          particle_event: particle_pcluster
-          neutrino_event: neutrino_mc_truth
-          sparse_semantics_event: sparse3d_pcluster_semantics
-          add_particle_info: true
-          clean_data: true
-        coord_label:
-          parser: particle_coords
-          particle_event: particle_pcluster
-          cluster_event: cluster3d_pcluster
-        particles:
-          parser: particle
-          particle_event: particle_pcluster
-          neutrino_event: neutrino_mc_truth
-          cluster_event: cluster3d_pcluster
-          skip_empty: true
-        neutrinos:
-          parser: neutrino
-          neutrino_event: neutrino_mc_truth
-          cluster_event: cluster3d_pcluster
-        meta:
-          parser: meta
-          sparse_event: sparse3d_pcluster
-        run_info:
-          parser: run_info
-          sparse_event: sparse3d_pcluster
-        trigger:
-          parser: trigger
-          trigger_event: trigger_base
-        flashes:
-          parser: flash
-          flash_event: opflash_light
-
-  writer:
-    name: hdf5
-    file_name: null
-    overwrite: true
-    keys:
-      - run_info
-      - meta
-      - trigger
-      - flashes
-      - points
-      - points_label
-      - depositions
-      - depositions_label
-      - reco_particles
-      - truth_particles
-      - reco_interactions
-      - truth_interactions
+# Model common configuration for ND-LAr
 
 # Model configuration
 model:
@@ -168,7 +73,7 @@ model:
           input_kernel: 5
           depth: 5
           reps: 2
-          spatial_size: 6144
+          # spatial_size varies by config - override in specific configs
           allow_bias: false
           activation:
             name: lrelu
@@ -206,7 +111,7 @@ model:
         grouping_method: score
       graph:
         name: complete
-        max_length: [500, 0, 500, 500, 0, 0, 0, 25, 0, 25]
+        # max_length varies by config - override in specific configs
         dist_algorithm: recursive
       node_encoder:
         name: geo
@@ -258,7 +163,7 @@ model:
     grappa_shower_loss:
       node_loss:
         name: shower_primary
-        use_closest: true
+        # use_closest varies by config - override in specific configs
         high_purity: true
         use_group_pred: true
       edge_loss:
@@ -275,7 +180,7 @@ model:
         grouping_method: score
       graph:
         name: complete
-        max_length: 300
+        # max_length varies by config - override in specific configs
         dist_algorithm: recursive
       node_encoder:
         name: geo
@@ -337,7 +242,7 @@ model:
         make_groups: true
       graph:
         name: complete
-        max_length: [500, 500, 0, 0, 500, 50, 50, 0, 0, 0]
+        # max_length varies by config - override in specific configs
         dist_algorithm: recursive
       node_encoder:
         name: geo
@@ -407,86 +312,3 @@ model:
       edge_loss:
         name: channel
         target: interaction
-
-# Build output representations
-build:
-  mode: both
-  units: cm
-  fragments: false
-  particles: true
-  interactions: true
-
-# Run post-processors
-post:
-  shape_logic:
-    enforce_pid: true
-    enforce_primary: true
-    priority: 3
-  direction:
-    run_mode: reco
-    obj_type: particle
-    optimize: true
-    radius: 60
-    priority: 2
-  calibration:
-    do_tracking: false
-    gain:
-      gain: 42372.8813559322 # e-/MeV
-    recombination:
-      efield: 0.5 # kV/cm
-      model: birks
-      birks_a: 0.800
-      birks_k: 0.0486
-      segment_length: 5 # cm
-      min_count: 10
-    lifetime:
-      lifetime: 2200 # us
-      driftv: 0.164 # cm/us
-    priority: 2
-  calo_ke:
-    run_mode: both
-    scaling: 1.
-    shower_fudge: 1/0.77
-    priority: 1
-  csda_ke:
-    run_mode: reco
-    tracking_mode: step_next
-    segment_length: 5.0
-    priority: 1
-  mcs_ke:
-    run_mode: reco
-    tracking_mode: bin_pca
-    segment_length: 14.0
-    res_a: 0.24388893
-    res_b: 1.39055786
-    res_mixture: true
-    res_scale_ratio: 2.0
-    res_weight_ratio: 0.5
-  containment:
-    run_mode: both
-    margin: 5.0
-    mode: detector
-    priority: 1
-  vertex:
-    run_mode: reco
-    use_primaries: true
-    update_primaries: false
-    priority: 1
-  topology_threshold:
-    run_mode: both
-    ke_thresholds:
-      4: 50
-      default: 25
-  fiducial:
-    run_mode: both
-    margin: 10.0
-    mode: module
-  children_count:
-    mode: shape
-  match:
-    match_mode: both
-    ghost: false
-    truth_point_mode: points
-    fragment: false
-    particle: true
-    interaction: true

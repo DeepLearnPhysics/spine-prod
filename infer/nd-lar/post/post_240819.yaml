@@ -1,0 +1,14 @@
+# Post-processing configuration for ND-LAr
+# Revision date: July 19, 2024
+
+__meta__:
+  version: "240819"
+  date: "2024-08-19"
+  description: "ND-LAr post-processing for August 2024 weights"
+  compatible_with:
+    base: ">=240819"
+    io: ">=240819"
+    model: ">=240819"
+  tags: [post-calibration]
+
+include: post_common.yaml

@@ -1,0 +1,5 @@
+# ND-LAr full chain configuration
+# Revision date: May 15, 2025
+
+include:
+  - ../full_chain_250515.yaml

@@ -1,0 +1,14 @@
+# Base common configuration for ND-LAr (includes geometry and builder)
+# Revision date: August 19, 2024
+
+__meta__:
+  version: "240819"
+  date: "2024-08-19"
+  description: "Base ND-LAr configuration for August 2024 geometry"
+  tags: [up4-1]
+
+include: base_common.yaml
+
+override:
+  # Geometry tag for ND-LAr used for all 2024-2025 model weights
+  geo.tag: up4.1

@@ -1,0 +1,32 @@
+# ND-LAr model configuration
+# Revision date: August 19, 2024
+
+__meta__:
+  version: "240819"
+  date: "2024-08-19"
+  description: "ND-LAr model 2x2 weights (debug)"
+  compatible_with:
+    base: ">=240819"
+    io: ">=240819"
+  tags: []
+  training_set: "2x2_v2"
+
+include: model_common.yaml
+
+override:
+  # 2x2 (!!!) MPV/MPR v02 default weights
+  model.weight_path: /sdf/data/neutrino/2x2/spine/train/mpvmpr_v2/weights/full_chain/default/snapshot-3999.ckpt # S3DF
+  #model.weight_path: /global/cfs/cdirs/dune/www/data/2x2/simulation/mlreco_weights/2x2_240819_snapshot.ckpt # NERSC
+
+  # Graph-SPICE embedding settings
+  model.modules.graph_spice.embedder.uresnet.spatial_size: 31231
+
+  # Aggregator edge length setting changes
+  model.modules.grappa_shower.graph.max_length:
+    [340, 0, 340, 340, 0, 0, 0, 17, 0, 17]
+  model.modules.grappa_track.graph.max_length: 67
+  model.modules.grappa_inter.graph.max_length:
+    [340, 340, 0, 0, 17, 17, 17, 0, 0, 0]
+
+  # Loss adjustments
+  model.modules.grappa_shower_loss.node_loss.use_closest: false

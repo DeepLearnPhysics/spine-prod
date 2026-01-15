@@ -1,56 +1,66 @@
 # Summary of ND-LAr full chain configurations and their characteristics
 
+**NOTE: These configurations have been refactored to YAML format using modular includes. See the "Configuration Structure" section below for details.**
+
 The configurations below have been trained on ND-LAr MPV/MPR datasets. This summary is divided by training/validation dataset.
 
 ## Configuration Structure
 
-All ND-LAr configurations follow a hierarchical include structure to minimize duplication:
+All ND-LAr configs now use a **hierarchical YAML include system** with composable components:
 
-- **nd-lar_base.cfg**: Common base configuration with all shared settings (IO loaders, models, post-processing)
-- **nd-lar_ovl_mod.cfg**: Overlay modifier that adapts for overlay processing (4x spills)
-- **nd-lar_full_chain_240819.cfg**: Frankenstein version using 2x2 weights (for benchmarking only)
-- **nd-lar_full_chain_250505.cfg**: May 5th 2025 version with MPV/MPR v00 weights
-- **nd-lar_full_chain_250515.cfg**: May 15th 2025 version with updated fiducial and edge lengths
-- **nd-lar_full_chain_250806.cfg**: August 6th 2025 version trained on overlays
-- **nd-lar_full_chain_ovl_250806.cfg**: Includes 250806 + ovl_mod for overlay processing
+### Main Configurations
+- **`full_chain_240819.yaml`**: Frankenstein version using 2x2 weights (benchmarking only)
+- **`full_chain_250505.yaml`**: May 2025 with MPV/MPR v00 weights
+- **`full_chain_250515.yaml`**: May 2025 with updated fiducial and edge lengths
+- **`full_chain_250806.yaml`**: August 2025 trained on overlays
 
-**Inheritance chain:**
-```
-nd-lar_base.cfg
-  ↓ includes
-nd-lar_full_chain_240819.cfg
-nd-lar_full_chain_250505.cfg
-nd-lar_full_chain_250515.cfg
-nd-lar_full_chain_250806.cfg
-  ↓ includes
-nd-lar_full_chain_ovl_250806.cfg + nd-lar_ovl_mod.cfg
-```
+### Component Structure
+Each main config includes modular YAML files:
 
-This eliminates duplication across date declinations.
+**Base Components:**
+- **`base/base_240819.yaml`**: Geometry and base settings
+- **`base/base_common.yaml`**: Common base configuration
 
-**Runtime composition:**
-```shell
-python submit.py nd-lar_full_chain_250806.cfg --apply-mods ovl  # Equivalent to nd-lar_full_chain_ovl_250806.cfg
-python submit.py nd-lar_full_chain_250806.cfg --list-mods       # Show available modifiers
-```
+**IO Components:**
+- **`io/io_240819.yaml`**: IO configuration
+- **`io/io_common.yaml`**: Common IO settings
+
+**Model Components:**
+- **`model/model_240819.yaml`**: 2x2 weights (debug/benchmark only)
+- **`model/model_250505.yaml`**: May 5 2025 ND-LAr weights (v0)
+- **`model/model_250515.yaml`**: May 15 2025 ND-LAr weights (v0)
+- **`model/model_250806.yaml`**: August 6 2025 ND-LAr weights (v0, overlay training)
+- **`model/model_common.yaml`**: Common model architecture
+
+**Post-processing Components:**
+- **`post/post_240819.yaml`**: Post-processing configuration
+- **`post/post_common.yaml`**: Common post-processing settings
+
+### Modifiers
+Located in `modifier/` subdirectories:
+- **`ovl/mod_ovl_240819.yaml`**: Overlay mode (4x spills)
+- **`lite/mod_lite_240819.yaml`**: Lite mode (reduced output)
+
+### Legacy Configs
+Old `.cfg` files moved to `legacy/` directory for backward compatibility
 
 ## Frankenstein configurations
 
-These configurations have been trained using 2x2 and are not expected to work properly. These configurations are to be exclusively used to benchmark SPINE's resource usage at ND-LAr but are not to be used to benchmark reconstruction performance or produce physics results.
+These configurations have been trained using 2x2 weights and are not expected to work properly. These configurations are to be exclusively used to benchmark SPINE's resource usage at ND-LAr but are not to be used to benchmark reconstruction performance or produce physics results.
 
 ### August 19th 2024
 
 ```shell
-nd-lar_full_chain_flash_nersc_240819.cfg
+full_chain_240819.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Includes flash parsing
-  - The `*_nersc_*` declination points to a weight path at NERSC (as opposed to S3DF)
+  - Uses 2x2 weights for initial testing/benchmarking
+  - Modular YAML structure with base/io/model/post components
 
 Known issue(s):
-  - This set of weights is not appropriate for ND-LAr... but it will run (as a test)
+  - This set of weights is not appropriate for ND-LAr but will run (as a test)
   - No flash matching
 
 
@@ -66,15 +76,14 @@ Known issues with the simulation:
 ### May 5th 2025
 
 ```shell
-nd-lar_full_chain_250505.cfg
-nd-lar_full_chain_nersc_250505.cfg
+full_chain_250505.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Includes flash parsing
-  - The `*_nersc_*` declination points to a weight path at NERSC (as opposed to S3DF)
-  - The `*_data_*` declination is meant to run on real data (no labels)
+  - First ND-LAr trained weights (MPV/MPR v00)
+  - Modular YAML structure with base/io/model/post components
+  - Modifiers available in `modifier/` for overlay and lite modes
 
 Known issues:
   - No flash matching
@@ -82,21 +91,39 @@ Known issues:
 ### May 15th 2025
 
 ```shell
-nd-lar_full_chain_250515.cfg
+full_chain_250515.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Includes flash parsing
+  - Improved configuration with updated fiducial and edge lengths
+  - Modular YAML structure with base/io/model/post components
+  - Modifiers available in `modifier/` for overlay and lite modes
 
 Known issues:
   - No flash matching
 
-Changes:
+Changes from May 5th:
   - Changed fiducial definition (10 cm from module boundaries now)
   - Relaxed maximum edge lengths in the GrapPAs
 
 ### August 6th 2025
+
+```shell
+full_chain_250806.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Trained on overlay data (4x spills)
+  - Modular YAML structure with base/io/model/post components
+  - Modifiers available in `modifier/` for overlay and lite modes
+
+Known issues:
+  - No flash matching
+
+Changes from May 15th:
+  - Trained on overlay samples (multiple interactions per readout window)
 
 ```shell
 nd-lar_full_chain_250806.cfg

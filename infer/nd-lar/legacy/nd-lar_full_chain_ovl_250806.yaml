@@ -1,0 +1,6 @@
+# ND-LAr full chain configuration, for overlays
+# Revision date: August 6, 2025
+
+include:
+  - ../full_chain_250806.yaml
+  - ../modifier/ovl/mod_ovl_240819.yaml

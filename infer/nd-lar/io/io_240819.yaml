@@ -1,0 +1,12 @@
+# IO configuration for ND-LAr
+# Revision date: August 19, 2024
+
+__meta__:
+  version: "240819"
+  date: "2024-08-19"
+  description: "IO configuration for ND-LAr August 2024"
+  compatible_with:
+    base: ">=240819"
+  tags: [no-ppn-point-tagging]
+
+include: io_common.yaml
