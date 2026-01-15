@@ -2,7 +2,7 @@
 # Revision date: July 19, 2024
 
 __meta__:
-  name: "lite"
+  name: "noflash"
   version: "240719"
   date: "2024-07-19"
   description: "No-flash configuration"
