@@ -17,3 +17,17 @@ rules:
     indent-sequences: consistent
 
   document-start: disable
+
+  # Allow custom YAML tags like !path
+  quoted-strings: disable
+
+yaml-files:
+  - "*.yaml"
+  - "*.yml"
+  - ".yamllint"
+
+ignore: |
+  .venv/
+  .git/
+  # Files with custom YAML tags (!path, etc.)
+  infer/**/post/*.yaml

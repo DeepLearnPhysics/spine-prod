@@ -21,10 +21,9 @@ To add a new detector for testing, add it to DETECTOR_BASE_CONFIGS dict.
 from pathlib import Path
 
 import pytest
-import yaml
 
 try:
-    from spine.utils.factory import module_dict  # noqa: F401
+    from spine.config import load_config
 
     SPINE_AVAILABLE = True
 except ImportError:
@@ -32,41 +31,16 @@ except ImportError:
 
 
 def load_config_with_includes(config_path):
-    """Load a YAML config and recursively process includes."""
+    """Load a YAML config using SPINE's load_config function.
+
+    This uses SPINE's native config loader which handles:
+    - Custom YAML tags (!path, !include, etc.)
+    - Include directives
+    - Override directives
+    - Metadata stripping
+    """
     config_path = Path(config_path)
-    with open(config_path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-
-    if cfg is None:
-        return {}
-
-    # Process includes
-    if "include" in cfg:
-        includes = cfg.pop("include")
-        if not isinstance(includes, list):
-            includes = [includes]
-
-        base_cfg = {}
-        for inc_file in includes:
-            inc_path = config_path.parent / inc_file
-            inc_cfg = load_config_with_includes(inc_path)
-            # Merge included config
-            base_cfg = {**base_cfg, **inc_cfg}
-
-        # Merge current config on top
-        cfg = {**base_cfg, **cfg}
-
-    # Process override directive
-    if "override" in cfg:
-        overrides = cfg.pop("override")
-        for key, value in overrides.items():
-            # Simple override handling (doesn't handle nested paths like SPINE does)
-            cfg[key] = value
-
-    # Strip metadata
-    cfg.pop("__meta__", None)
-
-    return cfg
+    return load_config(str(config_path))
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
