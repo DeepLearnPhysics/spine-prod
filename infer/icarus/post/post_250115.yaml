@@ -28,7 +28,7 @@ override:
 
   # Flash matching configuration
   post.flash_match:
-    cfg: flashmatch/flashmatch_230930.cfg
+    cfg: !path flashmatch/flashmatch_230930.cfg
     legacy: true
     flash_key: flashes
     volume: module

@@ -40,7 +40,7 @@ override:
     flash_key: flashes
     volume: module
     method: likelihood
-    cfg: flashmatch/flashmatch_250408.cfg
+    cfg: !path flashmatch/flashmatch_250408.cfg
     scaling: 1./555. # If reprocessing data that's already been scaled, use 1
     alpha: 0.21 # Light yield calculation - https://arxiv.org/pdf/1909.07920
     recombination_mip: 0.6 # 0.65 used in studies - https://sbn-docdb.fnal.gov/cgi-bin/sso/ShowDocument?docid=38164

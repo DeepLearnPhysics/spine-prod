@@ -8,7 +8,12 @@ else
     export SPINE_PROD_BASEDIR=$FORCE_SPINE_PROD_BASEDIR
 fi
 
-export SPINE_PROD_CFGDIR=$SPINE_PROD_BASEDIR/infer
+# Setup config search path (prepend to any existing paths)
+if [[ -z $SPINE_CONFIG_PATH ]]; then
+    export SPINE_CONFIG_PATH=$SPINE_PROD_BASEDIR/infer:$SPINE_PROD_BASEDIR/train
+else
+    export SPINE_CONFIG_PATH=$SPINE_PROD_BASEDIR/infer:$SPINE_PROD_BASEDIR/train:$SPINE_CONFIG_PATH
+fi
 
 # Define path to SPINE
 export SPINE_BASEDIR=/sdf/data/neutrino/software/spine
@@ -25,7 +30,7 @@ export SINGULARITY_PATH=/sdf/group/neutrino/images/larcv2_ub2204-cuda121-torch25
 echo
 printf "\033[93mSPINE_PROD\033[00m FYI shell env. may useful for external packages:\n"
 printf "    \033[95mSPINE_PROD_BASEDIR\033[00m = $SPINE_PROD_BASEDIR\n"
-printf "    \033[95mSPINE_PROD_CFGDIR\033[00m  = $SPINE_PROD_CFGDIR\n"
+printf "    \033[95mSPINE_CONFIG_PATH\033[00m  = $SPINE_CONFIG_PATH\n"
 printf "    \033[95mSPINE_BASEDIR\033[00m      = $SPINE_BASEDIR\n"
 printf "    \033[95mFMATCH_BASEDIR\033[00m     = $FMATCH_BASEDIR\n"
 printf "    \033[95mSINGULARITY_PATH\033[00m   = $SINGULARITY_PATH\n"
