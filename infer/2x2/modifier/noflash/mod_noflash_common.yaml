@@ -1,0 +1,7 @@
+# No-flash modification for 2x2 configs
+# Include this after the main config to remove flash parsing and output
+
+override:
+  # Remove flashes from loader and writer
+  io.loader.dataset.schema-: flashes
+  io.writer.keys-: flashes

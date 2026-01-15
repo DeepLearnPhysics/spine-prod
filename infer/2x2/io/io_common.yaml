@@ -1,0 +1,80 @@
+# IO common configuration for 2x2
+
+# IO configuration
+io:
+  loader:
+    batch_size: 64
+    shuffle: false
+    num_workers: 8
+    collate_fn: all
+    dataset:
+      name: larcv
+      file_keys: null
+      schema:
+        data:
+          parser: sparse3d
+          sparse_event: sparse3d_pcluster
+        seg_label:
+          parser: sparse3d
+          sparse_event: sparse3d_pcluster_semantics
+        ppn_label:
+          parser: particle_points
+          sparse_event: sparse3d_pcluster
+          particle_event: particle_pcluster
+          # include_point_tagging varies by config - override in specific configs
+          include_point_tagging: false
+        clust_label:
+          parser: cluster3d
+          cluster_event: cluster3d_pcluster
+          particle_event: particle_pcluster
+          neutrino_event: neutrino_mc_truth
+          sparse_semantics_event: sparse3d_pcluster_semantics
+          add_particle_info: true
+          clean_data: true
+        coord_label:
+          parser: particle_coords
+          particle_event: particle_pcluster
+          cluster_event: cluster3d_pcluster
+        graph_label:
+          parser: particle_graph
+          particle_event: particle_pcluster
+        particles:
+          parser: particle
+          particle_event: particle_pcluster
+          neutrino_event: neutrino_mc_truth
+          cluster_event: cluster3d_pcluster
+          skip_empty: true
+        neutrinos:
+          parser: neutrino
+          neutrino_event: neutrino_mc_truth
+          cluster_event: cluster3d_pcluster
+        meta:
+          parser: meta
+          sparse_event: sparse3d_pcluster
+        run_info:
+          parser: run_info
+          sparse_event: sparse3d_pcluster
+        trigger:
+          parser: trigger
+          trigger_event: trigger_base
+        flashes:
+          parser: flash
+          flash_event: opflash_light
+
+  writer:
+    name: hdf5
+    file_name: null
+    overwrite: true
+    keys:
+      - run_info
+      - meta
+      - trigger
+      - points
+      - points_label
+      - depositions
+      - depositions_label
+      - reco_particles
+      - truth_particles
+      - reco_interactions
+      - truth_interactions
+      - flashes

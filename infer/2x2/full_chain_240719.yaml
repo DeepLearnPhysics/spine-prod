@@ -1,0 +1,8 @@
+# 2x2 full chain configuration
+# Revision date: July 19, 2024
+
+include:
+  - base/base_240719.yaml
+  - io/io_240719.yaml
+  - model/model_240719.yaml
+  - post/post_240719.yaml

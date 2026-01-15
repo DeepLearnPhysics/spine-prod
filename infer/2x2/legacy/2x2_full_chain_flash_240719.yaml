@@ -1,0 +1,5 @@
+# 2x2 full chain configuration, with flash parsing
+# Revision date: July 19, 2024
+
+include:
+  - ../full_chain_240719.yaml

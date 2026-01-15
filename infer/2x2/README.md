@@ -1,50 +1,48 @@
 # Summary of 2x2 full chain configurations and their characteristics
 
-**NOTE: These configurations have been refactored to use the `include:` mechanism to avoid duplication. See the "Configuration Structure" section below for details.**
+**NOTE: These configurations have been refactored to YAML format using modular includes. See the "Configuration Structure" section below for details.**
 
 The configurations below have been trained on 2x2 MPV/MPR datasets. This summary is divided by training/validation dataset.
 
 ## Configuration Structure
 
-All 2x2 configs now use a **hierarchical include system** with composable modifiers:
+All 2x2 configs now use a **hierarchical YAML include system** with composable components:
 
-### Base Configuration
-- **`2x2_base.cfg`**: Main base config with all common settings (IO, model architecture, post-processing)
+### Main Configurations
+- **`full_chain_240819.yaml`**: Latest August 2024 weights (v2)
+- **`full_chain_240719.yaml`**: July 2024 weights (v1)
 
-### Modifier Configs
-- **`2x2_data_mod.cfg`**: Transforms any config to data-only mode (removes truth labels, sets reco-only)
-- **`2x2_flash_mod.cfg`**: Adds flash parsing to any config
+### Component Structure
+Each main config includes modular YAML files:
 
-### Version-Specific Configs
-- **`2x2_full_chain_240819.cfg`**: Latest v2 weights → `2x2_base.cfg`
-- **`2x2_full_chain_240719.cfg`**: Older v1 weights + legacy settings → `2x2_base.cfg` + overrides
+**Base Components:**
+- **`base/base_240719.yaml`**: Geometry and base settings
+- **`base/base_common.yaml`**: Common base configuration
 
-### Composed Configs
-Variants built by combining base versions with modifiers:
-- **`2x2_full_chain_flash_240819.cfg`**: `240819` + `flash_mod`
-- **`2x2_full_chain_data_240819.cfg`**: `240819` + `data_mod`
-- **`2x2_full_chain_data_flash_240819.cfg`**: `data_240819` + `flash_mod`
-- (Same pattern for 240719 versions)
+**IO Components:**
+- **`io/io_240719.yaml`**: July 2024 IO (with PPN point tagging)
+- **`io/io_240819.yaml`**: August 2024 IO (no PPN point tagging)
+- **`io/io_common.yaml`**: Common IO settings
 
-**Inheritance Example:**
-```
-2x2_full_chain_data_flash_240819.cfg
-  ↳ 2x2_full_chain_data_240819.cfg
-      ↳ 2x2_full_chain_240819.cfg
-          ↳ 2x2_base.cfg
-      ↳ 2x2_data_mod.cfg
-  ↳ 2x2_flash_mod.cfg
-```
+**Model Components:**
+- **`model/model_240719.yaml`**: July 2024 model weights (v1)
+- **`model/model_240819.yaml`**: August 2024 model weights (v2)
+- **`model/model_common.yaml`**: Common model architecture
 
-### Latest Configs
+**Post-processing Components:**
+- **`post/post_240719.yaml`**: Post-processing configuration
+- **`post/post_common.yaml`**: Common post-processing settings
 
-Symlinks pointing to the most recent versions:
-- `latest.cfg` → `2x2_full_chain_LATEST.cfg`
-- `latest_data.cfg` → `2x2_full_chain_data_LATEST.cfg`
-- `latest_flash.cfg` → `2x2_full_chain_flash_LATEST.cfg`
-- `latest_data_flash.cfg` → `2x2_full_chain_data_flash_LATEST.cfg`
+### Modifiers
+Located in `modifier/` subdirectories:
+- **`data/mod_data_240719.yaml`**: Data-only mode (no truth labels)
+- **`lite/mod_lite_240719.yaml`**: Lite mode (reduced output)
+- **`noflash/mod_noflash_240719.yaml`**: Disable flash parsing
 
-## Configurations for MPV/MPR v01
+### Legacy Configs
+Old `.cfg` files moved to `legacy/` directory for backward compatibility
+
+## Configurations for MPV/MPR v1
 
 These weights have been trained/validated using the following files:
 - Training set: `/sdf/data/neutrino/2x2/sim/mpvmpr_v1/train_file_list.txt`
@@ -53,38 +51,39 @@ These weights have been trained/validated using the following files:
 ### July 19th 2024
 
 ```shell
-2x2_full_chain_240719.cfg
-2x2_full_chain_flash_240719.cfg
-2x2_full_chain_data_240719.cfg
+full_chain_240719.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - The `*_flash_*` declination includes flash parsing
-  - The `*_data_*` declination is tailored for data (no labels)
+  - Uses PPN point tagging for shower start prediction
+  - Modular YAML structure with base/io/model/post components
+  - Modifiers available in `modifier/` for data-only, lite, and noflash modes
 
 Known issue(s):
   - Module 2 packets are simply wrong (performance in that module is terrible, may affect others)
   - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
 
+## Configurations for MPV/MPR v2
+
+These weights have been trained/validated using the following files:
+- Training set: `/sdf/data/neutrino/2x2/sim/mpvmpr_v2/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/2x2/sim/mpvmpr_v2/test_file_list.txt`
+
 ### August 19th 2024
 
 ```shell
-2x2_full_chain_240819.cfg
-2x2_full_chain_flash_240819.cfg
-2x2_full_chain_data_240819.cfg
-2x2_full_chain_data_flash_240819.cfg
+full_chain_240819.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - The `*_flash_*` declination includes flash parsing
-  - The `*_data_*` declination is tailored for data (no labels)
-  - The `*_data_flash_*` declination is tailored for data (no labels) and includes flash parsing
+  - Improved PPN labeling and predictions
+  - Fixed Module 2 packet issues from previous version
+  - PPN mask labeling now only includes points within the cluster providing the label point
+  - PPN no longer predicts track end point ordering
+  - Modular YAML structure with base/io/model/post components
+  - Modifiers available in `modifier/` for data-only, lite, and noflash modes
 
 Known issue(s):
-  - Module 2 packets have been fixed w.r.t. to the previous set of weights
-  - PPN labeling and predictions have been fixed
-    - PPN mask labeling now only includes points within the cluster providing the label point
-    - PPN no longer predicts track end point ordering
-  - No known major issue
+  - No known major issues

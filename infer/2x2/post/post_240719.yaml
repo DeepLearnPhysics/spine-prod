@@ -1,0 +1,14 @@
+# Post-processing configuration for 2x2
+# Revision date: July 19, 2024
+
+__meta__:
+  version: "240719"
+  date: "2024-07-19"
+  description: "2x2 post-processing for July 2024 weights"
+  compatible_with:
+    base: ">=240719"
+    io: ">=240719"
+    model: ">=240719"
+  tags: [post-calibration]
+
+include: post_common.yaml

@@ -1,0 +1,7 @@
+# 2x2 full chain data configuration
+# Revision date: July 19, 2024
+
+include:
+  - ../full_chain_240719.yaml
+  - ../modifier/noflash/mod_noflash_240719.yaml
+  - ../modifier/data/mod_data_240719.yaml

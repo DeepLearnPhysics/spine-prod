@@ -1,6 +1,8 @@
-# Data-only modification for 2x2 configs
+# Data-only modification for 2x2 configs, common settings
 # Include this after the main config to transform to data-only mode (no truth labels)
+
 override:
+  ### IO overrides ###
   # Use hits sparse event instead of pcluster
   io.loader.dataset.schema.data.sparse_event: sparse3d_hits
   io.loader.dataset.schema.meta.sparse_event: sparse3d_hits
@@ -26,6 +28,7 @@ override:
     truth_particles: TruthParticle
     truth_interactions: TruthInteraction
 
+  ### Model overrides ###
   # Remove seg_label from network input
   model.network_input-: seg_label
 
@@ -34,6 +37,7 @@ override:
   model.modules.grappa_track.graph.max_count: 1000000
   model.modules.grappa_inter.graph.max_count: 1000000
 
+  ### Post-processing overrides ###
   # Set build/post to reco-only mode
   build.mode: reco
   post.direction.run_mode: reco

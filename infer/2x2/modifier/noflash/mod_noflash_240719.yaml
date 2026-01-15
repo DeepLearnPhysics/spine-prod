@@ -1,0 +1,13 @@
+# No-flash modification for 2x2 configs
+# Revision date: July 19, 2024
+
+__meta__:
+  name: "lite"
+  version: "240719"
+  date: "2024-07-19"
+  description: "No-flash configuration"
+  applies_to: [mc, data]
+  compatible_with:
+    io: ">=240719"
+
+include: mod_noflash_common.yaml

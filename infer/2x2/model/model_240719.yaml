@@ -1,13 +1,21 @@
-# 2x2 full chain configuration (July 19, 2024 version)
-# Uses v1 weights with older settings
-include: 2x2_base.cfg
+# 2x2 model configuration
+# Revision date: July 19, 2024
+
+__meta__:
+  version: "240719"
+  date: "2024-07-19"
+  description: "2x2 model with average charge rescaling"
+  compatible_with:
+    base: ">=240719"
+    io: "==240719"
+  tags: []
+  training_set: "v1"
+
+include: model_common.yaml
 
 override:
   # Path to the v1 model weights
   model.weight_path: /sdf/data/neutrino/2x2/train_spine/mpvmpr_v1/weights/full_chain/default/snapshot-3999.ckpt
-
-  # Include point tagging in PPN label parser
-  io.loader.dataset.schema.ppn_label.include_point_tagging: true
 
   # Older PPN/Graph SPICE settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: true

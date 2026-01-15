@@ -1,0 +1,6 @@
+# 2x2 full chain data configuration, with flash parsing
+# Revision date: August 19, 2024
+
+include:
+  - ../full_chain_240819.yaml
+  - ../modifier/data/mod_data_240719.yaml

@@ -1,0 +1,13 @@
+# Data-only modification for 2x2 configs
+# Revision date: July 19, 2024
+
+__meta__:
+  name: "data"
+  version: "240719"
+  date: "2024-07-19"
+  description: "Data-only configuration"
+  applies_to: [data]
+  compatible_with:
+    post: ">=240719"
+
+include: mod_data_common.yaml
