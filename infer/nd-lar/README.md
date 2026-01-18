@@ -38,8 +38,10 @@ Each main config includes modular YAML files:
 
 ### Modifiers
 Located in `modifier/` subdirectories:
+- **`data/mod_data_240819.yaml`**: Data-only mode (no truth labels)
 - **`ovl/mod_ovl_240819.yaml`**: Overlay mode (4x spills)
 - **`lite/mod_lite_240819.yaml`**: Lite mode (reduced output)
+- **`single/mod_single_240819.yaml`**: Switch to single-module mode
 
 ### Legacy Configs
 Old `.cfg` files moved to `legacy/` directory for backward compatibility

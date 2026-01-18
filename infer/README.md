@@ -15,8 +15,6 @@ The configurations in this directory are used to:
 Each subdirectory contains detector-specific configurations:
 
 - **`2x2/`**: 2x2 demonstrator detector configurations
-- **`2x2-single/`**: Single-module 2x2 configurations
-- **`fsd/`**: Full Scale Demonstrator (FSD) configurations
 - **`generic/`**: Generic detector configurations for testing and development
 - **`icarus/`**: ICARUS detector configurations
 - **`nd-lar/`**: DUNE Near Detector Liquid Argon (ND-LAr) configurations
