@@ -1,0 +1,19 @@
+# Single-module modification for 2x2 configs
+# Revision date: July 19, 2024
+
+__meta__:
+  name: "single"
+  version: "240719"
+  date: "2024-07-19"
+  description: "Single-module configuration"
+  applies_to: [data]
+  compatible_with:
+    io: ">=240719"
+
+include: mod_single_common.yaml
+
+override:
+  # Change the names of data products which differ for single-module processing
+  io.loader.dataset.schema.data.sparse_event: sparse3d_packets
+  io.loader.dataset.schema.meta.sparse_event: sparse3d_packets
+  io.loader.dataset.schema.run_info.sparse_event: sparse3d_packets

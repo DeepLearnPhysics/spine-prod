@@ -1,0 +1,7 @@
+# 2x2 single module full chain configuration
+# Revision date: August 19, 2024
+
+include:
+  - ../full_chain_240819.yaml
+  - ../modifier/noflash/mod_noflash_240719.yaml
+  - ../modifier/single/mod_single_240719.yaml

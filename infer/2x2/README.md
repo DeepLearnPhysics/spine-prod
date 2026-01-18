@@ -38,6 +38,8 @@ Located in `modifier/` subdirectories:
 - **`data/mod_data_240719.yaml`**: Data-only mode (no truth labels)
 - **`lite/mod_lite_240719.yaml`**: Lite mode (reduced output)
 - **`noflash/mod_noflash_240719.yaml`**: Disable flash parsing
+- **`single/mod_single_240719.yaml`**: Switch to single-module mode
+- **`single/mod_single_data_240719.yaml`**: Switch to single-module mode for data
 
 ### Legacy Configs
 Old `.cfg` files moved to `legacy/` directory for backward compatibility

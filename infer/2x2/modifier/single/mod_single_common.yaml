@@ -1,0 +1,10 @@
+# Single-module modification for 2x2 configs
+# Include this after the main config to process only a single module
+
+override:
+  # Change the detector geometry to single-module
+  geo.detector: 2x2-single
+  geo.tag: mr5-0
+
+  # Change the batch size to a much larger number
+  io.loader.batch_size: 1024
