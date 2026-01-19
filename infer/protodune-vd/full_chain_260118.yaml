@@ -1,0 +1,8 @@
+# ProtoDUNE-VD full chain configuration
+# Revision date: January 18, 2026
+
+include:
+  - base/base_260118.yaml
+  - io/io_260118.yaml
+  - model/model_co_260118.yaml
+  - post/post_260118.yaml

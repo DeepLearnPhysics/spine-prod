@@ -1,0 +1,10 @@
+# Base common configuration for ProtoDUNE-VD (includes geometry and builder)
+# Revision date: January 18, 2026
+
+__meta__:
+  version: "260118"
+  date: "2026-01-18"
+  description: "Base ProtoDUNE-VD configuration for January 2026 weights"
+  tags: []
+
+include: base_common.yaml

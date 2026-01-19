@@ -1,0 +1,12 @@
+# IO configuration for ProtoDUNE-VD
+# Revision date: January 18, 2026
+
+__meta__:
+  version: "260118"
+  date: "2026-01-18"
+  description: "IO configuration for ProtoDUNE-VD January 2026"
+  compatible_with:
+    base: ">=260118"
+  tags: [no-ppn-point-tagging]
+
+include: io_common.yaml

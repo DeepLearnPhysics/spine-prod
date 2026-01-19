@@ -1,0 +1,20 @@
+# Lite-output modification for ProtoDUNE-VD configs
+# Include this after the main config to transform to lite-output mode (no heavy data products)
+
+override:
+  # Remove heavy keys from writer
+  io.writer.lite: true
+  io.writer.keys-:
+    - points
+    - depositions
+    - depositions_q
+    - sources
+    - points_label
+    - depositions_label
+    - depositions_q_label
+    - sources_label
+    - points_g4
+    - depositions_g4
+    - flashes
+    - crthits
+    - trigger

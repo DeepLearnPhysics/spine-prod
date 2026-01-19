@@ -1,0 +1,27 @@
+# Base common configuration for ProtoDUNE-VD (includes geometry and builder)
+
+# Base configuration
+base:
+  world_size: 1
+  iterations: -1
+  seed: 0
+  dtype: float32
+  unwrap: true
+  log_dir: logs
+  prefix_log: true
+  overwrite_log: true
+  log_step: 1
+  split_output: true
+
+# Geometry configuration
+geo:
+  detector: protodune-vd
+  tag: protodunevd_v5
+
+# Build output representations
+build:
+  mode: both
+  units: cm
+  fragments: false
+  particles: true
+  interactions: true
