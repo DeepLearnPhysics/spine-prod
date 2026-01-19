@@ -14,14 +14,6 @@ __meta__:
 include: post_common.yaml
 
 override:
-  # Flash matching configuration
-  post.flash_match:
-    cfg: !path flashmatch/flashmatch_250214.cfg
-    flash_key: flashes
-    volume: module
-    ref_volume_id: 0
-    method: likelihood
-
   # Containment configuration
   post.containment:
     run_mode: both

@@ -6,11 +6,7 @@ io:
     batch_size: 4
     shuffle: false
     num_workers: 8
-    collate_fn:
-      name: all
-      split: true
-      source:
-        sources: sources
+    collate_fn: all
     dataset:
       name: larcv
       file_keys: null
@@ -18,32 +14,20 @@ io:
         data:
           parser: sparse3d
           sparse_event_list:
-            - sparse3d_reco_cryoE
-            - sparse3d_reco_cryoE_chi2
-            - sparse3d_reco_cryoE_hit_charge0
-            - sparse3d_reco_cryoE_hit_charge1
-            - sparse3d_reco_cryoE_hit_charge2
-            - sparse3d_reco_cryoE_hit_key0
-            - sparse3d_reco_cryoE_hit_key1
-            - sparse3d_reco_cryoE_hit_key2
-            - sparse3d_reco_cryoW
-            - sparse3d_reco_cryoW_chi2
-            - sparse3d_reco_cryoW_hit_charge0
-            - sparse3d_reco_cryoW_hit_charge1
-            - sparse3d_reco_cryoW_hit_charge2
-            - sparse3d_reco_cryoW_hit_key0
-            - sparse3d_reco_cryoW_hit_key1
-            - sparse3d_reco_cryoW_hit_key2
-          num_features: 8
+            - sparse3d_reco
+            - sparse3d_reco_chi2
+            - sparse3d_reco_hit_charge0
+            - sparse3d_reco_hit_charge1
+            - sparse3d_reco_hit_charge2
+            - sparse3d_reco_hit_key0
+            - sparse3d_reco_hit_key1
+            - sparse3d_reco_hit_key2
         sources:
           parser: sparse3d
           sparse_event_list:
-            - sparse3d_reco_cryoE_cryo
-            - sparse3d_reco_cryoE_tpc
-            - sparse3d_reco_cryoW_cryo
-            - sparse3d_reco_cryoW_tpc
+            - sparse3d_reco_cryo
+            - sparse3d_reco_tpc
           feature_only: true
-          num_features: 2
         seg_label:
           parser: sparse3d
           sparse_event: sparse3d_pcluster_semantics_ghost
@@ -66,11 +50,8 @@ io:
           particle_event: particle_corrected
           add_particle_info: true
         charge_label:
-          parser: sparse3d_aggr
-          aggr: sum
-          sparse_event_list:
-            - sparse3d_reco_cryoE_rescaled
-            - sparse3d_reco_cryoW_rescaled
+          parser: sparse3d
+          sparse_event: sparse3d_reco_rescaled
         coord_label:
           parser: particle_coords
           particle_event: particle_corrected
@@ -90,8 +71,7 @@ io:
         flashes:
           parser: flash
           flash_event_list:
-            - opflash_cryoE
-            - opflash_cryoW
+            - opflash
         crthits:
           parser: crthit
           crthit_event: crthit_crthit
