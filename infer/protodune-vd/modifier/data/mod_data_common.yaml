@@ -1,0 +1,60 @@
+# Data-only modification for ProtoDUNE-VD configs, common settings
+# Include this after the main config to transform to data-only mode (no truth labels)
+
+override:
+  ### IO overrides ###
+  # Use hits sparse event instead of pcluster
+  io.loader.dataset.schema.meta.sparse_event: sparse3d_reco
+  io.loader.dataset.schema.run_info.sparse_event: sparse3d_reco
+
+  # Remove truth label parsers
+  io.loader.dataset.schema-:
+    - seg_label
+    - ppn_label
+    - clust_label
+    - clust_label_g4
+    - coord_label
+    - charge_label
+    - graph_label
+    - particles
+    - neutrinos
+
+  # Remove truth label writers
+  io.writer.keys-:
+    - points_label
+    - depositions_label
+    - depositions_q_label
+    - sources_label
+    - points_g4
+    - depositions_g4
+    - truth_particles
+    - truth_interactions
+
+  ### Model overrides ###
+  # Remove seg_label from network input
+  model.network_input-: seg_label
+
+  # Modify calibration parameters for data
+  # model.modules.calibration varies by config - override in specific configs
+
+  ### Post-processing overrides ###
+  # Set build/post to reco-only mode
+  build.mode: reco
+  post.direction.run_mode: reco
+  post.calo_ke.run_mode: reco
+  post.containment.run_mode: reco
+  post.time_containment.run_mode: reco
+  post.topology_threshold.run_mode: reco
+  post.fiducial.run_mode: reco
+
+  # Remove match post-processor (no truth)
+  post-:
+    - match
+    - children_count
+
+  # Remove irrelevant arguments
+  post.containment-: truth_point_mode
+  post.topology_threshold-: truth_ke_mode
+
+  # Modify calibration parameters for data
+  # post.apply_calibrations varies by config - override in specific configs
