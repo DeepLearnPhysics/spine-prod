@@ -1,14 +1,14 @@
 # Post-processing configuration for ICARUS
-# Revision date: July 19, 2024
+# Revision date: January 18, 2026
 
 __meta__:
-  version: "250625"
-  date: "2025-06-25"
+  version: "260118"
+  date: "2026-01-18"
   description: "ICARUS post-processing, latest"
   compatible_with:
-    base: ">=240719"
-    io: ">=240719"
-    model: ">=250303"
+    base: ">=260118"
+    io: ">=260118"
+    model: ">=260118"
   tags: [normalized-fm, shower-pp]
 
 include: post_common.yaml
