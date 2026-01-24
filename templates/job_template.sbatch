@@ -64,38 +64,54 @@ echo "Files in this task:"
 cat "$TASK_FILE_LIST"
 echo
 
-# Detect site and set bind paths
+# Detect site and configure container execution
 if [[ -d "/sdf" ]]; then
-    # S3DF
+    # S3DF - uses Singularity with bind mounts
+    SITE="s3df"
     BIND_PATHS="/sdf/,/fs/"
 elif [[ -d "/global/cfs" ]]; then
-    # NERSC
+    # NERSC - uses Shifter with srun
+    SITE="nersc"
     BIND_PATHS="/global/cfs/,/pscratch/sd/"
 else
-    # Default/unknown site - use minimal binding
+    # Default/unknown site
+    SITE="unknown"
     BIND_PATHS="$PWD"
 fi
 
-# Build singularity command
-SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SINGULARITY_PATH bash -c \""
+# Build execution command based on site
+if [[ "$SITE" == "nersc" ]]; then
+    # NERSC: Use srun with shifter
+    # Build the command to run inside container
+    INNER_CMD=""
+    {% if larcv_basedir %}
+    INNER_CMD="unset which; source {{ larcv_basedir }}/configure.sh; "
+    {% endif %}
+    {% if flashmatch %}
+    INNER_CMD="${INNER_CMD}source \$FMATCH_BASEDIR/configure.sh; "
+    {% endif %}
+    INNER_CMD="${INNER_CMD}python3 \$SPINE_BASEDIR/bin/run.py -S $TASK_FILE_LIST -o {{ output }} -c {{ config }}"
 
-# Add LArCV environment if specified
-{% if larcv_basedir %}
-SINGULARITY_CMD="$${SINGULARITY_CMD}unset which; source {{ larcv_basedir }}/configure.sh; "
-{% endif %}
-
-# Add flashmatch environment if needed
-{% if flashmatch %}
-SINGULARITY_CMD="$${SINGULARITY_CMD}source $$FMATCH_BASEDIR/configure.sh; "
-{% endif %}
-
-# Add SPINE execution command (using -S for source list)
-SINGULARITY_CMD="$${SINGULARITY_CMD}python3 $$SPINE_BASEDIR/bin/run.py -S $$TASK_FILE_LIST -o {{ output }} -c {{ config }}\""
+    # Execute with srun and shifter
+    RUN_CMD="srun -n 1 shifter --image=$SINGULARITY_PATH \"$INNER_CMD\""
+else
+    # S3DF or other: Use Singularity
+    SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SINGULARITY_PATH bash -c \""
+    {% if larcv_basedir %}
+    SINGULARITY_CMD="$${SINGULARITY_CMD}unset which; source {{ larcv_basedir }}/configure.sh; "
+    {% endif %}
+    {% if flashmatch %}
+    SINGULARITY_CMD="$${SINGULARITY_CMD}source $$FMATCH_BASEDIR/configure.sh; "
+    {% endif %}
+    SINGULARITY_CMD="$${SINGULARITY_CMD}python3 $$SPINE_BASEDIR/bin/run.py -S $$TASK_FILE_LIST -o {{ output }} -c {{ config }}\""
+    RUN_CMD="$SINGULARITY_CMD"
+fi
 
 # Execute
-echo "Running: $SINGULARITY_CMD"
+echo "Site: $SITE"
+echo "Running: $RUN_CMD"
 echo
-eval $SINGULARITY_CMD
+eval $RUN_CMD
 
 # Check exit status
 EXIT_STATUS=$?
