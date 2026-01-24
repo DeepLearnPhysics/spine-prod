@@ -1,7 +1,0 @@
-# FSD data full chain configuration
-# Revision date: May 5, 2025
-
-include:
-  - ../full_chain_250505.yaml
-  - ../modifier/data/mod_data_240819.yaml
-  - ../modifier/single/mod_single_240819.yaml
