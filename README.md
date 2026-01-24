@@ -31,6 +31,18 @@ export SPINE_BASEDIR=/path/to/your/spine
 source configure.sh
 ```
 
+**Updating SPINE Version:** To update to a specific SPINE release:
+```bash
+# Update to latest tagged release
+./update_spine_version.sh v0.9.3
+
+# Commit the update
+git commit -m "Update SPINE to v0.9.3"
+
+# Check current SPINE version
+git submodule status
+```
+
 ### 2. Basic Job Submission
 
 ```bash
