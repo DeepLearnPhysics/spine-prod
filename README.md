@@ -15,16 +15,21 @@ SPINE is a deep learning-based reconstruction framework for liquid argon time pr
 ### 1. Environment Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/DeepLearnPhysics/spine-prod.git
+# Clone the repository with submodules
+git clone --recursive https://github.com/DeepLearnPhysics/spine-prod.git
 cd spine-prod
 
-# Configure environment to point to your SPINE installation
-# Edit configure.sh to set SPINE_BASEDIR to your SPINE install location
+# Configure environment (automatically uses bundled SPINE submodule)
 source configure.sh
 ```
 
-**Note:** This repository contains SPINE configuration files for production runs. You need an existing SPINE installation - either a system-wide installation or a local build. The `configure.sh` script should be edited to point `SPINE_BASEDIR` to your SPINE installation directory.
+**SPINE Version Control:** This repository includes SPINE as a git submodule, ensuring version consistency between production configurations and the SPINE codebase. The submodule is automatically used by `configure.sh` if present.
+
+**Alternative Setup:** You can override `SPINE_BASEDIR` before sourcing `configure.sh` to use a different SPINE installation:
+```bash
+export SPINE_BASEDIR=/path/to/your/spine
+source configure.sh
+```
 
 ### 2. Basic Job Submission
 

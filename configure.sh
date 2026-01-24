@@ -16,7 +16,14 @@ else
 fi
 
 # Define path to SPINE
-export SPINE_BASEDIR=/sdf/data/neutrino/software/spine
+# Default to submodule if it exists, otherwise fall back to system installation
+if [[ -z $SPINE_BASEDIR ]]; then
+    if [[ -d "$SPINE_PROD_BASEDIR/spine" ]]; then
+        export SPINE_BASEDIR=$SPINE_PROD_BASEDIR/spine
+    else
+        export SPINE_BASEDIR=/sdf/data/neutrino/software/spine
+    fi
+fi
 
 # Define path to OpT0Finder
 #export FMATCH_BASEDIR=/sdf/data/neutrino/software/OpT0Finder_legacy

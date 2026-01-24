@@ -18,7 +18,7 @@ repos:
         args: ["--maxkb=5000"]
       - id: check-merge-conflict
       - id: check-case-conflict
-      - id: forbid-new-submodules
+      # Note: forbid-new-submodules removed to allow SPINE submodule
 
   - repo: https://github.com/psf/black
     rev: 24.8.0
