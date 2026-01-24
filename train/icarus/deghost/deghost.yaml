@@ -1,0 +1,65 @@
+# Base configuration
+base:
+  world_size: 4
+  epochs: 250
+  seed: 0
+  unwrap: false
+  log_dir: null # Set by user at runtime
+  log_step: 1
+  train:
+    weight_prefix: null # Set by user at runtime
+    save_step: 10000 # 10k/35k -> 0.6 epoch
+    optimizer:
+      name: Adam
+      lr: 0.001
+
+# IO configuration
+io:
+  loader:
+    batch_size: 16
+    shuffle: false
+    num_workers: 8
+    collate_fn: all
+    sampler: random_sequence
+    dataset:
+      name: larcv
+      file_keys: null # Set by user at runtime
+      skip_entry_list: null # Set by user at runtime
+      schema:
+        data:
+          parser: sparse3d
+          sparse_event_list:
+            - sparse3d_reco_cryoE
+            - sparse3d_reco_cryoE_chi2
+        seg_label:
+          parser: sparse3d_ghost
+          sparse_event: sparse3d_pcluster_semantics_ghost
+
+# Model configuration
+model:
+  name: uresnet
+  weight_path: null
+
+  network_input:
+    data: data
+  loss_input:
+    seg_label: seg_label
+
+  modules:
+    uresnet:
+      num_input: 2
+      num_classes: 2
+      filters: 32
+      depth: 5
+      reps: 2
+      allow_bias: false
+      activation:
+        name: lrelu
+        negative_slope: 0.33
+      norm_layer:
+        name: batch_norm
+        eps: 0.0001
+        momentum: 0.01
+
+    uresnet_loss:
+      balance_loss: false

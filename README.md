@@ -152,6 +152,32 @@ Profile allocations are designed to:
 | `s3df_milano` | milano | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
 | `s3df_roma` | roma | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
 
+### NERSC Perlmutter Node Resources
+
+NERSC Perlmutter is a heterogeneous system with GPU nodes in two configurations:
+
+| Node Type | Count | GPUs/Node | GPU Type | CPUs/Node | RAM/Node | Resources per GPU |
+|-----------|-------|-----------|----------|-----------|----------|------------------|
+| **GPU (40GB)** | 1,536 | 4 | A100 (40 GB) | 64 | 512 GB | 32 CPUs, 128 GB |
+| **GPU (80GB)** | 256 | 4 | A100 (80 GB) | 64 | 512 GB | 32 CPUs, 128 GB |
+| **CPU** | 3,072 | 0 | - | 128 | 512 GB | - |
+
+Profile allocations are designed to:
+- **GPU nodes**: Request full resources per GPU (32 CPUs × 4 GB/CPU = 128 GB per GPU)
+- **CPU nodes**: Request minimal resources (1 CPU × 4 GB = 4 GB) for flexible scheduling
+- **Shared partitions**: Allow partial node allocation for cost-efficient small jobs
+
+### NERSC Available Profiles
+
+| Profile | Partition | GPU Type | GPU Memory | GPUs | CPUs | Memory | Time | Use Case |
+|---------|-----------|----------|------------|------|------|--------|------|----------|
+| `nersc_gpu` | gpu_ss11 | A100 | 40 GB | 1 | 32 | 4 GB/CPU | 2h | Standard GPU processing (default, best availability) |
+| `nersc_gpu_80gb` | gpu_ss11 | A100 | 80 GB | 1 | 32 | 4 GB/CPU | 2h | High-memory GPU processing (limited availability) |
+| `nersc_gpu_exclusive` | gpu | A100 | 40 GB | 4 | 32 | 4 GB/CPU | 2h | Full-node exclusive access (training) |
+| `nersc_cpu` | shared | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
+
+**Note:** The `nersc_gpu` profile uses 40GB A100s by default since there are 6x more nodes available (1,536 vs 256), resulting in significantly faster queue times. Use `nersc_gpu_80gb` only when you specifically need >40GB GPU memory.
+
 ### Profile Selection
 
 Profiles are auto-detected based on detector and config, or can be specified explicitly:

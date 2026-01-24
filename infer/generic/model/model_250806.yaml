@@ -1,0 +1,31 @@
+# ND-LAr model configuration
+# Revision date: August 6, 2024
+
+__meta__:
+  version: "250806"
+  date: "2025-08-06"
+  description: "ND-LAr model first full weights release"
+  compatible_with:
+    base: ">=240819"
+    io: ">=240819"
+  tags: []
+  training_set: "v0"
+
+include: model_common.yaml
+
+override:
+  # MPV/MPR v00 overlay kaon weight path
+  model.weight_path: /sdf/data/neutrino/ndlar/spine/train/mpvmpr_v00/weights/full_chain/overlay_ka/snapshot-24999.ckpt
+
+  # Graph-SPICE embedding settings
+  model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
+
+  # Aggregator edge length setting changes
+  model.modules.grappa_shower.graph.max_length:
+    [500, 0, 500, 500, 0, 0, 0, 25, 0, 25]
+  model.modules.grappa_track.graph.max_length: 300
+  model.modules.grappa_inter.graph.max_length:
+    [500, 500, 0, 0, 500, 50, 50, 0, 0, 0]
+
+  # Loss adjustments
+  model.modules.grappa_shower_loss.node_loss.use_closest: true

@@ -2,6 +2,7 @@
 # Define common resource configurations for different use cases
 
 profiles:
+  ##### S3DF Resource Profiles #####
   # Extremely high-demanding GPU jobs (fastest) at S3DF
   # Node resources: 4 GPUs, 224 CPUs, 1344 GB RAM
   # -> 56 CPU per GPU, 6 GB per CPU
@@ -67,6 +68,88 @@ profiles:
     mem_per_cpu: 4g
     time: "2:00:00"
     description: "CPU-only analysis tasks"
+
+  ##### NERSC Resource Profiles #####
+  # 1536 nodes with 4x A100 40GB GPUs (majority of GPU nodes)
+  # -> 32 CPUs per GPU (16 physical cores), 128 GB RAM per GPU
+  # -> 4 GB per CPU
+  # Use this for standard jobs - better availability and queue times
+  nersc_gpu:
+    partition: gpu_ss11
+    gpu_type: a100
+    gpu_mem: 40g
+    gpus: 1
+    cpus_per_task: 32
+    mem_per_cpu: 4g
+    time: "2:00:00"
+    constraint: gpu
+    description: "GPU processing on NERSC Perlmutter (shared node, 40GB A100)"
+
+  # NERSC Perlmutter GPU (shared node, 80GB high-memory variant)
+  # 256 nodes with 4x A100 80GB GPUs (less available, longer queues)
+  # Use only when you specifically need >40GB GPU memory
+  nersc_gpu_80gb:
+    partition: gpu_ss11
+    gpu_type: a100
+    gpu_mem: 80g
+    gpus: 1
+    cpus_per_task: 32
+    mem_per_cpu: 4g
+    time: "2:00:00"
+    constraint: gpu
+    description: "High-memory GPU on NERSC Perlmutter (shared node, 80GB A100)"
+
+  # NERSC Perlmutter CPU (shared partition, for small jobs)
+  nersc_cpu:
+    partition: shared
+    gpu_type: null
+    gpu_mem: null
+    gpus: 0
+    cpus_per_task: 1
+    mem_per_cpu: 4g
+    time: "2:00:00"
+    description: "CPU-only tasks on NERSC Perlmutter (shared node)"
+
+  # NERSC Perlmutter GPU (full node, exclusive)
+  # Use for expensive training requiring full node (40GB standard)
+  nersc_gpu_exclusive:
+    partition: gpu
+    gpu_type: a100
+    gpu_mem: 40g
+    gpus: 4
+    cpus_per_task: 32
+    mem_per_cpu: 4g
+    time: "2:00:00"
+    constraint: gpu
+    qos: regular
+    description: "Full-node GPU processing on NERSC Perlmutter (80GB A100)"
+
+  # NERSC Perlmutter GPU (full node, exclusive)
+  # Use for expensive training requiring full node (80GB standard)
+  nersc_gpu_exclusive_80gb:
+    partition: gpu
+    gpu_type: a100
+    gpu_mem: 40g
+    gpus: 4
+    cpus_per_task: 32
+    mem_per_cpu: 4g
+    time: "2:00:00"
+    constraint: gpu
+    qos: regular
+    description: "Full-node GPU processing on NERSC Perlmutter (80GB A100)"
+
+  # NERSC Perlmutter CPU (regular partition)
+  # Node resources: 128 CPUs, 512 GB RAM
+  # -> 4 GB per CPU
+  nersc_cpu_exclusive:
+    partition: regular
+    gpu_type: null
+    gpu_mem: null
+    gpus: 0
+    cpus_per_task: 128
+    mem_per_cpu: 4g
+    time: "2:00:00"
+    description: "CPU-only tasks on NERSC Perlmutter"
 
 # Detector-specific defaults
 detectors:

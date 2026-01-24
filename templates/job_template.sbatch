@@ -4,12 +4,18 @@
 
 #SBATCH --account={{ account }}
 #SBATCH --partition={{ partition }}
+{% if qos %}
+#SBATCH --qos={{ qos }}
+{% endif %}
 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={{ cpus_per_task }}
 #SBATCH --mem-per-cpu={{ mem_per_cpu }}
 #SBATCH --time={{ time }}
 #SBATCH --gpus={{ gpus }}
+{% if constraint %}
+#SBATCH --constraint={{ constraint }}
+{% endif %}
 
 #SBATCH --array={{ array_spec }}
 
@@ -58,8 +64,20 @@ echo "Files in this task:"
 cat "$TASK_FILE_LIST"
 echo
 
+# Detect site and set bind paths
+if [[ -d "/sdf" ]]; then
+    # S3DF
+    BIND_PATHS="/sdf/,/fs/"
+elif [[ -d "/global/cfs" ]]; then
+    # NERSC
+    BIND_PATHS="/global/cfs/,/pscratch/sd/"
+else
+    # Default/unknown site - use minimal binding
+    BIND_PATHS="$PWD"
+fi
+
 # Build singularity command
-SINGULARITY_CMD="singularity exec --bind /sdf/,/fs/ --nv $SINGULARITY_PATH bash -c \""
+SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SINGULARITY_PATH bash -c \""
 
 # Add LArCV environment if specified
 {% if larcv_basedir %}

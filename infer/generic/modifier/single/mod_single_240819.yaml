@@ -1,0 +1,13 @@
+# Single-module modification for ND-LAr configs
+# Revision date: August 19, 2024
+
+__meta__:
+  name: "single"
+  version: "240819"
+  date: "2024-08-19"
+  description: "Single-module configuration"
+  applies_to: [mc]
+  compatible_with:
+    io: ">=240819"
+
+include: mod_single_common.yaml

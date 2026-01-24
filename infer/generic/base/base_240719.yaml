@@ -1,0 +1,10 @@
+# Base common configuration for ND-LAr (includes geometry and builder)
+# Revision date: July 19, 2024
+
+__meta__:
+  version: "240719"
+  date: "2024-07-19"
+  description: "Base generic configuration"
+  tags: []
+
+include: base_common.yaml
