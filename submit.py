@@ -743,6 +743,145 @@ fi
 
         return result
 
+    def run_interactive(
+        self,
+        config: str,
+        files: List[str],
+        source_type: str = "source",
+        output: Optional[str] = None,
+        files_per_task: int = 1,
+        task_id: int = 1,
+        larcv_basedir: Optional[str] = None,
+        flashmatch: bool = False,
+        apply_mods: Optional[List[str]] = None,
+    ) -> int:
+        """Run SPINE processing interactively (no SLURM submission).
+
+        This mode performs all config composition and file preparation like
+        submit_job(), but executes the SPINE command directly in the current
+        shell instead of submitting to SLURM. Useful for testing configs.
+
+        Parameters
+        ----------
+        config : str
+            Path to SPINE configuration file
+        files : List[str]
+            List of input files (direct paths/globs or source list path)
+        source_type : str, optional
+            Either 'source' (direct paths/globs) or 'source_list' (text file)
+        output : str, optional
+            Output file path
+        files_per_task : int, optional
+            Files to process per task, by default 1
+        task_id : int, optional
+            Which task to run (1-indexed), by default 1
+        larcv_basedir : str, optional
+            Custom LArCV installation path
+        flashmatch : bool, optional
+            Enable flash matching
+        apply_mods : List[str], optional
+            List of modifiers to apply
+
+        Returns
+        -------
+        int
+            Exit code from SPINE execution
+        """
+        # Parse input files
+        file_list = self._parse_files(files, source_type)
+        if not file_list:
+            raise ValueError("No input files found")
+
+        print(f"Found {len(file_list)} file(s) to process")
+
+        # Detect detector
+        detector = self._detect_detector(config)
+        config_path = Path(config)
+        config_name = config_path.stem
+
+        # Check if this is a "latest" request
+        is_latest = config_name == "latest" or "latest" in config_path.parts
+
+        job_name = f"interactive_{detector}_{config_name}"
+        job_dir = self._create_job_dir(job_name)
+
+        # Handle "latest" config generation
+        if is_latest:
+            print(f"\nDetected 'latest' config request for {detector}")
+            config = self._create_latest_config(detector, job_dir)
+
+        # Apply modifiers if specified
+        if apply_mods:
+            config = self._create_composite_config(
+                config, apply_mods, job_dir, detector=detector if is_latest else None
+            )
+
+        # Determine output path
+        if not output:
+            output = str(job_dir / "output" / f"{job_name}.h5")
+
+        # Ensure output directory exists
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+
+        # Chunk files for processing
+        max_array_size = self.profiles["defaults"]["max_array_size"]
+        file_chunks = self._chunk_files(file_list, max_array_size, files_per_task)
+
+        # Validate task_id
+        if task_id < 1 or task_id > len(file_chunks):
+            raise ValueError(f"Task ID {task_id} out of range (1-{len(file_chunks)})")
+
+        # Get the file group for this task
+        file_group = file_chunks[task_id - 1]
+
+        # Create temporary file list for this task
+        task_file_list = job_dir / f"interactive_files_task_{task_id}.txt"
+        with open(task_file_list, "w", encoding="utf-8") as f:
+            for file_path in file_group.split(","):
+                f.write(f"{file_path}\n")
+
+        print(f"\nRunning task {task_id}/{len(file_chunks)}")
+        print(f"Processing {len(file_group.split(','))} file(s):")
+        for file_path in file_group.split(","):
+            print(f"  {file_path}")
+
+        # Build command
+        cmd_parts = []
+
+        # Add environment setup if needed
+        if larcv_basedir:
+            cmd_parts.append(f"source {larcv_basedir}/configure.sh")
+
+        if flashmatch:
+            cmd_parts.append("source $FMATCH_BASEDIR/configure.sh")
+
+        # Build SPINE command
+        spine_cmd = (
+            f"python3 $SPINE_BASEDIR/bin/run.py "
+            f"-S {task_file_list} "
+            f"-o {output} "
+            f"-c {config}"
+        )
+        cmd_parts.append(spine_cmd)
+
+        # Join with && for proper sequencing
+        full_cmd = " && ".join(cmd_parts)
+
+        print("\nExecuting:")
+        print(f"  {full_cmd}\n")
+        print("=" * 80)
+
+        # Execute directly
+        result = subprocess.run(full_cmd, shell=True)
+
+        print("=" * 80)
+        print(f"\nInteractive execution completed with exit code: {result.returncode}")
+        print(f"Job directory: {job_dir}")
+        if result.returncode == 0:
+            print(f"Output: {output}")
+
+        return result.returncode
+
     def submit_job(
         self,
         config: str,
@@ -1042,6 +1181,10 @@ Examples:
   # Direct sources with glob pattern
   %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root
 
+  # Interactive mode (test locally without SLURM)
+  %(prog)s --interactive --config infer/icarus/icarus_full_chain_co_250625.yaml --source test.root
+  %(prog)s -I --config infer/icarus/icarus_full_chain_co_250625.yaml --source-list files.txt --task-id 2
+
   # With custom profile
   %(prog)s --config infer/icarus/icarus_full_chain_co_250625.yaml --source data/*.root --profile s3df_ampere
 
@@ -1133,6 +1276,18 @@ Examples:
 
     # Execution
     parser.add_argument(
+        "--interactive",
+        "-I",
+        action="store_true",
+        help="Run interactively without submitting to SLURM (useful for testing)",
+    )
+    parser.add_argument(
+        "--task-id",
+        type=int,
+        default=1,
+        help="Task ID to run in interactive mode (default: 1)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would be submitted without submitting",
@@ -1183,6 +1338,14 @@ Examples:
     if args.config and not (args.source or args.source_list):
         parser.error("--config requires either --source/-s or --source-list/-S")
 
+    # Interactive and dry-run are mutually exclusive
+    if args.interactive and args.dry_run:
+        parser.error("--interactive and --dry-run are mutually exclusive")
+
+    # Interactive mode not supported for pipelines
+    if args.interactive and args.pipeline:
+        parser.error("--interactive mode is not supported with --pipeline")
+
     # Build profile overrides
     profile_overrides = {}
     for key in ["partition", "gpus", "cpus_per_task", "mem_per_cpu", "time", "account"]:
@@ -1197,8 +1360,25 @@ Examples:
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():
                 print(f"{stage}: {', '.join(job_ids)}")
+        elif args.interactive:
+            # Interactive mode - run directly without SLURM
+            files = args.source if args.source else args.source_list
+            source_type = "source" if args.source else "source_list"
+
+            exit_code = submitter.run_interactive(
+                config=args.config,
+                files=files,
+                source_type=source_type,
+                output=args.output,
+                files_per_task=args.files_per_task,
+                task_id=args.task_id,
+                larcv_basedir=args.larcv_basedir,
+                flashmatch=args.flashmatch,
+                apply_mods=args.apply_mods,
+            )
+            return exit_code
         else:
-            # Single job mode
+            # Single job mode (batch submission)
             # Determine which source type was provided
             files = args.source if args.source else args.source_list
             source_type = "source" if args.source else "source_list"

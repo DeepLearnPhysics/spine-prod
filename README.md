@@ -73,7 +73,35 @@ git submodule status
 
 # Dry run (see what would be submitted)
 ./submit.py --config infer/icarus/latest.cfg --source test.root --dry-run
+
+# Interactive mode (test locally without SLURM submission)
+./submit.py --interactive --config infer/icarus/latest.cfg --source test.root
+./submit.py -I --config infer/icarus/latest.cfg --source-list files.txt --task-id 2
 ```
+
+### Interactive Mode
+
+Interactive mode (`--interactive` or `-I`) runs SPINE processing directly in your current shell without submitting to SLURM. This is particularly useful for:
+
+- **Testing configurations** before batch submission
+- **Debugging issues** with immediate feedback
+- **Small-scale runs** on login nodes (use sparingly!)
+- **Config validation** with real execution
+
+Interactive mode performs all the same config composition, file chunking, and environment setup as batch mode, but executes locally:
+
+```bash
+# Test a config on one file
+./submit.py -I --config infer/icarus/latest.cfg --source /path/to/test.root
+
+# Test with modifiers applied
+./submit.py -I --config infer/icarus/latest.cfg --source test.root --apply-mods data lite
+
+# Test a specific task from a file list (if using --files-per-task)
+./submit.py -I --config infer/icarus/latest.cfg --source-list files.txt --files-per-task 5 --task-id 2
+```
+
+**Note:** Interactive mode is not supported for pipelines. Use `--dry-run` to preview pipeline submissions.
 
 ## Directory Structure
 
