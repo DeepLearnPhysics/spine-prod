@@ -34,6 +34,9 @@ Thumbs.db
 # SLURM job directories (generated at runtime)
 jobs/
 
+# Cache directories (for downloaded weights, etc.)
+.cache/
+
 # Node modules (if any)
 node_modules/
 
