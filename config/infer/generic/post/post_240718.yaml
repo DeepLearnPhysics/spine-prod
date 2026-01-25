@@ -1,0 +1,14 @@
+# Post-processing configuration for generic simulations
+# Revision date: July 18, 2024
+
+__meta__:
+  version: "240718"
+  date: "2024-07-18"
+  description: "Generic simulation post-processing for July 2024 weights"
+  compatible_with:
+    base: ">=240718"
+    io: ">=240718"
+    model: ">=240718"
+  tags: [post-calibration]
+
+include: post_common.yaml

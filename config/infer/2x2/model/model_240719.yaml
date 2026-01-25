@@ -15,7 +15,9 @@ include: model_common.yaml
 
 override:
   # Path to the v1 model weights
-  model.weight_path: /sdf/data/neutrino/2x2/train_spine/mpvmpr_v1/weights/full_chain/default/snapshot-3999.ckpt
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/2x2/2x2_snapshot_240719.ckpt
+    hash: e4f1c050d515c9d78e7920121533729d1112684c549232f1761514f74f6f55a2
 
   # Older PPN/Graph SPICE settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: true

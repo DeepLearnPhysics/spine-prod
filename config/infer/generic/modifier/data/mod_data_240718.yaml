@@ -1,0 +1,13 @@
+# Data-only modification for generic simulation configs
+# Revision date: July 18, 2024
+
+__meta__:
+  name: "data"
+  version: "240718"
+  date: "2024-07-18"
+  description: "Data-only configuration"
+  applies_to: [data]
+  compatible_with:
+    post: ">=240718"
+
+include: mod_data_common.yaml

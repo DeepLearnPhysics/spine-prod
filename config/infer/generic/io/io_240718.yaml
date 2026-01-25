@@ -1,0 +1,16 @@
+# IO configuration for generic simulations
+# Revision date: July 18, 2024
+
+__meta__:
+  version: "240718"
+  date: "2024-07-18"
+  description: "IO configuration for generic simulations July 2024"
+  compatible_with:
+    base: ">=240718"
+  tags: [ppn-point-tagging]
+
+include: io_common.yaml
+
+override:
+  # Include point tagging in PPN label parser
+  io.loader.dataset.schema.ppn_label.include_point_tagging: true

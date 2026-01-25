@@ -1,0 +1,5 @@
+# SBND full chain configuration
+# Revision date: September 18, 2024
+
+include:
+  - ../full_chain_240918.yaml

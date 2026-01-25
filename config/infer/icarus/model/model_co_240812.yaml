@@ -15,7 +15,9 @@ include: model_common.yaml
 
 override:
   # Path to the v2 collection-only, restricted model weights
-  model.weight_path: /sdf/data/neutrino/icarus/spine/train/mpvmpr_v02/weights/full_chain/co/snapshot-3999.ckpt
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/icarus/icarus_co_snapshot_240812.ckpt
+    hash: a58b04d656da56a23029c52f6f891fe0c28a82e9e5a55687fd8a114dce1446eb
 
   # Change the input data to collection-only (for deghosting)
   io.loader.dataset.schema.data.sparse_event_list:

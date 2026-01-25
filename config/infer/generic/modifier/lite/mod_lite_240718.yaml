@@ -1,0 +1,13 @@
+# Lite-output modification for generic simulation configs
+# Revision date: July 18, 2024
+
+__meta__:
+  name: "lite"
+  version: "240718"
+  date: "2024-07-18"
+  description: "Lite-output configuration"
+  applies_to: [mc, data]
+  compatible_with:
+    io: ">=240718"
+
+include: mod_lite_common.yaml

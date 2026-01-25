@@ -1,5 +1,5 @@
-# Overlay modification for ND-LAr configs
-# Include this after the main config to transform to lite-output mode (no heavy data products)
+# Overlay modification for generic simulation configs
+# Include this after the main config to overlay four images (no heavy data products)
 
 override:
   # Overlay collate function
@@ -11,11 +11,8 @@ override:
   # Remove currently problematic data products for overlays
   io.loader.dataset.schema-:
     - run_info
-    - flashes
-    - trigger
 
   # Remove problematic writers for overlays
   io.writer.keys-:
     - run_info
-    - flashes
     - trigger

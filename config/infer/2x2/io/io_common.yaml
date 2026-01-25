@@ -22,7 +22,6 @@ io:
           sparse_event: sparse3d_pcluster
           particle_event: particle_pcluster
           # include_point_tagging varies by config - override in specific configs
-          include_point_tagging: false
         clust_label:
           parser: cluster3d
           cluster_event: cluster3d_pcluster

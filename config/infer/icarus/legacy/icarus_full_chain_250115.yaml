@@ -1,0 +1,5 @@
+# ICARUS full chain configuration
+# Revision date: January 15, 2025
+
+include:
+  - ../full_chain_250115.yaml

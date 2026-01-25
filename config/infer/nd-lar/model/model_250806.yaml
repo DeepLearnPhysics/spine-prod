@@ -15,7 +15,9 @@ include: model_common.yaml
 
 override:
   # MPV/MPR v00 overlay kaon weight path
-  model.weight_path: /sdf/data/neutrino/ndlar/spine/train/mpvmpr_v00/weights/full_chain/overlay_ka/snapshot-24999.ckpt
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/nd-lar/ndlar_snapshot_250806.ckpt
+    hash: f8555a00f1833fc40235d37f3b346b77cf99ce0c0c4f29ddc3beb4362b0d1a39
 
   # Graph-SPICE embedding settings
   model.modules.graph_spice.embedder.uresnet.spatial_size: 6144

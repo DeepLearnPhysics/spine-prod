@@ -1,0 +1,10 @@
+# Base common configuration for generic simulations (includes geometry and builder)
+# Revision date: July 18, 2024
+
+__meta__:
+  version: "240718"
+  date: "2024-07-18"
+  description: "Base generic configuration"
+  tags: []
+
+include: base_common.yaml

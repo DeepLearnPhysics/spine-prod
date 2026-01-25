@@ -15,7 +15,9 @@ include: model_common.yaml
 
 override:
   # Path to the v3 restricted model weights
-  model.weight_path: /sdf/data/neutrino/icarus/spine/train/mpvmpr_v03/weights/full_chain/restrict_v2/snapshot-2999.ckpt
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/icarus/icarus_snapshot_250115.ckpt
+    hash: a164479177b0e48fb8de478f01895ecab37b362f70b0c103086bb35f85a99e9c
 
   # No calibration applied in the chain, handled in post-processing
   model.modules.chain.calibration: null

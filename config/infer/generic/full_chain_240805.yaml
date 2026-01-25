@@ -1,0 +1,8 @@
+# Generic simulation full chain configuration
+# Revision date: August 5, 2024
+
+include:
+  - base/base_240718.yaml
+  - io/io_240805.yaml
+  - model/model_240805.yaml
+  - post/post_240718.yaml

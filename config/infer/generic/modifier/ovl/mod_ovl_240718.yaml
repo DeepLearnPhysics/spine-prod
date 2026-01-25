@@ -1,0 +1,13 @@
+# Overlay modification for generic simulation configs
+# Revision date: July 18, 2024
+
+__meta__:
+  name: "ovl"
+  version: "240718"
+  date: "2024-07-18"
+  description: "Overlay configuration"
+  applies_to: [mc, data]
+  compatible_with:
+    io: ">=240718"
+
+include: mod_ovl_common.yaml

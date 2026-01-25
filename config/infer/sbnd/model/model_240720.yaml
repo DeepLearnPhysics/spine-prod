@@ -15,7 +15,9 @@ include: model_common.yaml
 
 override:
   # Path to the v1 model weights
-  model.weight_path: /sdf/data/neutrino/sbnd/spine/train/mpvmpr_v01/weights/full_chain/default/snapshot-1999.ckpt
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/sbnd/sbnd_snapshot_240720.ckpt
+    hash: fa0e292312ca94626b0681e8e0cee32603cd7a27a92501ab43ae955ec8b6067b
 
   # No pre-calibration
   model.modules.chain.calibration: null

@@ -1,4 +1,4 @@
-# Model common configuration for ND-LAr
+# Model common configuration for generic simulations
 
 # Model configuration
 model:
@@ -89,9 +89,7 @@ model:
         edge_threshold: 0.1
         min_size: 3
         label_edges: false
-        graph:
-          name: radius
-          r: 1.9
+        # graph settings vary by config - override in specific configs
         orphan:
           mode: radius
           radius: 1.9
@@ -111,7 +109,7 @@ model:
         grouping_method: score
       graph:
         name: complete
-        # max_length varies by config - override in specific configs
+        max_length: [500, 0, 500, 500, 0, 0, 0, 25, 0, 25]
         dist_algorithm: recursive
       node_encoder:
         name: geo
@@ -180,7 +178,7 @@ model:
         grouping_method: score
       graph:
         name: complete
-        # max_length varies by config - override in specific configs
+        max_length: 100
         dist_algorithm: recursive
       node_encoder:
         name: geo
@@ -242,7 +240,7 @@ model:
         make_groups: true
       graph:
         name: complete
-        # max_length varies by config - override in specific configs
+        max_length: [500, 500, 0, 0, 25, 25, 25, 0, 0, 0]
         dist_algorithm: recursive
       node_encoder:
         name: geo
@@ -262,7 +260,7 @@ model:
         node_feats: 33 # 16 (geo) + 3 (extra) + 6 (points) + 6 (directions) + 2 (local dedxs)
         edge_feats: 19
         node_pred:
-          type: 6 # With kaon!
+          type: 5
           primary: 2
           orient: 2
         edge_pred: 2

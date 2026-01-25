@@ -1,12 +1,12 @@
-# IO configuration for 2x2
-# Revision date: August 19, 2024
+# IO configuration for generic simulations
+# Revision date: August 5, 2024
 
 __meta__:
-  version: "240819"
-  date: "2024-08-19"
-  description: "IO configuration for 2x2 August 2024"
+  version: "240805"
+  date: "2024-08-05"
+  description: "IO configuration for generic simulations August 2024"
   compatible_with:
-    base: ">=240719"
+    base: ">=240718"
   tags: [no-ppn-point-tagging]
 
 include: io_common.yaml

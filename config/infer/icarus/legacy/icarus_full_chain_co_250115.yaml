@@ -1,0 +1,5 @@
+# ICARUS full chain configuration with collection-only model
+# Revision date: January 15, 2025
+
+include:
+  - ../full_chain_co_250115.yaml

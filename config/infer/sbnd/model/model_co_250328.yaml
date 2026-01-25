@@ -15,8 +15,9 @@ include: model_common.yaml
 
 override:
   # Path to the v2 restricted model weights
-  model.weight_path: /sdf/data/neutrino/sbnd/train/mpvmpr_v02/weights/full_chain/restrict_250516/snapshot-6499.ckpt # S3DF
-  #model.weight_path: /lus/eagle/projects/neutrinoGPU/bearc/spine_weights/mpvmpr_v02/weights/full_chain/grappa_inter/restrict_250516/snapshot-6499.ckpt # Polaris
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/sbnd/sbnd_co_snapshot_250328.ckpt
+    hash: df1cd7e40fbc31eceebd089fef30075e42d5561591567495c451834f8d410fc3
 
   # No pre-calibration
   model.modules.chain.calibration: null

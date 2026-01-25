@@ -1,9 +1,9 @@
-# IO common configuration for ND-LAr
+# IO common configuration for generic simulations
 
 # IO configuration
 io:
   loader:
-    batch_size: 4
+    batch_size: 64
     shuffle: false
     num_workers: 8
     collate_fn: all
@@ -20,42 +20,33 @@ io:
         ppn_label:
           parser: particle_points
           sparse_event: sparse3d_pcluster
-          particle_event: particle_pcluster
-          include_point_tagging: false
+          particle_event: particle_corrected
+          # include_point_tagging varies by config - override in specific configs
         clust_label:
           parser: cluster3d
           cluster_event: cluster3d_pcluster
-          particle_event: particle_pcluster
-          neutrino_event: neutrino_mc_truth
+          particle_event: particle_corrected
           sparse_semantics_event: sparse3d_pcluster_semantics
           add_particle_info: true
           clean_data: true
+          shape_precedence: [2, 1, 0, 3, 4, 6]
         coord_label:
           parser: particle_coords
-          particle_event: particle_pcluster
+          particle_event: particle_corrected
           cluster_event: cluster3d_pcluster
+        graph_label:
+          parser: particle_graph
+          particle_event: particle_pcluster
         particles:
           parser: particle
           particle_event: particle_pcluster
-          neutrino_event: neutrino_mc_truth
-          cluster_event: cluster3d_pcluster
-          skip_empty: true
-        neutrinos:
-          parser: neutrino
-          neutrino_event: neutrino_mc_truth
           cluster_event: cluster3d_pcluster
         meta:
-          parser: meta
+          parser: meta3d
           sparse_event: sparse3d_pcluster
         run_info:
           parser: run_info
           sparse_event: sparse3d_pcluster
-        trigger:
-          parser: trigger
-          trigger_event: trigger_base
-        flashes:
-          parser: flash
-          flash_event: opflash_light
 
   writer:
     name: hdf5
@@ -64,8 +55,6 @@ io:
     keys:
       - run_info
       - meta
-      - trigger
-      - flashes
       - points
       - points_label
       - depositions

@@ -1,0 +1,38 @@
+# Generic simulation model configuration
+# Revision date: July 18, 2024
+
+__meta__:
+  version: "240718"
+  date: "2024-07-18"
+  description: "Generic simulation model 2x2 weights (debug)"
+  compatible_with:
+    base: ">=240718"
+    io: ">=240718"
+  tags: []
+  training_set: "v1"
+
+include: model_common.yaml
+
+override:
+  # First full chain weights for generic simulations
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/generic/generic_snapshot_240718.ckpt
+    hash: 94f47955e5d8ac7c8d39465e795a58ff48c65629b3b62c4b35954c5a7e38ba84
+
+  # PPN endpoint classification enabled
+  model.modules.uresnet_ppn.ppn.classify_endpoints: true
+
+  # PPN loss - do not restrict to clusters
+  model.modules.ppn_loss.restrict_to_clusters: false
+
+  # GraphSPICE spatial size
+  model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
+
+  # GraphSPICE constructor graph settings (knn-based)
+  model.modules.graph_spice.constructor.graph.name: knn
+  model.modules.graph_spice.constructor.graph.k: 5
+
+  # GraPPA inter-aggregation layer widths
+  model.modules.grappa_inter.gnn_model.edge_layer.mlp.width: 64
+  model.modules.grappa_inter.gnn_model.node_layer.message_mlp.width: 64
+  model.modules.grappa_inter.gnn_model.node_layer.aggr_mlp.width: 64
