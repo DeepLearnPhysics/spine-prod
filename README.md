@@ -111,16 +111,15 @@ spine-prod/
 ├── submit.py                # Main submission orchestrator (NEW!)
 ├── README.md                # This file
 │
-├── infer/                   # SPINE inference configurations
-│   ├── icarus/              # ICARUS detector configs
-│   ├── sbnd/                # SBND detector configs
-│   ├── 2x2/                 # 2x2 detector configs
-│   ├── 2x2-single/          # 2x2 single-module detector configs
-│   ├── fsd/                 # Full scale demonstrator configs
-│   ├── nd-lar/              # ND-LAr detector configs
-│   ├── generic/             # Generic (no detector) configs
-│   └── common/              # Shared configs
-│
+├── config/                  # All SPINE configs (inference & training)
+│   ├── infer/               # Inference configs (referenced as infer/...)
+│   │   ├── icarus/          # ICARUS detector configs
+│   │   ├── sbnd/            # SBND detector configs
+│   │   ├── 2x2/             # 2x2 detector configs
+│   │   ├── nd-lar/          # ND-LAr detector configs
+│   │   ├── generic/         # Generic (no detector) configs
+│   │   └── common/          # Shared configs
+│   └── train/               # Training configs (referenced as train/...)
 ├── templates/               # Job templates
 │   ├── profiles.yaml        # Resource profiles
 │   └── job_template.sbatch  # SLURM job template

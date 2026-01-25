@@ -10,9 +10,9 @@ fi
 
 # Setup config search path (prepend to any existing paths)
 if [[ -z $SPINE_CONFIG_PATH ]]; then
-    export SPINE_CONFIG_PATH=$SPINE_PROD_BASEDIR/infer:$SPINE_PROD_BASEDIR/train
+    export SPINE_CONFIG_PATH=$SPINE_PROD_BASEDIR/config
 else
-    export SPINE_CONFIG_PATH=$SPINE_PROD_BASEDIR/infer:$SPINE_PROD_BASEDIR/train:$SPINE_CONFIG_PATH
+    export SPINE_CONFIG_PATH=$SPINE_PROD_BASEDIR/config:$SPINE_CONFIG_PATH
 fi
 
 # Define path to SPINE
