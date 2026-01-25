@@ -29,10 +29,11 @@ fi
 #export FMATCH_BASEDIR=/sdf/data/neutrino/software/OpT0Finder_legacy
 export FMATCH_BASEDIR=/sdf/data/neutrino/software/OpT0Finder
 
-# Define path to the singularity container
-#export SINGULARITY_PATH=/sdf/group/neutrino/images/larcv2_ub20.04-cuda11.6-pytorch1.13-larndsim.sif
-#export SINGULARITY_PATH=/sdf/group/neutrino/images/larcv2_ub22.04-cuda12.1-pytorch2.4.0-larndsim-2024-09-03.sif
-export SINGULARITY_PATH=/sdf/group/neutrino/images/larcv2_ub2204-cuda121-torch251-larndsim.sif
+# Define path to the container (Singularity/Apptainer .sif file for S3DF)
+export CONTAINER_PATH=/sdf/group/neutrino/images/larcv2_ub2204-cuda121-torch251-larndsim.sif
+
+# Define container tag (Shifter image tag for NERSC)
+export CONTAINER_TAG=deeplearnphysics/larcv2:ub2204-cu121-torch251-larndsim
 
 echo
 printf "\033[93mSPINE_PROD\033[00m FYI shell env. may useful for external packages:\n"
@@ -40,7 +41,8 @@ printf "    \033[95mSPINE_PROD_BASEDIR\033[00m = $SPINE_PROD_BASEDIR\n"
 printf "    \033[95mSPINE_CONFIG_PATH\033[00m  = $SPINE_CONFIG_PATH\n"
 printf "    \033[95mSPINE_BASEDIR\033[00m      = $SPINE_BASEDIR\n"
 printf "    \033[95mFMATCH_BASEDIR\033[00m     = $FMATCH_BASEDIR\n"
-printf "    \033[95mSINGULARITY_PATH\033[00m   = $SINGULARITY_PATH\n"
+printf "    \033[95mCONTAINER_PATH\033[00m     = $CONTAINER_PATH\n"
+printf "    \033[95mCONTAINER_TAG\033[00m      = $CONTAINER_TAG\n"
 
 echo
 echo "Finished configuration."

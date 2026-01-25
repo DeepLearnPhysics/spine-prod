@@ -93,10 +93,10 @@ if [[ "$SITE" == "nersc" ]]; then
     INNER_CMD="${INNER_CMD}python3 \$SPINE_BASEDIR/bin/run.py -S $TASK_FILE_LIST -o {{ output }} -c {{ config }}"
 
     # Execute with srun and shifter
-    RUN_CMD="srun -n 1 shifter --image=$SINGULARITY_PATH \"$INNER_CMD\""
+    RUN_CMD="srun -n 1 shifter --image=$CONTAINER_TAG \"$INNER_CMD\""
 else
     # S3DF or other: Use Singularity
-    SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SINGULARITY_PATH bash -c \""
+    SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $CONTAINER_PATH bash -c \""
     {% if larcv_basedir %}
     SINGULARITY_CMD="$${SINGULARITY_CMD}unset which; source {{ larcv_basedir }}/configure.sh; "
     {% endif %}
