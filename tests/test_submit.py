@@ -243,7 +243,8 @@ class TestConfigPathHandling:
     def test_absolute_vs_relative_paths(self, workspace_root):
         """Test handling of absolute vs relative config paths."""
         # Both should work
-        rel_path = "infer/icarus/icarus_full_chain_co_250625.yaml"
+
+        rel_path = "config/infer/icarus/icarus_full_chain_co_250625.yaml"
         abs_path = workspace_root / rel_path
 
         # Check paths exist
