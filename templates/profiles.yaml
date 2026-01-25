@@ -168,19 +168,14 @@ detectors:
     configs_dir: infer/2x2
     account: "neutrino:dune-ml"
 
-  2x2-single:
-    default_profile: s3df_ampere
-    configs_dir: infer/2x2-single
-    account: "neutrino:dune-ml"
-
-  fsd:
-    default_profile: s3df_ampere
-    configs_dir: infer/fsd
-    account: "neutrino:dune-ml"
-
   nd-lar:
     default_profile: s3df_ampere
     configs_dir: infer/nd-lar
+    account: "neutrino:dune-ml"
+
+  protodune-vd:
+    default_profile: s3df_ampere
+    configs_dir: infer/protodune-vd
     account: "neutrino:dune-ml"
 
   generic:

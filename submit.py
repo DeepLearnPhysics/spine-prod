@@ -89,7 +89,7 @@ class SlurmSubmitter:
         for detector in self.profiles["detectors"]:
             if detector in str(config_path):
                 return detector
-        return "generic"
+        return "unknown_detector"
 
     def _get_profile(self, profile_name: str, detector: Optional[str] = None) -> Dict:
         """Get resource profile with detector defaults.
