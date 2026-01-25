@@ -340,7 +340,7 @@ class SlurmSubmitter:
         # Discover available modifiers
         # If detector is provided, look in the detector's config directory
         if detector:
-            modifier_search_path = str(self.basedir / "config" / detector)
+            modifier_search_path = str(self.basedir / "config" / "infer" / detector)
         else:
             modifier_search_path = base_config
 
@@ -624,7 +624,7 @@ fi
         str
             Path to the generated latest config file
         """
-        config_dir = self.basedir / "infer" / detector
+        config_dir = self.basedir / "config" / "infer" / detector
 
         if not config_dir.exists():
             raise ValueError(f"Detector config directory not found: {config_dir}")
