@@ -270,9 +270,9 @@ class TestDetectorDetection:
         assert result == "2x2"
 
     def test_detect_detector_generic(self, mock_submitter):
-        """Test fallback to generic for unknown detectors."""
+        """Test fallback for unknown detectors."""
         result = mock_submitter._detect_detector("some/random/config.yaml")
-        assert result == "generic"
+        assert result == "unknown_detector"
 
 
 class TestVersionExtraction:
