@@ -244,7 +244,7 @@ class TestConfigPathHandling:
         """Test handling of absolute vs relative config paths."""
         # Both should work
 
-        rel_path = "config/infer/icarus/icarus_full_chain_co_250625.yaml"
+        rel_path = "config/infer/icarus/full_chain_co_250625.yaml"
         abs_path = workspace_root / rel_path
 
         # Check paths exist
