@@ -831,19 +831,24 @@ fi
         if task_id < 1 or task_id > len(file_chunks):
             raise ValueError(f"Task ID {task_id} out of range (1-{len(file_chunks)})")
 
-        # Get the file group for this task
-        file_group = file_chunks[task_id - 1]
+        # Get the file group for this task (it's a list of comma-separated file strings)
+        file_group_list = file_chunks[task_id - 1]
 
         # Create temporary file list for this task
         task_file_list = job_dir / f"interactive_files_task_{task_id}.txt"
         with open(task_file_list, "w", encoding="utf-8") as f:
-            for file_path in file_group.split(","):
-                f.write(f"{file_path}\n")
+            for file_group in file_group_list:
+                # Each file_group is a comma-separated string of files
+                for file_path in file_group.split(","):
+                    f.write(f"{file_path}\n")
 
+        # Count total files for display
+        total_files = sum(len(fg.split(",")) for fg in file_group_list)
         print(f"\nRunning task {task_id}/{len(file_chunks)}")
-        print(f"Processing {len(file_group.split(','))} file(s):")
-        for file_path in file_group.split(","):
-            print(f"  {file_path}")
+        print(f"Processing {total_files} file(s):")
+        for file_group in file_group_list:
+            for file_path in file_group.split(","):
+                print(f"  {file_path}")
 
         # Build command
         cmd_parts = []
