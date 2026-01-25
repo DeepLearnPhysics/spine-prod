@@ -21,18 +21,10 @@ __meta__:
 include: model_common.yaml
 
 override:
-  # Path to the individual module weights (pre-prod)
-  # model.weight_path: TBD
-  model.modules.uresnet_deghost.weight_path: /sdf/data/neutrino/pdune/spine/train/vd/mpvmpr_v0/weights/full_chain/uresnet_ppn/snapshot-4999.ckpt
-  model.modules.uresnet_ppn.weight_path: /sdf/data/neutrino/pdune/spine/train/vd/mpvmpr_v0/weights/full_chain/uresnet_ppn/snapshot-4999.ckpt
-  model.modules.graph_spice.weight_path: /sdf/data/neutrino/pdune/spine/train/vd/mpvmpr_v0/weights/graph_spice/edep/snapshot-14999.ckpt
-  model.modules.graph_spice.model_name: ""
-  model.modules.grappa_shower.weight_path: /sdf/data/neutrino/pdune/spine/train/vd/mpvmpr_v0/weights/grappa_shower/edep/snapshot-9999.ckpt
-  model.modules.grappa_shower.model_name: ""
-  model.modules.grappa_track.weight_path: /sdf/data/neutrino/pdune/spine/train/vd/mpvmpr_v0/weights/grappa_track/edep/snapshot-9999.ckpt
-  model.modules.grappa_track.model_name: ""
-  model.modules.grappa_inter.weight_path: /sdf/data/neutrino/pdune/spine/train/vd/mpvmpr_v0/weights/grappa_inter/edep_balanced/snapshot-9999.ckpt
-  model.modules.grappa_inter.model_name: ""
+  # Path to the first full chain model weights
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/protodune-vd/protodune-vd_snapshot_26018.ckpt
+    hash: 525d50afa5cddcfe05669e4ae01d14b05d111c9987a4e4c1c77c357125ac1a6c
 
   # Calibration handled before the semantic segmentation stage
   model.modules.chain.calibration: apply
