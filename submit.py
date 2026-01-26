@@ -33,13 +33,15 @@ class SlurmSubmitter:
     """Orchestrates SLURM job submissions for SPINE production"""
 
     def __init__(self, basedir: Optional[Path] = None, local_output: bool = False):
-        if local_output:
-            self.basedir = Path(os.getcwd())
-        else:
-            self.basedir = basedir or Path(__file__).parent
+        # Always use the project base for resources
+        self.basedir = basedir or Path(__file__).parent
         self.profiles = self._load_profiles()
         self.template = self._load_template()
-        self.jobs_dir = self.basedir / "jobs"
+        # Only jobs_dir is affected by --local-output
+        if local_output:
+            self.jobs_dir = Path(os.getcwd()) / "jobs"
+        else:
+            self.jobs_dir = self.basedir / "jobs"
         self.jobs_dir.mkdir(exist_ok=True)
 
         # Check environment
