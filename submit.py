@@ -881,11 +881,14 @@ fi
             return 1
 
         # Build SPINE command
+        log_dir = job_dir / "logs"
+        log_dir.mkdir(exist_ok=True)
         spine_cmd = (
             f"python3 $SPINE_BASEDIR/bin/run.py "
             f"-S {task_file_list} "
             f"-o {output} "
-            f"-c {config}"
+            f"-c {config} "
+            f"--log-dir {log_dir}"
         )
         cmd_parts.append(spine_cmd)
 

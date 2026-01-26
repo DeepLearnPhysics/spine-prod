@@ -90,7 +90,7 @@ if [[ "$SITE" == "nersc" ]]; then
     {% if flashmatch %}
     INNER_CMD="${INNER_CMD}source \$FMATCH_BASEDIR/configure.sh; "
     {% endif %}
-    INNER_CMD="${INNER_CMD}python3 \$SPINE_BASEDIR/bin/run.py -S $TASK_FILE_LIST -o {{ output }} -c {{ config }}"
+    INNER_CMD="${INNER_CMD}python3 \$SPINE_BASEDIR/bin/run.py -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}"
 
     # Execute with srun and shifter
     RUN_CMD="srun -n 1 shifter --image=$CONTAINER_TAG \"$INNER_CMD\""
@@ -103,7 +103,7 @@ else
     {% if flashmatch %}
     SINGULARITY_CMD="$${SINGULARITY_CMD}source $$FMATCH_BASEDIR/configure.sh; "
     {% endif %}
-    SINGULARITY_CMD="$${SINGULARITY_CMD}python3 $$SPINE_BASEDIR/bin/run.py -S $$TASK_FILE_LIST -o {{ output }} -c {{ config }}\""
+    SINGULARITY_CMD="$${SINGULARITY_CMD}python3 $$SPINE_BASEDIR/bin/run.py -S $$TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}\""
     RUN_CMD="$SINGULARITY_CMD"
 fi
 
