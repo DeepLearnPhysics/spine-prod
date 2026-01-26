@@ -11,4 +11,4 @@ include: base_common.yaml
 
 override:
   # Geometry tag for ND-LAr used for all 2024-2025 model weights
-  geo.tag: up4.1
+  geo.tag: up4-1

@@ -11,4 +11,4 @@ include: base_common.yaml
 
 override:
   # Geometry tag for 2x2 used for all 2024 model weights
-  geo.tag: mr5.0
+  geo.tag: mr5-0
