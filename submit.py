@@ -9,6 +9,7 @@ Usage:
     ./submit.py --config infer/icarus/latest.cfg --source-list file_list.txt
     ./submit.py --config infer/icarus/latest_data.cfg --source data/*.root --profile s3df_ampere
     ./submit.py --pipeline pipelines/icarus_production.yaml
+    ./submit.py --config ... --source ... --local-output
 """
 
 import argparse
@@ -31,15 +32,18 @@ from version import __version__
 class SlurmSubmitter:
     """Orchestrates SLURM job submissions for SPINE production"""
 
-    def __init__(self, basedir: Optional[Path] = None):
-        self.basedir = basedir or Path(__file__).parent
+    def __init__(self, basedir: Optional[Path] = None, local_output: bool = False):
+        if local_output:
+            self.basedir = Path(os.getcwd())
+        else:
+            self.basedir = basedir or Path(__file__).parent
         self.profiles = self._load_profiles()
         self.template = self._load_template()
         self.jobs_dir = self.basedir / "jobs"
         self.jobs_dir.mkdir(exist_ok=True)
 
         # Check environment
-        if not os.getenv("SPINE_PROD_BASEDIR"):
+        if not os.getenv("SPINE_PROD_BASEDIR") and not local_output:
             print("WARNING: SPINE_PROD_BASEDIR not set. Did you source configure.sh?")
 
     def _load_profiles(self) -> Dict:
@@ -1263,6 +1267,12 @@ Examples:
     parser.add_argument("--output", "-o", help="Output file path")
     parser.add_argument("--account", "-A", help="SLURM account")
     parser.add_argument("--dependency", "-d", help="SLURM dependency string")
+    parser.add_argument(
+        "--local-output",
+        action="store_true",
+        help="Write job directories and logs to the current working directory "
+        "instead of the default jobs directory in the spine-prod base.",
+    )
 
     # Software paths
     parser.add_argument(
@@ -1301,7 +1311,7 @@ Examples:
     args = parser.parse_args()
 
     # Initialize submitter
-    submitter = SlurmSubmitter()
+    submitter = SlurmSubmitter(local_output=getattr(args, "local_output", False))
 
     # Handle --list-mods
     if args.list_mods:
