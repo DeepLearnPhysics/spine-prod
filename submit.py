@@ -521,7 +521,8 @@ class SlurmSubmitter:
 
         result = subprocess.run(
             ["sbatch", str(script_path)],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             check=False,
         )
@@ -604,7 +605,11 @@ fi
 
         # Submit
         result = subprocess.run(
-            ["sbatch", str(script_path)], capture_output=True, text=True, check=False
+            ["sbatch", str(script_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
         )
 
         if result.returncode != 0:
