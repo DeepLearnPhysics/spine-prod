@@ -23,7 +23,7 @@ include: model_common.yaml
 override:
   # Path to the first full chain model weights
   model.weight_path: !download
-    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/protodune-vd/protodune-vd_snapshot_26018.ckpt
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/protodune-vd/protodune-vd_snapshot_260118.ckpt
     hash: 525d50afa5cddcfe05669e4ae01d14b05d111c9987a4e4c1c77c357125ac1a6c
 
   # Calibration handled before the semantic segmentation stage
