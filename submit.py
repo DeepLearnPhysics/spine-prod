@@ -523,7 +523,7 @@ class SlurmSubmitter:
             ["sbatch", str(script_path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            universal_newlines=True,
             check=False,
         )
 
@@ -608,7 +608,7 @@ fi
             ["sbatch", str(script_path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            universal_newlines=True,
             check=False,
         )
 
@@ -888,7 +888,7 @@ fi
         print("=" * 80)
 
         # Execute directly
-        result = subprocess.run(full_cmd, shell=True)
+        result = subprocess.run(full_cmd, shell=True, check=False)
 
         print("=" * 80)
         print(f"\nInteractive execution completed with exit code: {result.returncode}")
