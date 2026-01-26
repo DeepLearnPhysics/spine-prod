@@ -871,6 +871,15 @@ fi
         if flashmatch:
             cmd_parts.append("source $FMATCH_BASEDIR/configure.sh")
 
+        # Check SPINE_BASEDIR
+        spine_basedir = os.environ.get("SPINE_BASEDIR")
+        if not spine_basedir:
+            print(
+                "ERROR: SPINE_BASEDIR environment variable is not set. "
+                "Please source configure.sh before running in interactive mode."
+            )
+            return 1
+
         # Build SPINE command
         spine_cmd = (
             f"python3 $SPINE_BASEDIR/bin/run.py "
