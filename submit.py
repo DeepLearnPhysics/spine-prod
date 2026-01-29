@@ -1055,6 +1055,8 @@ fi
                 output=output,
                 larcv_basedir=larcv_basedir,
                 flashmatch=flashmatch,
+                qos=profile_config.get("qos"),
+                constraint=profile_config.get("constraint"),
             )
 
             # Write script
