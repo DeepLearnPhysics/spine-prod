@@ -2,6 +2,7 @@
 
 # Post-processors
 post:
+  # apply_calibrations varies by config - override in specific configs
   # trigger varies by config - override in specific configs
   calo_ke:
     run_mode: both

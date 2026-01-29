@@ -1,0 +1,52 @@
+# ProtoDUNE-VD model configuration
+# Revision date: January 28, 2026
+
+__meta__:
+  version: "260128"
+  date: "2026-01-28"
+  description: "ProtoDUNE-VD collection-only model with in-chain calibration, v0 dataset"
+  compatible_with:
+    base: ">=260118"
+    io: ">=260118"
+  tags:
+    [
+      collection-only,
+      pre-calibration,
+      ppn-restrict,
+      grappa-use-closest,
+      grouping-through-track,
+    ]
+  training_set: "v0"
+
+include: model_common.yaml
+
+override:
+  # Path to the first full chain model weights
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/protodune-vd/protodune-vd_snapshot_260128.ckpt
+    hash: d76b505478d3d8279abaf181cb9338d05f5eeaa95245bb15a02d20943b9169ff
+
+  # Calibration handled before the semantic segmentation stage
+  model.modules.chain.calibration: apply
+  model.modules.calibration:
+    stage: segmentation
+    gain:
+      gain: 14.0 # e-/ADC
+    recombination:
+      model: mbox
+      efield: 0.495 # kV/cm
+      mip_dedx: 2.105168 # MeV/cm
+    lifetime:
+      lifetime: 35000 # us
+      driftv: 0.157725 # cm/us, derived from efield at T=87.68 (ICARUS fit)
+
+  # Charge rescaling uses collection-only charge
+  model.modules.chain.charge_rescaling: collection
+
+  # Older PPN/GrapPA loss settings
+  model.modules.uresnet_ppn.ppn.classify_endpoints: false
+  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
+  model.modules.grappa_shower_loss.node_loss.use_closest: true
+
+  # Interaction grouping restriction applied
+  model.modules.grappa_inter.nodes.grouping_through_track: true

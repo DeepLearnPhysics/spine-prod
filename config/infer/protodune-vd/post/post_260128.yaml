@@ -1,0 +1,78 @@
+# Post-processing configuration for ICARUS
+# Revision date: January 18, 2026
+
+__meta__:
+  version: "260118"
+  date: "2026-01-18"
+  description: "ICARUS post-processing, latest"
+  compatible_with:
+    base: ">=260118"
+    io: ">=260118"
+    model: ">=260118"
+  tags: [normalized-fm, shower-pp]
+
+include: post_common.yaml
+
+override:
+  # Correct for the gain mistake in the pre-calibration
+  post.calibration:
+    gain:
+      gain: 14.2857 # 1000 e-/ADC, 14.0 applied in pre-calibration --> 200/14 = 14.2857
+    priority: 7
+
+  # Containment configuration
+  post.containment:
+    run_mode: both
+    truth_point_mode: points_g4
+    mode: source
+    margin: 5.0
+    cathode_margin: -5.0
+    exclude_pids: [0, 1]
+    priority: 1
+
+  # Radius restriction in direction estimate
+  post.direction.radius: 60.0 # cm
+
+  # Shower fudge factor
+  post.calo_ke.shower_fudge: 1.2359
+
+  # Introduces all the shower-specific post-processors
+  # No threshold on maximum michel KE
+  post.shape_logic.maximum_michel_ke: 100
+  post.particle_threshold:
+    primary_threshold: 0.1
+    priority: 4
+  post.shower_start_merge:
+    angle_threshold: 0.175 # radians
+    distance_threshold: 1.0 # cm
+    track_length_limit: 50 # cm
+    track_dedx_limit: null
+    priority: 3
+  post.shower_start_correction:
+    update_directions: true
+    optimize: true
+    radius: 60
+    priority: 3
+  post.time_containment:
+    logical: true
+    mode: source
+    margin: 0.
+    cathode_margin: -5.0
+    exclude_pids: [0, 1]
+    priority: 1
+  post.start_dedx:
+    radius: 3.0
+    mode: default
+    include_pids: [0, 1, 2, 3, 4]
+  post.end_dedx:
+    radius: 3.0
+    mode: default
+    include_pids: [2, 3, 4]
+  post.start_straightness:
+    radius: 3.0
+    n_components: 3
+  post.particle_spread:
+    start_mode: start_point
+    use_start_dir: false
+  post.shower_conversion_distance:
+    mode: vertex_to_points

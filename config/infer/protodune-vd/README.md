@@ -24,6 +24,7 @@ Each main config includes modular YAML files:
 
 **Model Components:**
 - **`model/model_260118.yaml`**: Jan 2026 weights and model settings
+- **`model/model_260118.yaml`**: Jan 2026 (v2) weights and model settings
 - **`model/model_common.yaml`**: Common model architecture
 
 **Post-processing Components:**
@@ -49,7 +50,23 @@ Description:
   - Modular YAML structure with base/io/model/post components
 
 Known issue(s):
-  - [Add any known issues here]
+  - PID + primary classification not trained correction. The MPV filter
+    was trained without passing neutrino_mpv to identify MPV interactions
+    (in this case single beam-like particles)
+  - No charged kaon in the training sample
+
+## January 28th 2026
+
+```shell
+full_chain_260128.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Modular YAML structure with base/io/model/post components
+
+Known issue(s):
+  - No charged kaon in the training sample
 
 ---
 
