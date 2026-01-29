@@ -335,12 +335,20 @@ class SlurmSubmitter:
         base_name = config_path.stem
         base_version = self._extract_version(config_path)
 
-        # Discover available modifiers
-        # If detector is provided, look in the detector's config directory
+        # Always use the detector's config directory for modifier discovery if detector is known
         if detector:
             modifier_search_path = str(self.basedir / "config" / "infer" / detector)
         else:
-            modifier_search_path = base_config
+            # Try to infer detector from base_config path if possible
+            config_path_parts = Path(base_config).parts
+            try:
+                infer_idx = config_path_parts.index("infer")
+                detector_guess = config_path_parts[infer_idx + 1]
+                modifier_search_path = str(
+                    self.basedir / "config" / "infer" / detector_guess
+                )
+            except (ValueError, IndexError):
+                modifier_search_path = base_config
 
         available_mods = self._discover_modifiers(modifier_search_path)
 
