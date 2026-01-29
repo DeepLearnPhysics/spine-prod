@@ -406,21 +406,59 @@ class SlurmSubmitter:
         composite_name = f"{base_name}_{'_'.join(mod_names)}_composite.yaml"
         composite_path = job_dir / composite_name
 
-        # Make all paths relative to the composite config location
+        # Make all paths relative to the config directory (SPINE_CONFIG_PATH)
+        # Find the config directory (should be .../config)
+        config_dir = self.basedir / "config"
+
         composite_content += "include:\n"
-        try:
-            rel_base = os.path.relpath(config_path, composite_path.parent)
-            composite_content += f"  - {rel_base}\n"
-        except ValueError:
-            # On Windows, relpath fails if paths are on different drives
-            composite_content += f"  - {config_path}\n"
+
+        # If the base config is a 'latest' (i.e., built on the fly, not in config_dir), use absolute path
+        # Otherwise, keep as relative to config_dir
+        # If the base config exists under SPINE_CONFIG_PATH, use as given (relative path)
+        # Otherwise (e.g. latest built on the fly), use absolute path
+        config_path_in_config = (
+            config_dir / os.path.relpath(config_path, self.basedir)
+        ).resolve()
+        if config_path_in_config.exists():
+            composite_content += f"  - {os.path.relpath(config_path, self.basedir)}\n"
+        else:
+            # For 'latest' (built) configs, use a relative path from the composite file's directory
+            rel_to_composite = os.path.relpath(config_path, composite_path.parent)
+            composite_content += f"  - {rel_to_composite}\n"
 
         for mod_path in resolved_mods:
             try:
-                rel_mod = os.path.relpath(mod_path, composite_path.parent)
+                rel_mod = os.path.relpath(mod_path, config_dir)
                 composite_content += f"  - {rel_mod}\n"
             except ValueError:
                 composite_content += f"  - {mod_path}\n"
+
+        # If this is a 'latest' composite (i.e., base config is a built composite),
+        # rewrite all includes in the base composite to be relative to SPINE_CONFIG_PATH
+        if base_name.endswith("_composite") or "latest" in base_name:
+            # Patch the just-written base composite file to rewrite its includes
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                with open(config_path, "w", encoding="utf-8") as f:
+                    for line in lines:
+                        if line.strip().startswith("- "):
+                            inc_path = line.strip()[2:]
+                            # If absolute or relative, always rewrite as relative to config_dir
+                            inc_path_abs = (
+                                (Path(config_path).parent / inc_path).resolve()
+                                if not os.path.isabs(inc_path)
+                                else Path(inc_path)
+                            )
+                            try:
+                                rel_inc = os.path.relpath(inc_path_abs, config_dir)
+                                f.write(f"  - {rel_inc}\n")
+                            except Exception:
+                                f.write(line)
+                        else:
+                            f.write(line)
+            except Exception as e:
+                print(f"WARNING: Could not rewrite includes in base composite: {e}")
 
         # Write the composite config
         with open(composite_path, "w", encoding="utf-8") as f:
