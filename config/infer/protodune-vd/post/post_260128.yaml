@@ -17,7 +17,7 @@ override:
   # Correct for the gain mistake in the pre-calibration
   post.calibration:
     gain:
-      gain: 14.2857 # 1000 e-/ADC, 14.0 applied in pre-calibration --> 200/14 = 14.2857
+      gain: 14.2857 # 200 e-/ADC, 14.0 applied in pre-calibration --> 200/14 = 14.2857
     priority: 7
 
   # Containment configuration
