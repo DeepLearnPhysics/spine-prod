@@ -92,8 +92,14 @@ if [[ "$SITE" == "nersc" ]]; then
     {% endif %}
     INNER_CMD="${INNER_CMD}python3 \$SPINE_BASEDIR/bin/run.py -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}"
 
+    # Add --module gpu if using a GPU profile
+    SHIFTER_MODULE=""
+    if [[ {{ gpus }} -gt 0 ]]; then
+        SHIFTER_MODULE="--module gpu"
+    fi
+
     # Execute with srun and shifter
-    RUN_CMD="srun -n 1 shifter --image=$CONTAINER_TAG \"$INNER_CMD\""
+    RUN_CMD="srun -n 1 shifter $SHIFTER_MODULE --image=$CONTAINER_TAG \"$INNER_CMD\""
 else
     # S3DF or other: Use Singularity
     SINGULARITY_INNER_CMD=""
