@@ -1314,7 +1314,7 @@ Examples:
 
     mem_group = parser.add_mutually_exclusive_group()
     mem_group.add_argument("--mem-per-cpu", help="Override memory per CPU")
-    mem_group.add_argument("--mem-per-task", help="Override memory per task")
+    mem_group.add_argument("--mem-per-node", help="Override memory per node")
 
     parser.add_argument("--constraint", help="Override constraint")
     parser.add_argument("--nodes", type=int, help="Override number of nodes")
@@ -1404,7 +1404,7 @@ Examples:
         "cpus_per_task",
         "cpus_per_node",
         "mem_per_cpu",
-        "mem_per_task",
+        "mem_per_node",
         "nodes",
         "time",
         "account",

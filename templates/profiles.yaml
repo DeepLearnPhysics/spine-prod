@@ -12,7 +12,7 @@ profiles:
     gpu_type: h200
     gpu_mem: 141g
     gpus: 1
-    cpus_per_task: 56
+    cpus_per_node: 56
     mem_per_cpu: 6g
     time: "2:00:00"
     description: "Highest-performance GPU processing on Hopper partition"
@@ -27,7 +27,7 @@ profiles:
     gpu_type: a100
     gpu_mem: 40g
     gpus: 1
-    cpus_per_task: 28
+    cpus_per_node: 28
     mem_per_cpu: 8g
     time: "2:00:00"
     description: "High-performance GPU processing on Ampere partition"
@@ -40,7 +40,7 @@ profiles:
     gpu_type: geforce_rtx_2080_ti
     gpu_mem: 11g
     gpus: 1
-    cpus_per_task: 4
+    cpus_per_node: 4
     mem_per_cpu: 4g
     time: "2:00:00"
     description: "Cheap GPU inference on Turing partition"
@@ -54,7 +54,7 @@ profiles:
     gpu_type: null
     gpu_mem: null
     gpus: 0
-    cpus_per_task: 1
+    cpus_per_node: 1
     mem_per_cpu: 4g
     time: "2:00:00"
     description: "CPU-only analysis tasks"
@@ -68,7 +68,7 @@ profiles:
     gpu_type: null
     gpu_mem: null
     gpus: 0
-    cpus_per_task: 1
+    cpus_per_node: 1
     mem_per_cpu: 4g
     time: "2:00:00"
     description: "CPU-only analysis tasks"
@@ -85,9 +85,9 @@ profiles:
     constraint: gpu
     gpu_type: a100
     gpu_mem: 40g
-    gpus_per_task: 1
-    cpus_per_task: 32
-    mem_per_task: 128g
+    gpus_per_node: 1
+    cpus_per_node: 32
+    mem: 128g
     time: "2:00:00"
     description: "GPU processing on NERSC Perlmutter (shared node, 40GB A100)"
 
@@ -100,9 +100,9 @@ profiles:
     constraint: gpu
     gpu_type: a100
     gpu_mem: 80g
-    gpus_per_task: 1
-    cpus_per_task: 32
-    mem_per_task: 128g
+    gpus_per_node: 1
+    cpus_per_node: 32
+    mem: 128g
     time: "2:00:00"
     description: "High-memory GPU on NERSC Perlmutter (shared node, 80GB A100)"
 
@@ -112,9 +112,9 @@ profiles:
     qos: shared
     gpu_type: null
     gpu_mem: null
-    gpus_per_task: 0
-    cpus_per_task: 1
-    mem_per_task: 4g
+    gpus_per_node: 0
+    cpus_per_node: 1
+    mem: 4g
     time: "2:00:00"
     description: "CPU-only tasks on NERSC Perlmutter (shared node)"
 
@@ -126,9 +126,9 @@ profiles:
     constraint: gpu
     gpu_type: a100
     gpu_mem: 40g
-    gpus_per_task: 4
-    cpus_per_task: 128
-    mem_per_task: 512g
+    gpus_per_node: 4
+    cpus_per_node: 128
+    mem: 512g
     time: "2:00:00"
     description: "Full-node GPU processing on NERSC Perlmutter (80GB A100)"
 
@@ -140,9 +140,9 @@ profiles:
     constraint: gpu
     gpu_type: a100
     gpu_mem: 40g
-    gpus_per_task: 4
-    cpus_per_task: 128
-    mem_per_task: 512g
+    gpus_per_node: 4
+    cpus_per_node: 128
+    mem: 512g
     time: "2:00:00"
     description: "Full-node GPU processing on NERSC Perlmutter (80GB A100)"
 
@@ -154,9 +154,9 @@ profiles:
     qos: regular
     gpu_type: null
     gpu_mem: null
-    gpus_per_task: 0
-    cpus_per_task: 128
-    mem_per_task: 512g
+    gpus_per_node: 0
+    cpus_per_node: 128
+    mem: 512g
     time: "2:00:00"
     description: "CPU-only tasks on NERSC Perlmutter"
 
