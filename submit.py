@@ -1310,7 +1310,6 @@ Examples:
 
     cpu_group = parser.add_mutually_exclusive_group()
     cpu_group.add_argument("--cpus-per-task", type=int, help="Override CPUs per task")
-    cpu_group.add_argument("--cpus-per-node", type=int, help="Override CPUs per node")
 
     mem_group = parser.add_mutually_exclusive_group()
     mem_group.add_argument("--mem-per-cpu", help="Override memory per CPU")
@@ -1402,7 +1401,6 @@ Examples:
         "gpus_per_node",
         "gpus",
         "cpus_per_task",
-        "cpus_per_node",
         "mem_per_cpu",
         "mem_per_node",
         "nodes",

@@ -10,7 +10,7 @@
 
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node={{ gpus_per_node }}
-#SBATCH --cpus-per-node={{ cpus_per_node }}
+#SBATCH --cpus-per-task={{ cpus_per_task }}
 #SBATCH --mem={{ mem }}
 #SBATCH --time={{ time }}
 
