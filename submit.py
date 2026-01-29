@@ -36,8 +36,7 @@ class SlurmSubmitter:
         # Always use the project base for resources
         self.basedir = basedir or Path(__file__).parent
         self.profiles = self._load_profiles()
-        self.template = self._load_template()
-        # Only jobs_dir is affected by --local-output
+
         if local_output:
             self.jobs_dir = Path(os.getcwd()) / "jobs"
         else:
@@ -63,18 +62,11 @@ class SlurmSubmitter:
         with open(profiles_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
 
-    def _load_template(self) -> Template:
-        """Load SBATCH job template.
-
-        Returns
-        -------
-        Template
-            Jinja2 template for SBATCH script
-        """
-        template_path = self.basedir / "templates" / "job_template.sbatch"
+    def _load_template(self, template_name: str) -> Template:
+        """Load SBATCH job template by name."""
+        template_path = self.basedir / "templates" / template_name
         if not template_path.exists():
             raise FileNotFoundError(f"Template not found: {template_path}")
-
         with open(template_path, "r", encoding="utf-8") as f:
             return Template(f.read())
 
@@ -1036,13 +1028,19 @@ fi
             if ntasks and ntasks < len(chunk):
                 array_spec += f"%{ntasks}"
 
-            script_content = self.template.render(
+            # Select template based on site
+            site = profile_config.get("site", "s3df")
+            if site == "nersc":
+                template = self._load_template("job_template_nersc.sbatch")
+            elif site == "s3df":
+                template = self._load_template("job_template_s3df.sbatch")
+            else:
+                raise ValueError(
+                    f"Unknown site in profile: {site}, must specify 's3df' or 'nersc'"
+                )
+
+            script_content = template.render(
                 account=account,
-                partition=profile_config["partition"],
-                cpus_per_task=profile_config["cpus_per_task"],
-                mem_per_cpu=profile_config["mem_per_cpu"],
-                time=profile_config["time"],
-                gpus=profile_config["gpus"],
                 array_spec=array_spec,
                 job_name=(
                     f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
@@ -1055,8 +1053,7 @@ fi
                 output=output,
                 larcv_basedir=larcv_basedir,
                 flashmatch=flashmatch,
-                qos=profile_config.get("qos"),
-                constraint=profile_config.get("constraint"),
+                **profile_config,
             )
 
             # Write script

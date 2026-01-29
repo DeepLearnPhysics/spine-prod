@@ -7,6 +7,7 @@ profiles:
   # Node resources: 4 GPUs, 224 CPUs, 1344 GB RAM
   # -> 56 CPU per GPU, 6 GB per CPU
   s3df_hopper:
+    site: s3df
     partition: hopper
     gpu_type: h200
     gpu_mem: 141g
@@ -21,6 +22,7 @@ profiles:
   # Node resources: 4 GPUs, 112 CPUs, 952 GB RAM
   # -> 28 CPU per GPU, 8 GB per CPU
   s3df_ampere:
+    site: s3df
     partition: ampere
     gpu_type: a100
     gpu_mem: 40g
@@ -34,7 +36,7 @@ profiles:
   # Node resources: 10 GPUs, 40 CPUs, 160 GB RAM
   # -> 4 CPUs per GPU, 4 GB per CPU
   s3df_turing:
-    partition: turing
+    site: s3df
     gpu_type: geforce_rtx_2080_ti
     gpu_mem: 11g
     gpus: 1
@@ -47,6 +49,7 @@ profiles:
   # Node resources: 120 CPUs, 480 GB RAM
   # -> 4 GB per CPU
   s3df_milano:
+    site: s3df
     partition: milano
     gpu_type: null
     gpu_mem: null
@@ -60,6 +63,7 @@ profiles:
   # Node resources: 120 CPUs, 480 GB RAM
   # -> 4 GB per CPU
   s3df_roma:
+    site: s3df
     partition: roma
     gpu_type: null
     gpu_mem: null
@@ -70,84 +74,89 @@ profiles:
     description: "CPU-only analysis tasks"
 
   ##### NERSC Resource Profiles #####
+  # NERSC Perlmutter GPU (shared node, 40GB standard variant)
   # 1536 nodes with 4x A100 40GB GPUs (majority of GPU nodes)
   # -> 32 CPUs per GPU (16 physical cores), 128 GB RAM per GPU
   # -> 4 GB per CPU
   # Use this for standard jobs - better availability and queue times
   nersc_gpu:
-    partition: gpu_ss11
+    site: nersc
+    qos: shared
+    constraint: gpu
     gpu_type: a100
     gpu_mem: 40g
     gpus: 1
     cpus_per_task: 32
-    mem_per_cpu: 4g
+    mem_per_task: 128g
     time: "2:00:00"
-    constraint: gpu
     description: "GPU processing on NERSC Perlmutter (shared node, 40GB A100)"
 
   # NERSC Perlmutter GPU (shared node, 80GB high-memory variant)
   # 256 nodes with 4x A100 80GB GPUs (less available, longer queues)
   # Use only when you specifically need >40GB GPU memory
   nersc_gpu_80gb:
-    partition: gpu_ss11
+    site: nersc
+    qos: shared
+    constraint: gpu
     gpu_type: a100
     gpu_mem: 80g
     gpus: 1
     cpus_per_task: 32
-    mem_per_cpu: 4g
+    mem_per_task: 128g
     time: "2:00:00"
-    constraint: gpu
     description: "High-memory GPU on NERSC Perlmutter (shared node, 80GB A100)"
 
   # NERSC Perlmutter CPU (shared partition, for small jobs)
   nersc_cpu:
-    partition: shared
+    site: nersc
+    qos: shared
     gpu_type: null
     gpu_mem: null
     gpus: 0
     cpus_per_task: 1
-    mem_per_cpu: 4g
+    mem_per_task: 4g
     time: "2:00:00"
     description: "CPU-only tasks on NERSC Perlmutter (shared node)"
 
   # NERSC Perlmutter GPU (full node, exclusive)
   # Use for expensive training requiring full node (40GB standard)
   nersc_gpu_exclusive:
-    partition: gpu
+    site: nersc
+    qos: regular
+    constraint: gpu
     gpu_type: a100
     gpu_mem: 40g
     gpus: 4
-    cpus_per_task: 32
-    mem_per_cpu: 4g
+    cpus_per_task: 128
+    mem_per_cpu: 512g
     time: "2:00:00"
-    constraint: gpu
-    qos: regular
     description: "Full-node GPU processing on NERSC Perlmutter (80GB A100)"
 
   # NERSC Perlmutter GPU (full node, exclusive)
   # Use for expensive training requiring full node (80GB standard)
   nersc_gpu_exclusive_80gb:
-    partition: gpu
+    site: nersc
+    qos: regular
+    constraint: gpu
     gpu_type: a100
     gpu_mem: 40g
     gpus: 4
-    cpus_per_task: 32
-    mem_per_cpu: 4g
+    cpus_per_task: 128
+    mem_per_cpu: 512g
     time: "2:00:00"
-    constraint: gpu
-    qos: regular
     description: "Full-node GPU processing on NERSC Perlmutter (80GB A100)"
 
   # NERSC Perlmutter CPU (regular partition)
   # Node resources: 128 CPUs, 512 GB RAM
   # -> 4 GB per CPU
   nersc_cpu_exclusive:
-    partition: regular
+    site: nersc
+    qos: regular
     gpu_type: null
     gpu_mem: null
     gpus: 0
     cpus_per_task: 128
-    mem_per_cpu: 4g
+    mem_per_cpu: 512g
     time: "2:00:00"
     description: "CPU-only tasks on NERSC Perlmutter"
 
