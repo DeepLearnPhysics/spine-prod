@@ -1001,7 +1001,7 @@ fi
         # Get account
         account = profile_config.get("account")
         if not account and detector in self.profiles["detectors"]:
-            account = self.profiles["detectors"][detector].get(
+            profile_config["account"] = self.profiles["detectors"][detector].get(
                 "account", self.profiles["defaults"]["account"]
             )
 
@@ -1040,7 +1040,6 @@ fi
                 )
 
             script_content = template.render(
-                account=account,
                 array_spec=array_spec,
                 job_name=(
                     f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
@@ -1301,10 +1300,25 @@ Examples:
     )
 
     # Profile overrides
-    parser.add_argument("--partition", help="Override partition")
-    parser.add_argument("--gpus", type=int, help="Override GPU count")
-    parser.add_argument("--cpus-per-task", type=int, help="Override CPUs per task")
-    parser.add_argument("--mem-per-cpu", help="Override memory per CPU")
+    partition_group = parser.add_mutually_exclusive_group()
+    partition_group.add_argument("--partition", help="Override partition")
+    partition_group.add_argument("--qos", help="Override QOS")
+
+    gpu_group = parser.add_mutually_exclusive_group()
+    gpu_group.add_argument("--gpus", type=int, help="Override total GPU count")
+    gpu_group.add_argument("--gpus-per-node", type=int, help="Override GPUs per node")
+
+    cpu_group = parser.add_mutually_exclusive_group()
+    cpu_group.add_argument("--cpus-per-task", type=int, help="Override CPUs per task")
+    cpu_group.add_argument("--cpus-per-node", type=int, help="Override CPUs per node")
+
+    mem_group = parser.add_mutually_exclusive_group()
+    mem_group.add_argument("--mem-per-cpu", help="Override memory per CPU")
+    mem_group.add_argument("--mem-per-task", help="Override memory per task")
+
+    parser.add_argument("--constraint", help="Override constraint")
+    parser.add_argument("--nodes", type=int, help="Override number of nodes")
+    parser.add_argument("--ntasks-per-node", type=int, help="Override tasks per node")
     parser.add_argument("--time", "-t", help="Override time limit")
 
     # Execution
@@ -1381,7 +1395,20 @@ Examples:
 
     # Build profile overrides
     profile_overrides = {}
-    for key in ["partition", "gpus", "cpus_per_task", "mem_per_cpu", "time", "account"]:
+    for key in [
+        "partition",
+        "qos",
+        "constraint",
+        "gpus_per_node",
+        "gpus",
+        "cpus_per_task",
+        "cpus_per_node",
+        "mem_per_cpu",
+        "mem_per_task",
+        "nodes",
+        "time",
+        "account",
+    ]:
         value = getattr(args, key, None)
         if value is not None:
             profile_overrides[key] = value

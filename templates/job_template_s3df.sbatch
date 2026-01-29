@@ -58,6 +58,10 @@ echo "Files in this task:"
 cat "$TASK_FILE_LIST"
 echo
 
+# Cap the number Numba threads to 64 (what OpenBLAS was compiled with)
+export NUMBA_NUM_THREADS=64
+echo "NUMBA_NUM_THREADS set to $NUMBA_NUM_THREADS"
+
 # S3DF: Use Singularity
 BIND_PATHS="/sdf/,/fs/"
 SINGULARITY_INNER_CMD=""
