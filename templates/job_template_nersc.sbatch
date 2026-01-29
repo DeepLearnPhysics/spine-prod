@@ -9,11 +9,11 @@
 {% endif %}
 
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task={{ cpus_per_task }}
-#SBATCH --mem-per-cpu={{ mem_per_cpu }}
+#SBATCH --mem-per-task={{ mem_per_task }}
 #SBATCH --time={{ time }}
-#SBATCH --gpus-per-node={{ gpus }}
+#SBATCH --gpus-per-node={{ gpus_per_node }}
 
 #SBATCH --array={{ array_spec }}
 
