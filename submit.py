@@ -725,9 +725,23 @@ fi
             Dictionary with 'base_version', 'config_name', and 'modifiers' keys.
             Each modifier contains 'selected', 'available', and 'paths' information.
         """
+
         config_path_obj = Path(config_path)
         base_version = self._extract_version(config_path_obj)
-        modifiers = self._discover_modifiers(config_path)
+
+        # Always use the detector's config directory for modifier discovery if possible
+        config_path_parts = config_path_obj.parts
+        modifier_search_path = config_path
+        try:
+            infer_idx = config_path_parts.index("infer")
+            detector_guess = config_path_parts[infer_idx + 1]
+            modifier_search_path = str(
+                self.basedir / "config" / "infer" / detector_guess
+            )
+        except (ValueError, IndexError):
+            pass
+
+        modifiers = self._discover_modifiers(modifier_search_path)
 
         result = {
             "base_version": base_version,
