@@ -1084,9 +1084,11 @@ fi
                     f.write(f"{file_group}\n")
 
             # Render SBATCH script
-            array_spec = f"1-{len(chunk)}"
-            if ntasks and ntasks < len(chunk):
-                array_spec += f"%{ntasks}"
+            array_spec = None
+            if len(chunk) > 1:
+                array_spec = f"1-{len(chunk)}"
+                if ntasks and ntasks < len(chunk):
+                    array_spec += f"%{ntasks}"
 
             # Select template based on site
             site = profile_config.get("site", "s3df")
