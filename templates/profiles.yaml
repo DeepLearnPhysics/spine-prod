@@ -130,7 +130,7 @@ profiles:
     cpus_per_task: 128
     mem: 0 # Automated full node memory
     time: "2:00:00"
-    description: "Full-node GPU processing on NERSC Perlmutter (80GB A100)"
+    description: "Full-node GPU processing on NERSC Perlmutter (40GB A100)"
 
   # NERSC Perlmutter GPU (full node, exclusive)
   # Use for expensive training requiring full node (80GB standard)
@@ -139,7 +139,7 @@ profiles:
     qos: regular
     constraint: gpu
     gpu_type: a100
-    gpu_mem: 40g
+    gpu_mem: 80g
     gpus_per_node: 4
     cpus_per_task: 128
     mem: 0 # Automated full node memory
