@@ -77,11 +77,11 @@ INNER_CMD="${INNER_CMD}python3 $SPINE_BASEDIR/bin/run.py -S $TASK_FILE_LIST -o {
 
 # Add --module gpu if using a GPU profile
 SHIFTER_MODULE=""
-if [[ {{ gpus|default(0) }} -gt 0 ]]; then
+if [[ {{ gpus_per_node|default(0) }} -gt 0 ]]; then
     SHIFTER_MODULE="--module gpu"
 fi
 
-RUN_CMD="srun -n 1 shifter $SHIFTER_MODULE --image=$CONTAINER_TAG \"$INNER_CMD\""
+RUN_CMD="srun -n 1 shifter $SHIFTER_MODULE --image=$CONTAINER_TAG bash -c \"$INNER_CMD\""
 
 # Execute
 echo "Running: $RUN_CMD"
