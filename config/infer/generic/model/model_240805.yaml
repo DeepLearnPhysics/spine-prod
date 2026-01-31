@@ -36,3 +36,11 @@ override:
   model.modules.grappa_inter.gnn_model.edge_layer.mlp.width: 128
   model.modules.grappa_inter.gnn_model.node_layer.message_mlp.width: 128
   model.modules.grappa_inter.gnn_model.node_layer.aggr_mlp.width: 128
+
+  # Direction and dE/dx radii settings for GrapPA modules
+  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
+  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
+  model.modules.grappa_track.node_encoder.dir_max_dist: -1
+  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
+  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1

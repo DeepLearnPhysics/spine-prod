@@ -142,9 +142,9 @@ model:
         add_shape: true
         add_points: true
         add_local_dirs: true
-        dir_max_dist: 5
         add_local_dedxs: true
-        dedx_max_dist: 5
+        # dir_max_dist varies by config - override in specific configs
+        # dedx_max_dist varies by config - override in specific configs
       edge_encoder:
         name: geo
         use_numpy: true
@@ -211,9 +211,9 @@ model:
         add_shape: false
         add_points: true
         add_local_dirs: true
-        dir_max_dist: 5
         add_local_dedxs: true
-        dedx_max_dist: 5
+        # dir_max_dist varies by config - override in specific configs
+        # dedx_max_dist varies by config - override in specific configs
       edge_encoder:
         name: geo
         use_numpy: true
@@ -273,8 +273,8 @@ model:
         add_shape: true
         add_points: true
         add_local_dirs: true
-        dir_max_dist: 5
         add_local_dedxs: true
+        # dir_max_dist varies by config - override in specific configs
         # dedx_max_dist varies by config - override in specific configs
       edge_encoder:
         name: geo

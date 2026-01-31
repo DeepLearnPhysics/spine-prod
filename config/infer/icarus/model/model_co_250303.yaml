@@ -41,5 +41,13 @@ override:
   model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
   model.modules.grappa_shower_loss.node_loss.use_closest: false
 
+  # Direction and dE/dx radii settings for GrapPA modules
+  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
+  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
+  model.modules.grappa_track.node_encoder.dir_max_dist: -1
+  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
+  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1
+
   # Interaction grouping restriction applied
   model.modules.grappa_inter.nodes.grouping_through_track: true

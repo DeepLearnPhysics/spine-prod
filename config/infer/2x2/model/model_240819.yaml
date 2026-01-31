@@ -18,3 +18,11 @@ override:
   model.weight_path: !download
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/2x2/2x2_snapshot_240819.ckpt
     hash: a0d5609e24abe8e88884d39ea6c0fcf4b507141bbc637fdf200cb404dfbd1bb0
+
+  # Direction and dE/dx radii settings for GrapPA modules
+  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
+  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
+  model.modules.grappa_track.node_encoder.dir_max_dist: -1
+  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
+  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1

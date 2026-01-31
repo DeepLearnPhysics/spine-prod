@@ -22,3 +22,11 @@ override:
   # Older PPN/Graph SPICE settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: true
   model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
+
+  # Direction and dE/dx radii settings for GrapPA modules
+  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
+  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
+  model.modules.grappa_track.node_encoder.dir_max_dist: -1
+  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
+  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1
