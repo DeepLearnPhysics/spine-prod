@@ -29,7 +29,7 @@ class TestModifierDiscovery:
     def test_discover_modifiers_icarus(self, mock_submitter, infer_root):
         """Test discovering modifiers for ICARUS detector."""
         # Test with a real ICARUS config that has modifiers
-        icarus_configs = list((infer_root / "icarus").glob("icarus_full_chain_*.yaml"))
+        icarus_configs = list((infer_root / "icarus").glob("full_chain_*.yaml"))
         if not icarus_configs:
             pytest.skip("No ICARUS configs found for testing")
 
@@ -50,7 +50,7 @@ class TestModifierDiscovery:
 
     def test_list_modifiers_public_api(self, mock_submitter, infer_root):
         """Test the public list_modifiers() API."""
-        icarus_configs = list((infer_root / "icarus").glob("icarus_full_chain_*.yaml"))
+        icarus_configs = list((infer_root / "icarus").glob("full_chain_*.yaml"))
         if not icarus_configs:
             pytest.skip("No ICARUS configs found for testing")
 
@@ -280,7 +280,7 @@ class TestVersionExtraction:
 
     def test_extract_version_yymmdd(self, mock_submitter):
         """Test extracting YYMMDD version format."""
-        config_path = Path("icarus_full_chain_co_250625.yaml")
+        config_path = Path("full_chain_co_250625.yaml")
         version = mock_submitter._extract_version(config_path)
         assert version == "250625"
 
@@ -298,7 +298,7 @@ class TestVersionExtraction:
 
     def test_extract_version_legacy_format(self, mock_submitter):
         """Test extracting version from legacy format."""
-        config_path = Path("icarus_full_chain_240719.yaml")
+        config_path = Path("full_chain_240719.yaml")
         version = mock_submitter._extract_version(config_path)
         assert version == "240719"
 
@@ -442,7 +442,7 @@ class TestCompositeConfig:
     def test_create_composite_config_basic(self, mock_submitter, tmp_path, infer_root):
         """Test creating a composite config."""
         # Use a real ICARUS config
-        icarus_configs = list((infer_root / "icarus").glob("icarus_full_chain_*.yaml"))
+        icarus_configs = list((infer_root / "icarus").glob("full_chain_*.yaml"))
         if not icarus_configs:
             pytest.skip("No ICARUS configs found")
 
@@ -467,7 +467,7 @@ class TestCompositeConfig:
     ):
         """Test creating composite config with modifiers."""
         # We need a config that's in the same directory as modifiers
-        # The top-level icarus_full_chain configs don't have modifiers in their directory
+        # The top-level full_chain configs don't have modifiers in their directory
         pytest.skip(
             "Composite config with modifiers requires special directory structure"
         )

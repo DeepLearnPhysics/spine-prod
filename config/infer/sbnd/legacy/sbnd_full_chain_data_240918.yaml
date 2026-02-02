@@ -2,5 +2,5 @@
 # Revision date: September 18, 2024
 
 include:
-  - ../sbnd_full_chain_240918.yaml
+  - ../full_chain_240918.yaml
   - ../modifier/data/mod_data_240720.yaml

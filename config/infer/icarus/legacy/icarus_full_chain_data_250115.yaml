@@ -2,5 +2,5 @@
 # Revision date: January 15, 2025
 
 include:
-  - ../icarus_full_chain_250115.yaml
+  - ../full_chain_250115.yaml
   - ../modifier/data/mod_data_250115.yaml

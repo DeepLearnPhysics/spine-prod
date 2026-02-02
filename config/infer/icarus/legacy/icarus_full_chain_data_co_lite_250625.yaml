@@ -2,6 +2,6 @@
 # Revision date: June 25, 2025
 
 include:
-  - ../icarus_full_chain_co_250625.yaml
+  - ../full_chain_co_250625.yaml
   - ../modifier/data/mod_data_250303.yaml
   - ../modifier/lite/mod_lite_240719.yaml

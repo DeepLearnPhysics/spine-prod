@@ -23,7 +23,7 @@ def workspace_root():
 @pytest.fixture
 def infer_root(workspace_root):
     """Return path to infer directory."""
-    return workspace_root / "infer"
+    return workspace_root / "config" / "infer"
 
 
 @pytest.fixture
@@ -33,4 +33,6 @@ def mock_submitter(workspace_root, tmp_path):
     submitter = SlurmSubmitter(basedir=workspace_root)
     submitter.jobs_dir = tmp_path / "test_job"
     submitter.jobs_dir.mkdir(parents=True, exist_ok=True)
+    # Also update the SlurmClient's jobs_dir since that's where job dirs are created
+    submitter.slurm_client.jobs_dir = submitter.jobs_dir
     return submitter

@@ -2,5 +2,5 @@
 # Revision date: July 19, 2024
 
 include:
-  - ../icarus_full_chain_240719.yaml
+  - ../full_chain_240719.yaml
   - ../modifier/data/mod_data_240719.yaml

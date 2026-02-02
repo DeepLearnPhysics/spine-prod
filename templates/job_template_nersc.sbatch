@@ -18,7 +18,6 @@
 #SBATCH --array={{ array_spec }}
 {% endif %}
 
-
 #SBATCH --job-name={{ job_name }}
 {% if array_spec %}
 #SBATCH --output={{ log_dir }}/{{ job_name }}_%A_%a.out
