@@ -1,0 +1,13 @@
+# Lite-output modification for DUNE10kt-1x2x6 configs
+# Revision date: February 2, 2026
+
+__meta__:
+  name: "lite"
+  version: "260202"
+  date: "2026-02-02"
+  description: "Lite-output configuration"
+  applies_to: [mc, data]
+  compatible_with:
+    io: ">=260202"
+
+include: mod_lite_common.yaml

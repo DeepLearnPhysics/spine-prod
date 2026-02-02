@@ -1,0 +1,27 @@
+# Base common configuration for DUNE10kt-1x2x6 (includes geometry and builder)
+
+# Base configuration
+base:
+  world_size: 1
+  iterations: -1
+  seed: 0
+  dtype: float32
+  unwrap: true
+  log_dir: logs
+  prefix_log: true
+  overwrite_log: true
+  log_step: 1
+  split_output: true
+
+# Geometry configuration
+geo:
+  detector: dune10kt-1x2x6
+  tag: dune10kt_v4_1x2x6
+
+# Build output representations
+build:
+  mode: both
+  units: cm
+  fragments: false
+  particles: true
+  interactions: true

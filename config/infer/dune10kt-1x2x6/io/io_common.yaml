@@ -1,0 +1,106 @@
+# IO common configuration for DUNE10kt-1x2x6
+
+# IO configuration
+io:
+  loader:
+    batch_size: 4
+    shuffle: false
+    num_workers: 8
+    collate_fn: all
+    dataset:
+      name: larcv
+      file_keys: null
+      schema:
+        data:
+          parser: sparse3d
+          sparse_event_list:
+            - sparse3d_reco
+            - sparse3d_reco_chi2
+            - sparse3d_reco_hit_charge0
+            - sparse3d_reco_hit_charge1
+            - sparse3d_reco_hit_charge2
+            - sparse3d_reco_hit_key0
+            - sparse3d_reco_hit_key1
+            - sparse3d_reco_hit_key2
+        sources:
+          parser: sparse3d
+          sparse_event_list:
+            - sparse3d_reco_cryo
+            - sparse3d_reco_tpc
+          feature_only: true
+        seg_label:
+          parser: sparse3d
+          sparse_event: sparse3d_pcluster_semantics_ghost
+        ppn_label:
+          parser: particle_points
+          sparse_event: sparse3d_pcluster
+          particle_event: particle_corrected
+          include_point_tagging: false
+        clust_label:
+          parser: cluster3d
+          cluster_event: cluster3d_pcluster
+          particle_event: particle_corrected
+          neutrino_event: neutrino_mpv
+          sparse_semantics_event: sparse3d_pcluster_semantics
+          add_particle_info: true
+          clean_data: true
+        clust_label_g4:
+          parser: cluster3d
+          cluster_event: cluster3d_sed
+          particle_event: particle_corrected
+          add_particle_info: true
+        charge_label:
+          parser: sparse3d
+          sparse_event: sparse3d_reco_rescaled
+        coord_label:
+          parser: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+        graph_label:
+          parser: particle_graph
+          particle_event: particle_corrected
+        particles:
+          parser: particle
+          particle_event: particle_corrected
+          neutrino_event: neutrino_mpv
+          cluster_event: cluster3d_pcluster
+        neutrinos:
+          parser: neutrino
+          neutrino_event: neutrino_mpv
+          cluster_event: cluster3d_pcluster
+        flashes:
+          parser: flash
+          flash_event_list:
+            - opflash
+        crthits:
+          parser: crthit
+          crthit_event: crthit_crthit
+        meta:
+          parser: meta
+          sparse_event: sparse3d_pcluster
+        run_info:
+          parser: run_info
+          sparse_event: sparse3d_pcluster
+
+  writer:
+    name: hdf5
+    file_name: null
+    overwrite: true
+    keys:
+      - run_info
+      - meta
+      - points
+      - points_label
+      - points_g4
+      - depositions
+      - depositions_label
+      - depositions_q_label
+      - depositions_g4
+      - sources
+      - sources_label
+      - reco_particles
+      - truth_particles
+      - reco_interactions
+      - truth_interactions
+      - flashes
+      - crthits

@@ -1,0 +1,71 @@
+# Post-processing common configuration for DUNE10kt-1x2x6
+
+# Post-processors
+post:
+  # apply_calibrations varies by config - override in specific configs
+  # trigger varies by config - override in specific configs
+  calo_ke:
+    run_mode: both
+    scaling: 1.
+    # shower_fudge varies by config - override in specific configs
+    priority: 6
+  shape_logic:
+    enforce_pid: true
+    enforce_primary: true
+    # maximum_michel_ke varies by config - override in specific configs
+    priority: 5
+  # particle_threshold varies by config - override in specific configs
+  direction:
+    run_mode: reco
+    obj_type: particle
+    optimize: true
+    # radius varies by config - override in specific configs
+    priority: 4
+  csda_ke:
+    run_mode: reco
+    tracking_mode: step_next
+    segment_length: 5.0
+    fill_per_pid: true
+    priority: 4
+  # shower_start_merge varies by config - override in specific configs
+  # shower_start_correction varies by config - override in specific configs
+  vertex:
+    run_mode: reco
+    use_primaries: true
+    update_orientations: true
+    update_primaries: false
+    priority: 2
+  mcs_ke:
+    run_mode: reco
+    tracking_mode: bin_pca
+    segment_length: 14.0
+    fill_per_pid: true
+    priority: 1
+  # time_containment varies by config - override in specific configs
+  # containment varies by config - override in specific configs
+  fiducial:
+    run_mode: both
+    mode: module
+    margin: [[25, 25], [25, 25], [30, 50]]
+  topology_threshold:
+    run_mode: both
+    ke_thresholds:
+      1: 50
+      4: 50
+      default: 25
+    truth_ke_mode: energy_deposit
+  # start_dedx varies by config - override in specific configs
+  # end_dedx varies by config - override in specific configs
+  # start_straightness varies by config - override in specific configs
+  # particle_spread varies by config - override in specific configs
+  # shower_conversion_distance varies by config - override in specific configs
+  # flash_match varies by config - override in specific configs
+  children_count:
+    mode: shape
+  match:
+    match_mode: both
+    ghost: true
+    truth_point_mode: points
+    fragment: false
+    particle: true
+    interaction: true
