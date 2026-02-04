@@ -274,7 +274,40 @@ class ConfigManager:
         str
             Path to the generated composite config file
         """
-        config_path = Path(base_config).resolve()
+        # Resolve base config path
+        # First try relative to cwd, then try SPINE_CONFIG_PATH
+        config_dir = self.basedir / "config"
+        base_config_path = Path(base_config)
+
+        if base_config_path.is_absolute():
+            config_path = base_config_path
+            config_path_rel_to_spine = None
+        else:
+            # Try relative to cwd first
+            if base_config_path.exists():
+                config_path = base_config_path.resolve()
+                # Check if it's under SPINE_CONFIG_PATH
+                try:
+                    rel = os.path.relpath(config_path, config_dir)
+                    if not rel.startswith(".."):
+                        config_path_rel_to_spine = rel
+                    else:
+                        config_path_rel_to_spine = None
+                except ValueError:
+                    config_path_rel_to_spine = None
+            else:
+                # Try under SPINE_CONFIG_PATH
+                config_under_spine = config_dir / base_config
+                if config_under_spine.exists():
+                    config_path = config_under_spine.resolve()
+                    config_path_rel_to_spine = str(base_config)
+                else:
+                    raise FileNotFoundError(
+                        f"Base config not found: {base_config}\n"
+                        f"  Tried: {base_config_path.absolute()}\n"
+                        f"  Tried: {config_under_spine}"
+                    )
+
         base_name = config_path.stem
         base_version = self.extract_version(config_path)
 
@@ -355,17 +388,13 @@ class ConfigManager:
 
         composite_content += "include:\n"
 
-        # If the base config is a 'latest' (i.e., built on the fly, not in config_dir),
-        # use absolute path. Otherwise, keep as relative to config_dir
-        # If the base config exists under SPINE_CONFIG_PATH, use as given (relative path)
-        # Otherwise (e.g. latest built on the fly), use absolute path
-        config_path_in_config = (
-            config_dir / os.path.relpath(config_path, self.basedir)
-        ).resolve()
-        if config_path_in_config.exists():
-            composite_content += f"  - {os.path.relpath(config_path, self.basedir)}\n"
+        # If config is under SPINE_CONFIG_PATH, use relative path so SPINE can resolve it
+        # Otherwise use relative path from composite file's directory
+        if config_path_rel_to_spine:
+            composite_content += f"  - {config_path_rel_to_spine}\n"
         else:
-            # For 'latest' (built) configs, use a relative path from the composite file's directory
+            # For configs outside SPINE_CONFIG_PATH (e.g., 'latest' in job dir),
+            # use relative path from composite file's directory
             rel_to_composite = os.path.relpath(config_path, composite_path.parent)
             composite_content += f"  - {rel_to_composite}\n"
 
