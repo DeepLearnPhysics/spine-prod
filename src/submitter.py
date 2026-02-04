@@ -370,6 +370,7 @@ class SlurmSubmitter:
                 job_name=(
                     f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
                 ),
+                log_dir=str(job_dir / "logs"),
                 dependency=dependency,
                 basedir=str(self.basedir),
                 file_list=str(file_list_path),

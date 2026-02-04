@@ -202,5 +202,3 @@ defaults:
   account: "neutrino:ml-dev"
   max_array_size: 99
   files_per_task: 1
-  output_dir: output
-  log_dir: batch_logs
