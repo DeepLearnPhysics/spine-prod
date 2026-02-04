@@ -341,18 +341,22 @@ class SlurmSubmitter:
 
         job_ids = []
         for chunk_idx, chunk in enumerate(file_chunks):
-            # Create file list for this chunk
-            file_list_path = job_dir / f"files_chunk_{chunk_idx}.txt"
-            with open(file_list_path, "w", encoding="utf-8") as f:
-                for _, file_group in enumerate(chunk, 1):
-                    f.write(f"{file_group}\n")
-
             # Render SBATCH script
             array_spec = None
             if len(chunk) > 1:
                 array_spec = f"1-{len(chunk)}"
                 if ntasks and ntasks < len(chunk):
                     array_spec += f"%{ntasks}"
+
+            # Create one file list per array task
+            file_list_pattern = str(job_dir / f"files_chunk_{chunk_idx}_task_*.txt")
+            for task_idx, file_group in enumerate(chunk, start=1):
+                task_file_list = (
+                    job_dir / f"files_chunk_{chunk_idx}_task_{task_idx}.txt"
+                )
+                with open(task_file_list, "w", encoding="utf-8") as f:
+                    for file_path in file_group:
+                        f.write(f"{file_path}\n")
 
             # Select template based on site
             site = profile_config.get("site", "s3df")
@@ -373,7 +377,7 @@ class SlurmSubmitter:
                 log_dir=str(job_dir / "logs"),
                 dependency=dependency,
                 basedir=str(self.basedir),
-                file_list=str(file_list_path),
+                file_list_pattern=file_list_pattern,
                 config=config,
                 output=output,
                 larcv_basedir=larcv_basedir,

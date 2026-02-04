@@ -53,11 +53,7 @@ fi
 
 {% if array_spec %}
 # Get file list for this array task
-FILE_GROUP=$(sed -n "${SLURM_ARRAY_TASK_ID}p" {{ file_list }})
-
-# Create a temporary file list for this task
-TASK_FILE_LIST="{{ log_dir }}/task_files_${SLURM_JOB_ID}_${SLURM_ARRAY_TASK_ID}.txt"
-echo "$FILE_GROUP" | tr ',' '\n' > "$TASK_FILE_LIST"
+TASK_FILE_LIST="{{ file_list_pattern | replace('*', '${SLURM_ARRAY_TASK_ID}') }}"
 
 # Verify first file exists
 FIRST_FILE=$(head -n 1 "$TASK_FILE_LIST")
@@ -71,8 +67,8 @@ echo "Files in this task:"
 cat "$TASK_FILE_LIST"
 echo
 {% else %}
-# Single job: just use the file list as is
-TASK_FILE_LIST="{{ file_list }}"
+# Single job: use the single file list
+TASK_FILE_LIST="{{ file_list_pattern | replace('*', '1') }}"
 FIRST_FILE=$(head -n 1 "$TASK_FILE_LIST")
 if [[ ! -f "$FIRST_FILE" ]]; then
     echo "ERROR: Input file not found: $FIRST_FILE"

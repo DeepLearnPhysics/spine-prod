@@ -201,4 +201,3 @@ detectors:
 defaults:
   account: "neutrino:ml-dev"
   max_array_size: 99
-  files_per_task: 1

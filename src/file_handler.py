@@ -67,13 +67,14 @@ class FileHandler:
         Returns
         -------
         List[List[str]]
-            List of file chunks, each chunk is a list of comma-separated file groups
+            List of file chunks, each chunk is a list of file groups,
+            where each group contains files_per_task individual files
         """
         # Group files by files_per_task
         file_groups = []
         for i in range(0, len(files), files_per_task):
             group = files[i : i + files_per_task]
-            file_groups.append(",".join(group))
+            file_groups.append(group)
 
         # Split into chunks that fit array size limit
         chunks = []
