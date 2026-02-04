@@ -387,8 +387,9 @@ class TestFileChunking:
         # 9 files / 3 per task = 3 groups
         assert len(chunks) == 1
         assert len(chunks[0]) == 3
-        # Each group should have 3 files comma-separated
-        assert chunks[0][0].count(",") == 2  # 3 files means 2 commas
+        # Each group should have 3 files as a list
+        assert len(chunks[0][0]) == 3
+        assert isinstance(chunks[0][0], list)
 
 
 class TestJobDirectory:
