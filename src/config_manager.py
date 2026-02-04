@@ -387,17 +387,24 @@ class ConfigManager:
                     for line in lines:
                         if line.strip().startswith("- "):
                             inc_path = line.strip()[2:]
-                            # If absolute or relative, always rewrite as relative to config_dir
-                            inc_path_abs = (
-                                (Path(config_path).parent / inc_path).resolve()
-                                if not os.path.isabs(inc_path)
-                                else Path(inc_path)
-                            )
-                            try:
-                                rel_inc = os.path.relpath(inc_path_abs, config_dir)
-                                f.write(f"  - {rel_inc}\n")
-                            except (ValueError, OSError):
+                            # Check if this is already a proper SPINE_CONFIG_PATH relative path
+                            # (i.e., file exists when resolved from config_dir)
+                            spine_config_resolved = (config_dir / inc_path).resolve()
+                            if spine_config_resolved.exists():
+                                # Already correct - keep as-is
                                 f.write(line)
+                            else:
+                                # Need to rewrite - resolve and make relative to config_dir
+                                inc_path_abs = (
+                                    (Path(config_path).parent / inc_path).resolve()
+                                    if not os.path.isabs(inc_path)
+                                    else Path(inc_path)
+                                )
+                                try:
+                                    rel_inc = os.path.relpath(inc_path_abs, config_dir)
+                                    f.write(f"  - {rel_inc}\n")
+                                except (ValueError, OSError):
+                                    f.write(line)
                         else:
                             f.write(line)
 
