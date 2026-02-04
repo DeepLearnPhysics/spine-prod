@@ -486,10 +486,13 @@ class ConfigManager:
         for component in component_dirs:
             if component in latest_components:
                 comp_path = latest_components[component]
+                # Use path relative to SPINE_CONFIG_PATH (config dir)
+                # This allows SPINE to resolve includes via SPINE_CONFIG_PATH
                 try:
-                    rel_path = os.path.relpath(comp_path, job_dir)
+                    rel_path = os.path.relpath(comp_path, self.basedir / "config")
                     composite_content += f"  - {rel_path}\n"
                 except ValueError:
+                    # Fallback to absolute path if on different drives/filesystems
                     composite_content += f"  - {comp_path}\n"
 
         # Save the config with version in filename
