@@ -17,15 +17,15 @@ from .slurm_client import SlurmClient
 class SlurmSubmitter:
     """Orchestrates SLURM job submissions for SPINE production."""
 
-    def __init__(self, basedir: Optional[Path] = None, local_output: bool = False):
+    def __init__(self, basedir: Optional[Path] = None, central_dir: bool = False):
         """Initialize SlurmSubmitter.
 
         Parameters
         ----------
         basedir : Optional[Path], optional
             Base directory of spine-prod, by default None (use script location)
-        local_output : bool, optional
-            Write job dirs to cwd instead of basedir, by default False
+        central_dir : bool, optional
+            Write job dirs to spine-prod/jobs instead of cwd/jobs, by default False
         """
         # Always use the project base for resources
         self.basedir = basedir or Path(__file__).parent.parent
@@ -34,16 +34,16 @@ class SlurmSubmitter:
         self.config_mgr = ConfigManager(self.basedir)
         self.file_handler = FileHandler()
 
-        if local_output:
-            jobs_dir = Path(os.getcwd()) / "jobs"
-        else:
+        if central_dir:
             jobs_dir = self.basedir / "jobs"
+        else:
+            jobs_dir = Path(os.getcwd()) / "jobs"
         jobs_dir.mkdir(exist_ok=True)
 
         self.slurm_client = SlurmClient(self.basedir, jobs_dir)
 
         # Check environment
-        if not os.getenv("SPINE_PROD_BASEDIR") and not local_output:
+        if not os.getenv("SPINE_PROD_BASEDIR") and central_dir:
             print("WARNING: SPINE_PROD_BASEDIR not set. Did you source configure.sh?")
 
     @property

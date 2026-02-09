@@ -8,7 +8,7 @@ Usage:
     ./submit.py --config infer/icarus/latest.cfg --source-list file_list.txt
     ./submit.py --config infer/icarus/latest_data.cfg --source data/*.root --profile s3df_ampere
     ./submit.py --pipeline pipelines/icarus_production.yaml
-    ./submit.py --config ... --source ... --local-output
+    ./submit.py --config ... --source ... --central-dir
 """
 
 import argparse
@@ -108,11 +108,20 @@ Examples:
     parser.add_argument("--output", "-o", help="Output file path")
     parser.add_argument("--account", "-A", help="SLURM account")
     parser.add_argument("--dependency", "-d", help="SLURM dependency string")
-    parser.add_argument(
+
+    # Directory configuration
+    dir_group = parser.add_mutually_exclusive_group()
+    dir_group.add_argument(
+        "--central-dir",
+        action="store_true",
+        help="Write job directories and logs to the central spine-prod/jobs directory "
+        "instead of the current working directory (default).",
+    )
+    dir_group.add_argument(
         "--local-output",
         action="store_true",
-        help="Write job directories and logs to the current working directory "
-        "instead of the default jobs directory in the spine-prod base.",
+        help="(DEPRECATED: This is now the default behavior and will be removed in a future version. "
+        "Use --central-dir to write to spine-prod/jobs instead.)",
     )
 
     # Software paths
@@ -166,8 +175,17 @@ Examples:
 
     args = parser.parse_args()
 
-    # Initialize submitter
-    submitter = SlurmSubmitter(local_output=getattr(args, "local_output", False))
+    # Handle deprecated --local-output flag
+    if getattr(args, "local_output", False):
+        print(
+            "WARNING: --local-output is deprecated and now the default behavior. "
+            "This flag will be removed in a future version. "
+            "Use --central-dir to write to spine-prod/jobs instead.",
+            file=sys.stderr,
+        )
+
+    # Initialize submitter (central_dir True means write to spine-prod/jobs)
+    submitter = SlurmSubmitter(central_dir=getattr(args, "central_dir", False))
 
     # Handle --list-mods
     if args.list_mods:
