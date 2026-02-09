@@ -12,4 +12,4 @@ __meta__:
 
 override:
   # Use NuMI-specific flash matching configuration
-  post.flash_match.cfg: flashmatch/flashmatch_numi_250214.cfg
+  post.flash_match.cfg: !path flashmatch/flashmatch_numi_250214.cfg
