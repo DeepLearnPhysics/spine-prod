@@ -340,6 +340,7 @@ class SlurmSubmitter:
         print(f"Splitting into {len(file_chunks)} array job(s)")
 
         job_ids = []
+        chunk_dependency = dependency  # Track dependency for chunk chaining
         for chunk_idx, chunk in enumerate(file_chunks):
             # Render SBATCH script
             array_spec = None
@@ -375,7 +376,7 @@ class SlurmSubmitter:
                     f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
                 ),
                 log_dir=str(job_dir / "logs"),
-                dependency=dependency,
+                dependency=chunk_dependency,
                 basedir=str(self.basedir),
                 file_list_pattern=file_list_pattern,
                 config=config,
@@ -396,11 +397,17 @@ class SlurmSubmitter:
             print(f"  Script: {script_path}")
             print(f"  Files: {len(chunk)}")
             print(f"  Profile: {profile} ({profile_config['description']})")
+            if chunk_dependency:
+                print(f"  Dependency: {chunk_dependency}")
 
             job_id = self.slurm_client.submit_sbatch(script_path, dry_run)
             if job_id:
                 job_ids.append(job_id)
                 print(f"  Job ID: {job_id}")
+
+                # Chain dependencies: next chunk waits for this chunk to complete
+                if len(file_chunks) > 1:
+                    chunk_dependency = f"afterok:{job_id}"
 
         # Save metadata
         from version import __version__
