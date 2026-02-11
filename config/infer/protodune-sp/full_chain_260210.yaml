@@ -1,0 +1,8 @@
+# ProtoDUNE-SP full chain configuration
+# Revision date: February 10, 2026
+
+include:
+  - base/base_260210.yaml
+  - io/io_260210.yaml
+  - model/model_260210.yaml
+  - post/post_260210.yaml

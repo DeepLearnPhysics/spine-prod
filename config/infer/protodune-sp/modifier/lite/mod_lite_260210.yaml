@@ -1,0 +1,13 @@
+# Lite-output modification for ProtoDUNE-SP configs
+# Revision date: February 10, 2026
+
+__meta__:
+  name: "lite"
+  version: "260210"
+  date: "2026-02-10"
+  description: "Lite-output configuration"
+  applies_to: [mc, data]
+  compatible_with:
+    io: ">=260210"
+
+include: mod_lite_common.yaml

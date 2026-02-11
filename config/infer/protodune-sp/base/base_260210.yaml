@@ -1,0 +1,10 @@
+# Base common configuration for ProtoDUNE-SP (includes geometry and builder)
+# Revision date: February 10, 2026
+
+__meta__:
+  version: "260210"
+  date: "2026-02-10"
+  description: "Base ProtoDUNE-SP configuration for February 2026 weights"
+  tags: []
+
+include: base_common.yaml

@@ -1,0 +1,27 @@
+# Data-only modification for ProtoDUNE-SP configs
+# Revision date: February 10, 2026
+
+__meta__:
+  name: "data"
+  version: "260210"
+  date: "2026-02-10"
+  description: "Data-only configuration"
+  applies_to: [data]
+  compatible_with:
+    post: ">=260210"
+
+include: mod_data_common.yaml
+
+#override:
+### Post-processing overrides ###
+# Set calibration parameters for data (post-processor)
+#  model.modules.calibration:
+#    stage: segmentation
+#    gain:
+#      gain: 46.478 # e-/ADC for the collection planes
+#    recombination:
+#      model: mbox
+#      efield: 0.5 # kV/cm
+#    lifetime:
+#      lifetime: 35000 # us
+#      driftv: 0.1563 # cm/us
