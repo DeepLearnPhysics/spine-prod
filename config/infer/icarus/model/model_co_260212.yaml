@@ -1,10 +1,10 @@
 # ICARUS model configuration
-# Revision date: January 15, 2025
+# Revision date: February 12, 2026
 
 __meta__:
-  version: "250625"
-  date: "2025-06-25"
-  description: "ICARUS collection-only model with in-chain calibration, v4 dataset"
+  version: "260212"
+  date: "2026-02-12"
+  description: "ICARUS collection-only model with in-chain calibration, v4 dataset, fixed GrapPA encoder radii settings"
   compatible_with:
     base: ">=240719"
     io: ">=240812"
@@ -15,6 +15,7 @@ __meta__:
       ppn-restrict,
       grappa-use-closest,
       grouping-through-track,
+      grappa-radii-5,
     ]
   training_set: "v4"
 
@@ -23,8 +24,8 @@ include: model_common.yaml
 override:
   # Path to the v4 (mixed lifetime) restricted, collection-only, calibrated model weights
   model.weight_path: !download
-    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/icarus/icarus_co_snapshot_250625.ckpt
-    hash: 0c6d82ba9f1bcc4f4bd158b4849ba400b2f3850012126e02bd78e0d21882fe72
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/icarus/icarus_co_snapshot_260212.ckpt
+    hash: db36f89b6b6e0370a2ce69f0b0a89dda79fb2a68e5c3fcc61e258d00e42bba01
 
   # Calibration handled before the semantic segmentation stage
   model.modules.chain.calibration: apply
@@ -49,12 +50,12 @@ override:
   model.modules.grappa_shower_loss.node_loss.use_closest: true
 
   # Direction and dE/dx radii settings for GrapPA modules
-  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
-  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_track.node_encoder.dir_max_dist: -1
-  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1
+  model.modules.grappa_shower.node_encoder.dir_max_dist: 5
+  model.modules.grappa_shower.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_track.node_encoder.dir_max_dist: 5
+  model.modules.grappa_track.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dir_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: 5
 
   # Interaction grouping restriction applied
   model.modules.grappa_inter.nodes.grouping_through_track: true
