@@ -7,7 +7,7 @@ __meta__:
   description: "IO configuration for SBND July 2024"
   compatible_with:
     base: ">=240720"
-  tags: [without-crt]
+  tags: [without-crt, with-xa]
 
 include: io_common.yaml
 

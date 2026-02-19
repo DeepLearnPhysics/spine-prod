@@ -7,6 +7,6 @@ __meta__:
   description: "IO configuration for SBND March 2025 (removed PPN point tagging)"
   compatible_with:
     base: ">=240720"
-  tags: [with-crt]
+  tags: [with-crt, with-xa]
 
 include: io_common.yaml

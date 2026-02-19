@@ -34,24 +34,37 @@ Legacy `.yaml files have been moved to the `legacy/` directory.
 
 ## Configurations for MPVMPR v02
 
-These weights have been trained using the following files at Polaris:
-- Training set: `/lus/eagle/projects/neutrinoGPU/bearc/simulation/mpvmpr_v02/train/files.txt` (255k)
-- Test set: `/lus/eagle/projects/neutrinoGPU/bearc/simulation/mpvmpr_v02/test/larcv/files.txt` (68k)
-
-...using the configs in the [sbnd_spine_train](https://github.com/bear-is-asleep/sbnd_spine_train/tree/master) repo.
-
-## September 1st 2025
-
-```shell
-sbnd_full_chain_co_250901.yaml
-```
-
 Training samples MPVMPR using `sbndcode v10_04_01` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_04_01) . The training samples are generated using the following fcls:
 ```
 run_mpvmpr_sbnd.fcl
 g4_sce_lite.fcl
 detsim_sce_lite.fcl
 reco1_mpvmpr.fcl
+```
+
+These weights have been trained using the following files at Polaris:
+- Training set: `/lus/eagle/projects/neutrinoGPU/bearc/simulation/mpvmpr_v02/train/files.txt` (255k)
+- Test set: `/lus/eagle/projects/neutrinoGPU/bearc/simulation/mpvmpr_v02/test/larcv/files.txt` (68k)
+
+...using the configs in the [sbnd_spine_train](https://github.com/bear-is-asleep/sbnd_spine_train/tree/master) repo.
+
+## February 18th 2026
+
+```shell
+sbnd_full_chain_co_260218.yaml
+```
+
+The following modifications were made w.r.t. the September 2025 configuration
+- Removed X-Arapuca flash information parsing
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+
+## September 1st 2025
+
+```shell
+sbnd_full_chain_co_250901.yaml
 ```
 
 The following modifications were made w.r.t. the August configurations
@@ -73,14 +86,6 @@ Description:
 sbnd_full_chain_co_250818.cfg
 ```
 
-Training samples MPVMPR using `sbndcode v10_04_01` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_04_01) . The training samples are generated using the following fcls:
-```
-run_mpvmpr_sbnd.fcl
-g4_sce_lite.fcl
-detsim_sce_lite.fcl
-reco1_mpvmpr.fcl
-```
-
 The following modifications were made w.r.t. the March configurations
 - Add a logical containment post-processor
 - Do not move cathode crosser depositions to fix the truth matching
@@ -96,14 +101,6 @@ Description:
 
 ```shell
 sbnd_full_chain_co_250328.cfg
-```
-
-Training samples MPVMPR using `sbndcode v10_04_01` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_04_01) . The training samples are generated using the following fcls:
-```
-run_mpvmpr_sbnd.fcl
-g4_sce_lite.fcl
-detsim_sce_lite.fcl
-reco1_mpvmpr.fcl
 ```
 
 The following modifications were made to the `sbndcode` configuration:

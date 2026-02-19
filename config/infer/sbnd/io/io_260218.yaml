@@ -1,0 +1,17 @@
+# IO configuration for SBND
+# Revision date: February 18, 2026
+
+__meta__:
+  version: "260218"
+  date: "2026-02-18"
+  description: "IO configuration for SBND February 2026 (removed PPN point tagging)"
+  compatible_with:
+    base: ">=240720"
+  tags: [with-crt, without-xa]
+
+include: io_common.yaml
+
+override:
+  # Remove X-Arapuca information from the IO loader/writer
+  io.loader.dataset.schema-: flashes_xa
+  io.writer.keys-: flashes_xa

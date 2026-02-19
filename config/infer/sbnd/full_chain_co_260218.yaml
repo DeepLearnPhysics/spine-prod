@@ -1,0 +1,8 @@
+# SBND full chain configuration
+# Revision date: September 1, 2025
+
+include:
+  - base/base_240720.yaml
+  - io/io_260218.yaml
+  - model/model_co_250901.yaml
+  - post/post_250901.yaml
