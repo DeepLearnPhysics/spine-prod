@@ -5,6 +5,24 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-03-01
+
+### Added
+- New SBND configuration without X-Arapuca parsing
+- New ICARUS configuration with weights trained on v4, leveraging correct GrapPA feature extraction scheme
+- ProtoDUNE-SP weights
+
+### Changed
+- Updated SPINE dependency to v0.10.3
+
+### Fixed
+- Interactive submitter functionality
+- Configuration `!include` parsing issues (SPINE v0.10.2)
+
+Full Changelog: [v0.4.0...v0.4.1](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.4.0...v0.4.1)
+
+---
+
 ## [0.4.0] - 2026-02-10
 
 **Post-reformatting baseline release** - Major architectural overhaul of the configuration system and codebase structure. This release marks a stable reference point before planned architectural evolution.
