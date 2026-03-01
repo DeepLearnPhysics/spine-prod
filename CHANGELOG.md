@@ -5,6 +5,15 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-03-01
+
+### Changed
+- Updated SPINE dependency to v0.10.4
+
+Full Changelog: [v0.4.1...v0.4.2](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.4.1...v0.4.2)
+
+---
+
 ## [0.4.1] - 2026-03-01
 
 ### Added
