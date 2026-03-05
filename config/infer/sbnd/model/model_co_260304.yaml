@@ -1,0 +1,55 @@
+# SBND model configuration
+# Revision date: March 4, 2026
+
+__meta__:
+  version: "260304"
+  date: "2026-03-04"
+  description: "SBND model with collection-only charge rescaling"
+  compatible_with:
+    base: ">=240720"
+    io: ">=240720"
+  tags:
+    [
+      collection-only,
+      ppn-restrict,
+      grappa-use-closest,
+      graph-spice-radius,
+      grouping-through-track,
+    ]
+  training_set: "v2"
+
+include: model_common.yaml
+
+override:
+  # Path to the v2 model weights, with GrapPA feature engineering fix
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/sbnd/sbnd_co_snapshot_260304.ckpt
+    hash: bdc52a6a88d644516ea5a931763358f00c837f859cbc16bf97fd5c95ee80cc84
+
+  # No pre-calibration
+  model.modules.chain.calibration: null
+
+  # Charge rescaling uses collection-only charge
+  model.modules.chain.charge_rescaling: collection
+
+  # Older PPN/GrapPA loss settings
+  model.modules.uresnet_ppn.ppn.classify_endpoints: false
+  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
+  model.modules.grappa_shower_loss.node_loss.use_closest: true
+
+  # Graph-SPICE uses a radius graph with r=1.9 pixels (direct neighbors)
+  model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
+  model.modules.graph_spice.constructor.graph:
+    name: radius
+    r: 1.9
+
+  # Direction and dE/dx radii settings for GrapPA modules
+  model.modules.grappa_shower.node_encoder.dir_max_dist: 5
+  model.modules.grappa_shower.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_track.node_encoder.dir_max_dist: 5
+  model.modules.grappa_track.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dir_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: 5
+
+  # Interaction grouping restriction applied
+  model.modules.grappa_inter.nodes.grouping_through_track: true
