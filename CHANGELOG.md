@@ -5,6 +5,16 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-03-06
+
+### Added
+- New ICARUS MPV/MPR v5 trained configuration
+- New SBND v2 configuration with fixed GrapPA feature engineering
+
+Full Changelog: [v0.4.2...v0.4.3](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.4.2...v0.4.3)
+
+---
+
 ## [0.4.2] - 2026-03-01
 
 ### Changed
