@@ -158,3 +158,45 @@ Changes:
     - Compute EM shower conversion distance
   - Use true energy depoisitions (SED) for the contaiment check
   - Use the vertex to update the track orientations (fix track flipping)
+
+### February 12th 2026
+
+```shell
+icarus_full_chain_co_260212.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - Collection charge configurations available
+  - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, calibration variations, low batch size, and unblind mode are now handled through modular composition and CLI options.
+
+Changes:
+  - Transfer trained the full chain with the corrected GrapPA direction + dE/dx feature engineering
+
+
+## Configurations for MPV/MPR v05
+
+These weights have been trained/validated using the following files:
+- Training set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v5/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v5/test_file_list.txt`
+
+This dataset is composed in equal fractions of events generated with the simulation central value
+and events generated with the omni-detector simulation pipeline (varies lifetime, gain, noise, etc.)
+
+### March 6th 2026
+
+```shell
+icarus_full_chain_co_260306.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - Collection charge configurations available
+  - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
+
+Changes:
+  - Same configuration as 260212, new training sample

@@ -48,6 +48,19 @@ These weights have been trained using the following files at Polaris:
 
 ...using the configs in the [sbnd_spine_train](https://github.com/bear-is-asleep/sbnd_spine_train/tree/master) repo.
 
+## March 4th 2026
+
+```shell
+sbnd_full_chain_co_260304.yaml
+```
+
+The following modifications were made w.r.t. the September 2025 configuration
+- Transfer trained the full chain with the corrected GrapPA direction + dE/dx feature engineering
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+
 ## February 18th 2026
 
 ```shell
