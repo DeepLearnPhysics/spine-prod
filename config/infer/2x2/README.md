@@ -44,28 +44,6 @@ Located in `modifier/` subdirectories:
 ### Legacy Configs
 Old `.cfg` files moved to `legacy/` directory for backward compatibility
 
-## Configurations for MPV/MPR v1
-
-These weights have been trained/validated using the following files:
-- Training set: `/sdf/data/neutrino/2x2/sim/mpvmpr_v1/train_file_list.txt`
-- Test set: `/sdf/data/neutrino/2x2/sim/mpvmpr_v1/test_file_list.txt`
-
-### July 19th 2024
-
-```shell
-full_chain_240719.yaml
-```
-
-Description:
-  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Uses PPN point tagging for shower start prediction
-  - Modular YAML structure with base/io/model/post components
-  - Modifiers available in `modifier/` for data-only, lite, and noflash modes
-
-Known issue(s):
-  - Module 2 packets are simply wrong (performance in that module is terrible, may affect others)
-  - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
-
 ## Configurations for MPV/MPR v2
 
 These weights have been trained/validated using the following files:
@@ -89,3 +67,25 @@ Description:
 
 Known issue(s):
   - No known major issues
+
+## Configurations for MPV/MPR v1
+
+These weights have been trained/validated using the following files:
+- Training set: `/sdf/data/neutrino/2x2/sim/mpvmpr_v1/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/2x2/sim/mpvmpr_v1/test_file_list.txt`
+
+### July 19th 2024
+
+```shell
+full_chain_240719.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Uses PPN point tagging for shower start prediction
+  - Modular YAML structure with base/io/model/post components
+  - Modifiers available in `modifier/` for data-only, lite, and noflash modes
+
+Known issue(s):
+  - Module 2 packets are simply wrong (performance in that module is terrible, may affect others)
+  - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained

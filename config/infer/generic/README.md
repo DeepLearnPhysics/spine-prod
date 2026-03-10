@@ -49,19 +49,6 @@ These weights have been trained/validated using the following files:
 - Training set: `/sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root`
 - Test set: `/sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root`
 
-### July 18th 2024
-
-```shell
-full_chain_240718.yaml
-```
-
-Description:
-  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Modular YAML structure with base/io/model/post components
-
-Known issue(s):
-  - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
-
 ### August 5th 2024
 
 ```shell
@@ -79,3 +66,16 @@ Description:
 
 Known issue(s):
   - Nothing obvious
+
+### July 18th 2024
+
+```shell
+full_chain_240718.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Modular YAML structure with base/io/model/post components
+
+Known issue(s):
+  - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained

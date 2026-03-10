@@ -39,6 +39,19 @@ Located in `modifier/` subdirectories:
 ### Legacy Configs
 No legacy configs are present in this directory. Add `.cfg` files to a `legacy/` subdirectory if needed for backward compatibility.
 
+## January 28th 2026
+
+```shell
+full_chain_260128.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Modular YAML structure with base/io/model/post components
+
+Known issue(s):
+  - No charged kaon in the training sample
+
 ## January 18th 2026
 
 ```shell
@@ -53,19 +66,6 @@ Known issue(s):
   - PID + primary classification not trained correction. The MPV filter
     was trained without passing neutrino_mpv to identify MPV interactions
     (in this case single beam-like particles)
-  - No charged kaon in the training sample
-
-## January 28th 2026
-
-```shell
-full_chain_260128.yaml
-```
-
-Description:
-  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Modular YAML structure with base/io/model/post components
-
-Known issue(s):
   - No charged kaon in the training sample
 
 ---

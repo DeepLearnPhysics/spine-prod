@@ -35,77 +35,19 @@ For example:
 
 Legacy `.yaml` files have been moved to the `legacy/` directory.
 
-## Configurations for MPV/MPR v02
+## Configurations for MPV/MPR v05
 
 These weights have been trained/validated using the following files:
-- Training set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v2/train_file_list.txt`
-- Test set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v2/test_file_list.txt`
+- Training set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v5/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v5/test_file_list.txt`
 
-### July 19th 2024
+This dataset is composed in equal fractions of events generated with the simulation central value
+and events generated with the omni-detector simulation pipeline (varies lifetime, gain, noise, etc.)
 
-```shell
-icarus_full_chain_240719.yaml
-```
-
-Description:
-  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Class-weighted loss on PID predictions
-
-**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, NuMI beam windows, and single cryostat processing are now handled through modular composition and CLI options.
-
-Known issue(s):
-  - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
-
-### August 12th 2024
+### March 6th 2026
 
 ```shell
-icarus_full_chain_240812.yaml
-icarus_full_chain_co_240812.yaml
-```
-
-Description:
-  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Class-weighted loss on PID predictions
-  - Collection charge configurations available
-
-**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, NuMI beam windows, and single cryostat processing are now handled through modular composition and CLI options.
-
-Known issue(s):
-  - Resolves the issue with the PPN target in the previous set of weights
-  - Removed PPN-based end point predictions
-  - The signal gain on the first induction plane is wrong (`_fitFR` fcl file)
-  - No other known issue
-
-
-## Configurations for MPV/MPR v03
-
-These weights have been trained/validated using the following files:
-- Training set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v3/train_file_list.txt`
-- Test set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v3/test_file_list.txt`
-
-### January 15th 2025 
-
-```shell
-icarus_full_chain_250115.yaml
-icarus_full_chain_co_250115.yaml
-```
-
-Description:
-  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Class-weighted loss on PID predictions
-  - Collection charge configurations available
-
-**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, and unblind mode are now handled through modular composition and CLI options.
-
-Known issue(s):
-  - Resolves the issue with the first induction plane gain
-  - Uses correct calibration constant (courtesy of Lane Kashur)
-  - No other known issue
-
-### March 3rd 2025 
-
-```shell
-icarus_full_chain_co_250303.yaml
+icarus_full_chain_co_260306.yaml
 ```
 
 Description:
@@ -114,11 +56,8 @@ Description:
   - Collection charge configurations available
   - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
 
-**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, calibration variations, and unblind mode are now handled through modular composition and CLI options.
-
-Known issue(s):
-  - Moved all calibrations upstream of the full chain (for the better!)
-  - No other known issue
+Changes:
+  - Same configuration as 260212, new training sample
 
 
 ## Configurations for MPV/MPR v04
@@ -129,6 +68,23 @@ These weights have been trained/validated using the following files:
 
 This dataset is a superset of v03, with the additional of samples with different
 electron lifetimes (4 ms and 8 ms) to match what was recorded during ICARUS run 2.
+
+### February 12th 2026
+
+```shell
+icarus_full_chain_co_260212.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - Collection charge configurations available
+  - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, calibration variations, low batch size, and unblind mode are now handled through modular composition and CLI options.
+
+Changes:
+  - Transfer trained the full chain with the corrected GrapPA direction + dE/dx feature engineering
 
 ### June 25th 2025 
 
@@ -159,37 +115,17 @@ Changes:
   - Use true energy depoisitions (SED) for the contaiment check
   - Use the vertex to update the track orientations (fix track flipping)
 
-### February 12th 2026
 
-```shell
-icarus_full_chain_co_260212.yaml
-```
-
-Description:
-  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Class-weighted loss on PID predictions
-  - Collection charge configurations available
-  - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
-
-**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, calibration variations, low batch size, and unblind mode are now handled through modular composition and CLI options.
-
-Changes:
-  - Transfer trained the full chain with the corrected GrapPA direction + dE/dx feature engineering
-
-
-## Configurations for MPV/MPR v05
+## Configurations for MPV/MPR v03
 
 These weights have been trained/validated using the following files:
-- Training set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v5/train_file_list.txt`
-- Test set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v5/test_file_list.txt`
+- Training set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v3/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v3/test_file_list.txt`
 
-This dataset is composed in equal fractions of events generated with the simulation central value
-and events generated with the omni-detector simulation pipeline (varies lifetime, gain, noise, etc.)
-
-### March 6th 2026
+### March 3rd 2025 
 
 ```shell
-icarus_full_chain_co_260306.yaml
+icarus_full_chain_co_250303.yaml
 ```
 
 Description:
@@ -198,5 +134,69 @@ Description:
   - Collection charge configurations available
   - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
 
-Changes:
-  - Same configuration as 260212, new training sample
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, calibration variations, and unblind mode are now handled through modular composition and CLI options.
+
+Known issue(s):
+  - Moved all calibrations upstream of the full chain (for the better!)
+  - No other known issue
+
+### January 15th 2025 
+
+```shell
+icarus_full_chain_250115.yaml
+icarus_full_chain_co_250115.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - Collection charge configurations available
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, and unblind mode are now handled through modular composition and CLI options.
+
+Known issue(s):
+  - Resolves the issue with the first induction plane gain
+  - Uses correct calibration constant (courtesy of Lane Kashur)
+  - No other known issue
+
+
+## Configurations for MPV/MPR v02
+
+These weights have been trained/validated using the following files:
+- Training set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v2/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v2/test_file_list.txt`
+
+### August 12th 2024
+
+```shell
+icarus_full_chain_240812.yaml
+icarus_full_chain_co_240812.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - Collection charge configurations available
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, NuMI beam windows, and single cryostat processing are now handled through modular composition and CLI options.
+
+Known issue(s):
+  - Resolves the issue with the PPN target in the previous set of weights
+  - Removed PPN-based end point predictions
+  - The signal gain on the first induction plane is wrong (`_fitFR` fcl file)
+  - No other known issue
+
+### July 19th 2024
+
+```shell
+icarus_full_chain_240719.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+
+**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, NuMI beam windows, and single cryostat processing are now handled through modular composition and CLI options.
+
+Known issue(s):
+  - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained

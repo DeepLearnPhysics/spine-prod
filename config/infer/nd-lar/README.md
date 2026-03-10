@@ -75,20 +75,23 @@ Known issues with the simulation:
   - Wrong KE range produced for protons (and possibly electrons)
   - Unrealistically low pile-up (interaction multiplicity)
 
-### May 5th 2025
+### August 6th 2025
 
 ```shell
-full_chain_250505.yaml
+full_chain_250806.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - First ND-LAr trained weights (MPV/MPR v00)
+  - Trained on overlay data (4x spills)
   - Modular YAML structure with base/io/model/post components
   - Modifiers available in `modifier/` for overlay and lite modes
 
 Known issues:
   - No flash matching
+
+Changes from May 15th:
+  - Trained on overlay samples (multiple interactions per readout window)
 
 ### May 15th 2025
 
@@ -109,37 +112,17 @@ Changes from May 5th:
   - Changed fiducial definition (10 cm from module boundaries now)
   - Relaxed maximum edge lengths in the GrapPAs
 
-### August 6th 2025
+### May 5th 2025
 
 ```shell
-full_chain_250806.yaml
+full_chain_250505.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Trained on overlay data (4x spills)
+  - First ND-LAr trained weights (MPV/MPR v00)
   - Modular YAML structure with base/io/model/post components
   - Modifiers available in `modifier/` for overlay and lite modes
 
 Known issues:
   - No flash matching
-
-Changes from May 15th:
-  - Trained on overlay samples (multiple interactions per readout window)
-
-```shell
-nd-lar_full_chain_250806.cfg
-nd-lar_full_chain_ovl_250806.cfg
-```
-
-Description:
-  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Includes flash parsing
-  - The `*_ovl_*` declination is meant to run overlays (4x spills)
-
-Known issues:
-  - No flash matching
-
-Changes:
-  - Trained on overlays (4x images per event)
-  - Improves interaction clusering purity as some cost to efficiency
