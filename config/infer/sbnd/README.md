@@ -48,6 +48,19 @@ These weights have been trained using the following files at Polaris:
 
 ...using the configs in the [sbnd_spine_train](https://github.com/bear-is-asleep/sbnd_spine_train/tree/master) repo.
 
+## March 16th 2026
+
+```shell
+sbnd_full_chain_co_260316.yaml
+```
+
+The following modifications were made w.r.t. the earlier March 2026 configuration
+- Transfer all GrapPA stages this time (not just the final GrapPA-Inter stage)
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+
 ## March 4th 2026
 
 ```shell
