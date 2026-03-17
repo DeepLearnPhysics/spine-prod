@@ -11,7 +11,7 @@ base:
   prefix_log: true
   overwrite_log: true
   log_step: 1
-  split_output: true
+  split_output: false
 
 # Geometry configuration
 geo:
