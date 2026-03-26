@@ -5,6 +5,21 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2026-03-25
+
+### Added
+- New ICARUS v4 inference configuration with GrapPA shower/track fix
+- New SBND configuration with fully transfer trained weights and feature engineering fix
+- ND-LAr v1 training weights (preliminary)
+
+### Changed
+- Reordered configuration descriptions
+- Updated ICARUS and SBND READMEs to include newer configurations
+
+Full Changelog: [v0.4.3...v0.4.4](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.4.3...v0.4.4)
+
+---
+
 ## [0.4.3] - 2026-03-06
 
 ### Added
