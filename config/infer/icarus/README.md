@@ -69,6 +69,21 @@ These weights have been trained/validated using the following files:
 This dataset is a superset of v03, with the additional of samples with different
 electron lifetimes (4 ms and 8 ms) to match what was recorded during ICARUS run 2.
 
+### March 25th 2026
+
+```shell
+icarus_full_chain_co_260325.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - Collection charge configurations available
+  - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
+
+Changes:
+  - Also transfer trained the shower/track GrapPAs with the feature engineering fix
+
 ### February 12th 2026
 
 ```shell
@@ -80,8 +95,6 @@ Description:
   - Class-weighted loss on PID predictions
   - Collection charge configurations available
   - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
-
-**Note:** Legacy `.yaml` files with all naming variations are in `legacy/`. Features like data-only mode, lite output, NuMI beam windows, single cryostat processing, calibration variations, low batch size, and unblind mode are now handled through modular composition and CLI options.
 
 Changes:
   - Transfer trained the full chain with the corrected GrapPA direction + dE/dx feature engineering

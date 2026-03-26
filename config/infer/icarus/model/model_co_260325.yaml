@@ -1,10 +1,10 @@
 # ICARUS model configuration
-# Revision date: February 12, 2026
+# Revision date: March 25, 2026
 
 __meta__:
-  version: "260212"
-  date: "2026-02-12"
-  description: "ICARUS collection-only model with in-chain calibration, v4 dataset, fixed GrapPA encoder radii settings"
+  version: "260325"
+  date: "2026-03-25"
+  description: "ICARUS collection-only model with in-chain calibration, v4 dataset, fixed GrapPA encoder radii settings (including shower/track)"
   compatible_with:
     base: ">=240719"
     io: ">=240812"
@@ -22,10 +22,10 @@ __meta__:
 include: model_common.yaml
 
 override:
-  # Path to the v4 (mixed lifetime) restricted, collection-only, calibrated model weights, with GrapPA feature engineering fix
+  # Path to the v4 (mixed lifetime) restricted, collection-only, calibrated model weights, with GrapPA feature engineering fix (including shower/track)
   model.weight_path: !download
-    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/icarus/icarus_co_snapshot_260212.ckpt
-    hash: db36f89b6b6e0370a2ce69f0b0a89dda79fb2a68e5c3fcc61e258d00e42bba01
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/icarus/icarus_co_snapshot_260325.ckpt
+    hash: 00d79114b6686010e4da63766a43f85fe0041aafaf78f945d67bf6973b9584fb
 
   # Calibration handled before the semantic segmentation stage
   model.modules.chain.calibration: apply
