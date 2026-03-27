@@ -32,3 +32,11 @@ io:
       - truth_particles
       - reco_interactions
       - truth_interactions
+
+# Build output representations
+build:
+  mode: both
+  units: cm
+  fragments: false
+  particles: true
+  interactions: true
