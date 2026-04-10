@@ -1,0 +1,8 @@
+# ICARUS full chain configuration with collection-only model
+# Revision date: April 10, 2026
+
+include:
+  - base/base_240719.yaml
+  - io/io_240812.yaml
+  - model/model_co_260410.yaml
+  - post/post_250625.yaml
