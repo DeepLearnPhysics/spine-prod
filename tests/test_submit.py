@@ -493,3 +493,66 @@ class TestProfileSelection:
         # Should fall back to default if available
         profile = mock_submitter._get_profile("auto", detector="generic")
         assert profile is not None
+
+
+class TestCVMFSOption:
+    """Tests for opt-in CVMFS container exposure."""
+
+    def _render_template(self, mock_submitter, template_name, **kwargs):
+        """Render a job template with minimal defaults."""
+        template = mock_submitter.slurm_client.load_template(template_name)
+        defaults = {
+            "account": "test-account",
+            "partition": "test-partition",
+            "qos": "test-qos",
+            "constraint": None,
+            "gpus": 0,
+            "gpus_per_node": 0,
+            "cpus_per_task": 1,
+            "mem_per_cpu": "1g",
+            "mem": "1g",
+            "time": "00:10:00",
+            "array_spec": None,
+            "job_name": "test-job",
+            "log_dir": "/tmp/logs",
+            "dependency": None,
+            "config": "/tmp/config.yaml",
+            "output": "/tmp/output.h5",
+            "basedir": "/tmp/spine-prod",
+            "file_list_pattern": "/tmp/files_*.txt",
+            "larcv_basedir": None,
+            "flashmatch": False,
+            "cvmfs": False,
+        }
+        defaults.update(kwargs)
+        return template.render(**defaults)
+
+    def test_s3df_does_not_bind_cvmfs_by_default(self, mock_submitter):
+        """Test S3DF leaves CVMFS out of bind paths by default."""
+        script = self._render_template(mock_submitter, "job_template_s3df.sbatch")
+
+        assert 'BIND_PATHS="/sdf/"' in script
+        assert "/cvmfs/" not in script
+
+    def test_s3df_binds_cvmfs_when_requested(self, mock_submitter):
+        """Test S3DF adds CVMFS to bind paths when requested."""
+        script = self._render_template(
+            mock_submitter, "job_template_s3df.sbatch", cvmfs=True
+        )
+
+        assert 'BIND_PATHS="/sdf/"' in script
+        assert 'BIND_PATHS="$BIND_PATHS,/cvmfs/"' in script
+
+    def test_nersc_does_not_load_cvmfs_module_by_default(self, mock_submitter):
+        """Test NERSC leaves Shifter CVMFS module out by default."""
+        script = self._render_template(mock_submitter, "job_template_nersc.sbatch")
+
+        assert "--module=cvmfs" not in script
+
+    def test_nersc_loads_cvmfs_module_when_requested(self, mock_submitter):
+        """Test NERSC adds Shifter CVMFS module when requested."""
+        script = self._render_template(
+            mock_submitter, "job_template_nersc.sbatch", cvmfs=True
+        )
+
+        assert 'SHIFTER_MODULES+=("--module=cvmfs")' in script

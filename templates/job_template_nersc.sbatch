@@ -95,13 +95,16 @@ INNER_CMD="${INNER_CMD}source $FMATCH_BASEDIR/configure.sh; "
 {% endif %}
 INNER_CMD="${INNER_CMD}python3 $SPINE_BASEDIR/bin/run.py -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}"
 
-# Add --module gpu if using a GPU profile
-SHIFTER_MODULE=""
+# Add Shifter modules requested by the job profile/options
+SHIFTER_MODULES=()
 if [[ {{ gpus_per_node|default(0) }} -gt 0 ]]; then
-    SHIFTER_MODULE="--module gpu"
+    SHIFTER_MODULES+=("--module gpu")
 fi
+{% if cvmfs %}
+SHIFTER_MODULES+=("--module=cvmfs")
+{% endif %}
 
-RUN_CMD="srun -n 1 shifter $SHIFTER_MODULE --image=$CONTAINER_TAG bash -c \"$INNER_CMD\""
+RUN_CMD="srun -n 1 shifter ${SHIFTER_MODULES[*]} --image=$CONTAINER_TAG bash -c \"$INNER_CMD\""
 
 # Execute
 echo "Running: $RUN_CMD"

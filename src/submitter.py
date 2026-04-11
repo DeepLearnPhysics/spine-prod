@@ -76,6 +76,7 @@ class SlurmSubmitter:
         task_id: int = 1,
         larcv_basedir: Optional[str] = None,
         flashmatch: bool = False,
+        cvmfs: bool = False,
         apply_mods: Optional[List[str]] = None,
     ) -> int:
         """Run SPINE processing interactively (no SLURM submission).
@@ -102,6 +103,8 @@ class SlurmSubmitter:
             Custom LArCV installation path
         flashmatch : bool, optional
             Enable flash matching
+        cvmfs : bool, optional
+            Expose CVMFS inside the container, by default False
         apply_mods : List[str], optional
             List of modifiers to apply
 
@@ -237,6 +240,7 @@ class SlurmSubmitter:
         dependency: Optional[str] = None,
         larcv_basedir: Optional[str] = None,
         flashmatch: bool = False,
+        cvmfs: bool = False,
         apply_mods: Optional[List[str]] = None,
         dry_run: bool = False,
         **profile_overrides,
@@ -268,6 +272,8 @@ class SlurmSubmitter:
             Custom LArCV installation path, by default None
         flashmatch : bool, optional
             Enable flash matching, by default False
+        cvmfs : bool, optional
+            Expose CVMFS inside the container, by default False
         apply_mods : List[str], optional
             List of modifiers to apply (e.g., ['data', 'flash']), by default None
         dry_run : bool, optional
@@ -383,6 +389,7 @@ class SlurmSubmitter:
                 output=output,
                 larcv_basedir=larcv_basedir,
                 flashmatch=flashmatch,
+                cvmfs=cvmfs,
                 **profile_config,
             )
 
@@ -419,6 +426,7 @@ class SlurmSubmitter:
             "config": config,
             "original_config": original_config if apply_mods else config,
             "applied_modifiers": apply_mods or [],
+            "cvmfs": cvmfs,
             "profile": profile,
             "profile_config": profile_config,
             "num_files": len(file_list),
@@ -488,6 +496,7 @@ class SlurmSubmitter:
                 dependency=dependency,
                 larcv_basedir=stage.get("larcv_basedir"),
                 flashmatch=stage.get("flashmatch", False),
+                cvmfs=stage.get("cvmfs", False),
                 dry_run=dry_run,
             )
 

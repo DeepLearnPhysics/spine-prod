@@ -131,6 +131,12 @@ Examples:
     parser.add_argument(
         "--flashmatch", "-F", action="store_true", help="Enable flash matching"
     )
+    parser.add_argument(
+        "--cvmfs",
+        action="store_true",
+        help="Expose CVMFS inside the container. On S3DF this adds /cvmfs/ to "
+        "Singularity binds; on NERSC this adds --module=cvmfs to Shifter.",
+    )
 
     # Profile overrides
     partition_group = parser.add_mutually_exclusive_group()
@@ -270,6 +276,7 @@ Examples:
                 task_id=args.task_id,
                 larcv_basedir=args.larcv_basedir,
                 flashmatch=args.flashmatch,
+                cvmfs=args.cvmfs,
                 apply_mods=args.apply_mods,
             )
             return exit_code
@@ -292,6 +299,7 @@ Examples:
                 dependency=args.dependency,
                 larcv_basedir=args.larcv_basedir,
                 flashmatch=args.flashmatch,
+                cvmfs=args.cvmfs,
                 apply_mods=args.apply_mods,
                 dry_run=args.dry_run,
                 **profile_overrides,

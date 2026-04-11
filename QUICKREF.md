@@ -57,6 +57,9 @@
 
 # Dry run (test without submitting)
 ./submit.py --config infer/icarus/latest --source data.root --dry-run
+
+# Expose CVMFS inside the container
+./submit.py --config infer/icarus/latest --source data.root --cvmfs
 ```
 
 ### Pipeline Mode

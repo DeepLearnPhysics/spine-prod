@@ -358,6 +358,9 @@ This is especially useful for large-scale production to save disk space by remov
 
 # Enable flash matching
 ./submit.py --config infer/icarus/latest.cfg --source data.root --flashmatch
+
+# Expose CVMFS inside the container
+./submit.py --config infer/icarus/latest.cfg --source data.root --cvmfs
 ```
 
 ### Job Dependencies
