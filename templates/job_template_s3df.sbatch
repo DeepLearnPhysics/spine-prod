@@ -83,7 +83,7 @@ export NUMBA_NUM_THREADS=64
 echo "NUMBA_NUM_THREADS set to $NUMBA_NUM_THREADS"
 
 # S3DF: Use Singularity
-BIND_PATHS="/sdf/,/fs/"
+BIND_PATHS="/sdf/,/cvmfs/"
 SINGULARITY_INNER_CMD=""
 {% if larcv_basedir %}
 SINGULARITY_INNER_CMD="unset which; source {{ larcv_basedir }}/configure.sh; "
