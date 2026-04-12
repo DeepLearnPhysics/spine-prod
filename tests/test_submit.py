@@ -614,11 +614,3 @@ class TestBatchClients:
         assert mock_submitter._get_template_name({"site": "anl"}) == (
             "job_template_anl.pbs"
         )
-
-    def test_submitter_expands_profile_environment(self, mock_submitter, monkeypatch):
-        """Test profile values can be configured through environment variables."""
-        monkeypatch.setenv("ANL_ACCOUNT", "neutrinoGPU::test-suballocation")
-
-        profile = mock_submitter._expand_profile_env({"account": "${ANL_ACCOUNT}"})
-
-        assert profile["account"] == "neutrinoGPU::test-suballocation"

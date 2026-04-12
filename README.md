@@ -234,7 +234,6 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 ./submit.py --config infer/icarus/latest.cfg --source data.root --profile s3df_turing
 
 # ANL/Polaris using CONTAINER_PATH from configure.sh
-export ANL_ACCOUNT='neutrinoGPU::<suballocation>'
 ./submit.py --config infer/icarus/latest.cfg --source data.root --profile anl_polaris_debug
 
 # Override specific resources

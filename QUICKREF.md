@@ -44,7 +44,6 @@
 ./submit.py --config infer/icarus/latest --source data.root --profile s3df_milano
 
 # ANL/Polaris debug queue
-export ANL_ACCOUNT='neutrinoGPU::<suballocation>'
 ./submit.py --config infer/icarus/latest --source data.root --profile anl_polaris_debug
 ```
 

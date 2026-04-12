@@ -360,24 +360,12 @@ class Submitter:
         # Detect detector and get profile
         profile_config = self.config_mgr.get_profile(profile, detector)
         profile_config.update(profile_overrides)
-        profile_config = self._expand_profile_env(profile_config)
 
         # Get account
         account = profile_config.get("account")
         if not account and detector in self.profiles["detectors"]:
             profile_config["account"] = self.profiles["detectors"][detector].get(
                 "account", self.profiles["defaults"]["account"]
-            )
-            profile_config = self._expand_profile_env(profile_config)
-
-        if (
-            isinstance(profile_config.get("account"), str)
-            and "$" in profile_config["account"]
-        ):
-            raise ValueError(
-                "Batch scheduler account contains an unresolved environment "
-                f"variable: {profile_config['account']}. Set ANL_ACCOUNT or pass "
-                "--account with the concrete PBS account/suballocation."
             )
 
         # Determine output path
@@ -599,16 +587,6 @@ class Submitter:
     def _get_profile(self, profile_name: str, detector: Optional[str] = None) -> Dict:
         """Delegate to ConfigManager.get_profile."""
         return self.config_mgr.get_profile(profile_name, detector)
-
-    def _expand_profile_env(self, profile_config: Dict) -> Dict:
-        """Expand environment variables in string profile values."""
-        expanded = {}
-        for key, value in profile_config.items():
-            if isinstance(value, str):
-                expanded[key] = os.path.expandvars(value)
-            else:
-                expanded[key] = value
-        return expanded
 
     def _extract_version(self, config_path: Path) -> Optional[str]:
         """Delegate to ConfigManager.extract_version."""
