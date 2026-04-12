@@ -1,0 +1,41 @@
+# ND-LAr model configuration
+# Revision date: April 09, 2026
+
+__meta__:
+  version: "260409"
+  date: "2026-04-09"
+  description: "ND-LAr model first full weights release"
+  compatible_with:
+    base: ">=240819"
+    io: ">=240819"
+  tags: []
+  training_set: "v1"
+
+include: model_common.yaml
+
+override:
+  # MPV/MPR v01 long-range, kaon weights path, trained longer
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/nd-lar/nd-lar_snapshot_260409.ckpt
+    hash: 4b9cbe81a1fd8a757b374e177b5317647e5ff19ce201f9261a8ddae2c62c0233
+
+  # Graph-SPICE embedding settings
+  model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
+
+  # Aggregator edge length setting changes
+  model.modules.grappa_shower.graph.max_length:
+    [400, 0, 400, 400, 0, 0, 0, 35, 0, 70]
+  model.modules.grappa_track.graph.max_length: 250
+  model.modules.grappa_inter.graph.max_length:
+    [400, 400, 0, 0, 400, 40, 40, 0, 0, 0]
+
+  # Direction and dE/dx radii settings for GrapPA modules
+  model.modules.grappa_shower.node_encoder.dir_max_dist: 5
+  model.modules.grappa_shower.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_track.node_encoder.dir_max_dist: 5
+  model.modules.grappa_track.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dir_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: 5
+
+  # Loss adjustments
+  model.modules.grappa_shower_loss.node_loss.use_closest: true

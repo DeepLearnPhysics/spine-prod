@@ -25,9 +25,15 @@ if [[ -z $SPINE_BASEDIR ]]; then
     fi
 fi
 
-# Define path to OpT0Finder
-#export FMATCH_BASEDIR=/sdf/data/neutrino/software/OpT0Finder_legacy
-export FMATCH_BASEDIR=/sdf/data/neutrino/software/OpT0Finder
+# If FMATCH_BASEDIR is not set, default to the standard location on S3DF.
+if [[ -z $FMATCH_BASEDIR ]]; then
+    export FMATCH_BASEDIR=/sdf/data/neutrino/software/OpT0Finder
+fi
+
+# If ICARUS_DATA_DIR is not set, default to the standard location on CVMFS.
+if [[ -z $ICARUS_DATA_DIR ]]; then
+    export ICARUS_DATA_DIR=/cvmfs/icarus.opensciencegrid.org/products/icarus/icarus_data
+fi
 
 # Define path to the container (Singularity/Apptainer .sif file for S3DF)
 export CONTAINER_PATH=/sdf/group/neutrino/images/larcv2_ub2204-cuda121-torch251-larndsim.sif
@@ -41,6 +47,7 @@ printf "    \033[95mSPINE_PROD_BASEDIR\033[00m = $SPINE_PROD_BASEDIR\n"
 printf "    \033[95mSPINE_CONFIG_PATH\033[00m  = $SPINE_CONFIG_PATH\n"
 printf "    \033[95mSPINE_BASEDIR\033[00m      = $SPINE_BASEDIR\n"
 printf "    \033[95mFMATCH_BASEDIR\033[00m     = $FMATCH_BASEDIR\n"
+printf "    \033[95mICARUS_DATA_DIR\033[00m    = $ICARUS_DATA_DIR\n"
 printf "    \033[95mCONTAINER_PATH\033[00m     = $CONTAINER_PATH\n"
 printf "    \033[95mCONTAINER_TAG\033[00m      = $CONTAINER_TAG\n"
 

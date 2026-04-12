@@ -38,10 +38,10 @@ override:
       efield: 0.4938 # kV/cm
       mip_dedx: 2.105168 # MeV/cm
     lifetime:
-      lifetime_db: /cvmfs/icarus.opensciencegrid.org/products/icarus/icarus_data/v10_06_03/icarus_data/database/tpc_elifetime_data.db
-      driftv_db: /cvmfs/icarus.opensciencegrid.org/products/icarus/icarus_data/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
+      lifetime_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_elifetime_data.db
+      driftv_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
     transparency:
-      transparency_db: /cvmfs/icarus.opensciencegrid.org/products/icarus/icarus_data/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
+      transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
 
   # Charge rescaling uses collection-only charge
   model.modules.chain.charge_rescaling: collection

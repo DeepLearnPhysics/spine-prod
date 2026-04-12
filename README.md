@@ -363,6 +363,14 @@ This is especially useful for large-scale production to save disk space by remov
 ./submit.py --config infer/icarus/latest.cfg --source data.root --cvmfs
 ```
 
+For sites without CVMFS, point ICARUS configs at a local copy of the
+`icarus_data` release directory before sourcing `configure.sh`:
+
+```bash
+export ICARUS_DATA_DIR=/path/to/icarus_data
+source configure.sh
+```
+
 ### Job Dependencies
 
 ```bash
