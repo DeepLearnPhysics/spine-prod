@@ -104,7 +104,7 @@ seff JOB_ID
 | `s3df_milano` | None | CPU-only analysis |
 | `s3df_roma` | None | CPU-only analysis |
 | `anl_polaris_debug` | A100 | Polaris debug queue |
-| `anl_polaris_gpu` | A100 | Polaris capacity queue |
+| `anl_polaris_capacity` | A100 | Polaris capacity queue |
 
 ## Common Configs
 
