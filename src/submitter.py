@@ -1,4 +1,4 @@
-"""Main SLURM submission orchestrator for SPINE production."""
+"""Main batch submission orchestrator for SPINE production."""
 
 import os
 import subprocess
@@ -9,16 +9,16 @@ from typing import Dict, List, Optional
 
 import yaml
 
+from .client import PBSClient, SlurmClient
 from .config_manager import ConfigManager
 from .file_handler import FileHandler
-from .slurm_client import SlurmClient
 
 
-class SlurmSubmitter:
-    """Orchestrates SLURM job submissions for SPINE production."""
+class Submitter:
+    """Orchestrates batch job submissions for SPINE production."""
 
     def __init__(self, basedir: Optional[Path] = None, central_dir: bool = False):
-        """Initialize SlurmSubmitter.
+        """Initialize Submitter.
 
         Parameters
         ----------
@@ -40,7 +40,8 @@ class SlurmSubmitter:
             jobs_dir = Path(os.getcwd()) / "jobs"
         jobs_dir.mkdir(exist_ok=True)
 
-        self.slurm_client = SlurmClient(self.basedir, jobs_dir)
+        self.jobs_dir = jobs_dir
+        self.batch_client = SlurmClient(self.basedir, jobs_dir)
 
         # Check environment
         if not os.getenv("SPINE_PROD_BASEDIR") and central_dir:
@@ -65,6 +66,40 @@ class SlurmSubmitter:
             Dictionary with 'base_version', 'config_name', and 'modifiers' keys
         """
         return self.config_mgr.list_modifiers(config_path)
+
+    def _get_batch_client(self, profile_config: Dict):
+        """Get the batch client for a profile."""
+        scheduler = profile_config.get("scheduler")
+        site = profile_config.get("site", "s3df")
+
+        if scheduler is None:
+            scheduler = "pbs" if site in ("anl", "polaris") else "slurm"
+
+        if scheduler == "slurm":
+            return SlurmClient(self.basedir, self.jobs_dir)
+        if scheduler == "pbs":
+            return PBSClient(self.basedir, self.jobs_dir)
+
+        raise ValueError(
+            f"Unknown scheduler in profile: {scheduler}, must specify 'slurm' or 'pbs'"
+        )
+
+    def _get_template_name(self, profile_config: Dict) -> str:
+        """Get the job template for a profile."""
+        if profile_config.get("template"):
+            return profile_config["template"]
+
+        site = profile_config.get("site", "s3df")
+        if site == "nersc":
+            return "job_template_nersc.sbatch"
+        if site == "s3df":
+            return "job_template_s3df.sbatch"
+        if site in ("anl", "polaris"):
+            return "job_template_anl.pbs"
+
+        raise ValueError(
+            f"Unknown site in profile: {site}, must specify 's3df', 'nersc', or 'anl'"
+        )
 
     def run_interactive(
         self,
@@ -129,7 +164,7 @@ class SlurmSubmitter:
         is_latest = config_name == "latest" or "latest" in config_path.parts
 
         job_name = f"interactive_{detector}_{config_name}"
-        job_dir = self.slurm_client.create_job_dir(job_name)
+        job_dir = self.batch_client.create_job_dir(job_name)
 
         # Handle "latest" config generation
         if is_latest:
@@ -245,7 +280,7 @@ class SlurmSubmitter:
         dry_run: bool = False,
         **profile_overrides,
     ) -> List[str]:
-        """Submit SLURM job for SPINE processing.
+        """Submit batch job for SPINE processing.
 
         Parameters
         ----------
@@ -267,7 +302,7 @@ class SlurmSubmitter:
         files_per_task : int, optional
             Files to process per task, by default 1
         dependency : str, optional
-            SLURM dependency string, by default None
+            Batch scheduler dependency string, by default None
         larcv_basedir : str, optional
             Custom LArCV installation path, by default None
         flashmatch : bool, optional
@@ -306,7 +341,7 @@ class SlurmSubmitter:
         if not job_name:
             job_name = f"spine_{detector}_{config_name}"
 
-        job_dir = self.slurm_client.create_job_dir(job_name)
+        job_dir = self.batch_client.create_job_dir(job_name)
 
         # Handle "latest" config generation
         if is_latest:
@@ -365,16 +400,10 @@ class SlurmSubmitter:
                     for file_path in file_group:
                         f.write(f"{file_path}\n")
 
-            # Select template based on site
-            site = profile_config.get("site", "s3df")
-            if site == "nersc":
-                template = self.slurm_client.load_template("job_template_nersc.sbatch")
-            elif site == "s3df":
-                template = self.slurm_client.load_template("job_template_s3df.sbatch")
-            else:
-                raise ValueError(
-                    f"Unknown site in profile: {site}, must specify 's3df' or 'nersc'"
-                )
+            batch_client = self._get_batch_client(profile_config)
+            template = batch_client.load_template(
+                self._get_template_name(profile_config)
+            )
 
             script_content = template.render(
                 array_spec=array_spec,
@@ -394,7 +423,9 @@ class SlurmSubmitter:
             )
 
             # Write script
-            script_path = job_dir / f"submit_chunk_{chunk_idx}.sbatch"
+            script_path = (
+                job_dir / f"submit_chunk_{chunk_idx}{batch_client.script_suffix}"
+            )
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(script_content)
             script_path.chmod(0o755)
@@ -407,14 +438,14 @@ class SlurmSubmitter:
             if chunk_dependency:
                 print(f"  Dependency: {chunk_dependency}")
 
-            job_id = self.slurm_client.submit_sbatch(script_path, dry_run)
+            job_id = batch_client.submit(script_path, dry_run)
             if job_id:
                 job_ids.append(job_id)
                 print(f"  Job ID: {job_id}")
 
                 # Chain dependencies: next chunk waits for this chunk to complete
                 if len(file_chunks) > 1:
-                    chunk_dependency = f"afterok:{job_id}"
+                    chunk_dependency = batch_client.dependency_afterok(job_id)
 
         # Save metadata
         from version import __version__
@@ -436,7 +467,7 @@ class SlurmSubmitter:
             "submitted": datetime.now().isoformat(),
             "command": " ".join(sys.argv),
         }
-        self.slurm_client.save_job_metadata(job_dir, metadata)
+        self.batch_client.save_job_metadata(job_dir, metadata)
 
         print(f"\nJob directory: {job_dir}")
         print(f"Job metadata: {job_dir}/job_metadata.json")
@@ -535,7 +566,7 @@ class SlurmSubmitter:
                             f"  {stage_name}: cleanup after {', '.join(dependent_stages)} complete"
                         )
 
-                        self.slurm_client.submit_cleanup_job(
+                        self.batch_client.submit_cleanup_job(
                             paths_to_clean=cleanup_info["paths"],
                             job_name=f"cleanup_{stage_name}",
                             dependency=dependency,
@@ -602,12 +633,12 @@ class SlurmSubmitter:
         return self.file_handler.chunk_files(files, max_array_size, files_per_task)
 
     def _create_job_dir(self, job_name: str) -> Path:
-        """Delegate to SlurmClient.create_job_dir."""
-        return self.slurm_client.create_job_dir(job_name)
+        """Delegate to BatchClient.create_job_dir."""
+        return self.batch_client.create_job_dir(job_name)
 
     def _save_job_metadata(self, job_dir: Path, metadata: Dict):
-        """Delegate to SlurmClient.save_job_metadata."""
-        return self.slurm_client.save_job_metadata(job_dir, metadata)
+        """Delegate to BatchClient.save_job_metadata."""
+        return self.batch_client.save_job_metadata(job_dir, metadata)
 
     def _create_latest_config(self, detector: str, job_dir: Path) -> str:
         """Delegate to ConfigManager.create_latest_config."""

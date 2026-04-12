@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""SPINE Production SLURM Submission System.
+"""SPINE Production Batch Submission System.
 
 A modern, flexible job submission orchestrator for SPINE reconstruction
-on SLURM-based HPC systems.
+on batch-based HPC systems.
 
 Usage:
     ./submit.py --config infer/icarus/latest.cfg --source-list file_list.txt
@@ -15,13 +15,13 @@ import argparse
 import sys
 from pathlib import Path
 
-from src import SlurmSubmitter
+from src import Submitter
 
 
 def main():
-    """Main entry point for the SLURM submission system."""
+    """Main entry point for the batch submission system."""
     parser = argparse.ArgumentParser(
-        description="SPINE Production SLURM Submission System",
+        description="SPINE Production Batch Submission System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -31,7 +31,7 @@ Examples:
   # Direct sources with glob pattern
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source data/*.root
 
-  # Interactive mode (test locally without SLURM)
+  # Interactive mode (test locally without a batch scheduler)
   %(prog)s --interactive --config infer/icarus/full_chain_co_250625.yaml --source test.root
   %(prog)s -I --config infer/icarus/full_chain_co_250625.yaml --source-list files.txt --task-id 2
 
@@ -106,8 +106,8 @@ Examples:
     # Job configuration
     parser.add_argument("--job-name", "-j", help="Custom job name")
     parser.add_argument("--output", "-o", help="Output file path")
-    parser.add_argument("--account", "-A", help="SLURM account")
-    parser.add_argument("--dependency", "-d", help="SLURM dependency string")
+    parser.add_argument("--account", "-A", help="Batch scheduler account")
+    parser.add_argument("--dependency", "-d", help="Batch scheduler dependency string")
 
     # Directory configuration
     dir_group = parser.add_mutually_exclusive_group()
@@ -137,11 +137,11 @@ Examples:
         help="Expose CVMFS inside the container. On S3DF this adds /cvmfs/ to "
         "Singularity binds; on NERSC this adds --module=cvmfs to Shifter.",
     )
-
     # Profile overrides
     partition_group = parser.add_mutually_exclusive_group()
     partition_group.add_argument("--partition", help="Override partition")
     partition_group.add_argument("--qos", help="Override QOS")
+    partition_group.add_argument("--queue", help="Override PBS queue")
 
     gpu_group = parser.add_mutually_exclusive_group()
     gpu_group.add_argument("--gpus", type=int, help="Override total GPU count")
@@ -169,7 +169,7 @@ Examples:
         "--interactive",
         "-I",
         action="store_true",
-        help="Run interactively without submitting to SLURM (useful for testing)",
+        help="Run interactively without submitting to a batch scheduler (useful for testing)",
     )
 
     parser.add_argument(
@@ -191,7 +191,7 @@ Examples:
         )
 
     # Initialize submitter (central_dir True means write to spine-prod/jobs)
-    submitter = SlurmSubmitter(central_dir=getattr(args, "central_dir", False))
+    submitter = Submitter(central_dir=getattr(args, "central_dir", False))
 
     # Handle --list-mods
     if args.list_mods:
@@ -240,6 +240,7 @@ Examples:
     for key in [
         "partition",
         "qos",
+        "queue",
         "constraint",
         "gpus_per_node",
         "gpus",

@@ -11,11 +11,14 @@ spine-prod/
 ├── submit.py                # Main CLI entry point (295 lines)
 ├── src/                     # Source code modules
 │   ├── __init__.py         # Package initialization
+│   ├── client/             # Batch scheduler clients
+│   │   ├── base.py         # Shared template/job metadata helpers
+│   │   ├── slurm.py        # SLURM sbatch client
+│   │   └── pbs.py          # PBS qsub client
 │   ├── config_manager.py   # Configuration and profile management (560 lines)
 │   ├── file_handler.py     # File parsing and chunking (81 lines)
-│   ├── slurm_client.py     # SLURM job operations (206 lines)
 │   └── submitter.py        # Main orchestration class (522 lines)
-├── templates/              # SLURM job templates
+├── templates/              # Batch job templates
 ├── config/                 # SPINE configurations
 └── jobs/                   # Job output directories
 ```
@@ -39,15 +42,16 @@ spine-prod/
 - Chunk files for array jobs
 - File validation
 
-### `src/slurm_client.py`
-- Load SLURM job templates
-- Submit jobs via sbatch
+### `src/client/`
+- Load batch job templates
+- Submit jobs via scheduler-specific clients
 - Create job directories
 - Save job metadata
-- Cleanup job management
+- Parse scheduler-specific job IDs
+- Cleanup job management for SLURM
 
 ### `src/submitter.py`
-- Main `SlurmSubmitter` class
+- Main `Submitter` class
 - Orchestrates all components
 - Handles job submission workflow
 - Pipeline management
@@ -80,12 +84,12 @@ No changes to user-facing commands - all existing scripts and workflows continue
 The refactored code can now be easily used programmatically:
 
 ```python
-from src import SlurmSubmitter
+from src import Submitter
 from src.config_manager import ConfigManager
 from src.file_handler import FileHandler
-from src.slurm_client import SlurmClient
+from src.client import PBSClient, SlurmClient
 
 # Example: Use components directly
-submitter = SlurmSubmitter()
+submitter = Submitter()
 job_ids = submitter.submit_job(config="...", files=["..."])
 ```

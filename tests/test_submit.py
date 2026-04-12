@@ -1,6 +1,6 @@
 """Tests for submit.py functionality.
 
-This module provides integration tests for the SLURM submission system,
+This module provides integration tests for the batch submission system,
 testing actual code paths in submit.py to ensure proper coverage reporting.
 
 Tests include:
@@ -20,7 +20,8 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from submit import SlurmSubmitter
+from src.client import PBSClient, SlurmClient
+from submit import Submitter
 
 
 class TestModifierDiscovery:
@@ -181,7 +182,7 @@ class TestProfileLoading:
 
     def test_load_profiles_default(self, workspace_root):
         """Test loading default profiles.yaml."""
-        submitter = SlurmSubmitter(basedir=workspace_root)
+        submitter = Submitter(basedir=workspace_root)
 
         # Should load profiles successfully
         assert submitter.profiles is not None
@@ -194,7 +195,7 @@ class TestProfileLoading:
 
     def test_detector_config_paths(self, workspace_root):
         """Test that detector configs_dir paths are correct."""
-        submitter = SlurmSubmitter(basedir=workspace_root)
+        submitter = Submitter(basedir=workspace_root)
 
         detectors = submitter.profiles.get("detectors", {})
         for detector_name, detector_config in detectors.items():
@@ -212,13 +213,13 @@ class TestEnvironmentVariables:
         with patch.dict(
             os.environ, {"SPINE_PROD_BASEDIR": str(workspace_root)}, clear=False
         ):
-            submitter = SlurmSubmitter()
+            submitter = Submitter()
             assert submitter.basedir == workspace_root
 
     def test_basedir_explicit_override(self, workspace_root, tmp_path):
         """Test explicit basedir overrides environment."""
         with patch.dict(os.environ, {"SPINE_PROD_BASEDIR": str(tmp_path)}, clear=False):
-            submitter = SlurmSubmitter(basedir=workspace_root)
+            submitter = Submitter(basedir=workspace_root)
             assert submitter.basedir == workspace_root
 
 
@@ -500,17 +501,23 @@ class TestCVMFSOption:
 
     def _render_template(self, mock_submitter, template_name, **kwargs):
         """Render a job template with minimal defaults."""
-        template = mock_submitter.slurm_client.load_template(template_name)
+        template = mock_submitter.batch_client.load_template(template_name)
         defaults = {
             "account": "test-account",
             "partition": "test-partition",
             "qos": "test-qos",
+            "queue": "debug",
             "constraint": None,
             "gpus": 0,
             "gpus_per_node": 0,
+            "nodes": 1,
+            "system": "polaris",
+            "cpus_per_node": 32,
             "cpus_per_task": 1,
             "mem_per_cpu": "1g",
             "mem": "1g",
+            "filesystems": "home:grand:eagle",
+            "place": None,
             "time": "00:10:00",
             "array_spec": None,
             "job_name": "test-job",
@@ -523,6 +530,7 @@ class TestCVMFSOption:
             "larcv_basedir": None,
             "flashmatch": False,
             "cvmfs": False,
+            "bind_paths": None,
         }
         defaults.update(kwargs)
         return template.render(**defaults)
@@ -556,3 +564,53 @@ class TestCVMFSOption:
         )
 
         assert 'SHIFTER_MODULES+=("--module=cvmfs")' in script
+
+    def test_anl_template_uses_pbs_and_array_index(self, mock_submitter):
+        """Test ANL template uses PBS directives and PBS array variables."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_anl.pbs",
+            array_spec="1-4",
+            gpus_per_node=1,
+        )
+
+        assert "#PBS -A test-account" in script
+        assert "#PBS -q debug" in script
+        assert "#PBS -J 1-4" in script
+        assert "ngpus=1" in script
+        assert "${PBS_ARRAY_INDEX}" in script
+        assert "apptainer exec" in script
+
+
+class TestBatchClients:
+    """Tests for scheduler-specific batch clients."""
+
+    def test_client_package_exports_concrete_clients(self):
+        """Test client package exports concrete clients only."""
+        assert SlurmClient is not None
+        assert PBSClient is not None
+
+    def test_pbs_client_parses_qsub_job_id(self, tmp_path):
+        """Test PBS client parses qsub stdout."""
+        script_path = tmp_path / "job.pbs"
+        script_path.write_text("#!/bin/bash\n")
+        client = PBSClient(tmp_path, tmp_path)
+
+        completed = type(
+            "Completed",
+            (),
+            {"returncode": 0, "stdout": "12345.polaris-pbs-01\n", "stderr": ""},
+        )()
+        with patch("src.client.pbs.subprocess.run", return_value=completed):
+            job_id = client.submit(script_path)
+
+        assert job_id == "12345.polaris-pbs-01"
+
+    def test_submitter_selects_pbs_client_for_anl(self, mock_submitter):
+        """Test ANL profiles select the PBS client."""
+        client = mock_submitter._get_batch_client({"site": "anl", "scheduler": "pbs"})
+
+        assert isinstance(client, PBSClient)
+        assert mock_submitter._get_template_name({"site": "anl"}) == (
+            "job_template_anl.pbs"
+        )
