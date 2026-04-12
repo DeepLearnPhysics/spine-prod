@@ -178,6 +178,11 @@ Examples:
         default=1,
         help="Task ID to run in interactive mode (default: 1)",
     )
+    parser.add_argument(
+        "--preload",
+        action="store_true",
+        help="Preload SPINE !download assets on the submit host before execution.",
+    )
 
     args = parser.parse_args()
 
@@ -258,7 +263,9 @@ Examples:
     try:
         if args.pipeline:
             # Pipeline mode
-            job_map = submitter.submit_pipeline(args.pipeline, dry_run=args.dry_run)
+            job_map = submitter.submit_pipeline(
+                args.pipeline, dry_run=args.dry_run, preload=args.preload
+            )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():
                 print(f"{stage}: {', '.join(job_ids)}")
@@ -279,6 +286,7 @@ Examples:
                 flashmatch=args.flashmatch,
                 cvmfs=args.cvmfs,
                 apply_mods=args.apply_mods,
+                preload=args.preload,
             )
             return exit_code
 
@@ -303,6 +311,7 @@ Examples:
                 cvmfs=args.cvmfs,
                 apply_mods=args.apply_mods,
                 dry_run=args.dry_run,
+                preload=args.preload,
                 **profile_overrides,
             )
 

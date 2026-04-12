@@ -12,6 +12,7 @@ import yaml
 from .client import PBSClient, SlurmClient
 from .config_manager import ConfigManager
 from .file_handler import FileHandler
+from .preload import preload_downloads
 
 
 class Submitter:
@@ -113,6 +114,7 @@ class Submitter:
         flashmatch: bool = False,
         cvmfs: bool = False,
         apply_mods: Optional[List[str]] = None,
+        preload: bool = False,
     ) -> int:
         """Run SPINE processing interactively (no SLURM submission).
 
@@ -142,6 +144,8 @@ class Submitter:
             Expose CVMFS inside the container, by default False
         apply_mods : List[str], optional
             List of modifiers to apply
+        preload : bool, optional
+            Preload !download assets before execution, by default False
 
         Returns
         -------
@@ -176,6 +180,9 @@ class Submitter:
             config = self.config_mgr.create_composite_config(
                 config, apply_mods, job_dir, detector=detector if is_latest else None
             )
+
+        if preload:
+            self._preload_downloads(config)
 
         # Determine output path
         if not output:
@@ -278,6 +285,7 @@ class Submitter:
         cvmfs: bool = False,
         apply_mods: Optional[List[str]] = None,
         dry_run: bool = False,
+        preload: bool = False,
         **profile_overrides,
     ) -> List[str]:
         """Submit batch job for SPINE processing.
@@ -313,6 +321,8 @@ class Submitter:
             List of modifiers to apply (e.g., ['data', 'flash']), by default None
         dry_run : bool, optional
             Show what would be submitted without submitting, by default False
+        preload : bool, optional
+            Preload !download assets before submitting, by default False
         **profile_overrides
             Override profile settings
 
@@ -356,6 +366,9 @@ class Submitter:
             config = self.config_mgr.create_composite_config(
                 config, apply_mods, job_dir, detector=detector if is_latest else None
             )
+
+        if preload:
+            self._preload_downloads(config)
 
         # Detect detector and get profile
         profile_config = self.config_mgr.get_profile(profile, detector)
@@ -475,7 +488,7 @@ class Submitter:
         return job_ids
 
     def submit_pipeline(
-        self, pipeline_path: str, dry_run: bool = False
+        self, pipeline_path: str, dry_run: bool = False, preload: bool = False
     ) -> Dict[str, List[str]]:
         """Submit multi-stage pipeline with dependencies.
 
@@ -485,6 +498,8 @@ class Submitter:
             Path to pipeline YAML file
         dry_run : bool, optional
             Show what would be submitted, by default False
+        preload : bool, optional
+            Preload !download assets before each stage submission, by default False
 
         Returns
         -------
@@ -529,6 +544,7 @@ class Submitter:
                 flashmatch=stage.get("flashmatch", False),
                 cvmfs=stage.get("cvmfs", False),
                 dry_run=dry_run,
+                preload=preload,
             )
 
             job_map[stage_name] = job_ids
@@ -639,6 +655,12 @@ class Submitter:
     def _save_job_metadata(self, job_dir: Path, metadata: Dict):
         """Delegate to BatchClient.save_job_metadata."""
         return self.batch_client.save_job_metadata(job_dir, metadata)
+
+    def _preload_downloads(self, config: str):
+        """Preload !download assets for a config on the submit host."""
+        print("\nPreloading !download assets:")
+        print(f"  Config: {config}")
+        preload_downloads(config, self.basedir)
 
     def _create_latest_config(self, detector: str, job_dir: Path) -> str:
         """Delegate to ConfigManager.create_latest_config."""

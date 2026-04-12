@@ -614,3 +614,22 @@ class TestBatchClients:
         assert mock_submitter._get_template_name({"site": "anl"}) == (
             "job_template_anl.pbs"
         )
+
+
+class TestPreloadDownloads:
+    """Tests for submit-time download preloading."""
+
+    def test_preload_downloads_invokes_helper(self, mock_submitter, workspace_root):
+        """Test submitter invokes the preload helper with the requested config."""
+        with patch("src.submitter.preload_downloads") as preload:
+            mock_submitter._preload_downloads("infer/2x2/full_chain_240819.yaml")
+
+        preload.assert_called_once_with(
+            "infer/2x2/full_chain_240819.yaml", workspace_root
+        )
+
+    def test_preload_downloads_raises_on_failure(self, mock_submitter):
+        """Test preload failures stop submission before jobs are queued."""
+        with patch("src.submitter.preload_downloads", side_effect=RuntimeError("boom")):
+            with pytest.raises(RuntimeError, match="boom"):
+                mock_submitter._preload_downloads("infer/2x2/full_chain_240819.yaml")

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Preload SPINE !download assets into the shared cache."""
+"""CLI wrapper for preloading SPINE !download assets."""
 
 import argparse
-import os
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -12,33 +12,24 @@ def get_project_root():
     return Path(__file__).resolve().parents[1]
 
 
-def bootstrap_spine(project_root):
-    """Make the bundled SPINE submodule importable when present."""
-    spine_src = project_root / "spine" / "src"
-    if spine_src.exists():
-        sys.path.insert(0, str(spine_src))
+PROJECT_ROOT = get_project_root()
 
 
-def resolve_config_path(config, project_root):
-    """Resolve a config path from cwd or the repository config directory."""
-    path = Path(config).expanduser()
-    if path.exists():
-        return path.resolve()
-
-    repo_config_path = project_root / "config" / config
-    if repo_config_path.exists():
-        return repo_config_path.resolve()
-
-    raise FileNotFoundError("Config not found: {}".format(config))
+def load_preload_downloads():
+    """Load src/preload.py without importing the full src package."""
+    preload_path = PROJECT_ROOT / "src" / "preload.py"
+    spec = importlib.util.spec_from_file_location("spine_prod_preload", preload_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.preload_downloads
 
 
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description=(
-            "Preload files referenced by SPINE !download tags. Run this on a "
-            "login node before submitting jobs on systems where worker nodes "
-            "do not have outbound network access."
+            "Preload files referenced by SPINE !download tags. Useful when "
+            "using spine-prod configs from an external production pipeline."
         )
     )
     parser.add_argument(
@@ -59,40 +50,16 @@ def parse_args():
 def main():
     """Preload all downloads needed by the requested configs."""
     args = parse_args()
-    project_root = get_project_root()
-
-    os.environ.setdefault("SPINE_PROD_BASEDIR", str(project_root))
-    if args.cache_dir:
-        os.environ["SPINE_CACHE_DIR"] = str(Path(args.cache_dir).expanduser())
-
-    bootstrap_spine(project_root)
-
     try:
-        from spine.config.download import get_cache_dir
-        from spine.config.load import load_config_file
-    except ImportError as exc:
-        print(
-            "ERROR: Could not import SPINE config tools. Source configure.sh or "
-            "initialize the spine submodule before running this script.",
-            file=sys.stderr,
+        preload_downloads = load_preload_downloads()
+        preload_downloads(
+            args.configs,
+            PROJECT_ROOT,
+            cache_dir=args.cache_dir,
         )
-        print("Import error: {}".format(exc), file=sys.stderr)
+    except Exception as exc:
+        print("ERROR: {}".format(exc), file=sys.stderr)
         return 1
-
-    print("Download cache: {}".format(get_cache_dir()))
-
-    for config in args.configs:
-        try:
-            config_path = resolve_config_path(config, project_root)
-            print("\nLoading config: {}".format(config_path))
-            load_config_file(str(config_path))
-        except Exception as exc:
-            print(
-                "ERROR: Failed to preload {}: {}".format(config, exc), file=sys.stderr
-            )
-            return 1
-
-    print("\nPreload complete.")
     return 0
 
 

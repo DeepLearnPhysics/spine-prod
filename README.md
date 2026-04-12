@@ -236,11 +236,14 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 # ANL/Polaris using CONTAINER_PATH from configure.sh
 ./submit.py --config infer/icarus/latest.cfg --source data.root --profile anl_polaris_debug
 
-# Preload model weights on login nodes without worker-node internet
-./scripts/preload_downloads.py infer/2x2/model/model_240819.yaml
-
 # Override specific resources
 ./submit.py --config infer/icarus/latest.cfg --source data.root --time 2:00:00 --cpus-per-task 8
+
+# Preload model weights on the submit host before submitting
+./submit.py --config infer/2x2/full_chain_240819.yaml --source data.root --profile anl_polaris_debug --preload
+
+# Optional: preload only, useful for external production pipelines
+./scripts/preload_downloads.py infer/2x2/full_chain_240819.yaml
 ```
 
 ## Pipeline Mode
