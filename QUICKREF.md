@@ -45,6 +45,9 @@
 
 # ANL/Polaris debug queue
 ./submit.py --config infer/icarus/latest --source data.root --profile anl_polaris_debug
+
+# Preload model weights from a login node
+./scripts/preload_downloads.py infer/2x2/model/model_240819.yaml
 ```
 
 ### Job Control
