@@ -168,7 +168,7 @@ profiles:
     site: anl
     scheduler: pbs
     template: job_template_anl.pbs
-    account: neutrinoGPU
+    account: ${ANL_ACCOUNT}
     queue: capacity
     system: polaris
     nodes: 1
@@ -186,7 +186,7 @@ profiles:
     site: anl
     scheduler: pbs
     template: job_template_anl.pbs
-    account: neutrinoGPU
+    account: ${ANL_ACCOUNT}
     queue: debug
     system: polaris
     nodes: 1
