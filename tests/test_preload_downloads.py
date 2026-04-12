@@ -1,6 +1,8 @@
 """Tests for the preload_downloads utility."""
 
 import importlib.util
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -50,52 +52,40 @@ def test_import_does_not_import_spine(preload_module):
     assert "spine" not in sys.modules
 
 
-def test_collect_downloads_from_config_and_includes(preload_module, tmp_path):
-    """Test collecting downloads from a config include tree."""
-    base = tmp_path / "config" / "infer" / "detector"
-    model_dir = base / "model"
-    model_dir.mkdir(parents=True)
+def test_bootstrap_spine_adds_submodule_src(preload_module, tmp_path):
+    """Test the bundled SPINE source path is added when present."""
+    spine_src = tmp_path / "spine" / "src"
+    spine_src.mkdir(parents=True)
 
-    full_chain = base / "full_chain.yaml"
-    full_chain.write_text("include:\n  - model/model.yaml\n")
+    old_path = list(sys.path)
+    try:
+        preload_module.bootstrap_spine(tmp_path)
+        assert str(spine_src) == sys.path[0]
+    finally:
+        sys.path[:] = old_path
 
-    model = model_dir / "model.yaml"
-    model.write_text(
-        "override:\n"
-        "  model.weight_path: !download\n"
-        "    url: https://example.com/model.ckpt\n"
-        "    hash: abc123\n"
+
+def test_spine_config_import_does_not_import_h5py():
+    """Test SPINE config imports do not load runtime IO dependencies."""
+    spine_src = SCRIPT_PATH.parents[1] / "spine" / "src"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(spine_src)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys; "
+                "from spine.config.load import load_config_file; "
+                "print('h5py' in sys.modules)"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        env=env,
+        check=False,
     )
 
-    downloads = preload_module.collect_downloads(full_chain, tmp_path)
-
-    assert len(downloads) == 1
-    assert downloads[0].url == "https://example.com/model.ckpt"
-    assert downloads[0].expected_hash == "abc123"
-    assert downloads[0].source == model.resolve()
-
-
-def test_url_to_filename_matches_spine_convention(preload_module):
-    """Test URL cache filenames match SPINE's convention."""
-    filename = preload_module.url_to_filename(
-        "https://s3df.slac.stanford.edu/data/neutrino/spine/weights/2x2/"
-        "2x2_snapshot_240819.ckpt"
-    )
-
-    assert filename == "5bee7a9d1a75a25e.ckpt"
-
-
-def test_deduplicate_downloads(preload_module, tmp_path):
-    """Test repeated downloads are collapsed while preserving order."""
-    specs = [
-        preload_module.DownloadSpec("https://example.com/a.ckpt", "hash-a", tmp_path),
-        preload_module.DownloadSpec("https://example.com/a.ckpt", "hash-a", tmp_path),
-        preload_module.DownloadSpec("https://example.com/b.ckpt", "hash-b", tmp_path),
-    ]
-
-    deduped = preload_module.deduplicate_downloads(specs)
-
-    assert [spec.url for spec in deduped] == [
-        "https://example.com/a.ckpt",
-        "https://example.com/b.ckpt",
-    ]
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "False"
