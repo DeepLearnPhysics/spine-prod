@@ -1,0 +1,17 @@
+# Graph-SPICE model + loss configuration
+model:
+  name: graph_spice
+  weight_path: null
+
+  network_input:
+    data: data
+    seg_label: seg_label
+    clust_label: clust_label
+
+  loss_input:
+    seg_label: seg_label
+    clust_label: clust_label
+
+  modules: {}
+    # graph_spice varies by config - override in specific configs
+    # graph_spice_loss varies by config - override in specific configs

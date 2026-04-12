@@ -1,0 +1,25 @@
+# Import the training configuration
+include: full_chain_grappa_track.yaml
+
+# Turn it into a validatio config
+override:
+  # Single GPU, 100 iterations
+  base.world_size: 1
+  base.iterations: 100
+  base-: [epochs, train]
+
+  # Single GPU batch size, no sampler, test set
+  io.loader-: [sampler]
+  io.loader.batch_size: 64
+  io.loader.dataset.file_list: /sdf/data/neutrino/pdune/sim/vd/mpvmpr_v0/test_file_list.txt
+
+  # Remove weights provided to individual modules
+  model.modules.uresnet_deghost-: [weight_path, model_name]
+  model.modules.uresnet_ppn-: [weight_path, model_name]
+  model.modules.graph_spice-: [weight_path, model_name]
+  model.modules.grappa_track-: [weight_path, model_name]
+
+  # Full set of weights
+  model.weight_path: /sdf/data/neutrino/pdune/spine/train/vd/mpvmpr_v0/weights/full_chain/grappa_track/snapshot-*.ckpt
+  #model.weight_path: /sdf/data/neutrino/pdune/spine/train/vd/mpvmpr_v0/weights/full_chain/grappa_track/snapshot-[8-9]999.ckpt
+  #model.weight_path: /sdf/data/neutrino/pdune/spine/train/vd/mpvmpr_v0/weights/full_chain/grappa_track/snapshot-1[4-9]999.ckpt

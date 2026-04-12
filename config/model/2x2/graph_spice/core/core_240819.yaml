@@ -1,0 +1,19 @@
+# Graph-SPICE model configuration for 2x2
+# Revision date: August 19, 2024
+
+__meta__:
+  version: "240819"
+  date: "2024-08-19"
+  description: "Graph-SPICE model configuration for 2x2, August 2024"
+  tags: []
+
+include: model/common/graph_spice/core/core_common.yaml
+
+override:
+  # Spatial size of the input image (normalize coordinates by this value)
+  embedder.uresnet.spatial_size: 320
+
+  # Graph construction settings
+  constructor.graph:
+    name: radius
+    radius: 1.9

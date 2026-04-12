@@ -1,0 +1,10 @@
+# GrapPA-Shower loss configuration for deghosting
+node_loss:
+  name: shower_primary
+  use_closest: true
+  high_purity: true
+  use_group_pred: true
+edge_loss:
+  name: channel
+  target: group
+  high_purity: true

@@ -1,0 +1,17 @@
+# IO configuration for DUNE10kt-1x2x6 deghosting training
+# Revision date: February 2, 2026
+
+__meta__:
+  version: "260202"
+  date: "2026-02-02"
+  description: "IO configuration for DUNE10kt-1x2x6 deghosting, February 2026"
+  compatible_with:
+    base: ">=260202"
+  tags: ["mpvmpr_v0"]
+
+include: io_common.yaml
+
+override:
+  # Point to the specific file list and skip entry list for this training configuration
+  io.loader.dataset.file_list: /sdf/data/neutrino/dune/sim/mpvmpr_v0/train_file_list.txt
+  io.loader.dataset.skip_entry_list: /sdf/data/neutrino/dune/sim/mpvmpr_v0/dune_mpvmpr_v00_train_skip_event_list.txt

@@ -1,0 +1,7 @@
+# DUNE10kt-1x2x6 UResNet Deghost training configuration
+# Revision date: February 2, 2026
+
+include:
+  - ../base/base_260202.yaml
+  - ../io/uresnet_deghost/io_260202.yaml
+  - model/dune10kt-1x2x6/uresnet_deghost/uresnet_deghost_260202.yaml

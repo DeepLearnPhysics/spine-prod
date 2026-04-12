@@ -1,0 +1,26 @@
+# Graph-SPICE model + loss configuration for 2x2
+# Revision date: July 19, 2024
+
+__meta__:
+  version: "240719"
+  date: "2024-07-19"
+  description: "Graph-SPICE model + loss configuration for 2x2, July 2024"
+  tags: []
+
+# Construct model configuration
+model:
+  name: graph_spice
+  weight_path: null
+
+  network_input:
+    data: data
+    seg_label: seg_label
+    clust_label: clust_label
+
+  loss_input:
+    seg_label: seg_label
+    clust_label: clust_label
+
+  modules:
+    graph_spice: !include core/core_240719.yaml
+    graph_spice_loss: !include loss/loss_240719.yaml

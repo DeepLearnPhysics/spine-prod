@@ -1,0 +1,17 @@
+# Validation modification for DUNE10kt-1x2x6 training configs, common settings
+# Include this after the training configuration will turn it into a validation config
+
+override:
+  # Single GPU, 10% of test set, no train process
+  base.world_size: 1
+  base.epochs: 0.1
+  base-: [iteration, train]
+
+  # No sampler, test set
+  io.loader-: [sampler]
+  io.loader.batch_size: 16
+  # io.loader.dataset.file_list varies by config - override in specific configs
+  # io.loader.dataset.skip_entry_list varies by config - override in specific configs
+
+  # Full set of weights
+  model.weight_path: null # Set through CLI argument

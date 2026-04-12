@@ -1,0 +1,43 @@
+# Graph-SPICE model configuration for DUNE10kt-1x2x6
+shapes: [shower, track, michel, delta]
+use_raw_features: true
+invert: true
+make_clusters: false
+
+embedder:
+  spatial_embedding_dim: 3
+  feature_embedding_dim: 16
+  occupancy_mode: softplus
+  covariance_mode: softplus
+  uresnet:
+    num_input: 4 # 1 feature + 3 normalized coords
+    filters: 32
+    input_kernel: 5
+    depth: 5
+    reps: 2
+    spatial_size: 6144
+    allow_bias: false
+    activation:
+      name: lrelu
+      negative_slope: 0.33
+    norm_layer:
+      name: batch_norm
+      eps: 0.0001
+      momentum: 0.01
+
+kernel:
+  name: bilinear
+  num_features: 32
+
+constructor:
+  edge_threshold: 0.1
+  min_size: 3
+  label_edges: true
+  graph:
+    name: radius
+    r: 1.9
+  orphan:
+    mode: radius
+    radius: 1.9
+    iterate: true
+    assign_all: true

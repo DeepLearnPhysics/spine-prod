@@ -1,0 +1,28 @@
+# UResNet-PPN model + loss configuration
+# Revision date: July 18, 2024
+
+__meta__:
+  version: "240718"
+  date: "2024-07-18"
+  description: "UResNet-PPN training configuration for deghosting, July 2024"
+  tags: []
+
+# Construct model configuration
+model:
+  name: uresnet_ppn
+  weight_path: null
+
+  network_input:
+    data: data
+
+  loss_input:
+    seg_label: seg_label
+    ppn_label: ppn_label
+    clust_label: clust_label
+
+  modules:
+    uresnet: !include uresnet/uresnet_240718.yaml
+    uresnet_loss: !include uresnet_loss/uresnet_loss_240718.yaml
+
+    ppn: !include ppn/ppn_240718.yaml
+    ppn_loss: !include ppn_loss/ppn_loss_240718.yaml

@@ -1,0 +1,10 @@
+# UResNet model configuration used for deghosting
+# Revision date: July 18, 2024
+
+__meta__:
+  version: "240718"
+  date: "2024-07-18"
+  description: "UResNet model configuration for deghosting, July 2024"
+  tags: []
+
+include: uresnet_common.yaml

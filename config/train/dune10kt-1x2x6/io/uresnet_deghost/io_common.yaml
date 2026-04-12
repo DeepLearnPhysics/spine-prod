@@ -1,0 +1,23 @@
+# IO common configuration for DUNE10kt-1x2x6 deghosting training
+
+# IO configuration
+io:
+  loader:
+    minibatch_size: 4
+    shuffle: false
+    num_workers: 8
+    collate_fn: all
+    sampler: random_sequence
+    dataset:
+      name: larcv
+      # file_list varies by config - override in specific configs
+      # skip_entry_list varies by config - override in specific configs
+      schema:
+        data:
+          parser: sparse3d
+          sparse_event_list:
+            - sparse3d_reco
+            - sparse3d_reco_chi2
+        seg_label:
+          parser: sparse3d_ghost
+          sparse_event: sparse3d_pcluster_semantics_ghost

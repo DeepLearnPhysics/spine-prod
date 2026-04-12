@@ -1,0 +1,10 @@
+# Graph-SPICE loss configuration for 2x2
+# Revision date: July 19, 2024
+
+__meta__:
+  version: "240719"
+  date: "2024-07-19"
+  description: "Graph-SPICE loss configuration for 2x2, July 2024"
+  tags: []
+
+include: model/common/graph_spice/loss/loss_common.yaml

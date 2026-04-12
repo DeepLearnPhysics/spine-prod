@@ -1,0 +1,8 @@
+# UResNet-PPN loss configuration
+uresnet_loss:
+  balance_loss: false
+
+ppn_loss:
+  mask_loss: CE
+  resolution: 5.0
+  # restrict_to_clusters varies by config - override in specific configs

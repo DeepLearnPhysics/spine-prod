@@ -1,0 +1,2 @@
+# UResNet loss configuration used for deghosting
+balance_loss: false

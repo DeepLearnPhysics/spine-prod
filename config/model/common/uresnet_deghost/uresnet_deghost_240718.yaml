@@ -1,0 +1,23 @@
+# UResNet model + loss configuration for deghosting
+# Revision date: July 18, 2024
+
+__meta__:
+  version: "240718"
+  date: "2024-07-18"
+  description: "UResNet model + loss configuration for deghosting, July 2024"
+  tags: []
+
+# Construct model configuration
+model:
+  name: uresnet
+  weight_path: null
+
+  network_input:
+    data: data
+
+  loss_input:
+    seg_label: seg_label
+
+  modules:
+    uresnet: !include uresnet/uresnet_240718.yaml
+    uresnet_loss: !include uresnet_loss/uresnet_loss_240718.yaml

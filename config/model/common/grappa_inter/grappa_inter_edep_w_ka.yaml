@@ -1,0 +1,11 @@
+# Import the training configuration
+include: grappa_inter_edep_w.yaml
+
+# Turn it into a validatio config
+override:
+  # Change log/weight paths
+  base.log_dir: /sdf/data/neutrino/dune/spine/train/mpvmpr_v0/logs/grappa_inter/edep_balanced_ka
+  base.train.weight_prefix: /sdf/data/neutrino/dune/spine/train/mpvmpr_v0/weights/grappa_inter/edep_balanced_ka/snapshot
+
+  # Include kaon as a possible type prediction
+  model.modules.grappa.gnn_model.node_pred.type: 6

@@ -1,0 +1,10 @@
+# UResNet model + loss configuration for deghosting for DUNE10kt-1x2x6
+# Revision date: February 2, 2026
+
+__meta__:
+  version: "260202"
+  date: "2026-02-02"
+  description: "UResNet model + loss configuration for deghosting in DUNE10kt-1x2x6, February 2026"
+  tags: []
+
+include: model/common/uresnet_deghost/uresnet_deghost_240718.yaml

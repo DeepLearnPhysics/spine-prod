@@ -1,0 +1,3 @@
+# Graph-SPICE loss configuration
+name: edge
+loss: binary_log_dice_ce

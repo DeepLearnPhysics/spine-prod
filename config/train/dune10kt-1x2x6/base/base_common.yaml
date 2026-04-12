@@ -1,0 +1,21 @@
+# Base common configuration for DUNE10kt-1x2x6 training (includes geometry)
+
+# Base training configuration
+base:
+  world_size: 4
+  epochs: 50
+  seed: -1
+  unwrap: false
+  log_dir: null # Set through CLI argument
+  log_step: 1
+  train:
+    weight_prefix: null # Set through CLI argument
+    save_epoch: 1.0
+    optimizer:
+      name: Adam
+      lr: 0.001
+
+# Geometry configuration
+geo:
+  detector: dune10kt-1x2x6
+  tag: dune10kt_v4_1x2x6

@@ -1,0 +1,28 @@
+# IO common configuration for DUNE10kt-1x2x6 GrapPA-Shower training
+
+# IO configuration
+io:
+  loader:
+    minibatch_size: 4
+    shuffle: false
+    num_workers: 12
+    collate_fn: all
+    sampler: random_sequence
+    dataset:
+      name: larcv
+      # file_list varies by config - override in specific configs
+      # skip_entry_list varies by config - override in specific configs
+      schema:
+        data:
+          parser: cluster3d
+          cluster_event: cluster3d_pcluster
+          particle_event: particle_corrected
+          sparse_semantics_event: sparse3d_pcluster_semantics
+          sparse_value_event: sparse3d_pcluster
+          add_particle_info: true
+          clean_data: true
+          break_clusters: true
+        coord_label:
+          parser: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster

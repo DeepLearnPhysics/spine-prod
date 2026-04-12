@@ -1,0 +1,41 @@
+# Full chain model configuration for 2x2
+# General chain configuration
+chain:
+  deghosting: null
+  charge_rescaling: null
+  calibration: null
+  segmentation: uresnet
+  point_proposal: ppn
+  fragmentation: graph_spice
+  shower_aggregation: grappa
+  shower_primary: grappa
+  track_aggregation: grappa
+  particle_aggregation: null
+  inter_aggregation: grappa
+  particle_identification: grappa
+  primary_identification: grappa
+  orientation_identification: grappa
+
+# Semantic segmentation + point proposal
+uresnet_ppn:
+  uresnet: !include uresnet_ppn/uresnet/uresnet_240719.yaml
+  uresnet_loss: !include uresnet_ppn/uresnet_loss/uresnet_loss_240719.yaml
+
+  ppn: !include uresnet_ppn/ppn/ppn_240719.yaml
+  ppn_loss: !include uresnet_ppn/ppn_loss/ppn_loss_240719.yaml
+
+# Dense clustering
+graph_spice: !include graph_spice/core/core_240719.yaml
+graph_spice_loss: !include graph_spice/loss/loss_240719.yaml
+
+# Shower fragment aggregation + shower primary identification
+grappa_shower: !include grappa_shower/core/core_240719.yaml
+grappa_shower_loss: !include grappa_shower/loss/loss_240719.yaml
+
+# Track fragment aggregation
+grappa_track: !include grappa_track/core/core_240719.yaml
+grappa_track_loss: !include grappa_track/loss/loss_240719.yaml
+
+# Interaction aggregation, PID, primary, orientation
+grappa_inter: !include grappa_inter/core/core_240719.yaml
+grappa_inter_loss: !include grappa_inter/loss/loss_240719.yaml

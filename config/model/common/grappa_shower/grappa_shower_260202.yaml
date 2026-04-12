@@ -1,0 +1,27 @@
+# GrapPA-Shower training configuration for DUNE10kt-1x2x6
+# Revision date: February 2, 2026
+
+__meta__:
+  version: "260202"
+  date: "2026-02-02"
+  description: "GrapPA-Shower model training configuration, February 2026"
+  compatible_with:
+    base: ">=260202"
+  tags: []
+
+# Construct model configuration
+model:
+  name: grappa_shower
+  weight_path: null
+
+  network_input:
+    data: data
+    coord_label: coord_label
+
+  loss_input:
+    clust_label: data
+    coord_label: coord_label
+
+  modules:
+    grappa: !include core/core_260202.yaml
+    grappa_shower: !include loss/loss_260202.yaml
