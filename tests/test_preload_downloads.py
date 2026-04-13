@@ -42,8 +42,24 @@ def test_resolve_config_path_raises_for_missing_config(tmp_path):
 
 
 def test_import_does_not_import_spine():
-    """Test the preload module does not load SPINE at import time."""
-    assert "spine" not in sys.modules
+    """Test importing src.preload does not load SPINE."""
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            ("import sys; " "import src.preload; " "print('spine' in sys.modules)"),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        env=env,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "False"
 
 
 def test_bootstrap_spine_adds_submodule_src(tmp_path):
