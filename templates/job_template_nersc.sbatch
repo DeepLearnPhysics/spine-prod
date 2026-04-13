@@ -47,7 +47,7 @@ echo "=================================="
 echo
 
 # Load environment from configure.sh
-if [ -z $${SPINE_PROD_BASEDIR+x} ]; then
+if [ -z ${SPINE_PROD_BASEDIR+x} ]; then
     source {{ basedir }}/configure.sh
 fi
 

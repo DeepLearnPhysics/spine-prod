@@ -35,8 +35,10 @@ if [[ -z $ICARUS_DATA_DIR ]]; then
     export ICARUS_DATA_DIR=/cvmfs/icarus.opensciencegrid.org/products/icarus/icarus_data
 fi
 
-# Define path to the container (Singularity/Apptainer .sif file for S3DF)
-export CONTAINER_PATH=/sdf/group/neutrino/images/larcv2_ub2204-cuda121-torch251-larndsim.sif
+# Define path to the container (Singularity/Apptainer .sif file)
+if [[ -z $CONTAINER_PATH ]]; then
+    export CONTAINER_PATH=/sdf/group/neutrino/images/larcv2_ub2204-cuda121-torch251-larndsim.sif
+fi
 
 # Define container tag (Shifter image tag for NERSC)
 export CONTAINER_TAG=deeplearnphysics/larcv2:ub2204-cu121-torch251-larndsim

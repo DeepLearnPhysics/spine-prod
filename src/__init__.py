@@ -1,5 +1,5 @@
 """SPINE Production submission system."""
 
-from .submitter import SlurmSubmitter
+from .submitter import Submitter
 
-__all__ = ["SlurmSubmitter"]
+__all__ = ["Submitter"]

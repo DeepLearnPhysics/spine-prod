@@ -11,7 +11,7 @@ import pytest
 # Add parent directory to path to import submit
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from submit import SlurmSubmitter  # noqa: E402
+from submit import Submitter  # noqa: E402
 
 
 @pytest.fixture
@@ -28,11 +28,11 @@ def infer_root(workspace_root):
 
 @pytest.fixture
 def mock_submitter(workspace_root, tmp_path):
-    """Create a SlurmSubmitter instance with mocked paths."""
+    """Create a Submitter instance with mocked paths."""
     # Use real basedir but mock job_dir - pass Path not str
-    submitter = SlurmSubmitter(basedir=workspace_root)
+    submitter = Submitter(basedir=workspace_root)
     submitter.jobs_dir = tmp_path / "test_job"
     submitter.jobs_dir.mkdir(parents=True, exist_ok=True)
-    # Also update the SlurmClient's jobs_dir since that's where job dirs are created
-    submitter.slurm_client.jobs_dir = submitter.jobs_dir
+    # Also update the BatchClient's jobs_dir since that's where job dirs are created
+    submitter.batch_client.jobs_dir = submitter.jobs_dir
     return submitter

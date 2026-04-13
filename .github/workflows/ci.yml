@@ -46,7 +46,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Add SPINE to Python path
-        run: echo "PYTHONPATH=${{ github.workspace }}/spine:$PYTHONPATH" >> $GITHUB_ENV
+        run: echo "PYTHONPATH=${{ github.workspace }}/spine/src:$PYTHONPATH" >> $GITHUB_ENV
 
       - name: Run tests
         run: pytest -v --cov=. --cov-report=xml

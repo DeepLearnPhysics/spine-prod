@@ -160,6 +160,45 @@ profiles:
     time: "2:00:00"
     description: "CPU-only tasks on NERSC Perlmutter"
 
+  ##### ANL/Polaris Resource Profiles #####
+  # ANL Polaris capacity queue. The prod queue has a 10-node minimum, so this
+  # profile is the explicit non-debug single-node option.
+  # Node resources: 4x A100 GPUs, 32 CPU cores
+  anl_polaris_capacity:
+    site: anl
+    scheduler: pbs
+    template: job_template_anl.pbs
+    account: "14453"
+    queue: capacity
+    system: polaris
+    nodes: 1
+    place: scatter
+    gpus_per_node: 1
+    cpus_per_node: 32
+    cpus_per_task: 32
+    filesystems: home:grand:eagle
+    time: "2:00:00"
+    bind_paths: null
+    description: "Capacity queue GPU processing on ANL Polaris"
+
+  # ANL Polaris debug queue
+  anl_polaris_debug:
+    site: anl
+    scheduler: pbs
+    template: job_template_anl.pbs
+    account: "14453"
+    queue: debug
+    system: polaris
+    nodes: 1
+    place: scatter
+    gpus_per_node: 1
+    cpus_per_node: 32
+    cpus_per_task: 32
+    filesystems: home:grand:eagle
+    time: "1:00:00"
+    bind_paths: null
+    description: "Debug GPU processing on ANL Polaris"
+
 # Detector-specific defaults
 detectors:
   icarus:

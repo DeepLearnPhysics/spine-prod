@@ -42,6 +42,15 @@
 
 # CPU only
 ./submit.py --config infer/icarus/latest --source data.root --profile s3df_milano
+
+# ANL/Polaris debug queue
+./submit.py --config infer/icarus/latest --source data.root --profile anl_polaris_debug
+
+# Preload model weights before submitting
+./submit.py --config infer/2x2/full_chain_240819.yaml --source data.root --profile anl_polaris_debug --preload
+
+# Preload only for external production pipelines
+./scripts/preload_downloads.py infer/2x2/full_chain_240819.yaml
 ```
 
 ### Job Control
@@ -94,6 +103,8 @@ seff JOB_ID
 | `s3df_turing` | RTX 2080 Ti (11GB) | Cheaper GPU inference |
 | `s3df_milano` | None | CPU-only analysis |
 | `s3df_roma` | None | CPU-only analysis |
+| `anl_polaris_debug` | A100 | Polaris debug queue |
+| `anl_polaris_capacity` | A100 | Polaris capacity queue |
 
 ## Common Configs
 
