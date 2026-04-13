@@ -13,6 +13,8 @@ All ND-LAr configs now use a **hierarchical YAML include system** with composabl
 - **`full_chain_250505.yaml`**: May 2025 with MPV/MPR v00 weights
 - **`full_chain_250515.yaml`**: May 2025 with updated fiducial and edge lengths
 - **`full_chain_250806.yaml`**: August 2025 trained on overlays
+- **`full_chain_260310.yaml`**: March 2026 with MPV/MPR v01 weights
+- **`full_chain_260409.yaml`**: April 2026 with longer-trained MPV/MPR v01 weights
 
 ### Component Structure
 Each main config includes modular YAML files:
@@ -30,6 +32,8 @@ Each main config includes modular YAML files:
 - **`model/model_250505.yaml`**: May 5 2025 ND-LAr weights (v0)
 - **`model/model_250515.yaml`**: May 15 2025 ND-LAr weights (v0)
 - **`model/model_250806.yaml`**: August 6 2025 ND-LAr weights (v0, overlay training)
+- **`model/model_260310.yaml`**: March 10 2026 ND-LAr weights (v1)
+- **`model/model_260409.yaml`**: April 9 2026 ND-LAr weights (v1, longer training)
 - **`model/model_common.yaml`**: Common model architecture
 
 **Post-processing Components:**
@@ -46,24 +50,52 @@ Located in `modifier/` subdirectories:
 ### Legacy Configs
 Old `.cfg` files moved to `legacy/` directory for backward compatibility
 
-## Frankenstein configurations
 
-These configurations have been trained using 2x2 weights and are not expected to work properly. These configurations are to be exclusively used to benchmark SPINE's resource usage at ND-LAr but are not to be used to benchmark reconstruction performance or produce physics results.
+## Configurations for MPV/MPR v01
 
-### August 19th 2024
+These configurations have been trained on the second MPV/MPR simulation produced in the ND-LAr geometry.
+
+Fixes issues:
+- Near-field induction added
+- KE coverage for electrons and protons now adequate for LBNF
+- Pile-up not increased but high KE range gives adequate occupancy
+
+Known issues with the simulation:
+  - No far-field induction modeling
+
+### April 9th 2026
 
 ```shell
-full_chain_240819.yaml
+full_chain_260409.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Uses 2x2 weights for initial testing/benchmarking
+  - Trained on overlay data (4x spills)
   - Modular YAML structure with base/io/model/post components
+  - Modifiers available in `modifier/` for overlay and lite modes
 
-Known issue(s):
-  - This set of weights is not appropriate for ND-LAr but will run (as a test)
+Known issues:
   - No flash matching
+
+Changes from March 10th:
+  - Transfer trained much longer (now appropriate)
+
+### March 10th 2026
+
+```shell
+full_chain_260310.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Trained on overlay data (4x spills)
+  - Modular YAML structure with base/io/model/post components
+  - Modifiers available in `modifier/` for overlay and lite modes
+
+Known issues:
+  - No flash matching
+  - Transfer trained for little time (~1 week)
 
 
 ## Configurations for MPV/MPR v00
@@ -125,4 +157,24 @@ Description:
   - Modifiers available in `modifier/` for overlay and lite modes
 
 Known issues:
+  - No flash matching
+
+
+## Frankenstein configurations
+
+These configurations have been trained using 2x2 weights and are not expected to work properly. These configurations are to be exclusively used to benchmark SPINE's resource usage at ND-LAr but are not to be used to benchmark reconstruction performance or produce physics results.
+
+### August 19th 2024
+
+```shell
+full_chain_240819.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Uses 2x2 weights for initial testing/benchmarking
+  - Modular YAML structure with base/io/model/post components
+
+Known issue(s):
+  - This set of weights is not appropriate for ND-LAr but will run (as a test)
   - No flash matching
