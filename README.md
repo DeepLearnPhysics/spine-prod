@@ -156,10 +156,10 @@ infer/icarus/latest.cfg
 infer/icarus/latest_data.cfg
 
 # Specific version with cosmic overlay
-infer/icarus/icarus_full_chain_co_250625.cfg
+infer/icarus/full_chain_co_250625.yaml
 
 # Data with lite outputs
-infer/icarus/icarus_full_chain_data_co_lite_250625.cfg
+infer/icarus/full_chain_co_250625.yaml --modifier data,lite
 ```
 
 See individual config directories for detector-specific documentation.
@@ -414,7 +414,7 @@ ICARUS uses split cryostat processing with cosmic overlay:
 ./submit.py --config infer/icarus/latest_numi.cfg --source data.root
 
 # Lite output (reduced file size)
-./submit.py --config infer/icarus/icarus_full_chain_data_co_lite_250625.cfg --source data.root
+./submit.py --config infer/icarus/full_chain_co_250625.yaml --modifier data,lite --source data.root
 ```
 
 ### SBND

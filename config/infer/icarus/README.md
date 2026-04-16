@@ -13,7 +13,7 @@ The ICARUS configurations now follow a modular structure where each full chain c
 - **`post/`**: Post-processing configurations including flash matching and analysis modules
 - **`legacy/`**: Archived configurations for backward compatibility
 
-Each top-level configuration file (e.g., `icarus_full_chain_co_250625.yaml`) includes the appropriate modular components to build the complete chain. This structure makes it easier to:
+Each top-level configuration file (e.g., `full_chain_co_250625.yaml`) includes the appropriate modular components to build the complete chain. This structure makes it easier to:
 - Mix and match components from different versions
 - Update individual parts without duplicating settings
 - Maintain consistency across similar configurations
@@ -47,7 +47,7 @@ and events generated with the omni-detector simulation pipeline (varies lifetime
 ### March 6th 2026
 
 ```shell
-icarus_full_chain_co_260306.yaml
+full_chain_co_260306.yaml
 ```
 
 Description:
@@ -72,7 +72,7 @@ electron lifetimes (4 ms and 8 ms) to match what was recorded during ICARUS run 
 ### March 25th 2026
 
 ```shell
-icarus_full_chain_co_260325.yaml
+full_chain_co_260325.yaml
 ```
 
 Description:
@@ -87,7 +87,7 @@ Changes:
 ### February 12th 2026
 
 ```shell
-icarus_full_chain_co_260212.yaml
+full_chain_co_260212.yaml
 ```
 
 Description:
@@ -102,7 +102,7 @@ Changes:
 ### June 25th 2025 
 
 ```shell
-icarus_full_chain_co_250625.yaml
+full_chain_co_250625.yaml
 ```
 
 Description:
@@ -138,7 +138,7 @@ These weights have been trained/validated using the following files:
 ### March 3rd 2025 
 
 ```shell
-icarus_full_chain_co_250303.yaml
+full_chain_co_250303.yaml
 ```
 
 Description:
@@ -156,8 +156,8 @@ Known issue(s):
 ### January 15th 2025 
 
 ```shell
-icarus_full_chain_250115.yaml
-icarus_full_chain_co_250115.yaml
+full_chain_250115.yaml
+full_chain_co_250115.yaml
 ```
 
 Description:
@@ -182,8 +182,8 @@ These weights have been trained/validated using the following files:
 ### August 12th 2024
 
 ```shell
-icarus_full_chain_240812.yaml
-icarus_full_chain_co_240812.yaml
+full_chain_240812.yaml
+full_chain_co_240812.yaml
 ```
 
 Description:
@@ -202,7 +202,7 @@ Known issue(s):
 ### July 19th 2024
 
 ```shell
-icarus_full_chain_240719.yaml
+full_chain_240719.yaml
 ```
 
 Description:

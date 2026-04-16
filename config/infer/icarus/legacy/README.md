@@ -17,19 +17,19 @@ spine-prod --config icarus/legacy/icarus_full_chain_data_co_lite_250625.yaml --s
 
 **New way (recommended):**
 ```bash
-spine-prod --config icarus/icarus_full_chain_co_250625 --modifier data,lite --source data/*.root
+spine-prod --config icarus/full_chain_co_250625 --modifier data,lite --source data/*.root
 ```
 
 ### Migration Examples
 
 | Legacy Config | Base Config | Modifiers |
 |--------------|-------------|-----------|
-| `icarus_full_chain_data_co_lite_250625.yaml` | `icarus_full_chain_co_250625` | `data,lite` |
-| `icarus_full_chain_single_co_250625.yaml` | `icarus_full_chain_co_250625` | `single` |
-| `icarus_full_chain_co_numi_250625.yaml` | `icarus_full_chain_co_250625` | `numi` |
-| `icarus_full_chain_data_co_unblind_lite_250625.yaml` | `icarus_full_chain_co_250625` | `data,lite,unblind` |
-| `icarus_full_chain_co_4ms_lite_250625.yaml` | `icarus_full_chain_co_250625` | `4ms,lite` |
-| `icarus_full_chain_co_8ms_lite_250625.yaml` | `icarus_full_chain_co_250625` | `8ms,lite` |
+| `icarus_full_chain_data_co_lite_250625.yaml` | `full_chain_co_250625` | `data,lite` |
+| `icarus_full_chain_single_co_250625.yaml` | `full_chain_co_250625` | `single` |
+| `icarus_full_chain_co_numi_250625.yaml` | `full_chain_co_250625` | `numi` |
+| `icarus_full_chain_data_co_unblind_lite_250625.yaml` | `full_chain_co_250625` | `data,lite,unblind` |
+| `icarus_full_chain_co_4ms_lite_250625.yaml` | `full_chain_co_250625` | `4ms,lite` |
+| `icarus_full_chain_co_8ms_lite_250625.yaml` | `full_chain_co_250625` | `8ms,lite` |
 
 ## Available Modifiers
 
