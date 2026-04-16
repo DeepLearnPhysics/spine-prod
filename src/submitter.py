@@ -259,7 +259,12 @@ class Submitter:
         print("=" * 80)
 
         # Execute directly
-        result = subprocess.run(full_cmd, shell=True, check=False)
+        result = subprocess.run(
+            full_cmd,
+            shell=True,
+            executable="/bin/bash",
+            check=False,
+        )
 
         print("=" * 80)
         print(f"\nInteractive execution completed with exit code: {result.returncode}")

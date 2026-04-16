@@ -393,6 +393,35 @@ class TestFileChunking:
         assert isinstance(chunks[0][0], list)
 
 
+class TestInteractiveExecution:
+    """Tests for direct interactive execution."""
+
+    def test_run_interactive_uses_bash_for_source(
+        self, mock_submitter, tmp_path, workspace_root
+    ):
+        """Test interactive mode uses bash so source commands work."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        completed = type("Completed", (), {"returncode": 0})()
+
+        with (
+            patch.dict(os.environ, {"SPINE_BASEDIR": str(workspace_root)}, clear=False),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                flashmatch=True,
+            )
+
+        assert exit_code == 0
+        run.assert_called_once()
+        _, kwargs = run.call_args
+        assert kwargs["shell"] is True
+        assert kwargs["executable"] == "/bin/bash"
+        assert "source $FMATCH_BASEDIR/configure.sh" in run.call_args.args[0]
+
+
 class TestJobDirectory:
     """Tests for job directory creation."""
 
