@@ -32,6 +32,35 @@ For example:
 
 Legacy `.yaml files have been moved to the `legacy/` directory.
 
+## Configurations for SBND's Generation II MPVMPR
+
+Training samples MPVMPR using `sbndcode v10_14_02` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_14_02) . The training samples are generated using the following fcls:
+```
+run_mpvmpr_sbnd.fcl
+standard_g4_sbnd.fcl
+standard_detsim_sbnd.fcl
+standard_reco1_sbnd.fcl
+```
+
+These weights have been trained using the following files at Polaris:
+- Training set: `/lus/eagle/projects/neutrinoGPU/jmueller/spine_train/datasets/v10_14_02/generic/train/files.txt` (450k)
+- Test set: `/lus/eagle/projects/neutrinoGPU/jmueller/spine_train/datasets/v10_14_02/generic/test/files.txt` (50k)
+
+## May 1st 2026
+
+```shell
+sbnd_full_chain_co_260501.yaml
+```
+
+The following modifications were made w.r.t. the March 3 2026 configuration
+- Move to the new training sample
+- Move the calibration step before the semantic segmentation stage
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+
+
 ## Configurations for MPVMPR v02
 
 Training samples MPVMPR using `sbndcode v10_04_01` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_04_01) . The training samples are generated using the following fcls:

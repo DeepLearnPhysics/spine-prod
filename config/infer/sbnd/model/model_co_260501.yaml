@@ -1,0 +1,69 @@
+# SBND model configuration
+# Revision date: March 16, 2026
+
+__meta__:
+  version: "260316"
+  date: "2026-03-16"
+  description: "SBND model with collection-only charge rescaling"
+  compatible_with:
+    base: ">=240720"
+    io: ">=240720"
+  tags:
+    [
+      pre-calibration,
+      collection-only,
+      ppn-restrict,
+      grappa-use-closest,
+      graph-spice-radius,
+      grouping-through-track,
+    ]
+  training_set: "v2"
+
+include: model_common.yaml
+
+override:
+  # Path to the v2 model weights, with GrapPA feature engineering fix (including shower/track)
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/sbnd/sbnd_co_snapshot_260316.ckpt
+    hash: f592fc005847b5f731b25e8556a24b2ccdb5135cc1a35de7c04440b80179b0d9
+
+  # No pre-calibration
+  model.modules.chain.calibration: apply
+  model.modules.calibration:
+    stage: segmentation
+    gain:
+      gain: 47.551 # e-/ADC
+    recombination:
+      model: mbox_ell
+      efield: 0.5 # kV/cm
+      mbox_alpha: 0.904
+      mbox_beta: 0.204
+      mbox_ell_r: 1.25
+    lifetime:
+      lifetime: 35000 # us
+      driftv: 0.1563 # cm/us
+
+  # Charge rescaling uses collection-only charge
+  model.modules.chain.charge_rescaling: collection
+
+  # Older PPN/GrapPA loss settings
+  model.modules.uresnet_ppn.ppn.classify_endpoints: false
+  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
+  model.modules.grappa_shower_loss.node_loss.use_closest: true
+
+  # Graph-SPICE uses a radius graph with r=1.9 pixels (direct neighbors)
+  model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
+  model.modules.graph_spice.constructor.graph:
+    name: radius
+    r: 1.9
+
+  # Direction and dE/dx radii settings for GrapPA modules
+  model.modules.grappa_shower.node_encoder.dir_max_dist: 5
+  model.modules.grappa_shower.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_track.node_encoder.dir_max_dist: 5
+  model.modules.grappa_track.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dir_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: 5
+
+  # Interaction grouping restriction applied
+  model.modules.grappa_inter.nodes.grouping_through_track: true
