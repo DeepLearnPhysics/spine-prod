@@ -42,7 +42,7 @@ override:
   ### Post-processing overrides ###
   # Add trigger parsing to post-processors
   post.trigger:
-    file_path: /sdf/data/neutrino/icarus/trigger/triggers_run2.csv
+    file_path: /sdf/data/neutrino/icarus/trigger/trigger_04032026.csv
     flash_keys: [flashes]
     correct_flash_times: true
     flash_time_corr_us: 4
