@@ -57,8 +57,8 @@ Description:
   - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
 
 Changes:
-  - Same configuration as 260410, transfer trained with the appropriate calibrationc constants
-
+  - Same configuration as 260410, transfer trained with the appropriate calibration constants
+  - Adjusted shower energy fudge factor recomputed for this configuration
 
 ### April 10th 2026
 
