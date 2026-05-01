@@ -1,14 +1,14 @@
 # Post-processing configuration for ICARUS
-# Revision date: June 25, 2025
+# Revision date: May 1, 2026
 
 __meta__:
-  version: "250625"
-  date: "2025-06-25"
-  description: "ICARUS post-processing"
+  version: "260501"
+  date: "2026-05-01"
+  description: "ICARUS post-processing, latest"
   compatible_with:
     base: ">=240719"
     io: ">=240719"
-    model: ">=250303"
+    model: ">=260410"
   tags: [normalized-fm, shower-pp]
 
 include: post_common.yaml
@@ -36,7 +36,7 @@ override:
   post.direction.radius: 60.0 # cm
 
   # Shower fudge factor
-  post.calo_ke.shower_fudge: 1.2359
+  post.calo_ke.shower_fudge: 1.2048
 
   # Introduces all the shower-specific post-processors
   # No threshold on maximum michel KE
