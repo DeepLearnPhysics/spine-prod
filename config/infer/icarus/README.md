@@ -44,6 +44,37 @@ These weights have been trained/validated using the following files:
 This dataset is composed in equal fractions of events generated with the simulation central value
 and events generated with the omni-detector simulation pipeline (varies lifetime, gain, noise, etc.)
 
+### May 1st 2026
+
+```shell
+full_chain_co_260501.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - Collection charge configurations available
+  - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
+
+Changes:
+  - Same configuration as 260410, transfer trained with the appropriate calibrationc constants
+
+
+### April 10th 2026
+
+```shell
+full_chain_co_260410.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+  - Collection charge configurations available
+  - Calibration variations supported (4ms/8ms lifetimes, YZ transparency)
+
+Changes:
+  - Same configuration as 260306, fixed the calibration constants
+
 ### March 6th 2026
 
 ```shell

@@ -1,0 +1,63 @@
+# ICARUS model configuration
+# Revision date: May 1, 2026
+
+__meta__:
+  version: "260501"
+  date: "2026-05-01"
+  description: "ICARUS collection-only model with in-chain calibration, v5 dataset, fixed GrapPA encoder radii settings"
+  compatible_with:
+    base: ">=240719"
+    io: ">=240812"
+  tags:
+    [
+      collection-only,
+      pre-calibration,
+      ppn-restrict,
+      grappa-use-closest,
+      grouping-through-track,
+      grappa-radii-5,
+    ]
+  training_set: "v5"
+
+include: model_common.yaml
+
+override:
+  # Path to the v5 (CV + omni) restricted, collection-only, calibrated model weights
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/icarus/icarus_co_snapshot_260501.ckpt
+    hash: 5f2164ce81861cd9df0cb86b241a7abb548f73f34e19b0f1a6272e881806586a
+
+  # Calibration handled before the semantic segmentation stage
+  model.modules.chain.calibration: apply
+  model.modules.calibration:
+    stage: segmentation
+    gain:
+      gain: 79.9169 # e-/ADC
+    recombination:
+      model: mbox
+      efield: 0.4938 # kV/cm
+      mip_dedx: 2.105168 # MeV/cm
+    lifetime:
+      lifetime_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_elifetime_data.db
+      driftv_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
+    transparency:
+      transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
+
+  # Charge rescaling uses collection-only charge
+  model.modules.chain.charge_rescaling: collection
+
+  # Older PPN/GrapPA loss settings
+  model.modules.uresnet_ppn.ppn.classify_endpoints: false
+  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
+  model.modules.grappa_shower_loss.node_loss.use_closest: true
+
+  # Direction and dE/dx radii settings for GrapPA modules
+  model.modules.grappa_shower.node_encoder.dir_max_dist: 5
+  model.modules.grappa_shower.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_track.node_encoder.dir_max_dist: 5
+  model.modules.grappa_track.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dir_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: 5
+
+  # Interaction grouping restriction applied
+  model.modules.grappa_inter.nodes.grouping_through_track: true
