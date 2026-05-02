@@ -27,6 +27,9 @@ override:
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/sbnd/sbnd_co_snapshot_260316.ckpt
     hash: f592fc005847b5f731b25e8556a24b2ccdb5135cc1a35de7c04440b80179b0d9
 
+  # Add metadata for the model input
+  model.network_input.meta: meta
+
   # No pre-calibration
   model.modules.chain.calibration: apply
   model.modules.calibration:

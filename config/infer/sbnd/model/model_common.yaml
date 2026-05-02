@@ -10,6 +10,7 @@ model:
     data: data
     sources: sources
     seg_label: seg_label
+    # meta varies by config - override in specific configs
 
   modules:
     # General chain configuration
