@@ -1,13 +1,13 @@
 # SBND model configuration
-# Revision date: March 16, 2026
+# Revision date: May 1, 2026
 
 __meta__:
-  version: "260316"
-  date: "2026-03-16"
+  version: "260501"
+  date: "2026-05-01"
   description: "SBND model with collection-only charge rescaling"
   compatible_with:
-    base: ">=240720"
-    io: ">=240720"
+    base: ">=260501"
+    io: ">=260218"
   tags:
     [
       pre-calibration,
@@ -24,8 +24,8 @@ include: model_common.yaml
 override:
   # Path to the v2 model weights, with GrapPA feature engineering fix (including shower/track)
   model.weight_path: !download
-    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/sbnd/sbnd_co_snapshot_260316.ckpt
-    hash: f592fc005847b5f731b25e8556a24b2ccdb5135cc1a35de7c04440b80179b0d9
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/sbnd/sbnd_co_snapshot_260501.ckpt
+    hash: ae31d1996db1d522d0f9503d762a2131f5aed205626de5e45c1c3b9cf1b8e583
 
   # Add metadata for the model input
   model.network_input.meta: meta
@@ -66,7 +66,7 @@ override:
   model.modules.grappa_track.node_encoder.dir_max_dist: 5
   model.modules.grappa_track.node_encoder.dedx_max_dist: 5
   model.modules.grappa_inter.node_encoder.dir_max_dist: 5
-  model.modules.grappa_inter.node_encoder.dedx_max_dist: 5
+  model.modules.grappa_inter.node_encoder.dedx_max_dist: 10
 
   # Interaction grouping restriction applied
   model.modules.grappa_inter.nodes.grouping_through_track: true
