@@ -5,6 +5,30 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.6] - 2026-05-10
+
+### Added
+- New ICARUS v5 production configurations with corrected calibration handling
+- New SBND Gen II production configuration with corrected weights
+- New ND-LAr 260409 inference configuration
+- Submit-time download preloading support for files referenced by `!download` tags
+- PBS client support and ANL Polaris submission profile
+
+### Changed
+- Updated SPINE dependency to v0.10.10
+- Updated GitHub Actions to current Node.js-supported action versions
+- Made CVMFS binding opt-in and improved site submission templates
+- Moved ICARUS calibration database lookup to `ICARUS_DATA_DIR`
+
+### Fixed
+- Corrected SBND Gen II model weights
+- Corrected ICARUS trigger and post-processing configuration details
+- Fixed CI preload import coverage and Codecov action parameters
+
+Full Changelog: [v0.4.5...v0.4.6](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.4.5...v0.4.6)
+
+---
+
 ## [0.4.5] - 2026-03-27
 
 ### Fixed
