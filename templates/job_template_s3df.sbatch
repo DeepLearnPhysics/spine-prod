@@ -88,10 +88,16 @@ BIND_PATHS="{{ bind_paths or '/sdf/' }}"
 BIND_PATHS="$BIND_PATHS,/cvmfs/"
 {% endif %}
 SINGULARITY_INNER_CMD=""
-{% if larcv_basedir %}
-SINGULARITY_INNER_CMD="unset which; source {{ larcv_basedir }}/configure.sh; "
+{% if larcv_path or flashmatch_path %}
+SINGULARITY_INNER_CMD="unset which; "
+{% if larcv_path %}
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (larcv_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
-SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD spine -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+{% if flashmatch_path %}
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
+{% endif %}
+{% endif %}
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD {{ spine_cmd|default('spine') }} -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
 RUN_CMD="$SINGULARITY_CMD"
 

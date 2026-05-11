@@ -118,7 +118,15 @@ By default, interactive mode uses the `spine` executable already on `PATH`. If
 `SPINE_CONTAINER_TAG` with Docker/Podman. Use `--interactive-runtime local` to require
 the local executable, or `--interactive-runtime container` to force container
 execution. Docker/Podman fallback requests `linux/amd64` by default; override
-`SPINE_CONTAINER_PLATFORM` if a different platform is needed.
+`SPINE_CONTAINER_PLATFORM` if a different platform is needed. For local debugging or
+batch jobs that should use an unreleased checkout, pass `--spine-path /path/to/spine`
+to run `/path/to/spine/bin/run.py` (or `/path/to/spine/bin/spine` if present)
+instead of the `spine` executable on `PATH`. The checkout root is added to
+container bind paths automatically where supported.
+
+```bash
+./submit.py --spine-path /path/to/spine -I --interactive-runtime local --config infer/generic/latest --source test.root --set base.world_size=0
+```
 
 ### EAF Interactive Container Setup
 
@@ -414,14 +422,18 @@ This is especially useful for large-scale production to save disk space by remov
 
 ```bash
 # Use custom LArCV installation
-./submit.py --config infer/icarus/latest --source data.root --larcv /path/to/larcv
+./submit.py --config infer/icarus/latest --source data.root --larcv-path /path/to/larcv
+
+# Use custom flash-matching setup
+./submit.py --config infer/icarus/latest --source data.root --flashmatch-path /path/to/flashmatch
 
 # Expose CVMFS inside the container
 ./submit.py --config infer/icarus/latest --source data.root --cvmfs
 ```
 
 There is no need to pass `--flashmatch`. The flag is accepted only for backward
-compatibility and is ignored.
+compatibility and is ignored. Use `--flashmatch-path` to source a custom
+flash-matching setup instead.
 
 For sites without CVMFS, point ICARUS configs at a local copy of the
 `icarus_data` release directory before sourcing `configure.sh`:

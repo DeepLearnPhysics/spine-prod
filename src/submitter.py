@@ -68,6 +68,23 @@ class Submitter:
             file=sys.stderr,
         )
 
+    @staticmethod
+    def _resolve_setup_path(
+        path: Optional[str], option_name: str
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Resolve a software setup path to a source command and bind root."""
+        if not path:
+            return None, None
+
+        root = Path(path).expanduser()
+        configure_script = root / "configure.sh"
+        if not configure_script.is_file():
+            raise RuntimeError(
+                f"{option_name} must point to a directory containing configure.sh: {root}"
+            )
+
+        return f"source {shlex.quote(str(configure_script))}", str(root)
+
     def __init__(self, basedir: Optional[Path] = None, central_dir: bool = False):
         """Initialize Submitter.
 
@@ -183,6 +200,68 @@ class Submitter:
         return f"/sdf/data/neutrino/images/spine_v{path_version}.sif"
 
     @staticmethod
+    def _resolve_spine_command(
+        spine_path: Optional[str] = None,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Resolve the SPINE command and any extra bind root it requires."""
+        configured = spine_path or os.environ.get("SPINE_LOCAL_PATH")
+        if configured:
+            configured_path = Path(configured).expanduser()
+            if configured_path.is_dir():
+                bind_root = configured_path
+                candidate_commands = [
+                    configured_path / "bin" / "spine",
+                    configured_path / "bin" / "run.py",
+                ]
+            else:
+                if configured_path.parent.name == "bin":
+                    bind_root = configured_path.parent.parent
+                else:
+                    bind_root = configured_path.parent
+                candidate_commands = [configured_path]
+
+            for candidate in candidate_commands:
+                if candidate.exists() and candidate.is_file():
+                    quoted_candidate = shlex.quote(str(candidate))
+                    if candidate.suffix == ".py":
+                        return f"python3 {quoted_candidate}", str(bind_root)
+                    return quoted_candidate, str(bind_root)
+
+            option_name = "--spine-path" if spine_path else "SPINE_LOCAL_PATH"
+            raise RuntimeError(
+                f"{option_name} is set, but no local SPINE executable was found. "
+                "Expected a file path or a directory containing bin/spine or "
+                "bin/run.py."
+            )
+
+        local_spine = shutil.which("spine")
+        if local_spine:
+            return shlex.quote(local_spine), None
+
+        return None, None
+
+    @staticmethod
+    def _merge_bind_paths(
+        bind_paths: Optional[str], extra_paths: Optional[List[str]] = None
+    ) -> Optional[str]:
+        """Merge user bind roots with required extra paths."""
+        resolved_paths = []
+        seen_paths = set()
+
+        for raw_value in [bind_paths, *(extra_paths or [])]:
+            if not raw_value:
+                continue
+
+            for path in str(raw_value).split(","):
+                stripped = path.strip()
+                if not stripped or stripped in seen_paths:
+                    continue
+                seen_paths.add(stripped)
+                resolved_paths.append(stripped)
+
+        return ",".join(resolved_paths) if resolved_paths else None
+
+    @staticmethod
     def _container_tag_for_cli() -> str:
         """Return the configured container tag in Docker/Podman CLI form."""
         version = os.environ.get("SPINE_CONTAINER_VERSION", "0.12.0")
@@ -293,7 +372,8 @@ class Submitter:
         output: Optional[str] = None,
         files_per_task: int = 1,
         task_id: int = 1,
-        larcv_basedir: Optional[str] = None,
+        larcv_path: Optional[str] = None,
+        flashmatch_path: Optional[str] = None,
         flashmatch: bool = False,
         cvmfs: bool = False,
         apply_mods: Optional[List[str]] = None,
@@ -301,6 +381,7 @@ class Submitter:
         set_overrides: Optional[List[str]] = None,
         interactive_runtime: str = "auto",
         bind_paths: Optional[str] = None,
+        spine_path: Optional[str] = None,
     ) -> int:
         """Run SPINE processing interactively (no SLURM submission).
 
@@ -322,8 +403,10 @@ class Submitter:
             Files to process per task, by default 1
         task_id : int, optional
             Which task to run (1-indexed), by default 1
-        larcv_basedir : str, optional
+        larcv_path : str, optional
             Custom LArCV installation path
+        flashmatch_path : str, optional
+            Custom flash-matching installation path
         flashmatch : bool, optional
             Deprecated compatibility option. OpT0Finder is provided by the SPINE
             container and no external setup is needed.
@@ -340,13 +423,16 @@ class Submitter:
         bind_paths : str, optional
             Extra container bind roots for interactive SIF execution, as a
             comma-separated list.
+        spine_path : str, optional
+            Override the SPINE executable with a checkout directory or an
+            explicit executable path.
 
         Returns
         -------
         int
             Exit code from SPINE execution
         """
-        if flashmatch:
+        if flashmatch and not flashmatch_path:
             self._warn_flashmatch_noop()
 
         if interactive_runtime not in ("auto", "local", "container"):
@@ -420,17 +506,34 @@ class Submitter:
 
         # Build command
         cmd_parts = []
+        resolved_bind_paths = bind_paths
+
+        larcv_setup_cmd, larcv_bind_root = self._resolve_setup_path(
+            larcv_path, "--larcv-path"
+        )
+        flashmatch_setup_cmd, flashmatch_bind_root = self._resolve_setup_path(
+            flashmatch_path, "--flashmatch-path"
+        )
 
         # Add environment setup if needed
-        if larcv_basedir:
-            cmd_parts.append(f"source {larcv_basedir}/configure.sh")
+        for setup_cmd in [larcv_setup_cmd, flashmatch_setup_cmd]:
+            if setup_cmd:
+                cmd_parts.append(setup_cmd)
 
         # Build SPINE command
         log_dir = job_dir / "logs"
         log_dir.mkdir(exist_ok=True)
         spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
+        local_spine_cmd, extra_bind_root = self._resolve_spine_command(spine_path)
+        extra_bind_roots = [
+            root
+            for root in [larcv_bind_root, flashmatch_bind_root, extra_bind_root]
+            if root
+        ]
+        if extra_bind_roots:
+            resolved_bind_paths = self._merge_bind_paths(bind_paths, extra_bind_roots)
         spine_cmd = (
-            "spine "
+            f"{local_spine_cmd or 'spine'} "
             f"-S {task_file_list} "
             f"-o {output} "
             f"-c {config} "
@@ -442,16 +545,17 @@ class Submitter:
 
         # Join with && for proper sequencing
         full_cmd = " && ".join(cmd_parts)
-        local_spine = shutil.which("spine")
-        if interactive_runtime == "local" and not local_spine:
+        if interactive_runtime == "local" and not local_spine_cmd:
             raise RuntimeError(
-                "Interactive runtime 'local' requested, but 'spine' is not on PATH."
+                "Interactive runtime 'local' requested, but no local SPINE command "
+                "was found. Install 'spine' on PATH, pass --spine-path, or set "
+                "SPINE_LOCAL_PATH."
             )
         if interactive_runtime == "container" or (
-            interactive_runtime == "auto" and not local_spine
+            interactive_runtime == "auto" and not local_spine_cmd
         ):
             full_cmd = self._build_interactive_container_command(
-                full_cmd, cvmfs, bind_paths=bind_paths
+                full_cmd, cvmfs, bind_paths=resolved_bind_paths
             )
 
         print("\nExecuting:")
@@ -485,13 +589,15 @@ class Submitter:
         ntasks: Optional[int] = None,
         files_per_task: int = 1,
         dependency: Optional[str] = None,
-        larcv_basedir: Optional[str] = None,
+        larcv_path: Optional[str] = None,
+        flashmatch_path: Optional[str] = None,
         flashmatch: bool = False,
         cvmfs: bool = False,
         apply_mods: Optional[List[str]] = None,
         dry_run: bool = False,
         preload: bool = False,
         set_overrides: Optional[List[str]] = None,
+        spine_path: Optional[str] = None,
         **profile_overrides,
     ) -> List[str]:
         """Submit batch job for SPINE processing.
@@ -517,8 +623,10 @@ class Submitter:
             Files to process per task, by default 1
         dependency : str, optional
             Batch scheduler dependency string, by default None
-        larcv_basedir : str, optional
+        larcv_path : str, optional
             Custom LArCV installation path, by default None
+        flashmatch_path : str, optional
+            Custom flash-matching installation path, by default None
         flashmatch : bool, optional
             Deprecated compatibility option. OpT0Finder is provided by the SPINE
             container and no external setup is needed.
@@ -532,6 +640,9 @@ class Submitter:
             Preload !download assets before submitting, by default False
         set_overrides : List[str], optional
             SPINE config overrides in KEY=VALUE form, passed as ``--set``.
+        spine_path : str, optional
+            Override the SPINE executable with a checkout directory or an
+            explicit executable path.
         **profile_overrides
             Override profile settings
 
@@ -540,7 +651,7 @@ class Submitter:
         List[str]
             List of submitted job IDs
         """
-        if flashmatch:
+        if flashmatch and not flashmatch_path:
             self._warn_flashmatch_noop()
 
         # Parse input files
@@ -579,10 +690,24 @@ class Submitter:
             self._preload_downloads(config)
 
         spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
+        spine_cmd, extra_bind_root = self._resolve_spine_command(spine_path)
+        _, larcv_bind_root = self._resolve_setup_path(larcv_path, "--larcv-path")
+        _, flashmatch_bind_root = self._resolve_setup_path(
+            flashmatch_path, "--flashmatch-path"
+        )
 
         # Detect detector and get profile
         profile_config = self.config_mgr.get_profile(profile, detector)
         profile_config.update(profile_overrides)
+        extra_bind_roots = [
+            root
+            for root in [larcv_bind_root, flashmatch_bind_root, extra_bind_root]
+            if root
+        ]
+        if extra_bind_roots:
+            profile_config["bind_paths"] = self._merge_bind_paths(
+                profile_config.get("bind_paths"), extra_bind_roots
+            )
 
         # Get account
         account = profile_config.get("account")
@@ -639,9 +764,11 @@ class Submitter:
                 file_list_pattern=file_list_pattern,
                 config=config,
                 output=output,
-                larcv_basedir=larcv_basedir,
+                larcv_path=larcv_path,
+                flashmatch_path=flashmatch_path,
                 flashmatch=flashmatch,
                 cvmfs=cvmfs,
+                spine_cmd=spine_cmd or "spine",
                 spine_cli_overrides=spine_cli_overrides,
                 **profile_config,
             )
@@ -682,6 +809,9 @@ class Submitter:
             "original_config": original_config if apply_mods else config,
             "applied_modifiers": apply_mods or [],
             "set_overrides": set_overrides or [],
+            "larcv_path": larcv_path,
+            "flashmatch_path": flashmatch_path,
+            "spine_path": spine_path,
             "cvmfs": cvmfs,
             "profile": profile,
             "profile_config": profile_config,
@@ -752,7 +882,8 @@ class Submitter:
                 ntasks=stage.get("ntasks"),
                 files_per_task=stage.get("files_per_task", 1),
                 dependency=dependency,
-                larcv_basedir=stage.get("larcv_basedir"),
+                larcv_path=stage.get("larcv_path", stage.get("larcv_basedir")),
+                flashmatch_path=stage.get("flashmatch_path"),
                 flashmatch=stage.get("flashmatch", False),
                 cvmfs=stage.get("cvmfs", False),
                 dry_run=dry_run,

@@ -432,6 +432,40 @@ class TestInteractiveExecution:
         assert "--set io.loader.batch_size=1" in run.call_args.args[0]
         assert "FMATCH_BASEDIR" not in run.call_args.args[0]
 
+    def test_run_interactive_sources_custom_software_paths(
+        self, mock_submitter, tmp_path
+    ):
+        """Test custom software paths source their configure scripts before SPINE."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        larcv_root = tmp_path / "larcv"
+        flashmatch_root = tmp_path / "flashmatch"
+        larcv_root.mkdir()
+        flashmatch_root.mkdir()
+        (larcv_root / "configure.sh").write_text("export LARCV=1\n", encoding="utf-8")
+        (flashmatch_root / "configure.sh").write_text(
+            "export FMATCH=1\n", encoding="utf-8"
+        )
+        completed = type("Completed", (), {"returncode": 0})()
+
+        with (
+            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                larcv_path=str(larcv_root),
+                flashmatch_path=str(flashmatch_root),
+                interactive_runtime="local",
+            )
+
+        assert exit_code == 0
+        command = run.call_args.args[0]
+        assert f"source {larcv_root / 'configure.sh'}" in command
+        assert f"source {flashmatch_root / 'configure.sh'}" in command
+        assert "spine -S" in command
+
     def test_run_interactive_flashmatch_is_warned_noop(self, mock_submitter, tmp_path):
         """Test --flashmatch is accepted but does not change execution."""
         input_file = tmp_path / "input.root"
@@ -648,6 +682,50 @@ class TestInteractiveExecution:
         assert "/exp/dune" in command
         assert str(container) in command
 
+    def test_run_interactive_local_uses_spine_path_run_py(
+        self, mock_submitter, tmp_path
+    ):
+        """Test local interactive mode can target a SPINE checkout via --spine-path."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        spine_checkout = tmp_path / "spine"
+        (spine_checkout / "bin").mkdir(parents=True)
+        run_py = spine_checkout / "bin" / "run.py"
+        run_py.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+        completed = type("Completed", (), {"returncode": 0})()
+
+        with (
+            patch("src.submitter.shutil.which", return_value=None),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                interactive_runtime="local",
+                spine_path=str(spine_checkout),
+            )
+
+        assert exit_code == 0
+        command = run.call_args.args[0]
+        assert str(run_py) in command
+        assert "spine -S" not in command
+        assert "python3 " in command
+
+    def test_run_interactive_local_rejects_invalid_spine_path(
+        self, mock_submitter, tmp_path
+    ):
+        """Test invalid --spine-path values fail clearly."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+
+        with (pytest.raises(RuntimeError, match="--spine-path"),):
+            mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                interactive_runtime="local",
+                spine_path=str(tmp_path / "missing-checkout"),
+            )
+
     def test_run_interactive_local_requires_spine_on_path(
         self, mock_submitter, tmp_path
     ):
@@ -657,7 +735,9 @@ class TestInteractiveExecution:
 
         with (
             patch("src.submitter.shutil.which", return_value=None),
-            pytest.raises(RuntimeError, match="spine.*PATH"),
+            pytest.raises(
+                RuntimeError, match="SPINE.*PATH|--spine-path|SPINE_LOCAL_PATH"
+            ),
         ):
             mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -688,6 +768,59 @@ class TestJobDirectory:
 
 class TestJobMetadata:
     """Tests for job metadata handling."""
+
+
+class TestBatchSpineOverride:
+    """Tests for explicit SPINE runtime overrides in batch mode."""
+
+    def test_submit_job_uses_spine_path_and_merges_bind_root(
+        self, mock_submitter, tmp_path
+    ):
+        """Test batch submission writes the overridden SPINE command into scripts."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        spine_checkout = tmp_path / "spine"
+        larcv_root = tmp_path / "larcv"
+        flashmatch_root = tmp_path / "flashmatch"
+        (spine_checkout / "bin").mkdir(parents=True)
+        larcv_root.mkdir()
+        flashmatch_root.mkdir()
+        (larcv_root / "configure.sh").write_text("export LARCV=1\n", encoding="utf-8")
+        (flashmatch_root / "configure.sh").write_text(
+            "export FMATCH=1\n", encoding="utf-8"
+        )
+        run_py = spine_checkout / "bin" / "run.py"
+        run_py.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
+        ):
+            job_ids = mock_submitter.submit_job(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                profile="s3df_ampere",
+                larcv_path=str(larcv_root),
+                flashmatch_path=str(flashmatch_root),
+                spine_path=str(spine_checkout),
+            )
+
+        assert job_ids == ["12345"]
+
+        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        assert len(scripts) == 1
+
+        script = scripts[0].read_text(encoding="utf-8")
+        assert f"python3 {run_py} -S $TASK_FILE_LIST" in script
+        assert str(spine_checkout) in script
+        assert f'source "{larcv_root / "configure.sh"}"' in script
+        assert f'source "{flashmatch_root / "configure.sh"}"' in script
+        assert str(larcv_root) in script
+        assert str(flashmatch_root) in script
 
     def test_save_job_metadata(self, mock_submitter, tmp_path):
         """Test saving job metadata to JSON."""
@@ -800,10 +933,12 @@ class TestCVMFSOption:
             "output": "/tmp/output.h5",
             "basedir": "/tmp/spine-prod",
             "file_list_pattern": "/tmp/files_*.txt",
-            "larcv_basedir": None,
+            "larcv_path": None,
+            "flashmatch_path": None,
             "flashmatch": False,
             "cvmfs": False,
             "bind_paths": None,
+            "spine_cmd": "spine",
             "spine_cli_overrides": "",
         }
         defaults.update(kwargs)
@@ -876,6 +1011,30 @@ class TestCVMFSOption:
 
         assert "--set base.world_size=0" in script
         assert "--set io.loader.batch_size=1" in script
+
+    def test_templates_allow_custom_spine_command(self, mock_submitter):
+        """Test batch templates can override the SPINE executable."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_s3df.sbatch",
+            spine_cmd="python3 /tmp/spine/bin/run.py",
+            bind_paths="/sdf/,/tmp/spine",
+        )
+
+        assert "python3 /tmp/spine/bin/run.py -S $TASK_FILE_LIST" in script
+        assert 'BIND_PATHS="/sdf/,/tmp/spine"' in script
+
+    def test_templates_source_custom_software_paths(self, mock_submitter):
+        """Test batch templates source custom software configure scripts."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_s3df.sbatch",
+            larcv_path="/tmp/larcv",
+            flashmatch_path="/tmp/flashmatch",
+        )
+
+        assert 'source "/tmp/larcv/configure.sh"' in script
+        assert 'source "/tmp/flashmatch/configure.sh"' in script
 
 
 class TestBatchClients:

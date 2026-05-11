@@ -142,8 +142,17 @@ Examples:
     )
 
     # Software paths
+    parser.add_argument("--larcv-path", "-l", help="Custom LArCV installation path")
     parser.add_argument(
-        "--larcv", "-l", dest="larcv_basedir", help="Custom LArCV installation path"
+        "--flashmatch-path",
+        help="Custom flash-matching installation path (sources configure.sh)",
+    )
+    parser.add_argument(
+        "--spine-path",
+        help=(
+            "Override the SPINE executable with a checkout directory or explicit "
+            "executable path. Directories resolve to bin/spine or bin/run.py."
+        ),
     )
     parser.add_argument(
         "--flashmatch",
@@ -322,7 +331,8 @@ Examples:
                 output=args.output,
                 files_per_task=args.files_per_task,
                 task_id=args.task_id,
-                larcv_basedir=args.larcv_basedir,
+                larcv_path=args.larcv_path,
+                flashmatch_path=args.flashmatch_path,
                 flashmatch=args.flashmatch,
                 cvmfs=args.cvmfs,
                 apply_mods=args.apply_mods,
@@ -330,6 +340,7 @@ Examples:
                 set_overrides=args.set_overrides,
                 interactive_runtime=args.interactive_runtime,
                 bind_paths=args.bind_paths,
+                spine_path=args.spine_path,
             )
             return exit_code
 
@@ -349,13 +360,15 @@ Examples:
                 ntasks=args.ntasks,
                 files_per_task=args.files_per_task,
                 dependency=args.dependency,
-                larcv_basedir=args.larcv_basedir,
+                larcv_path=args.larcv_path,
+                flashmatch_path=args.flashmatch_path,
                 flashmatch=args.flashmatch,
                 cvmfs=args.cvmfs,
                 apply_mods=args.apply_mods,
                 dry_run=args.dry_run,
                 preload=args.preload,
                 set_overrides=args.set_overrides,
+                spine_path=args.spine_path,
                 **profile_overrides,
             )
 

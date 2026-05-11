@@ -87,10 +87,16 @@ echo "NUMBA_NUM_THREADS set to $NUMBA_NUM_THREADS"
 
 # NERSC: Use Shifter
 INNER_CMD=""
-{% if larcv_basedir %}
-INNER_CMD="unset which; source {{ larcv_basedir }}/configure.sh; "
+{% if larcv_path or flashmatch_path %}
+INNER_CMD="unset which; "
+{% if larcv_path %}
+INNER_CMD="${INNER_CMD}source {{ (larcv_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
-INNER_CMD="${INNER_CMD}spine -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+{% if flashmatch_path %}
+INNER_CMD="${INNER_CMD}source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
+{% endif %}
+{% endif %}
+INNER_CMD="${INNER_CMD}{{ spine_cmd|default('spine') }} -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 
 # Add Shifter modules requested by the job profile/options
 SHIFTER_MODULES=()

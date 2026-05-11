@@ -22,8 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Derive the default S3DF Singularity image path from `SPINE_CONTAINER_VERSION`
   as `/sdf/data/neutrino/images/spine_v0-12-0.sif`
 - Added `submit.py --set KEY=VALUE` support for SPINE runtime config overrides
+- Added `--flashmatch-path /path/to/flashmatch` to source custom flash-matching
+  setups for interactive or batch execution
 - Added `--interactive-runtime` to let interactive mode use local `spine`,
   force container execution, or fall back to the container automatically
+- Added `--spine-path /path/to/spine` support to point interactive and batch
+  execution at a checkout without requiring a released `spine` executable on
+  `PATH`, including container bind propagation where supported
+- Renamed `--larcv` to `--larcv-path`
 - Docker/Podman interactive fallback now requests `linux/amd64` by default
 - Kept `--flashmatch` as a deprecated compatibility option; no external
   flash-matching setup is needed
