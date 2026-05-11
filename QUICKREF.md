@@ -1,5 +1,13 @@
 # SPINE Production Quick Reference
 
+## Runtime
+
+Production jobs run inside a tagged SPINE container. The default Shifter tag is
+`docker:ghcr.io/deeplearnphysics/spine:0.11.1`, with the S3DF `.sif` derived
+from that version at `/sdf/data/neutrino/images/spine_v0-11-1.sif`. The container
+provides SPINE, OpT0Finder, and runtime dependencies; batch jobs invoke the
+`spine` executable from inside the container.
+
 ## Common Commands
 
 ### Basic Submission
@@ -66,6 +74,12 @@
 
 # Dry run (test without submitting)
 ./submit.py --config infer/icarus/latest --source data.root --dry-run
+
+# Override SPINE config values
+./submit.py --config infer/generic/latest --source data.root --set base.world_size=0
+
+# Force container-backed interactive mode
+./submit.py -I --interactive-runtime container --config infer/generic/latest --source data.root --set base.world_size=0
 
 # Expose CVMFS inside the container
 ./submit.py --config infer/icarus/latest --source data.root --cvmfs

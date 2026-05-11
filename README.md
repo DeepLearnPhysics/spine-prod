@@ -15,32 +15,35 @@ SPINE is a deep learning-based reconstruction framework for liquid argon time pr
 ### 1. Environment Setup
 
 ```bash
-# Clone the repository with submodules
-git clone --recursive https://github.com/DeepLearnPhysics/spine-prod.git
+# Clone the repository
+git clone https://github.com/DeepLearnPhysics/spine-prod.git
 cd spine-prod
 
-# Configure environment (automatically uses bundled SPINE submodule)
+# Configure environment
 source configure.sh
 ```
 
-**SPINE Version Control:** This repository includes SPINE as a git submodule, ensuring version consistency between production configurations and the SPINE codebase. The submodule is automatically used by `configure.sh` if present.
+**SPINE Version Control:** Production jobs now run entirely from a tagged SPINE
+container image. The default Shifter tag is
+`docker:ghcr.io/deeplearnphysics/spine:0.11.1`, with the matching S3DF
+Singularity image derived from the same version at
+`/sdf/data/neutrino/images/spine_v0-11-1.sif`. This container packages SPINE,
+OpT0Finder, and runtime dependencies, and jobs invoke the container-provided
+`spine` executable directly.
 
-**Alternative Setup:** You can override `SPINE_BASEDIR` before sourcing `configure.sh` to use a different SPINE installation:
+**Alternative Container Location:** You can override the local `.sif` path or
+container release before sourcing `configure.sh`:
 ```bash
-export SPINE_BASEDIR=/path/to/your/spine
+export CONTAINER_PATH=/path/to/spine_v0-11-1.sif
+export SPINE_CONTAINER_VERSION=0.11.1
 source configure.sh
 ```
 
-**Updating SPINE Version:** To update to a specific SPINE release:
+**Updating SPINE Version:** Update the container version and site-local image
+path together:
 ```bash
-# Update to latest tagged release
-./update_spine_version.sh v0.9.3
-
-# Commit the update
-git commit -m "Update SPINE to v0.9.3"
-
-# Check current SPINE version
-git submodule status
+export SPINE_CONTAINER_VERSION=0.11.1
+# Default CONTAINER_PATH becomes /sdf/data/neutrino/images/spine_v0-11-1.sif
 ```
 
 ### 2. Basic Job Submission
@@ -94,6 +97,9 @@ Interactive mode performs all the same config composition, file chunking, and en
 # Test a config on one file
 ./submit.py -I --config infer/icarus/latest.cfg --source /path/to/test.root
 
+# Force container-backed interactive execution
+./submit.py -I --interactive-runtime container --config infer/generic/latest.cfg --source test.root --set base.world_size=0
+
 # Test with modifiers applied
 ./submit.py -I --config infer/icarus/latest.cfg --source test.root --apply-mods data lite
 
@@ -102,6 +108,14 @@ Interactive mode performs all the same config composition, file chunking, and en
 ```
 
 **Note:** Interactive mode is not supported for pipelines. Use `--dry-run` to preview pipeline submissions.
+
+By default, interactive mode uses the `spine` executable already on `PATH`. If
+`spine` is unavailable, it falls back to the configured container: first
+`CONTAINER_PATH` with Singularity/Apptainer if the `.sif` exists, then
+`CONTAINER_TAG` with Docker/Podman. Use `--interactive-runtime local` to require
+the local executable, or `--interactive-runtime container` to force container
+execution. Docker/Podman fallback requests `linux/amd64` by default; override
+`SPINE_CONTAINER_PLATFORM` if a different platform is needed.
 
 ## Directory Structure
 
@@ -239,6 +253,9 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 # Override specific resources
 ./submit.py --config infer/icarus/latest.cfg --source data.root --time 2:00:00 --cpus-per-task 8
 
+# Override SPINE configuration values at runtime
+./submit.py --config infer/generic/latest.cfg --source data.root --set base.world_size=0
+
 # Preload model weights on the submit host before submitting
 ./submit.py --config infer/2x2/full_chain_240819.yaml --source data.root --profile anl_polaris_debug --preload
 
@@ -365,7 +382,7 @@ This is especially useful for large-scale production to save disk space by remov
 # Use custom LArCV installation
 ./submit.py --config infer/icarus/latest.cfg --source data.root --larcv /path/to/larcv
 
-# Enable flash matching
+# Flash matching uses OpT0Finder packaged in the SPINE container
 ./submit.py --config infer/icarus/latest.cfg --source data.root --flashmatch
 
 # Expose CVMFS inside the container
@@ -442,7 +459,7 @@ ICARUS uses split cryostat processing with cosmic overlay:
 ### Environment Not Set
 
 ```
-WARNING: MLPROD_BASEDIR not set. Did you source configure.sh?
+WARNING: SPINE_PROD_BASEDIR not set. Did you source configure.sh?
 ```
 
 **Solution:** Source the environment:
@@ -554,11 +571,14 @@ ls -lt jobs/
 
 Set by `configure.sh`:
 
-- `MLPROD_BASEDIR` - Base directory of this repository
-- `MLPROD_CFGDIR` - Configuration directory
-- `SPINE_BASEDIR` - SPINE installation path
-- `FMATCH_BASEDIR` - OpT0Finder installation path
-- `SINGULARITY_PATH` - Container image path
+- `SPINE_PROD_BASEDIR` - Base directory of this repository
+- `SPINE_CONFIG_PATH` - Configuration search path
+- `ICARUS_DATA_DIR` - ICARUS data release path
+- `SPINE_CONTAINER_VERSION` - Tagged SPINE container version, without a leading `v`
+- `CONTAINER_PATH` - Singularity/Apptainer image path
+- `CONTAINER_TAG` - Registry image tag for Shifter-style runtimes, including `docker:`
+- `SPINE_PROD_CONTAINER_PATH_AUTO` - Tracks whether `CONTAINER_PATH` was auto-derived
+- `SPINE_CONTAINER_PLATFORM` - Docker/Podman platform for interactive fallback
 
 ## Contributing
 

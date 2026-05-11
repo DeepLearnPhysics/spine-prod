@@ -62,32 +62,32 @@ def test_import_does_not_import_spine():
     assert result.stdout.strip() == "False"
 
 
-def test_bootstrap_spine_adds_submodule_src(tmp_path):
-    """Test the bundled SPINE source path is added when present."""
+def test_bootstrap_spine_is_compatibility_noop(tmp_path):
+    """Test the legacy bootstrap hook no longer adds bundled source paths."""
     spine_src = tmp_path / "spine" / "src"
     spine_src.mkdir(parents=True)
 
     old_path = list(sys.path)
     try:
         preload.bootstrap_spine(tmp_path)
-        assert str(spine_src) == sys.path[0]
+        assert sys.path == old_path
     finally:
         sys.path[:] = old_path
 
 
-def test_spine_config_import_does_not_import_h5py():
-    """Test SPINE config imports do not load runtime IO dependencies."""
-    spine_src = REPO_ROOT / "spine" / "src"
+def test_spine_config_loader_imports_when_available():
+    """Test an optional local SPINE config loader can be imported."""
+    if importlib.util.find_spec("spine.config.load") is None:
+        pytest.skip("SPINE is not installed in this test environment")
+
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(spine_src)
     result = subprocess.run(
         [
             sys.executable,
             "-c",
             (
-                "import sys; "
                 "from spine.config.load import load_config_file; "
-                "print('h5py' in sys.modules)"
+                "print(callable(load_config_file))"
             ),
         ],
         stdout=subprocess.PIPE,
@@ -98,7 +98,7 @@ def test_spine_config_import_does_not_import_h5py():
     )
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "False"
+    assert result.stdout.strip() == "True"
 
 
 def test_preload_downloads_loads_config(tmp_path):

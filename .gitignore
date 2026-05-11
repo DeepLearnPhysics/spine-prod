@@ -36,9 +36,13 @@ jobs/
 
 # Cache directories (for downloaded weights, etc.)
 .cache/
+weights/
 
 # Node modules (if any)
 node_modules/
+
+# Optional local SPINE checkout; production uses tagged containers.
+spine/
 
 # Logs
 *.log

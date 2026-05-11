@@ -396,22 +396,22 @@ class TestFileChunking:
 class TestInteractiveExecution:
     """Tests for direct interactive execution."""
 
-    def test_run_interactive_uses_bash_for_source(
-        self, mock_submitter, tmp_path, workspace_root
-    ):
+    def test_run_interactive_uses_bash_for_source(self, mock_submitter, tmp_path):
         """Test interactive mode uses bash so source commands work."""
         input_file = tmp_path / "input.root"
         input_file.touch()
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch.dict(os.environ, {"SPINE_BASEDIR": str(workspace_root)}, clear=False),
+            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
             patch("src.submitter.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
                 files=[str(input_file)],
                 flashmatch=True,
+                set_overrides=["base.world_size=0", "io.loader.batch_size=1"],
+                interactive_runtime="local",
             )
 
         assert exit_code == 0
@@ -419,7 +419,95 @@ class TestInteractiveExecution:
         _, kwargs = run.call_args
         assert kwargs["shell"] is True
         assert kwargs["executable"] == "/bin/bash"
-        assert "source $FMATCH_BASEDIR/configure.sh" in run.call_args.args[0]
+        assert "spine -S" in run.call_args.args[0]
+        assert "--set base.world_size=0" in run.call_args.args[0]
+        assert "--set io.loader.batch_size=1" in run.call_args.args[0]
+        assert "FMATCH_BASEDIR" not in run.call_args.args[0]
+
+    def test_run_interactive_rejects_invalid_set_override(
+        self, mock_submitter, tmp_path
+    ):
+        """Test invalid --set overrides fail before execution."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+
+        with pytest.raises(ValueError, match="Expected KEY=VALUE"):
+            mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                set_overrides=["base.world_size"],
+                interactive_runtime="local",
+            )
+
+    def test_run_interactive_rejects_quoted_set_override(
+        self, mock_submitter, tmp_path
+    ):
+        """Test unsafe --set values fail before script rendering."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+
+        with pytest.raises(ValueError, match="Whitespace and quotes"):
+            mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                set_overrides=["model.name='full chain'"],
+                interactive_runtime="local",
+            )
+
+    def test_run_interactive_auto_falls_back_to_docker_container(
+        self, mock_submitter, tmp_path
+    ):
+        """Test auto interactive mode falls back to CONTAINER_TAG when spine is absent."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        completed = type("Completed", (), {"returncode": 0})()
+
+        def fake_which(command):
+            return "/usr/bin/docker" if command == "docker" else None
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "CONTAINER_PATH": str(tmp_path / "missing.sif"),
+                    "CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:0.11.1",
+                },
+                clear=False,
+            ),
+            patch("src.submitter.shutil.which", side_effect=fake_which),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                set_overrides=["base.world_size=0"],
+            )
+
+        assert exit_code == 0
+        command = run.call_args.args[0]
+        assert "docker run --rm" in command
+        assert "--platform linux/amd64" in command
+        assert "ghcr.io/deeplearnphysics/spine:0.11.1" in command
+        assert "docker:ghcr" not in command
+        assert "spine -S" in command
+        assert "--set base.world_size=0" in command
+
+    def test_run_interactive_local_requires_spine_on_path(
+        self, mock_submitter, tmp_path
+    ):
+        """Test local interactive mode fails clearly if spine is unavailable."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+
+        with (
+            patch("src.submitter.shutil.which", return_value=None),
+            pytest.raises(RuntimeError, match="spine.*PATH"),
+        ):
+            mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                interactive_runtime="local",
+            )
 
 
 class TestJobDirectory:
@@ -560,6 +648,7 @@ class TestCVMFSOption:
             "flashmatch": False,
             "cvmfs": False,
             "bind_paths": None,
+            "spine_cli_overrides": "",
         }
         defaults.update(kwargs)
         return template.render(**defaults)
@@ -609,6 +698,18 @@ class TestCVMFSOption:
         assert "ngpus=1" in script
         assert "${PBS_ARRAY_INDEX}" in script
         assert "apptainer exec" in script
+        assert "spine -S" in script
+
+    def test_templates_include_spine_set_overrides(self, mock_submitter):
+        """Test SPINE --set overrides are rendered into batch commands."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_s3df.sbatch",
+            spine_cli_overrides="--set base.world_size=0 --set io.loader.batch_size=1",
+        )
+
+        assert "--set base.world_size=0" in script
+        assert "--set io.loader.batch_size=1" in script
 
 
 class TestBatchClients:

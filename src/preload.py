@@ -1,15 +1,11 @@
 """Utilities for preloading SPINE !download assets."""
 
 import os
-import sys
 from pathlib import Path
 
 
 def bootstrap_spine(project_root: Path):
-    """Make the bundled SPINE submodule importable when present."""
-    spine_src = project_root / "spine" / "src"
-    if spine_src.exists() and str(spine_src) not in sys.path:
-        sys.path.insert(0, str(spine_src))
+    """Compatibility no-op retained for callers from older releases."""
 
 
 def resolve_config_path(config: str, project_root: Path) -> Path:
@@ -38,8 +34,9 @@ def preload_downloads(configs, project_root: Path, cache_dir=None):
         from spine.config.load import load_config_file
     except ImportError as exc:
         raise RuntimeError(
-            "Could not import SPINE config tools. Source configure.sh or "
-            "initialize the spine submodule before preloading downloads."
+            "Could not import SPINE config tools. Run this utility inside the "
+            "tagged SPINE container or install a matching SPINE release in the "
+            "submit environment before preloading downloads."
         ) from exc
 
     if isinstance(configs, (str, Path)):

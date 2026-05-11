@@ -1,6 +1,8 @@
 """Main batch submission orchestrator for SPINE production."""
 
 import os
+import shlex
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -102,6 +104,98 @@ class Submitter:
             f"Unknown site in profile: {site}, must specify 's3df', 'nersc', or 'anl'"
         )
 
+    @staticmethod
+    def _format_spine_set_overrides(set_overrides: Optional[List[str]]) -> str:
+        """Format SPINE ``--set`` overrides for shell execution."""
+        if not set_overrides:
+            return ""
+
+        formatted = []
+        for override in set_overrides:
+            if "=" not in override:
+                raise ValueError(
+                    f"Invalid --set override '{override}'. Expected KEY=VALUE."
+                )
+            if any(char.isspace() for char in override) or any(
+                char in override for char in ("'", '"')
+            ):
+                raise ValueError(
+                    f"Invalid --set override '{override}'. Whitespace and quotes "
+                    "are not supported in submit.py --set values."
+                )
+            formatted.append(f"--set {override}")
+
+        return " ".join(formatted)
+
+    @staticmethod
+    def _default_container_path() -> str:
+        """Build the default local SIF path from the configured SPINE version."""
+        version = os.environ.get("SPINE_CONTAINER_VERSION", "0.11.1")
+        path_version = version.replace(".", "-")
+        return f"/sdf/data/neutrino/images/spine_v{path_version}.sif"
+
+    @staticmethod
+    def _container_tag_for_cli() -> str:
+        """Return the configured container tag in Docker/Podman CLI form."""
+        version = os.environ.get("SPINE_CONTAINER_VERSION", "0.11.1")
+        tag = os.environ.get(
+            "CONTAINER_TAG", f"docker:ghcr.io/deeplearnphysics/spine:{version}"
+        )
+        return tag.removeprefix("docker:")
+
+    def _build_interactive_container_command(self, inner_cmd: str, cvmfs: bool) -> str:
+        """Build an interactive container command for local smoke tests."""
+        container_path = os.environ.get(
+            "CONTAINER_PATH", self._default_container_path()
+        )
+
+        if Path(container_path).exists():
+            singularity = shutil.which("singularity") or shutil.which("apptainer")
+            if singularity:
+                bind_paths = {str(Path.cwd()), str(self.basedir)}
+                if cvmfs:
+                    bind_paths.add("/cvmfs")
+                bind_arg = ",".join(sorted(bind_paths))
+                return (
+                    f"{shlex.quote(singularity)} exec --bind {shlex.quote(bind_arg)} "
+                    f"--nv {shlex.quote(container_path)} bash -c "
+                    f"{shlex.quote(inner_cmd)}"
+                )
+
+        docker = shutil.which("docker") or shutil.which("podman")
+        if docker:
+            workdir = str(Path.cwd())
+            platform = os.environ.get("SPINE_CONTAINER_PLATFORM", "linux/amd64")
+            platform_arg = f"--platform {shlex.quote(platform)} " if platform else ""
+            volume_args = [f"-v {shlex.quote(f'{workdir}:{workdir}')}"]
+            basedir = str(self.basedir)
+            if basedir != workdir:
+                volume_args.append(f"-v {shlex.quote(f'{basedir}:{basedir}')}")
+            if cvmfs and Path("/cvmfs").exists():
+                volume_args.append("-v /cvmfs:/cvmfs:ro")
+
+            env_args = [
+                f"-e SPINE_PROD_BASEDIR={shlex.quote(basedir)}",
+                f"-e SPINE_CONFIG_PATH={shlex.quote(os.environ.get('SPINE_CONFIG_PATH', str(self.basedir / 'config')))}",
+            ]
+            if os.environ.get("ICARUS_DATA_DIR"):
+                env_args.append(
+                    f"-e ICARUS_DATA_DIR={shlex.quote(os.environ['ICARUS_DATA_DIR'])}"
+                )
+
+            return (
+                f"{shlex.quote(docker)} run --rm {platform_arg}{' '.join(volume_args)} "
+                f"-w {shlex.quote(workdir)} {' '.join(env_args)} "
+                f"{shlex.quote(self._container_tag_for_cli())} bash -c "
+                f"{shlex.quote(inner_cmd)}"
+            )
+
+        raise RuntimeError(
+            "Interactive container runtime requested, but no usable runtime was "
+            "found. Install spine on PATH, provide a readable CONTAINER_PATH with "
+            "singularity/apptainer, or make docker/podman available with CONTAINER_TAG."
+        )
+
     def run_interactive(
         self,
         config: str,
@@ -115,6 +209,8 @@ class Submitter:
         cvmfs: bool = False,
         apply_mods: Optional[List[str]] = None,
         preload: bool = False,
+        set_overrides: Optional[List[str]] = None,
+        interactive_runtime: str = "auto",
     ) -> int:
         """Run SPINE processing interactively (no SLURM submission).
 
@@ -139,19 +235,29 @@ class Submitter:
         larcv_basedir : str, optional
             Custom LArCV installation path
         flashmatch : bool, optional
-            Enable flash matching
+            Deprecated compatibility option. OpT0Finder is provided by the SPINE
+            container and no external setup is needed.
         cvmfs : bool, optional
             Expose CVMFS inside the container, by default False
         apply_mods : List[str], optional
             List of modifiers to apply
         preload : bool, optional
             Preload !download assets before execution, by default False
+        set_overrides : List[str], optional
+            SPINE config overrides in KEY=VALUE form, passed as ``--set``.
+        interactive_runtime : str, optional
+            Runtime for interactive execution: 'auto', 'local', or 'container'.
 
         Returns
         -------
         int
             Exit code from SPINE execution
         """
+        if interactive_runtime not in ("auto", "local", "container"):
+            raise ValueError(
+                "interactive_runtime must be one of: 'auto', 'local', 'container'"
+            )
+
         # Parse input files
         file_list = self.file_handler.parse_files(files, source_type)
         if not file_list:
@@ -227,32 +333,32 @@ class Submitter:
         if larcv_basedir:
             cmd_parts.append(f"source {larcv_basedir}/configure.sh")
 
-        if flashmatch:
-            cmd_parts.append("source $FMATCH_BASEDIR/configure.sh")
-
-        # Check SPINE_BASEDIR
-        spine_basedir = os.environ.get("SPINE_BASEDIR")
-        if not spine_basedir:
-            print(
-                "ERROR: SPINE_BASEDIR environment variable is not set. "
-                "Please source configure.sh before running in interactive mode."
-            )
-            return 1
-
         # Build SPINE command
         log_dir = job_dir / "logs"
         log_dir.mkdir(exist_ok=True)
+        spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
         spine_cmd = (
-            f"python3 $SPINE_BASEDIR/bin/run.py "
+            "spine "
             f"-S {task_file_list} "
             f"-o {output} "
             f"-c {config} "
             f"--log-dir {log_dir}"
         )
+        if spine_cli_overrides:
+            spine_cmd = f"{spine_cmd} {spine_cli_overrides}"
         cmd_parts.append(spine_cmd)
 
         # Join with && for proper sequencing
         full_cmd = " && ".join(cmd_parts)
+        local_spine = shutil.which("spine")
+        if interactive_runtime == "local" and not local_spine:
+            raise RuntimeError(
+                "Interactive runtime 'local' requested, but 'spine' is not on PATH."
+            )
+        if interactive_runtime == "container" or (
+            interactive_runtime == "auto" and not local_spine
+        ):
+            full_cmd = self._build_interactive_container_command(full_cmd, cvmfs)
 
         print("\nExecuting:")
         print(f"  {full_cmd}\n")
@@ -291,6 +397,7 @@ class Submitter:
         apply_mods: Optional[List[str]] = None,
         dry_run: bool = False,
         preload: bool = False,
+        set_overrides: Optional[List[str]] = None,
         **profile_overrides,
     ) -> List[str]:
         """Submit batch job for SPINE processing.
@@ -319,7 +426,8 @@ class Submitter:
         larcv_basedir : str, optional
             Custom LArCV installation path, by default None
         flashmatch : bool, optional
-            Enable flash matching, by default False
+            Deprecated compatibility option. OpT0Finder is provided by the SPINE
+            container and no external setup is needed.
         cvmfs : bool, optional
             Expose CVMFS inside the container, by default False
         apply_mods : List[str], optional
@@ -328,6 +436,8 @@ class Submitter:
             Show what would be submitted without submitting, by default False
         preload : bool, optional
             Preload !download assets before submitting, by default False
+        set_overrides : List[str], optional
+            SPINE config overrides in KEY=VALUE form, passed as ``--set``.
         **profile_overrides
             Override profile settings
 
@@ -374,6 +484,8 @@ class Submitter:
 
         if preload:
             self._preload_downloads(config)
+
+        spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
 
         # Detect detector and get profile
         profile_config = self.config_mgr.get_profile(profile, detector)
@@ -437,6 +549,7 @@ class Submitter:
                 larcv_basedir=larcv_basedir,
                 flashmatch=flashmatch,
                 cvmfs=cvmfs,
+                spine_cli_overrides=spine_cli_overrides,
                 **profile_config,
             )
 
@@ -475,6 +588,7 @@ class Submitter:
             "config": config,
             "original_config": original_config if apply_mods else config,
             "applied_modifiers": apply_mods or [],
+            "set_overrides": set_overrides or [],
             "cvmfs": cvmfs,
             "profile": profile,
             "profile_config": profile_config,

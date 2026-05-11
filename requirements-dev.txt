@@ -6,8 +6,8 @@
 jinja2>=3.0.0
 pyyaml>=5.0.0
 
-# Note: SPINE is provided via git submodule (see spine/)
-# Tests use the submodule version via PYTHONPATH
+# Production jobs run inside a tagged SPINE container. Some preload tests are
+# skipped unless a matching SPINE Python package is available locally.
 
 # Testing
 pytest>=6.0.0

@@ -5,6 +5,38 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-11
+
+### Breaking Changes
+- SPINE is no longer packaged as a git submodule. Production jobs now rely on
+  the tagged SPINE container image instead of a repository-local SPINE checkout.
+- Batch and interactive execution now call the container-provided `spine`
+  executable instead of `python3 $SPINE_BASEDIR/bin/run.py`.
+- OpT0Finder setup is no longer sourced from `FMATCH_BASEDIR`; OpT0Finder is
+  packaged in the SPINE container.
+
+### Changed
+- Set the default SPINE container tag to
+  `docker:ghcr.io/deeplearnphysics/spine:0.11.1`
+- Derive the default S3DF Singularity image path from `SPINE_CONTAINER_VERSION`
+  as `/sdf/data/neutrino/images/spine_v0-11-1.sif`
+- Added `submit.py --set KEY=VALUE` support for SPINE runtime config overrides
+- Added `--interactive-runtime` to let interactive mode use local `spine`,
+  force container execution, or fall back to the container automatically
+- Docker/Podman interactive fallback now requests `linux/amd64` by default
+- Documented the container-first runtime model in the README and quick reference
+- Kept `--flashmatch` as a deprecated compatibility option; no external
+  flash-matching setup is needed
+
+### Removed
+- Removed the `spine` submodule from version control
+- Removed the SPINE submodule update helper script
+- Removed `SPINE_BASEDIR` and `FMATCH_BASEDIR` defaults from `configure.sh`
+
+Full Changelog: [v0.4.6...v0.5.0](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.4.6...v0.5.0)
+
+---
+
 ## [0.4.6] - 2026-05-10
 
 ### Added

@@ -86,10 +86,7 @@ APPTAINER_INNER_CMD=""
 {% if larcv_basedir %}
 APPTAINER_INNER_CMD="unset which; source {{ larcv_basedir }}/configure.sh; "
 {% endif %}
-{% if flashmatch %}
-APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD source $FMATCH_BASEDIR/configure.sh; "
-{% endif %}
-APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD python3 $SPINE_BASEDIR/bin/run.py -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}"
+APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD spine -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 RUN_CMD="apptainer exec $APPTAINER_BIND_OPTS --fakeroot --nv $CONTAINER_PATH bash -c '$APPTAINER_INNER_CMD'"
 
 echo "Running: $RUN_CMD"

@@ -90,10 +90,7 @@ INNER_CMD=""
 {% if larcv_basedir %}
 INNER_CMD="unset which; source {{ larcv_basedir }}/configure.sh; "
 {% endif %}
-{% if flashmatch %}
-INNER_CMD="${INNER_CMD}source $FMATCH_BASEDIR/configure.sh; "
-{% endif %}
-INNER_CMD="${INNER_CMD}python3 $SPINE_BASEDIR/bin/run.py -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}"
+INNER_CMD="${INNER_CMD}spine -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 
 # Add Shifter modules requested by the job profile/options
 SHIFTER_MODULES=()

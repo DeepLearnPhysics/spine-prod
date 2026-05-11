@@ -42,6 +42,9 @@ Examples:
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source data/*.root --apply-mods data
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source data/*.root --apply-mods data lite
 
+  # Override SPINE config values at runtime
+  %(prog)s --config infer/generic/latest --source test.root --set base.world_size=0
+
   # List available modifiers for a config
   %(prog)s --list-mods infer/icarus/full_chain_co_250625.yaml
 
@@ -88,6 +91,16 @@ Examples:
         nargs="+",
         help='Apply modifier configs (e.g., "data flash" to compose with data and flash modifiers)',
     )
+    parser.add_argument(
+        "--set",
+        dest="set_overrides",
+        action="append",
+        metavar="KEY=VALUE",
+        help=(
+            "Override a SPINE config parameter using dot notation. May be "
+            "specified multiple times."
+        ),
+    )
 
     # Resource configuration
     parser.add_argument(
@@ -129,7 +142,12 @@ Examples:
         "--larcv", "-l", dest="larcv_basedir", help="Custom LArCV installation path"
     )
     parser.add_argument(
-        "--flashmatch", "-F", action="store_true", help="Enable flash matching"
+        "--flashmatch",
+        "-F",
+        action="store_true",
+        help=(
+            "Deprecated no-op. OpT0Finder is included in the tagged SPINE " "container."
+        ),
     )
     parser.add_argument(
         "--cvmfs",
@@ -170,6 +188,16 @@ Examples:
         "-I",
         action="store_true",
         help="Run interactively without submitting to a batch scheduler (useful for testing)",
+    )
+    parser.add_argument(
+        "--interactive-runtime",
+        choices=["auto", "local", "container"],
+        default="auto",
+        help=(
+            "Runtime for --interactive: local uses spine on PATH, container uses "
+            "CONTAINER_PATH/CONTAINER_TAG, auto falls back to container if spine "
+            "is missing (default: auto)."
+        ),
     )
 
     parser.add_argument(
@@ -287,6 +315,8 @@ Examples:
                 cvmfs=args.cvmfs,
                 apply_mods=args.apply_mods,
                 preload=args.preload,
+                set_overrides=args.set_overrides,
+                interactive_runtime=args.interactive_runtime,
             )
             return exit_code
 
@@ -312,6 +342,7 @@ Examples:
                 apply_mods=args.apply_mods,
                 dry_run=args.dry_run,
                 preload=args.preload,
+                set_overrides=args.set_overrides,
                 **profile_overrides,
             )
 
