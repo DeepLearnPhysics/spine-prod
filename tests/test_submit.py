@@ -429,6 +429,9 @@ class TestInteractiveExecution:
         assert kwargs["executable"] == "/bin/bash"
         assert "export NUMBA_NUM_THREADS=64" in run.call_args.args[0]
         assert "spine -S" in run.call_args.args[0]
+        assert " -o " not in run.call_args.args[0]
+        assert "--set io.writer.directory=" in run.call_args.args[0]
+        assert "--set io.writer.suffix=full_chain_co_260316" in run.call_args.args[0]
         assert "--set base.world_size=0" in run.call_args.args[0]
         assert "--set io.loader.batch_size=1" in run.call_args.args[0]
         assert "FMATCH_BASEDIR" not in run.call_args.args[0]
@@ -713,6 +716,27 @@ class TestInteractiveExecution:
         assert "spine -S" not in command
         assert "python3 " in command
 
+    def test_run_interactive_accepts_output_suffix(self, mock_submitter, tmp_path):
+        """Test interactive mode can override the derived output suffix."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        completed = type("Completed", (), {"returncode": 0})()
+
+        with (
+            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                output_suffix="custom_reco",
+                interactive_runtime="local",
+            )
+
+        assert exit_code == 0
+        command = run.call_args.args[0]
+        assert "--set io.writer.suffix=custom_reco" in command
+
     def test_run_interactive_local_rejects_invalid_spine_path(
         self, mock_submitter, tmp_path
     ):
@@ -824,6 +848,34 @@ class TestBatchSpineOverride:
         assert str(larcv_root) in script
         assert str(flashmatch_root) in script
 
+    def test_submit_job_accepts_output_suffix(self, mock_submitter, tmp_path):
+        """Test batch submission can override the derived output suffix."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
+        ):
+            job_ids = mock_submitter.submit_job(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                profile="s3df_ampere",
+                output_suffix="custom_reco",
+            )
+
+        assert job_ids == ["12345"]
+
+        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        assert len(scripts) == 1
+
+        script = scripts[0].read_text(encoding="utf-8")
+        assert "--set io.writer.suffix=custom_reco" in script
+
     def test_save_job_metadata(self, mock_submitter, tmp_path):
         """Test saving job metadata to JSON."""
         metadata = {
@@ -933,6 +985,9 @@ class TestCVMFSOption:
             "dependency": None,
             "config": "/tmp/config.yaml",
             "output": "/tmp/output.h5",
+            "output_dir": "/tmp/output",
+            "output_suffix": "config",
+            "output_args": "--set io.writer.file_name=/tmp/output.h5",
             "basedir": "/tmp/spine-prod",
             "file_list_pattern": "/tmp/files_*.txt",
             "larcv_path": None,
@@ -1025,6 +1080,36 @@ class TestCVMFSOption:
 
         assert "python3 /tmp/spine/bin/run.py -S $TASK_FILE_LIST" in script
         assert 'BIND_PATHS="/sdf/,/tmp/spine"' in script
+
+    def test_templates_use_writer_directory_and_suffix_by_default(self, mock_submitter):
+        """Test batch templates can avoid forcing a writer file name."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_s3df.sbatch",
+            output=None,
+            output_dir="/tmp/job/output",
+            output_suffix="full_chain_260501",
+            output_args=(
+                "--set io.writer.directory=/tmp/job/output "
+                "--set io.writer.suffix=full_chain_260501"
+            ),
+        )
+
+        assert "-o /tmp/output.h5" not in script
+        assert "--set io.writer.directory=/tmp/job/output" in script
+        assert "--set io.writer.suffix=full_chain_260501" in script
+
+    def test_templates_use_writer_file_name_for_explicit_output(self, mock_submitter):
+        """Test explicit output files still avoid the deprecated -o shortcut."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_s3df.sbatch",
+            output="/tmp/output.h5",
+            output_args="--set io.writer.file_name=/tmp/output.h5",
+        )
+
+        assert " -o " not in script
+        assert "--set io.writer.file_name=/tmp/output.h5" in script
 
     def test_templates_source_custom_software_paths(self, mock_submitter):
         """Test batch templates source custom software configure scripts."""

@@ -39,7 +39,12 @@ echo "Array Task ID: $SLURM_ARRAY_TASK_ID"
 echo "Node: $SLURM_NODELIST"
 echo "Started: $(date)"
 echo "Config: {{ config }}"
+{% if output %}
 echo "Output: {{ output }}"
+{% else %}
+echo "Output directory: {{ output_dir }}"
+echo "Output suffix: {{ output_suffix }}"
+{% endif %}
 echo "=================================="
 echo
 
@@ -97,7 +102,7 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (larcv_path ~ '/configur
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
-SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD {{ spine_cmd|default('spine') }} -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD {{ spine_cmd|default('spine') }} -S $TASK_FILE_LIST {{ output_args }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
 RUN_CMD="$SINGULARITY_CMD"
 

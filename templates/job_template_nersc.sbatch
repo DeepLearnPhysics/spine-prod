@@ -42,7 +42,12 @@ echo "Array Task ID: $SLURM_ARRAY_TASK_ID"
 echo "Node: $SLURM_NODELIST"
 echo "Started: $(date)"
 echo "Config: {{ config }}"
+{% if output %}
 echo "Output: {{ output }}"
+{% else %}
+echo "Output directory: {{ output_dir }}"
+echo "Output suffix: {{ output_suffix }}"
+{% endif %}
 echo "=================================="
 echo
 
@@ -96,7 +101,7 @@ INNER_CMD="${INNER_CMD}source {{ (larcv_path ~ '/configure.sh')|tojson }}; "
 INNER_CMD="${INNER_CMD}source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
-INNER_CMD="${INNER_CMD}{{ spine_cmd|default('spine') }} -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+INNER_CMD="${INNER_CMD}{{ spine_cmd|default('spine') }} -S $TASK_FILE_LIST {{ output_args }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 
 # Add Shifter modules requested by the job profile/options
 SHIFTER_MODULES=()

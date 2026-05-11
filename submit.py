@@ -122,7 +122,21 @@ Examples:
 
     # Job configuration
     parser.add_argument("--job-name", "-j", help="Custom job name")
-    parser.add_argument("--output", "-o", help="Output file path")
+    parser.add_argument(
+        "--output",
+        "-o",
+        help=(
+            "Output file path or directory override. By default, outputs are "
+            "written under the job output directory with input-derived prefixes."
+        ),
+    )
+    parser.add_argument(
+        "--output-suffix",
+        help=(
+            "Override the suffix used for input-derived HDF5 output names "
+            "(default: final config stem)."
+        ),
+    )
     parser.add_argument("--account", "-A", help="Batch scheduler account")
     parser.add_argument("--dependency", "-d", help="Batch scheduler dependency string")
 
@@ -329,6 +343,7 @@ Examples:
                 files=files,
                 source_type=source_type,
                 output=args.output,
+                output_suffix=args.output_suffix,
                 files_per_task=args.files_per_task,
                 task_id=args.task_id,
                 larcv_path=args.larcv_path,
@@ -357,6 +372,7 @@ Examples:
                 profile=args.profile,
                 job_name=args.job_name,
                 output=args.output,
+                output_suffix=args.output_suffix,
                 ntasks=args.ntasks,
                 files_per_task=args.files_per_task,
                 dependency=args.dependency,

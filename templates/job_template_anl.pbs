@@ -33,7 +33,12 @@ echo "Array Index: $PBS_ARRAY_INDEX"
 echo "Node file: $PBS_NODEFILE"
 echo "Started: $(date)"
 echo "Config: {{ config }}"
+{% if output %}
 echo "Output: {{ output }}"
+{% else %}
+echo "Output directory: {{ output_dir }}"
+echo "Output suffix: {{ output_suffix }}"
+{% endif %}
 echo "=================================="
 echo
 
@@ -92,7 +97,7 @@ APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD source {{ (larcv_path ~ '/configure.sh
 APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
-APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD {{ spine_cmd|default('spine') }} -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD {{ spine_cmd|default('spine') }} -S $TASK_FILE_LIST {{ output_args }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 RUN_CMD="apptainer exec $APPTAINER_BIND_OPTS --fakeroot --nv $SPINE_CONTAINER_PATH bash -c '$APPTAINER_INNER_CMD'"
 
 echo "Running: $RUN_CMD"

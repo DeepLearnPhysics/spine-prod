@@ -193,6 +193,32 @@ class Submitter:
         return " ".join(formatted)
 
     @staticmethod
+    def _default_writer_output_settings(
+        job_dir: Path, config: str, suffix: Optional[str] = None
+    ) -> Tuple[str, str]:
+        """Return default HDF5 writer directory and suffix settings."""
+        return str(job_dir / "output"), suffix or Path(config).stem
+
+    @staticmethod
+    def _format_spine_output_args(
+        output: Optional[str], directory: str, suffix: str
+    ) -> str:
+        """Format SPINE output arguments for explicit or derived writer naming."""
+        if output:
+            output_path = Path(output)
+            if output_path.suffix:
+                return f"--set io.writer.file_name={shlex.quote(output)}"
+
+            directory = output
+
+        return " ".join(
+            [
+                f"--set io.writer.directory={shlex.quote(directory)}",
+                f"--set io.writer.suffix={shlex.quote(suffix)}",
+            ]
+        )
+
+    @staticmethod
     def _default_container_path() -> str:
         """Build the default local SIF path from the configured SPINE version."""
         version = os.environ.get("SPINE_CONTAINER_VERSION", "0.12.0")
@@ -370,6 +396,7 @@ class Submitter:
         files: List[str],
         source_type: str = "source",
         output: Optional[str] = None,
+        output_suffix: Optional[str] = None,
         files_per_task: int = 1,
         task_id: int = 1,
         larcv_path: Optional[str] = None,
@@ -399,6 +426,8 @@ class Submitter:
             Either 'source' (direct paths/globs) or 'source_list' (text file)
         output : str, optional
             Output file path
+        output_suffix : str, optional
+            Output HDF5 suffix when output names are derived from input files
         files_per_task : int, optional
             Files to process per task, by default 1
         task_id : int, optional
@@ -468,13 +497,6 @@ class Submitter:
         if preload:
             self._preload_downloads(config)
 
-        # Determine output path
-        if not output:
-            output = str(job_dir / "output" / f"{job_name}.h5")
-
-        # Ensure output directory exists
-        Path(output).parent.mkdir(parents=True, exist_ok=True)
-
         # Chunk files for processing
         max_array_size = self.profiles["defaults"]["max_array_size"]
         file_chunks = self.file_handler.chunk_files(
@@ -526,6 +548,18 @@ class Submitter:
         # Build SPINE command
         log_dir = job_dir / "logs"
         log_dir.mkdir(exist_ok=True)
+        output_dir, output_suffix = self._default_writer_output_settings(
+            job_dir, config, output_suffix
+        )
+        if output:
+            output_path = Path(output)
+            if output_path.suffix:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+            else:
+                output_path.mkdir(parents=True, exist_ok=True)
+        else:
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+        output_args = self._format_spine_output_args(output, output_dir, output_suffix)
         spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
         local_spine_cmd, extra_bind_root = self._resolve_spine_command(spine_path)
         extra_bind_roots = [
@@ -538,7 +572,7 @@ class Submitter:
         spine_cmd = (
             f"{local_spine_cmd or 'spine'} "
             f"-S {task_file_list} "
-            f"-o {output} "
+            f"{output_args} "
             f"-c {config} "
             f"--log-dir {log_dir}"
         )
@@ -577,7 +611,11 @@ class Submitter:
         print(f"\nInteractive execution completed with exit code: {result.returncode}")
         print(f"Job directory: {job_dir}")
         if result.returncode == 0:
-            print(f"Output: {output}")
+            if output:
+                print(f"Output: {output}")
+            else:
+                print(f"Output directory: {output_dir}")
+                print(f"Output suffix: {output_suffix}")
 
         return result.returncode
 
@@ -589,6 +627,7 @@ class Submitter:
         profile: str = "auto",
         job_name: Optional[str] = None,
         output: Optional[str] = None,
+        output_suffix: Optional[str] = None,
         ntasks: Optional[int] = None,
         files_per_task: int = 1,
         dependency: Optional[str] = None,
@@ -620,6 +659,9 @@ class Submitter:
             Custom job name, by default None
         output : str, optional
             Output file path, by default None
+        output_suffix : str, optional
+            Output HDF5 suffix when output names are derived from input files,
+            by default None
         ntasks : int, optional
             Number of parallel tasks (default: auto), by default None
         files_per_task : int, optional
@@ -719,9 +761,18 @@ class Submitter:
                 "account", self.profiles["defaults"]["account"]
             )
 
-        # Determine output path
-        if not output:
-            output = str(job_dir / "output" / f"{job_name}.h5")
+        output_dir, output_suffix = self._default_writer_output_settings(
+            job_dir, config, output_suffix
+        )
+        if output:
+            output_path = Path(output)
+            if output_path.suffix:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+            else:
+                output_path.mkdir(parents=True, exist_ok=True)
+        else:
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+        output_args = self._format_spine_output_args(output, output_dir, output_suffix)
 
         # Chunk files for array jobs
         max_array_size = self.profiles["defaults"]["max_array_size"]
@@ -767,6 +818,9 @@ class Submitter:
                 file_list_pattern=file_list_pattern,
                 config=config,
                 output=output,
+                output_dir=output_dir,
+                output_suffix=output_suffix,
+                output_args=output_args,
                 larcv_path=larcv_path,
                 flashmatch_path=flashmatch_path,
                 flashmatch=flashmatch,
@@ -821,7 +875,9 @@ class Submitter:
             "num_files": len(file_list),
             "num_chunks": len(file_chunks),
             "job_ids": job_ids,
-            "output": output,
+            "output": output or output_dir,
+            "output_dir": output_dir,
+            "output_suffix": output_suffix,
             "submitted": datetime.now().isoformat(),
             "command": " ".join(sys.argv),
         }
@@ -882,6 +938,7 @@ class Submitter:
                 profile=stage.get("profile", "auto"),
                 job_name=stage.get("job_name", stage_name),
                 output=stage.get("output"),
+                output_suffix=stage.get("output_suffix"),
                 ntasks=stage.get("ntasks"),
                 files_per_task=stage.get("files_per_task", 1),
                 dependency=dependency,
