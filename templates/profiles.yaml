@@ -221,9 +221,19 @@ detectors:
     configs_dir: infer/nd-lar
     account: "neutrino:dune-ml"
 
+  protodune-sp:
+    default_profile: s3df_ampere
+    configs_dir: infer/protodune-sp
+    account: "neutrino:dune-ml"
+
   protodune-vd:
     default_profile: s3df_ampere
     configs_dir: infer/protodune-vd
+    account: "neutrino:dune-ml"
+
+  dune10kt-1x2x6:
+    default_profile: s3df_ampere
+    configs_dir: infer/dune10kt-1x2x6
     account: "neutrino:dune-ml"
 
   generic:

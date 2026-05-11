@@ -234,6 +234,7 @@ class TestConfigPathHandling:
             "icarus/latest.yaml",
             "infer/icarus/latest",
             "infer/icarus",
+            "infer/dune10kt-1x2x6",
         ]
 
         for config_path in test_cases:
@@ -276,6 +277,11 @@ class TestDetectorDetection:
         """Test fallback for unknown detectors."""
         result = mock_submitter._detect_detector("some/random/config.yaml")
         assert result == "unknown_detector"
+
+    def test_detect_detector_dune10kt_1x2x6(self, mock_submitter):
+        """Test auto-detecting DUNE10kt-1x2x6 from config path."""
+        result = mock_submitter._detect_detector("infer/dune10kt-1x2x6")
+        assert result == "dune10kt-1x2x6"
 
 
 class TestVersionExtraction:
