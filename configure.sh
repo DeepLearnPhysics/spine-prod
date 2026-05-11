@@ -8,11 +8,12 @@ else
     export SPINE_PROD_BASEDIR=$FORCE_SPINE_PROD_BASEDIR
 fi
 
-# Setup config search path (prepend to any existing paths)
+# Setup config search path (prepend once to any existing paths)
+SPINE_PROD_CONFIG_PATH=$SPINE_PROD_BASEDIR/config
 if [[ -z $SPINE_CONFIG_PATH ]]; then
-    export SPINE_CONFIG_PATH=$SPINE_PROD_BASEDIR/config
-else
-    export SPINE_CONFIG_PATH=$SPINE_PROD_BASEDIR/config:$SPINE_CONFIG_PATH
+    export SPINE_CONFIG_PATH=$SPINE_PROD_CONFIG_PATH
+elif [[ :$SPINE_CONFIG_PATH: != *:$SPINE_PROD_CONFIG_PATH:* ]]; then
+    export SPINE_CONFIG_PATH=$SPINE_PROD_CONFIG_PATH:$SPINE_CONFIG_PATH
 fi
 
 # Define the SPINE container release used by production jobs.
