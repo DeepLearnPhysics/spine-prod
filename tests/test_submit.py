@@ -596,6 +596,51 @@ class TestInteractiveExecution:
         assert "--env LC_ALL=C.UTF-8" in command
         assert str(container) in command
 
+    def test_run_interactive_container_uses_bind_path_overrides(
+        self, mock_submitter, tmp_path
+    ):
+        """Test interactive container mode appends configured bind path overrides."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        container = tmp_path / "spine.sif"
+        container.touch()
+        completed = type("Completed", (), {"returncode": 0})()
+
+        def fake_which(command):
+            if command == "spine":
+                return None
+            if (
+                command
+                == "/cvmfs/oasis.opensciencegrid.org/mis/apptainer/current/bin/apptainer"
+            ):
+                return command
+            return None
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "SPINE_CONTAINER_PATH": str(container),
+                    "SPINE_CONTAINER_RUNTIME_BIN": "/cvmfs/oasis.opensciencegrid.org/mis/apptainer/current/bin/apptainer",
+                },
+                clear=False,
+            ),
+            patch("src.submitter.shutil.which", side_effect=fake_which),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                interactive_runtime="container",
+                bind_paths="/exp/dune",
+            )
+
+        assert exit_code == 0
+        command = run.call_args.args[0]
+        assert "--bind" in command
+        assert "/exp/dune" in command
+        assert str(container) in command
+
     def test_run_interactive_local_requires_spine_on_path(
         self, mock_submitter, tmp_path
     ):

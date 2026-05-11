@@ -325,6 +325,7 @@ Examples:
                 preload=args.preload,
                 set_overrides=args.set_overrides,
                 interactive_runtime=args.interactive_runtime,
+                bind_paths=args.bind_paths,
             )
             return exit_code
 

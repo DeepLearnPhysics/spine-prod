@@ -176,7 +176,19 @@ class Submitter:
 
         return " ".join(shlex.quote(arg) for arg in shlex.split(configured))
 
-    def _build_interactive_container_command(self, inner_cmd: str, cvmfs: bool) -> str:
+    @staticmethod
+    def _interactive_bind_paths(bind_paths: Optional[str] = None) -> str:
+        """Return the bind roots for interactive Singularity/Apptainer execution."""
+        resolved_paths = {str(Path.cwd())}
+        if bind_paths:
+            resolved_paths.update(
+                path.strip() for path in bind_paths.split(",") if path.strip()
+            )
+        return ",".join(sorted(resolved_paths))
+
+    def _build_interactive_container_command(
+        self, inner_cmd: str, cvmfs: bool, bind_paths: Optional[str] = None
+    ) -> str:
         """Build an interactive container command for local smoke tests."""
         container_path = os.environ.get(
             "SPINE_CONTAINER_PATH", self._default_container_path()
@@ -187,10 +199,12 @@ class Submitter:
             if singularity:
                 runtime_args = self._sif_runtime_args()
                 runtime_args = f" {runtime_args}" if runtime_args else ""
-                bind_paths = {str(Path.cwd()), str(self.basedir)}
+                resolved_bind_paths = self._interactive_bind_paths(bind_paths)
+                resolved_bind_path_set = set(resolved_bind_paths.split(","))
+                resolved_bind_path_set.add(str(self.basedir))
                 if cvmfs:
-                    bind_paths.add("/cvmfs")
-                bind_arg = ",".join(sorted(bind_paths))
+                    resolved_bind_path_set.add("/cvmfs")
+                bind_arg = ",".join(sorted(resolved_bind_path_set))
                 return (
                     f"{shlex.quote(singularity)} exec{runtime_args} --bind {shlex.quote(bind_arg)} "
                     f"--nv {shlex.quote(container_path)} bash -c "
@@ -247,6 +261,7 @@ class Submitter:
         preload: bool = False,
         set_overrides: Optional[List[str]] = None,
         interactive_runtime: str = "auto",
+        bind_paths: Optional[str] = None,
     ) -> int:
         """Run SPINE processing interactively (no SLURM submission).
 
@@ -283,6 +298,9 @@ class Submitter:
             SPINE config overrides in KEY=VALUE form, passed as ``--set``.
         interactive_runtime : str, optional
             Runtime for interactive execution: 'auto', 'local', or 'container'.
+        bind_paths : str, optional
+            Extra container bind roots for interactive SIF execution, as a
+            comma-separated list.
 
         Returns
         -------
@@ -397,7 +415,9 @@ class Submitter:
         if interactive_runtime == "container" or (
             interactive_runtime == "auto" and not local_spine
         ):
-            full_cmd = self._build_interactive_container_command(full_cmd, cvmfs)
+            full_cmd = self._build_interactive_container_command(
+                full_cmd, cvmfs, bind_paths=bind_paths
+            )
 
         print("\nExecuting:")
         print(f"  {full_cmd}\n")
