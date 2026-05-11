@@ -216,6 +216,11 @@ detectors:
     configs_dir: infer/2x2
     account: "neutrino:dune-ml"
 
+  fsd:
+    default_profile: s3df_ampere
+    configs_dir: infer/fsd
+    account: "neutrino:dune-ml"
+
   nd-lar:
     default_profile: s3df_ampere
     configs_dir: infer/nd-lar
