@@ -1,0 +1,14 @@
+# DUNE 10kt 1x2x6 truth saving configuration
+# Revision date: February 2, 2026
+
+include:
+  - base/base_260202.yaml
+  - io/io_260202.yaml
+
+# Overrides
+override:
+  # Only build truth objects
+  build.mode: truth
+
+  # No reconstructed information to write
+  io.writer.keys-: [points, depositions, reco_particles, reco_interactions]

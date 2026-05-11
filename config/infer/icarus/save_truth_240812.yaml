@@ -1,0 +1,14 @@
+# ICARUS truth saving configuration
+# Revision date: August 12, 2024
+
+include:
+  - base/base_240719.yaml
+  - io/io_240812.yaml
+
+# Overrides
+override:
+  # Only build truth objects
+  build.mode: truth
+
+  # No reconstructed information to write
+  io.writer.keys-: [points, depositions, reco_particles, reco_interactions]

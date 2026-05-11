@@ -11,6 +11,7 @@ All DUNE10kt-1x2x6 configs use a **hierarchical YAML include system** with compo
 ### Main Configurations
 - **`full_chain_260510.yaml`**: May 2026, latest DUNE10kt-1x2x6 full chain config
 - **`full_chain_260202.yaml`**: February 2026, previous DUNE10kt-1x2x6 full chain config
+- **`save_truth_260202.yaml`**: February 2026, truth-only output configuration writing truth content to HDF5
 
 ### Component Structure
 Each main config includes modular YAML files:

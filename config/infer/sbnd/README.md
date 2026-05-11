@@ -18,6 +18,8 @@ Each top-level configuration file (e.g., `sbnd_full_chain_co_250901.yaml`) inclu
 - Update individual parts without duplicating settings
 - Maintain consistency across similar configurations
 
+Truth-only output configurations are also available as top-level composites, for example `save_truth_260501.yaml`, to write truth content to HDF5 without reconstructed outputs.
+
 ### Configuration Composition
 
 Features that previously required separate config files (e.g., `*_data_*`) are now handled through:

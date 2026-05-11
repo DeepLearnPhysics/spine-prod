@@ -1,0 +1,14 @@
+# 2x2 truth saving configuration
+# Revision date: August 19, 2024
+
+include:
+  - base/base_240719.yaml
+  - io/io_240819.yaml
+
+# Overrides
+override:
+  # Only build truth objects
+  build.mode: truth
+
+  # No reconstructed information to write
+  io.writer.keys-: [points, depositions, reco_particles, reco_interactions]

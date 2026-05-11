@@ -11,6 +11,7 @@ All 2x2 configs now use a **hierarchical YAML include system** with composable c
 ### Main Configurations
 - **`full_chain_240819.yaml`**: Latest August 2024 weights (v2)
 - **`full_chain_240719.yaml`**: July 2024 weights (v1)
+- **`save_truth_240819.yaml`**: Truth-only output configuration writing truth content to HDF5
 
 ### Component Structure
 Each main config includes modular YAML files:

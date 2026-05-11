@@ -1,0 +1,14 @@
+# ProtoDUNE-VD truth saving configuration
+# Revision date: January 18, 2026
+
+include:
+  - base/base_260118.yaml
+  - io/io_260118.yaml
+
+# Overrides
+override:
+  # Only build truth objects
+  build.mode: truth
+
+  # No reconstructed information to write
+  io.writer.keys-: [points, depositions, reco_particles, reco_interactions]

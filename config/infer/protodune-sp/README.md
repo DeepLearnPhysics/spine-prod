@@ -10,6 +10,7 @@ All ProtoDUNE-SP configs use a **hierarchical YAML include system** with composa
 
 ### Main Configurations
 - **`full_chain_260210.yaml`**: February 2026, latest ProtoDUNE-SP full chain config
+- **`save_truth_260210.yaml`**: February 2026, truth-only output configuration writing truth content to HDF5
 
 ### Component Structure
 Each main config includes modular YAML files:

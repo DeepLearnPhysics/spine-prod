@@ -1,0 +1,14 @@
+# SBND truth saving configuration
+# Revision date: May 1, 2026
+
+include:
+  - base/base_260501.yaml
+  - io/io_260218.yaml
+
+# Overrides
+override:
+  # Only build truth objects
+  build.mode: truth
+
+  # No reconstructed information to write
+  io.writer.keys-: [points, depositions, reco_particles, reco_interactions]

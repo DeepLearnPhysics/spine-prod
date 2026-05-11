@@ -10,6 +10,7 @@ All ProtoDUNE-VD configs use a **hierarchical YAML include system** with composa
 
 ### Main Configurations
 - **`full_chain_260118.yaml`**: January 2026, main ProtoDUNE-VD full chain config
+- **`save_truth_260118.yaml`**: January 2026, truth-only output configuration writing truth content to HDF5
 
 ### Component Structure
 Each main config includes modular YAML files:
