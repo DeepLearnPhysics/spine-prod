@@ -1,31 +1,30 @@
 # DUNE10kt-1x2x6 model configuration
-# Revision date: February 2, 2026
+# Revision date: May 10, 2026
 
 __meta__:
-  version: "260202"
-  date: "2026-02-02"
-  description: "DUNE10kt-1x2x6 collection-only model with in-chain calibration, v0 dataset"
+  version: "260510"
+  date: "2026-05-10"
+  description: "DUNE10kt-1x2x6 collection-only model with in-chain calibration, v1 dataset"
   compatible_with:
     base: ">=260202"
     io: ">=260202"
   tags:
     [
-      bad-driftv,
       collection-only,
       pre-calibration,
       ppn-restrict,
       grappa-use-closest,
       grouping-through-track,
     ]
-  training_set: "v0"
+  training_set: "v1"
 
 include: model_common.yaml
 
 override:
   # Path to the first full chain model weights
   model.weight_path: !download
-    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/dune10kt-1x2x6/dune10kt-1x2x6_snapshot_260202.ckpt
-    hash: 550820ce441160410af3d7a724301a5dfc7bba0eab7e2fd971ec3a71f52a62c7
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/dune10kt-1x2x6/dune10kt-1x2x6_snapshot_260510.ckpt
+    hash: f2ca4bdc10cf0808ea6f78f3da62241fd24ffe080710866e00007292910a7b4c
 
   # Calibration handled before the semantic segmentation stage
   model.modules.chain.calibration: apply
@@ -39,7 +38,7 @@ override:
       mip_dedx: 2.105168 # MeV/cm
     lifetime:
       lifetime: 10400 # us
-      driftv: 1.60563 # cm/us, should be 0.160563 for DUNE10kt
+      driftv: 0.160563 # cm/us
 
   # Charge rescaling uses collection-only charge
   model.modules.chain.charge_rescaling: collection

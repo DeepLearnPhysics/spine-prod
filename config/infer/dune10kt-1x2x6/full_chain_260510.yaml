@@ -1,8 +1,8 @@
 # DUNE10kt-1x2x6 full chain configuration
-# Revision date: February 2, 2026
+# Revision date: May 10, 2026
 
 include:
   - base/base_260202.yaml
   - io/io_260202.yaml
-  - model/model_260202.yaml
+  - model/model_260510.yaml
   - post/post_260202.yaml

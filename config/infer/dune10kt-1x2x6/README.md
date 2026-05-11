@@ -9,7 +9,8 @@ The configurations below are for DUNE10kt-1x2x6 datasets. This summary is divide
 All DUNE10kt-1x2x6 configs use a **hierarchical YAML include system** with composable components:
 
 ### Main Configurations
-- **`full_chain_260202.yaml`**: January 2026, main DUNE10kt-1x2x6 full chain config
+- **`full_chain_260510.yaml`**: May 2026, latest DUNE10kt-1x2x6 full chain config
+- **`full_chain_260202.yaml`**: February 2026, previous DUNE10kt-1x2x6 full chain config
 
 ### Component Structure
 Each main config includes modular YAML files:
@@ -23,8 +24,8 @@ Each main config includes modular YAML files:
 - **`io/io_common.yaml`**: Common IO settings
 
 **Model Components:**
-- **`model/model_260202.yaml`**: Jan 2026 weights and model settings
-- **`model/model_260202.yaml`**: Jan 2026 (v2) weights and model settings
+- **`model/model_260510.yaml`**: May 2026 weights and model settings
+- **`model/model_260202.yaml`**: Feb 2026 weights and model settings
 - **`model/model_common.yaml`**: Common model architecture
 
 **Post-processing Components:**
@@ -38,6 +39,38 @@ Located in `modifier/` subdirectories:
 
 ### Legacy Configs
 No legacy configs are present in this directory. Add legacy YAML configs to a `legacy/` subdirectory if needed for backward compatibility.
+
+## Configurations for MPV/MPR v01
+
+These weights have been trained/validated using the following files:
+- Training set: `/sdf/data/neutrino/dune/sim/mpvmpr_v1/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/dune/sim/mpvmpr_v1/test_file_list.txt`
+
+This training set has a set of better-tuned ghost labels.
+
+## May 10th 2026
+
+```shell
+full_chain_260510.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Modular YAML structure with base/io/model/post components
+
+Changes:
+  - Fixed the drift velocity issue
+  - Trained much longer
+
+
+## Configurations for MPV/MPR v00
+
+These weights have been trained/validated using the following files:
+- Training set: `/sdf/data/neutrino/dune/sim/mpvmpr_v0/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/dune/sim/mpvmpr_v0/test_file_list.txt`
+
+Known issue(s):
+  - Poorly tuned ghost labeling
 
 ## February 2nd 2026
 

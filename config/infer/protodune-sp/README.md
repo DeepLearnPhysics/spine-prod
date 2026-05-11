@@ -39,6 +39,16 @@ Located in `modifier/` subdirectories:
 ### Legacy Configs
 No legacy configs are present in this directory. Add legacy YAML configs to a `legacy/` subdirectory if needed for backward compatibility.
 
+## Configurations for MPV/MPR v00
+
+These weights have been trained/validated using the following files:
+- Training set: `/sdf/data/neutrino/pdune/sim/sp/mpvmpr_v0/train_file_list.txt`
+- Test set: `/sdf/data/neutrino/pdune/sim/sp/mpvmpr_v0/test_file_list.txt`
+
+Known issue(s):
+  - Poorly tuned ghost labeling
+  - No charged kaon in the sample
+
 ## February 10th 2026
 
 ```shell
