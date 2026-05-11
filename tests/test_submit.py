@@ -12,6 +12,7 @@ Tests include:
 These tests exercise the actual Python code to provide meaningful coverage metrics.
 """
 
+import io
 import json
 import os
 from pathlib import Path
@@ -424,6 +425,27 @@ class TestInteractiveExecution:
         assert "--set io.loader.batch_size=1" in run.call_args.args[0]
         assert "FMATCH_BASEDIR" not in run.call_args.args[0]
 
+    def test_run_interactive_flashmatch_is_warned_noop(self, mock_submitter, tmp_path):
+        """Test --flashmatch is accepted but does not change execution."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        completed = type("Completed", (), {"returncode": 0})()
+
+        with (
+            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.submitter.subprocess.run", return_value=completed),
+            patch("sys.stderr", new_callable=io.StringIO) as stderr,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                flashmatch=True,
+                interactive_runtime="local",
+            )
+
+        assert exit_code == 0
+        assert "no-op" in stderr.getvalue()
+
     def test_run_interactive_rejects_invalid_set_override(
         self, mock_submitter, tmp_path
     ):
@@ -457,7 +479,7 @@ class TestInteractiveExecution:
     def test_run_interactive_auto_falls_back_to_docker_container(
         self, mock_submitter, tmp_path
     ):
-        """Test auto interactive mode falls back to CONTAINER_TAG when spine is absent."""
+        """Test auto interactive mode falls back to SPINE_CONTAINER_TAG when spine is absent."""
         input_file = tmp_path / "input.root"
         input_file.touch()
         completed = type("Completed", (), {"returncode": 0})()
@@ -469,8 +491,8 @@ class TestInteractiveExecution:
             patch.dict(
                 os.environ,
                 {
-                    "CONTAINER_PATH": str(tmp_path / "missing.sif"),
-                    "CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:0.11.1",
+                    "SPINE_CONTAINER_PATH": str(tmp_path / "missing.sif"),
+                    "SPINE_CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:0.11.1",
                 },
                 clear=False,
             ),

@@ -92,7 +92,7 @@ SINGULARITY_INNER_CMD=""
 SINGULARITY_INNER_CMD="unset which; source {{ larcv_basedir }}/configure.sh; "
 {% endif %}
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD spine -S $TASK_FILE_LIST -o {{ output }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
-SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
+SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
 RUN_CMD="$SINGULARITY_CMD"
 
 # Execute

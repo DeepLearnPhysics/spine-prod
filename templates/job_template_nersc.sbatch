@@ -101,7 +101,7 @@ fi
 SHIFTER_MODULES+=("--module=cvmfs")
 {% endif %}
 
-RUN_CMD="srun -n 1 shifter ${SHIFTER_MODULES[*]} --image=$CONTAINER_TAG bash -c \"$INNER_CMD\""
+RUN_CMD="srun -n 1 shifter ${SHIFTER_MODULES[*]} --image=$SPINE_CONTAINER_TAG bash -c \"$INNER_CMD\""
 
 # Execute
 echo "Running: $RUN_CMD"

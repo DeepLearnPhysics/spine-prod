@@ -20,6 +20,15 @@ from .preload import preload_downloads
 class Submitter:
     """Orchestrates batch job submissions for SPINE production."""
 
+    @staticmethod
+    def _warn_flashmatch_noop() -> None:
+        """Warn that the legacy flashmatch flag no longer changes behavior."""
+        print(
+            "WARNING: --flashmatch is deprecated and is now a no-op. "
+            "OpT0Finder is already included in the SPINE container.",
+            file=sys.stderr,
+        )
+
     def __init__(self, basedir: Optional[Path] = None, central_dir: bool = False):
         """Initialize Submitter.
 
@@ -139,14 +148,14 @@ class Submitter:
         """Return the configured container tag in Docker/Podman CLI form."""
         version = os.environ.get("SPINE_CONTAINER_VERSION", "0.11.1")
         tag = os.environ.get(
-            "CONTAINER_TAG", f"docker:ghcr.io/deeplearnphysics/spine:{version}"
+            "SPINE_CONTAINER_TAG", f"docker:ghcr.io/deeplearnphysics/spine:{version}"
         )
         return tag.removeprefix("docker:")
 
     def _build_interactive_container_command(self, inner_cmd: str, cvmfs: bool) -> str:
         """Build an interactive container command for local smoke tests."""
         container_path = os.environ.get(
-            "CONTAINER_PATH", self._default_container_path()
+            "SPINE_CONTAINER_PATH", self._default_container_path()
         )
 
         if Path(container_path).exists():
@@ -192,8 +201,9 @@ class Submitter:
 
         raise RuntimeError(
             "Interactive container runtime requested, but no usable runtime was "
-            "found. Install spine on PATH, provide a readable CONTAINER_PATH with "
-            "singularity/apptainer, or make docker/podman available with CONTAINER_TAG."
+            "found. Install spine on PATH, provide a readable SPINE_CONTAINER_PATH "
+            "with singularity/apptainer, or make docker/podman available with "
+            "SPINE_CONTAINER_TAG."
         )
 
     def run_interactive(
@@ -253,6 +263,9 @@ class Submitter:
         int
             Exit code from SPINE execution
         """
+        if flashmatch:
+            self._warn_flashmatch_noop()
+
         if interactive_runtime not in ("auto", "local", "container"):
             raise ValueError(
                 "interactive_runtime must be one of: 'auto', 'local', 'container'"
@@ -446,6 +459,9 @@ class Submitter:
         List[str]
             List of submitted job IDs
         """
+        if flashmatch:
+            self._warn_flashmatch_noop()
+
         # Parse input files
         file_list = self.file_handler.parse_files(files, source_type)
         if not file_list:

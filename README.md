@@ -34,7 +34,7 @@ OpT0Finder, and runtime dependencies, and jobs invoke the container-provided
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
 ```bash
-export CONTAINER_PATH=/path/to/spine_v0-11-1.sif
+export SPINE_CONTAINER_PATH=/path/to/spine_v0-11-1.sif
 export SPINE_CONTAINER_VERSION=0.11.1
 source configure.sh
 ```
@@ -43,7 +43,7 @@ source configure.sh
 path together:
 ```bash
 export SPINE_CONTAINER_VERSION=0.11.1
-# Default CONTAINER_PATH becomes /sdf/data/neutrino/images/spine_v0-11-1.sif
+# Default SPINE_CONTAINER_PATH becomes /sdf/data/neutrino/images/spine_v0-11-1.sif
 ```
 
 ### 2. Basic Job Submission
@@ -111,8 +111,8 @@ Interactive mode performs all the same config composition, file chunking, and en
 
 By default, interactive mode uses the `spine` executable already on `PATH`. If
 `spine` is unavailable, it falls back to the configured container: first
-`CONTAINER_PATH` with Singularity/Apptainer if the `.sif` exists, then
-`CONTAINER_TAG` with Docker/Podman. Use `--interactive-runtime local` to require
+`SPINE_CONTAINER_PATH` with Singularity/Apptainer if the `.sif` exists, then
+`SPINE_CONTAINER_TAG` with Docker/Podman. Use `--interactive-runtime local` to require
 the local executable, or `--interactive-runtime container` to force container
 execution. Docker/Podman fallback requests `linux/amd64` by default; override
 `SPINE_CONTAINER_PLATFORM` if a different platform is needed.
@@ -247,7 +247,7 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 # Explicit profile
 ./submit.py --config infer/icarus/latest.cfg --source data.root --profile s3df_turing
 
-# ANL/Polaris using CONTAINER_PATH from configure.sh
+# ANL/Polaris using SPINE_CONTAINER_PATH from configure.sh
 ./submit.py --config infer/icarus/latest.cfg --source data.root --profile anl_polaris_debug
 
 # Override specific resources
@@ -382,12 +382,12 @@ This is especially useful for large-scale production to save disk space by remov
 # Use custom LArCV installation
 ./submit.py --config infer/icarus/latest.cfg --source data.root --larcv /path/to/larcv
 
-# Flash matching uses OpT0Finder packaged in the SPINE container
-./submit.py --config infer/icarus/latest.cfg --source data.root --flashmatch
-
 # Expose CVMFS inside the container
 ./submit.py --config infer/icarus/latest.cfg --source data.root --cvmfs
 ```
+
+There is no need to pass `--flashmatch`. The flag is accepted only for backward
+compatibility and is ignored.
 
 For sites without CVMFS, point ICARUS configs at a local copy of the
 `icarus_data` release directory before sourcing `configure.sh`:
@@ -575,9 +575,9 @@ Set by `configure.sh`:
 - `SPINE_CONFIG_PATH` - Configuration search path
 - `ICARUS_DATA_DIR` - ICARUS data release path
 - `SPINE_CONTAINER_VERSION` - Tagged SPINE container version, without a leading `v`
-- `CONTAINER_PATH` - Singularity/Apptainer image path
-- `CONTAINER_TAG` - Registry image tag for Shifter-style runtimes, including `docker:`
-- `SPINE_PROD_CONTAINER_PATH_AUTO` - Tracks whether `CONTAINER_PATH` was auto-derived
+- `SPINE_CONTAINER_PATH` - Singularity/Apptainer image path
+- `SPINE_CONTAINER_TAG` - Registry image tag for Shifter-style runtimes, including `docker:`
+- `SPINE_CONTAINER_PATH_AUTO` - Tracks whether `SPINE_CONTAINER_PATH` was auto-derived
 - `SPINE_CONTAINER_PLATFORM` - Docker/Podman platform for interactive fallback
 
 ## Contributing

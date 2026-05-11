@@ -23,15 +23,18 @@ fi
 # Define path to the container (Singularity/Apptainer .sif file)
 SPINE_CONTAINER_PATH_VERSION=${SPINE_CONTAINER_VERSION//./-}
 DEFAULT_CONTAINER_PATH=/sdf/data/neutrino/images/spine_v${SPINE_CONTAINER_PATH_VERSION}.sif
-if [[ -z $CONTAINER_PATH || ${SPINE_PROD_CONTAINER_PATH_AUTO:-0} == 1 ]]; then
-    export CONTAINER_PATH=$DEFAULT_CONTAINER_PATH
-    export SPINE_PROD_CONTAINER_PATH_AUTO=1
+if [[ -z $SPINE_CONTAINER_PATH || ${SPINE_CONTAINER_PATH_AUTO:-0} == 1 ]]; then
+    export SPINE_CONTAINER_PATH=$DEFAULT_CONTAINER_PATH
+    export SPINE_CONTAINER_PATH_AUTO=1
 else
-    export SPINE_PROD_CONTAINER_PATH_AUTO=0
+    export SPINE_CONTAINER_PATH_AUTO=0
 fi
 
-# Define container tag (Shifter image tag for NERSC)
-export CONTAINER_TAG=docker:ghcr.io/deeplearnphysics/spine:${SPINE_CONTAINER_VERSION}
+# Define container tag (Shifter image tag for NERSC or local docker execution)
+DEFAULT_CONTAINER_TAG=docker:ghcr.io/deeplearnphysics/spine:${SPINE_CONTAINER_VERSION}
+if [[ -z $SPINE_CONTAINER_TAG ]]; then
+    export SPINE_CONTAINER_TAG=$DEFAULT_CONTAINER_TAG
+fi
 
 # If ICARUS_DATA_DIR is not set, default to the standard location on CVMFS.
 if [[ -z $ICARUS_DATA_DIR ]]; then
@@ -43,8 +46,8 @@ printf "\033[93mSPINE_PROD\033[00m FYI shell env. may useful for external packag
 printf "    \033[95mSPINE_PROD_BASEDIR\033[00m      = $SPINE_PROD_BASEDIR\n"
 printf "    \033[95mSPINE_CONFIG_PATH\033[00m       = $SPINE_CONFIG_PATH\n"
 printf "    \033[95mSPINE_CONTAINER_VERSION\033[00m = $SPINE_CONTAINER_VERSION\n"
-printf "    \033[95mCONTAINER_PATH\033[00m          = $CONTAINER_PATH\n"
-printf "    \033[95mCONTAINER_TAG\033[00m           = $CONTAINER_TAG\n"
+printf "    \033[95mSPINE_CONTAINER_PATH\033[00m    = $SPINE_CONTAINER_PATH\n"
+printf "    \033[95mSPINE_CONTAINER_TAG\033[00m     = $SPINE_CONTAINER_TAG\n"
 printf "    \033[95mICARUS_DATA_DIR\033[00m         = $ICARUS_DATA_DIR\n"
 
 echo

@@ -195,8 +195,8 @@ Examples:
         default="auto",
         help=(
             "Runtime for --interactive: local uses spine on PATH, container uses "
-            "CONTAINER_PATH/CONTAINER_TAG, auto falls back to container if spine "
-            "is missing (default: auto)."
+            "SPINE_CONTAINER_PATH/SPINE_CONTAINER_TAG, auto falls back to "
+            "container if spine is missing (default: auto)."
         ),
     )
 
