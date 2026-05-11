@@ -427,6 +427,7 @@ class TestInteractiveExecution:
         _, kwargs = run.call_args
         assert kwargs["shell"] is True
         assert kwargs["executable"] == "/bin/bash"
+        assert "export NUMBA_NUM_THREADS=64" in run.call_args.args[0]
         assert "spine -S" in run.call_args.args[0]
         assert "--set base.world_size=0" in run.call_args.args[0]
         assert "--set io.loader.batch_size=1" in run.call_args.args[0]
@@ -548,6 +549,7 @@ class TestInteractiveExecution:
 
         assert exit_code == 0
         command = run.call_args.args[0]
+        assert "export NUMBA_NUM_THREADS=64" in command
         assert "docker run --rm" in command
         assert "--platform linux/amd64" in command
         assert "ghcr.io/deeplearnphysics/spine:0.12.0" in command

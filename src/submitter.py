@@ -508,6 +508,9 @@ class Submitter:
         cmd_parts = []
         resolved_bind_paths = bind_paths
 
+        # Cap Numba threads to the OpenBLAS build limit used in batch templates.
+        cmd_parts.append("export NUMBA_NUM_THREADS=64")
+
         larcv_setup_cmd, larcv_bind_root = self._resolve_setup_path(
             larcv_path, "--larcv-path"
         )
