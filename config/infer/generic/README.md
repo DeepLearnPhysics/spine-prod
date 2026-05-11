@@ -41,7 +41,7 @@ Located in `modifier/` subdirectories:
 - **`lite/mod_lite_240718.yaml`**: Lite mode (reduced output)
 
 ### Legacy Configs
-Old `.cfg` files moved to `legacy/` directory for backward compatibility
+Old legacy top-level configs moved to `legacy/` directory for backward compatibility
 
 ## Configurations for MPV/MPR v04
 

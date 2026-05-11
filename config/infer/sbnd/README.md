@@ -138,7 +138,7 @@ Description:
 ## August 18th 2025
 
 ```shell
-sbnd_full_chain_co_250818.cfg
+sbnd_full_chain_co_250818.yaml
 ```
 
 The following modifications were made w.r.t. the March configurations
@@ -150,12 +150,12 @@ Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
 
-**Note:** Legacy `.cfg` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
+**Note:** Legacy `.yaml` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 ## March 28th 2025
 
 ```shell
-sbnd_full_chain_co_250328.cfg
+sbnd_full_chain_co_250328.yaml
 ```
 
 The following modifications were made to the `sbndcode` configuration:
@@ -168,7 +168,7 @@ Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
 
-**Note:** Legacy `.cfg` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
+**Note:** Legacy `.yaml` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 ## Configurations for MPV/MPR v01
 
@@ -179,14 +179,14 @@ These weights have been trained/validated using the following files:
 ### July 20th 2024
 
 ```shell
-sbnd_full_chain_240720.cfg
+sbnd_full_chain_240720.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
 
-**Note:** Legacy `.cfg` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
+**Note:** Legacy `.yaml` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 Known issue(s):
   - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
@@ -195,14 +195,14 @@ Known issue(s):
 ### August 14th 2024
 
 ```shell
-sbnd_full_chain_240814.cfg
+sbnd_full_chain_240814.yaml
 ```
 
 Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Class-weighted loss on PID predictions
 
-**Note:** Legacy `.cfg` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
+**Note:** Legacy `.yaml` files with `*_data_*` naming are in `legacy/`. Data-only mode is now handled through modular composition and CLI options.
 
 Known issue(s):
   - Resolves the issue with the PPN target in the previous set of weights
@@ -212,7 +212,7 @@ Known issue(s):
 ### September 18th 2024
 
 ```shell
-sbnd_full_chain_240918.cfg
+sbnd_full_chain_240918.yaml
 ```
 
 Description:

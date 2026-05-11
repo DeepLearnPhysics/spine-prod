@@ -4,23 +4,22 @@
 stages:
   # Stage 1: Run SPINE reconstruction on raw data
   - name: reconstruction
-    config: infer/icarus/latest_data.cfg
+    config: infer/icarus/latest
     files: /sdf/data/neutrino/icarus/run2/data/*.root
     profile: s3df_ampere
     ntasks: 100
     files_per_task: 1
     output: output_reco/icarus_reco.h5
-    flashmatch: true
     # Clean up reconstruction output after analysis completes
     # This saves disk space by removing intermediate files
     cleanup:
       - output_reco
 
   # Stage 2: Run analysis on reconstructed data
-  # This stage depends on reconstruction completing successfully
+  # Replace this placeholder with a real downstream YAML config.
   - name: analysis
     depends_on: [reconstruction]
-    config: infer/icarus/analysis.cfg
+    config: path/to/downstream_stage.yaml
     files: output_reco/*.h5
     profile: s3df_milano
     ntasks: 20

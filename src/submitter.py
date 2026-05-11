@@ -139,14 +139,14 @@ class Submitter:
     @staticmethod
     def _default_container_path() -> str:
         """Build the default local SIF path from the configured SPINE version."""
-        version = os.environ.get("SPINE_CONTAINER_VERSION", "0.11.1")
+        version = os.environ.get("SPINE_CONTAINER_VERSION", "0.12.0")
         path_version = version.replace(".", "-")
         return f"/sdf/data/neutrino/images/spine_v{path_version}.sif"
 
     @staticmethod
     def _container_tag_for_cli() -> str:
         """Return the configured container tag in Docker/Podman CLI form."""
-        version = os.environ.get("SPINE_CONTAINER_VERSION", "0.11.1")
+        version = os.environ.get("SPINE_CONTAINER_VERSION", "0.12.0")
         tag = os.environ.get(
             "SPINE_CONTAINER_TAG", f"docker:ghcr.io/deeplearnphysics/spine:{version}"
         )

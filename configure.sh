@@ -18,7 +18,7 @@ fi
 
 # Define the SPINE container release used by production jobs.
 if [[ -z $SPINE_CONTAINER_VERSION ]]; then
-    export SPINE_CONTAINER_VERSION=0.11.1
+    export SPINE_CONTAINER_VERSION=0.12.0
 fi
 
 # Define path to the container (Singularity/Apptainer .sif file)

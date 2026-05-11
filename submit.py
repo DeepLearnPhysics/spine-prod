@@ -5,8 +5,8 @@ A modern, flexible job submission orchestrator for SPINE reconstruction
 on batch-based HPC systems.
 
 Usage:
-    ./submit.py --config infer/icarus/latest.cfg --source-list file_list.txt
-    ./submit.py --config infer/icarus/latest_data.cfg --source data/*.root --profile s3df_ampere
+    ./submit.py --config infer/icarus/latest --source-list file_list.txt
+    ./submit.py --config infer/icarus/latest --apply-mods data --source data/*.root --profile s3df_ampere
     ./submit.py --pipeline pipelines/icarus_production.yaml
     ./submit.py --config ... --source ... --central-dir
 """

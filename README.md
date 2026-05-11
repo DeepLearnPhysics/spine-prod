@@ -4,11 +4,11 @@
 [![codecov](https://codecov.io/gh/DeepLearnPhysics/spine-prod/branch/main/graph/badge.svg)](https://codecov.io/gh/DeepLearnPhysics/spine-prod)
 [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
 
-A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPINE) (Scalable Particle Imaging with Neural Embeddings) reconstruction on SLURM-based HPC clusters.
+A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPINE) (Scalable Particle Imaging with Neural Embeddings) reconstruction on HPC clusters with SLURM- and PBS-based batch systems.
 
 ## Overview
 
-SPINE is a deep learning-based reconstruction framework for liquid argon time projection chamber (LArTPC) detectors. This production system provides tools for running SPINE at scale on large datasets using SLURM job arrays.
+SPINE is a deep learning-based reconstruction framework for liquid argon time projection chamber (LArTPC) detectors. This production system provides tools for running SPINE at scale on large datasets using scheduler-managed job arrays.
 
 ## Quick Start
 
@@ -25,66 +25,66 @@ source configure.sh
 
 **SPINE Version Control:** Production jobs now run entirely from a tagged SPINE
 container image. The default Shifter tag is
-`docker:ghcr.io/deeplearnphysics/spine:0.11.1`, with the matching S3DF
+`docker:ghcr.io/deeplearnphysics/spine:0.12.0`, with the matching S3DF
 Singularity image derived from the same version at
-`/sdf/data/neutrino/images/spine_v0-11-1.sif`. This container packages SPINE,
+`/sdf/data/neutrino/images/spine_v0-12-0.sif`. This container packages SPINE,
 OpT0Finder, and runtime dependencies, and jobs invoke the container-provided
 `spine` executable directly.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
 ```bash
-export SPINE_CONTAINER_PATH=/path/to/spine_v0-11-1.sif
-export SPINE_CONTAINER_VERSION=0.11.1
+export SPINE_CONTAINER_PATH=/path/to/spine_v0-12-0.sif
+export SPINE_CONTAINER_VERSION=0.12.0
 source configure.sh
 ```
 
 **Updating SPINE Version:** Update the container version and site-local image
 path together:
 ```bash
-export SPINE_CONTAINER_VERSION=0.11.1
-# Default SPINE_CONTAINER_PATH becomes /sdf/data/neutrino/images/spine_v0-11-1.sif
+export SPINE_CONTAINER_VERSION=0.12.0
+# Default SPINE_CONTAINER_PATH becomes /sdf/data/neutrino/images/spine_v0-12-0.sif
 ```
 
 ### 2. Basic Job Submission
 
 ```bash
 # Run on a single file
-./submit.py --config infer/icarus/latest.cfg --source /path/to/data.root
+./submit.py --config infer/icarus/latest --source /path/to/data.root
 
-# Run on multiple files (glob)
-./submit.py --config infer/icarus/latest_data.cfg --source /path/to/data/*.root
+# Run data-only processing on multiple files (glob)
+./submit.py --config infer/icarus/latest --apply-mods data --source /path/to/data/*.root
 
 # Run from a file list (recommended)
-./submit.py --config infer/2x2/latest.cfg --source-list file_list.txt
+./submit.py --config infer/2x2/latest --source-list file_list.txt
 ```
 
 ### 3. Advanced Usage
 
 ```bash
 # Use a specific resource profile
-./submit.py --config infer/icarus/latest.cfg --source data/*.root --profile s3df_turing
+./submit.py --config infer/icarus/latest --source data/*.root --profile s3df_turing
 
 # Process multiple files per job
-./submit.py --config infer/icarus/latest.cfg --source data/*.root --files-per-task 5
+./submit.py --config infer/icarus/latest --source data/*.root --files-per-task 5
 
 # Limit parallel tasks
-./submit.py --config infer/icarus/latest.cfg --source data/*.root --ntasks 50
+./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
 
 # Dry run (see what would be submitted)
-./submit.py --config infer/icarus/latest.cfg --source test.root --dry-run
+./submit.py --config infer/icarus/latest --source test.root --dry-run
 
-# Interactive mode (test locally without SLURM submission)
-./submit.py --interactive --config infer/icarus/latest.cfg --source test.root
-./submit.py -I --config infer/icarus/latest.cfg --source-list files.txt --task-id 2
+# Interactive mode (test locally without batch submission)
+./submit.py --interactive --config infer/icarus/latest --source test.root
+./submit.py -I --config infer/icarus/latest --source-list files.txt --task-id 2
 ```
 
 ### Interactive Mode
 
-Interactive mode (`--interactive` or `-I`) runs SPINE processing directly in your current shell without submitting to SLURM. This is particularly useful for:
+Interactive mode (`--interactive` or `-I`) runs SPINE processing directly in your current shell without submitting to the batch scheduler. This is particularly useful for:
 
 - **Testing configurations** before batch submission
 - **Debugging issues** with immediate feedback
@@ -95,16 +95,16 @@ Interactive mode performs all the same config composition, file chunking, and en
 
 ```bash
 # Test a config on one file
-./submit.py -I --config infer/icarus/latest.cfg --source /path/to/test.root
+./submit.py -I --config infer/icarus/latest --source /path/to/test.root
 
 # Force container-backed interactive execution
-./submit.py -I --interactive-runtime container --config infer/generic/latest.cfg --source test.root --set base.world_size=0
+./submit.py -I --interactive-runtime container --config infer/generic/latest --source test.root --set base.world_size=0
 
 # Test with modifiers applied
-./submit.py -I --config infer/icarus/latest.cfg --source test.root --apply-mods data lite
+./submit.py -I --config infer/icarus/latest --source test.root --apply-mods data lite
 
 # Test a specific task from a file list (if using --files-per-task)
-./submit.py -I --config infer/icarus/latest.cfg --source-list files.txt --files-per-task 5 --task-id 2
+./submit.py -I --config infer/icarus/latest --source-list files.txt --files-per-task 5 --task-id 2
 ```
 
 **Note:** Interactive mode is not supported for pipelines. Use `--dry-run` to preview pipeline submissions.
@@ -147,51 +147,61 @@ spine-prod/
 │   └── train/               # Training configs (referenced as train/...)
 ├── templates/               # Job templates
 │   ├── profiles.yaml        # Resource profiles
-│   └── job_template.sbatch  # SLURM job template
+│   ├── job_template_s3df.sbatch
+│   ├── job_template_nersc.sbatch
+│   └── job_template_anl.pbs
 │
 ├── pipelines/               # Multi-stage pipeline definitions
 │   └── icarus_production_example.yaml
 │
 ├── scripts/                 # Utility scripts
-├── slurm/                   # Legacy SLURM scripts
 ├── tests/                   # Test suite
 └── jobs/                    # Job artifacts (auto-created)
 ```
 
 ## Configuration System
 
-SPINE uses a hierarchical configuration system where configs can include and override base configurations.
+SPINE uses YAML configurations throughout. User-facing configs are either
+versioned `.yaml` files such as `infer/icarus/full_chain_co_260501.yaml` or
+detector shorthand such as `infer/icarus/latest`, which generates a composite
+YAML config at submission time.
 
 ### Config Organization
 
 ```
 infer/<detector>/
-├── <detector>_base.cfg           # Base MC configuration
-├── <detector>_base_data.cfg      # Base data-only configuration
-└── <detector>_full_chain_*.cfg   # Version-specific configs
+├── full_chain_*.yaml             # Version-specific top-level configs
+├── base/                         # Base component YAMLs
+├── io/                           # IO component YAMLs
+├── model/                        # Model component YAMLs
+├── post/                         # Post-processing component YAMLs
+└── modifier/                     # Optional modifier YAMLs
 ```
 
 ### Example: ICARUS Configurations
 
 ```bash
-# Latest MC configuration
-infer/icarus/latest.cfg
+# Latest composite request (generated at submission time)
+infer/icarus/latest
 
 # Latest data-only configuration
-infer/icarus/latest_data.cfg
+infer/icarus/latest --apply-mods data
+
+# Latest NuMI configuration
+infer/icarus/latest --apply-mods numi
 
 # Specific version with cosmic overlay
-infer/icarus/full_chain_co_250625.yaml
+infer/icarus/full_chain_co_260501.yaml
 
 # Data with lite outputs
-infer/icarus/full_chain_co_250625.yaml --modifier data,lite
+infer/icarus/full_chain_co_260501.yaml --apply-mods data lite
 ```
 
 See individual config directories for detector-specific documentation.
 
 ## Resource Profiles
 
-Resource profiles define SLURM resource requirements for different use cases. Profiles are defined in `templates/profiles.yaml`.
+Resource profiles define batch resource requirements for different use cases. Profiles are defined in `templates/profiles.yaml`.
 
 ### S3DF Node Resources
 
@@ -253,19 +263,19 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 
 ```bash
 # Auto-detect (default)
-./submit.py --config infer/icarus/latest.cfg --source data.root
+./submit.py --config infer/icarus/latest --source data.root
 
 # Explicit profile
-./submit.py --config infer/icarus/latest.cfg --source data.root --profile s3df_turing
+./submit.py --config infer/icarus/latest --source data.root --profile s3df_turing
 
 # ANL/Polaris using SPINE_CONTAINER_PATH from configure.sh
-./submit.py --config infer/icarus/latest.cfg --source data.root --profile anl_polaris_debug
+./submit.py --config infer/icarus/latest --source data.root --profile anl_polaris_debug
 
 # Override specific resources
-./submit.py --config infer/icarus/latest.cfg --source data.root --time 2:00:00 --cpus-per-task 8
+./submit.py --config infer/icarus/latest --source data.root --time 2:00:00 --cpus-per-task 8
 
 # Override SPINE configuration values at runtime
-./submit.py --config infer/generic/latest.cfg --source data.root --set base.world_size=0
+./submit.py --config infer/generic/latest --source data.root --set base.world_size=0
 
 # Preload model weights on the submit host before submitting
 ./submit.py --config infer/2x2/full_chain_240819.yaml --source data.root --profile anl_polaris_debug --preload
@@ -285,14 +295,15 @@ Create a YAML file in `pipelines/`:
 ```yaml
 stages:
   - name: reconstruction
-    config: infer/icarus/latest_data.cfg
+    config: infer/icarus/latest
     files: /path/to/raw/*.root
     profile: s3df_ampere
     ntasks: 100
+    # Replace with a concrete YAML config if you need specific modifiers
   
   - name: analysis
     depends_on: [reconstruction]  # Wait for reconstruction to complete
-    config: infer/icarus/analysis.cfg
+    config: path/to/downstream_stage.yaml
     files: output_reco/*.h5
     profile: s3df_milano
     ntasks: 20
@@ -314,8 +325,8 @@ Each submission creates a timestamped directory in `jobs/`:
 jobs/20260101_143022_spine_icarus_latest/
 ├── job_metadata.json           # Complete job metadata
 ├── files_chunk_0.txt          # Input file lists
-├── submit_chunk_0.sbatch      # Generated submission scripts
-├── logs/                      # SLURM stdout/stderr
+├── submit_chunk_0.sbatch      # Generated submission script (.sbatch or .pbs)
+├── logs/                      # Batch stdout/stderr
 │   ├── spine_icarus_latest_12345_1.out
 │   └── spine_icarus_latest_12345_1.err
 └── output/                    # Output files
@@ -325,17 +336,26 @@ jobs/20260101_143022_spine_icarus_latest/
 ### Monitoring Jobs
 
 ```bash
-# View job status
+# View job status on SLURM
 squeue -u $USER
 
-# View job details
+# View job details on SLURM
 scontrol show job <job_id>
+
+# View job status on PBS
+qstat -u $USER
+
+# View job details on PBS
+qstat -fx <job_id>
 
 # View logs
 tail -f jobs/<job_dir>/logs/spine_*.out
 
-# Cancel job
+# Cancel job on SLURM
 scancel <job_id>
+
+# Cancel job on PBS
+qdel <job_id>
 ```
 
 ### Job Metadata
@@ -346,7 +366,7 @@ Each job saves complete metadata for reproducibility:
 {
   "job_name": "spine_icarus_latest",
   "detector": "icarus",
-  "config": "infer/icarus/latest.cfg",
+  "config": "infer/icarus/latest",
   "profile": "s3df_ampere",
   "num_files": 100,
   "job_ids": ["12345", "12346"],
@@ -362,7 +382,7 @@ Pipelines can automatically clean up intermediate outputs once downstream stages
 ```yaml
 stages:
   - name: reconstruction
-    config: infer/icarus/latest.cfg
+    config: infer/icarus/latest
     files: /path/to/input/*.root
     output: output_reco
     # Clean up output_reco/ after all dependent stages finish
@@ -372,7 +392,7 @@ stages:
   
   - name: analysis
     depends_on: [reconstruction]
-    config: infer/icarus/analysis.cfg
+    config: path/to/downstream_stage.yaml
     files: output_reco/*.h5
     output: output_analysis
 ```
@@ -391,10 +411,10 @@ This is especially useful for large-scale production to save disk space by remov
 
 ```bash
 # Use custom LArCV installation
-./submit.py --config infer/icarus/latest.cfg --source data.root --larcv /path/to/larcv
+./submit.py --config infer/icarus/latest --source data.root --larcv /path/to/larcv
 
 # Expose CVMFS inside the container
-./submit.py --config infer/icarus/latest.cfg --source data.root --cvmfs
+./submit.py --config infer/icarus/latest --source data.root --cvmfs
 ```
 
 There is no need to pass `--flashmatch`. The flag is accepted only for backward
@@ -412,17 +432,17 @@ source configure.sh
 
 ```bash
 # Submit with dependency on another job
-./submit.py --config infer/icarus/stage2.cfg --source output/*.h5 --dependency afterok:12345
+./submit.py --config path/to/downstream_stage.yaml --source output/*.h5 --dependency afterok:12345
 ```
 
 ### Array Job Optimization
 
 ```bash
 # Process 5 files per job (reduces overhead)
-./submit.py --config infer/icarus/latest.cfg --source data/*.root --files-per-task 5
+./submit.py --config infer/icarus/latest --source data/*.root --files-per-task 5
 
 # Limit concurrent tasks to 50
-./submit.py --config infer/icarus/latest.cfg --source data/*.root --ntasks 50
+./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 ```
 
 ## Detector-Specific Guides
@@ -433,22 +453,22 @@ ICARUS uses split cryostat processing with cosmic overlay:
 
 ```bash
 # Standard cosmic overlay processing
-./submit.py --config infer/icarus/latest.cfg --source data.root
+./submit.py --config infer/icarus/latest --source data.root
 
 # Data-only mode (no truth labels)
-./submit.py --config infer/icarus/latest_data.cfg --source data.root
+./submit.py --config infer/icarus/latest --apply-mods data --source data.root
 
 # NuMI beam configuration
-./submit.py --config infer/icarus/latest_numi.cfg --source data.root
+./submit.py --config infer/icarus/latest --apply-mods numi --source data.root
 
 # Lite output (reduced file size)
-./submit.py --config infer/icarus/full_chain_co_250625.yaml --modifier data,lite --source data.root
+./submit.py --config infer/icarus/latest --apply-mods data lite --source data.root
 ```
 
 ### SBND
 
 ```bash
-./submit.py --config infer/sbnd/latest.cfg --source data.root
+./submit.py --config infer/sbnd/latest --source data.root
 ```
 
 ### 2x2
@@ -456,13 +476,13 @@ ICARUS uses split cryostat processing with cosmic overlay:
 2x2 uses higher resource requirements:
 
 ```bash
-./submit.py --config infer/2x2/latest.cfg --source data.root --profile s3df_ampere
+./submit.py --config infer/2x2/latest --source data.root --profile s3df_ampere
 ```
 
 ### ND-LAr
 
 ```bash
-./submit.py --config infer/nd-lar/nd-lar_base.cfg --source data.root
+./submit.py --config infer/nd-lar/latest --source data.root
 ```
 
 ## Troubleshooting
@@ -491,7 +511,7 @@ pip install jinja2 pyyaml
 
 ### Job Failures
 
-1. Check SLURM logs in `jobs/<job_dir>/logs/`
+1. Check batch logs in `jobs/<job_dir>/logs/`
 2. Review job metadata in `jobs/<job_dir>/job_metadata.json`
 3. Test configuration on a single file with `--dry-run`
 4. Verify input files exist and are accessible
@@ -500,35 +520,19 @@ pip install jinja2 pyyaml
 
 **Solution:** Use a profile with more memory or override memory:
 ```bash
-./submit.py --config infer/icarus/latest.cfg --source data.root --profile s3df_ampere
+./submit.py --config infer/icarus/latest --source data.root --profile s3df_ampere
 ```
 
 Or override memory:
 ```bash
-./submit.py --config infer/icarus/latest.cfg --source data.root --mem-per-cpu 16g
+./submit.py --config infer/icarus/latest --source data.root --mem-per-cpu 16g
 ```
 
 ### Job Time Limit
 
 **Solution:** Request more time:
 ```bash
-./submit.py --config infer/icarus/latest.cfg --source data.root --time 4:00:00
-```
-
-## Legacy Scripts
-
-The original submission system (`run.sh`, `slurm/run_slurm.sh`) is still available for backwards compatibility but is deprecated. New users should use `submit.py`.
-
-### Migrating from Legacy Scripts
-
-Old:
-```bash
-./run.sh -c infer/icarus/latest.cfg -n 50 -t 2:00:00 file_list.txt
-```
-
-New:
-```bash
-./submit.py --config infer/icarus/latest.cfg --source-list file_list.txt --ntasks 50 --time 2:00:00
+./submit.py --config infer/icarus/latest --source data.root --time 4:00:00
 ```
 
 ## Best Practices
@@ -539,10 +543,10 @@ Always test configurations on a small sample:
 
 ```bash
 # Test with dry run
-./submit.py --config infer/icarus/latest.cfg --source test.root --dry-run
+./submit.py --config infer/icarus/latest --source test.root --dry-run
 
 # Test with single file
-./submit.py --config infer/icarus/latest.cfg --source test.root
+./submit.py --config infer/icarus/latest --source test.root
 ```
 
 ### 2. Use Appropriate Profiles
@@ -555,15 +559,15 @@ Always test configurations on a small sample:
 
 ```bash
 # For many small files, batch them
-./submit.py --config infer/icarus/latest.cfg --source small_files/*.root --files-per-task 10
+./submit.py --config infer/icarus/latest --source small_files/*.root --files-per-task 10
 
 # For large files, process individually
-./submit.py --config infer/icarus/latest.cfg --source large_files/*.root --files-per-task 1
+./submit.py --config infer/icarus/latest --source large_files/*.root --files-per-task 1
 ```
 
 ### 4. Monitor Resource Usage
 
-Check actual resource usage to optimize future jobs:
+Check actual resource usage to optimize future jobs. On SLURM systems:
 
 ```bash
 seff <job_id>

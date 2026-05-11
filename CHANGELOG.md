@@ -17,9 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Set the default SPINE container tag to
-  `docker:ghcr.io/deeplearnphysics/spine:0.11.1`
+  `docker:ghcr.io/deeplearnphysics/spine:0.12.0`
 - Derive the default S3DF Singularity image path from `SPINE_CONTAINER_VERSION`
-  as `/sdf/data/neutrino/images/spine_v0-11-1.sif`
+  as `/sdf/data/neutrino/images/spine_v0-12-0.sif`
 - Added `submit.py --set KEY=VALUE` support for SPINE runtime config overrides
 - Added `--interactive-runtime` to let interactive mode use local `spine`,
   force container execution, or fall back to the container automatically

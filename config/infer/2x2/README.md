@@ -42,7 +42,7 @@ Located in `modifier/` subdirectories:
 - **`single/mod_single_data_240719.yaml`**: Switch to single-module mode for data
 
 ### Legacy Configs
-Old `.cfg` files moved to `legacy/` directory for backward compatibility
+Old legacy top-level configs moved to `legacy/` directory for backward compatibility
 
 ## Configurations for MPV/MPR v2
 

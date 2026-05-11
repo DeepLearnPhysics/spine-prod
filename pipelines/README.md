@@ -9,7 +9,7 @@ Pipelines are defined in YAML format with the following structure:
 ```yaml
 stages:
   - name: stage_name
-    config: path/to/config.cfg
+    config: path/to/config.yaml
     files: [input files or pattern]
     profile: s3df_ampere    # optional (default: auto-detect)
     ntasks: 50              # optional

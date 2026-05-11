@@ -233,7 +233,6 @@ class TestConfigPathHandling:
         test_cases = [
             "icarus/latest",
             "icarus/latest.yaml",
-            "icarus/latest.cfg",
             "infer/icarus/latest",
         ]
 
@@ -263,12 +262,12 @@ class TestDetectorDetection:
 
     def test_detect_detector_sbnd(self, mock_submitter):
         """Test auto-detecting SBND from config path."""
-        result = mock_submitter._detect_detector("infer/sbnd/sbnd_base.cfg")
+        result = mock_submitter._detect_detector("infer/sbnd/full_chain_240720.yaml")
         assert result == "sbnd"
 
     def test_detect_detector_2x2(self, mock_submitter):
         """Test auto-detecting 2x2 from config path."""
-        result = mock_submitter._detect_detector("infer/2x2/latest.cfg")
+        result = mock_submitter._detect_detector("infer/2x2/latest")
         assert result == "2x2"
 
     def test_detect_detector_generic(self, mock_submitter):
@@ -492,7 +491,7 @@ class TestInteractiveExecution:
                 os.environ,
                 {
                     "SPINE_CONTAINER_PATH": str(tmp_path / "missing.sif"),
-                    "SPINE_CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:0.11.1",
+                    "SPINE_CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:0.12.0",
                 },
                 clear=False,
             ),
@@ -509,7 +508,7 @@ class TestInteractiveExecution:
         command = run.call_args.args[0]
         assert "docker run --rm" in command
         assert "--platform linux/amd64" in command
-        assert "ghcr.io/deeplearnphysics/spine:0.11.1" in command
+        assert "ghcr.io/deeplearnphysics/spine:0.12.0" in command
         assert "docker:ghcr" not in command
         assert "spine -S" in command
         assert "--set base.world_size=0" in command

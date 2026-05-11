@@ -37,7 +37,7 @@ Located in `modifier/` subdirectories:
 - **`lite/mod_lite_260202.yaml`**: Lite mode (reduced output)
 
 ### Legacy Configs
-No legacy configs are present in this directory. Add `.cfg` files to a `legacy/` subdirectory if needed for backward compatibility.
+No legacy configs are present in this directory. Add legacy YAML configs to a `legacy/` subdirectory if needed for backward compatibility.
 
 ## February 2nd 2026
 
