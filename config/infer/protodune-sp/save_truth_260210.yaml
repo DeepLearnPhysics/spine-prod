@@ -10,5 +10,17 @@ override:
   # Only build truth objects
   build.mode: truth
 
-  # No reconstructed information to write
-  io.writer.keys-: [points, depositions, reco_particles, reco_interactions]
+  # Force CPU execution for truth-only parsing
+  base.world_size: 0
+
+  # Temporary workaround until SPINE produces sources labels without reco
+  # No reconstructed information or wire-TPC-only source products to write
+  io.writer.keys-:
+    [
+      points,
+      depositions,
+      reco_particles,
+      reco_interactions,
+      sources,
+      sources_label,
+    ]
