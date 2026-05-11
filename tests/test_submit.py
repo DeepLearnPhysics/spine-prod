@@ -514,6 +514,46 @@ class TestInteractiveExecution:
         assert "spine -S" in command
         assert "--set base.world_size=0" in command
 
+    def test_run_interactive_container_uses_configured_sif_runtime(
+        self, mock_submitter, tmp_path
+    ):
+        """Test interactive container mode honors a configured SIF runtime binary."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        container = tmp_path / "spine.sif"
+        container.touch()
+        completed = type("Completed", (), {"returncode": 0})()
+
+        def fake_which(command):
+            if command == "spine":
+                return None
+            if command == "/cvmfs/eaf.opensciencegrid.org/apptainer/bin/apptainer":
+                return command
+            return None
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "SPINE_CONTAINER_PATH": str(container),
+                    "SPINE_CONTAINER_RUNTIME_BIN": "/cvmfs/eaf.opensciencegrid.org/apptainer/bin/apptainer",
+                },
+                clear=False,
+            ),
+            patch("src.submitter.shutil.which", side_effect=fake_which),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                interactive_runtime="container",
+            )
+
+        assert exit_code == 0
+        command = run.call_args.args[0]
+        assert "/cvmfs/eaf.opensciencegrid.org/apptainer/bin/apptainer exec" in command
+        assert str(container) in command
+
     def test_run_interactive_local_requires_spine_on_path(
         self, mock_submitter, tmp_path
     ):

@@ -152,6 +152,21 @@ class Submitter:
         )
         return tag.removeprefix("docker:")
 
+    @staticmethod
+    def _sif_runtime_executable() -> Optional[str]:
+        """Return the Singularity/Apptainer executable for local SIF execution."""
+        configured = os.environ.get("SPINE_CONTAINER_RUNTIME_BIN")
+        if configured:
+            runtime = shutil.which(configured)
+            if not runtime:
+                raise RuntimeError(
+                    "SPINE_CONTAINER_RUNTIME_BIN is set, but no executable was found "
+                    f"for: {configured}"
+                )
+            return runtime
+
+        return shutil.which("singularity") or shutil.which("apptainer")
+
     def _build_interactive_container_command(self, inner_cmd: str, cvmfs: bool) -> str:
         """Build an interactive container command for local smoke tests."""
         container_path = os.environ.get(
@@ -159,7 +174,7 @@ class Submitter:
         )
 
         if Path(container_path).exists():
-            singularity = shutil.which("singularity") or shutil.which("apptainer")
+            singularity = self._sif_runtime_executable()
             if singularity:
                 bind_paths = {str(Path.cwd()), str(self.basedir)}
                 if cvmfs:
