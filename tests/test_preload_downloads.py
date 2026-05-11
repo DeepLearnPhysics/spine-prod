@@ -77,7 +77,12 @@ def test_bootstrap_spine_is_compatibility_noop(tmp_path):
 
 def test_spine_config_loader_imports_when_available():
     """Test an optional local SPINE config loader can be imported."""
-    if importlib.util.find_spec("spine.config.load") is None:
+    try:
+        loader_spec = importlib.util.find_spec("spine.config.load")
+    except ModuleNotFoundError:
+        loader_spec = None
+
+    if loader_spec is None:
         pytest.skip("SPINE is not installed in this test environment")
 
     env = os.environ.copy()
