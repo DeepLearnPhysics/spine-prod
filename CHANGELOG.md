@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   packaged in the SPINE container.
 
 ### Changed
+- Documented the container-first runtime model in the README and quick reference
 - Set the default SPINE container tag to
   `docker:ghcr.io/deeplearnphysics/spine:0.12.0`
 - Derive the default S3DF Singularity image path from `SPINE_CONTAINER_VERSION`
@@ -24,7 +25,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `--interactive-runtime` to let interactive mode use local `spine`,
   force container execution, or fall back to the container automatically
 - Docker/Podman interactive fallback now requests `linux/amd64` by default
-- Documented the container-first runtime model in the README and quick reference
 - Kept `--flashmatch` as a deprecated compatibility option; no external
   flash-matching setup is needed
 
