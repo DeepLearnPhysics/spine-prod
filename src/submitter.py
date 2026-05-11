@@ -7,7 +7,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -19,6 +19,45 @@ from .preload import preload_downloads
 
 class Submitter:
     """Orchestrates batch job submissions for SPINE production."""
+
+    def _classify_config_request(self, config: str) -> Tuple[bool, str]:
+        """Classify whether a config request should resolve to detector latest.
+
+        Parameters
+        ----------
+        config : str
+            User-provided config path or shorthand.
+
+        Returns
+        -------
+        Tuple[bool, str]
+            A tuple of ``(is_latest, config_name)`` where ``config_name`` is the
+            normalized user-facing name for job naming.
+        """
+        config_path = Path(config)
+        config_name = config_path.stem
+
+        if config_name == "latest" or "latest" in config_path.parts:
+            return True, "latest"
+
+        config_str = config_path.as_posix().rstrip("/")
+        for detector_config in self.profiles.get("detectors", {}).values():
+            configs_dir = detector_config.get("configs_dir")
+            if not configs_dir:
+                continue
+
+            rel_configs_dir = configs_dir.rstrip("/")
+            if config_str == rel_configs_dir:
+                return True, "latest"
+
+            if (
+                config_path.is_absolute()
+                and config_path.resolve()
+                == (self.basedir / "config" / rel_configs_dir).resolve()
+            ):
+                return True, "latest"
+
+        return False, config_name
 
     @staticmethod
     def _warn_flashmatch_noop() -> None:
@@ -324,11 +363,7 @@ class Submitter:
 
         # Detect detector
         detector = self.config_mgr.detect_detector(config)
-        config_path = Path(config)
-        config_name = config_path.stem
-
-        # Check if this is a "latest" request
-        is_latest = config_name == "latest" or "latest" in config_path.parts
+        is_latest, config_name = self._classify_config_request(config)
 
         job_name = f"interactive_{detector}_{config_name}"
         job_dir = self.batch_client.create_job_dir(job_name)
@@ -519,11 +554,7 @@ class Submitter:
         detector = self.config_mgr.detect_detector(config)
 
         # Create job directory first (needed for composite/latest config generation)
-        config_path = Path(config)
-        config_name = config_path.stem
-
-        # Check if this is a "latest" request
-        is_latest = config_name == "latest" or "latest" in config_path.parts
+        is_latest, config_name = self._classify_config_request(config)
 
         if not job_name:
             job_name = f"spine_{detector}_{config_name}"

@@ -229,17 +229,19 @@ class TestConfigPathHandling:
 
     def test_detect_latest_config(self, mock_submitter):
         """Test detecting 'latest' config shorthand."""
-        # Test various latest patterns
         test_cases = [
             "icarus/latest",
             "icarus/latest.yaml",
             "infer/icarus/latest",
+            "infer/icarus",
         ]
 
         for config_path in test_cases:
-            # Should recognize as latest config
-            # (Implementation detail: would trigger _create_latest_config)
-            assert "latest" in config_path
+            is_latest, config_name = mock_submitter._classify_config_request(
+                config_path
+            )
+            assert is_latest is True
+            assert config_name == "latest"
 
     def test_absolute_vs_relative_paths(self, workspace_root):
         """Test handling of absolute vs relative config paths."""

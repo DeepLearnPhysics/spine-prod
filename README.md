@@ -49,6 +49,9 @@ export SPINE_CONTAINER_VERSION=0.12.0
 ### 2. Basic Job Submission
 
 ```bash
+# Detector shorthand resolves to the latest composite config
+./submit.py --config infer/icarus --source /path/to/data.root
+
 # Run on a single file
 ./submit.py --config infer/icarus/latest --source /path/to/data.root
 
@@ -163,8 +166,8 @@ spine-prod/
 
 SPINE uses YAML configurations throughout. User-facing configs are either
 versioned `.yaml` files such as `infer/icarus/full_chain_co_260501.yaml` or
-detector shorthand such as `infer/icarus/latest`, which generates a composite
-YAML config at submission time.
+detector shorthands such as `infer/icarus` or `infer/icarus/latest`, which
+generate a composite YAML config at submission time.
 
 ### Config Organization
 

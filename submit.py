@@ -5,6 +5,7 @@ A modern, flexible job submission orchestrator for SPINE reconstruction
 on batch-based HPC systems.
 
 Usage:
+    ./submit.py --config infer/icarus --source test.root
     ./submit.py --config infer/icarus/latest --source-list file_list.txt
     ./submit.py --config infer/icarus/latest --apply-mods data --source data/*.root --profile s3df_ampere
     ./submit.py --pipeline pipelines/icarus_production.yaml
@@ -25,6 +26,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Detector shorthand resolves to the latest composite config
+  %(prog)s --config infer/icarus --source test.root
+
   # Basic submission with source list (recommended)
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source-list file_list.txt
 
