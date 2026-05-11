@@ -764,6 +764,16 @@ class TestCVMFSOption:
         assert 'BIND_PATHS="/sdf/"' in script
         assert "/cvmfs/" not in script
 
+    def test_s3df_honors_custom_bind_paths(self, mock_submitter):
+        """Test S3DF bind roots can be overridden through template context."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_s3df.sbatch",
+            bind_paths="/sdf/,/eaf/,/tmp/work",
+        )
+
+        assert 'BIND_PATHS="/sdf/,/eaf/,/tmp/work"' in script
+
     def test_s3df_binds_cvmfs_when_requested(self, mock_submitter):
         """Test S3DF adds CVMFS to bind paths when requested."""
         script = self._render_template(

@@ -83,7 +83,7 @@ export NUMBA_NUM_THREADS=64
 echo "NUMBA_NUM_THREADS set to $NUMBA_NUM_THREADS"
 
 # S3DF: Use Singularity
-BIND_PATHS="/sdf/"
+BIND_PATHS="{{ bind_paths or '/sdf/' }}"
 {% if cvmfs %}
 BIND_PATHS="$BIND_PATHS,/cvmfs/"
 {% endif %}

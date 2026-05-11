@@ -175,6 +175,13 @@ Examples:
     parser.add_argument("--constraint", help="Override constraint")
     parser.add_argument("--nodes", type=int, help="Override number of nodes")
     parser.add_argument("--time", "-t", help="Override time limit")
+    parser.add_argument(
+        "--bind-paths",
+        help=(
+            "Override Singularity/Apptainer bind roots for batch templates that "
+            "support them, as a comma-separated list."
+        ),
+    )
 
     # Execution
     exec_group = parser.add_mutually_exclusive_group()
@@ -283,6 +290,7 @@ Examples:
         "nodes",
         "time",
         "account",
+        "bind_paths",
     ]:
         value = getattr(args, key, None)
         if value is not None:
