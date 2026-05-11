@@ -167,6 +167,15 @@ class Submitter:
 
         return shutil.which("singularity") or shutil.which("apptainer")
 
+    @staticmethod
+    def _sif_runtime_args() -> str:
+        """Return additional args for interactive Singularity/Apptainer execution."""
+        configured = os.environ.get("SPINE_CONTAINER_RUNTIME_ARGS", "")
+        if not configured:
+            return ""
+
+        return " ".join(shlex.quote(arg) for arg in shlex.split(configured))
+
     def _build_interactive_container_command(self, inner_cmd: str, cvmfs: bool) -> str:
         """Build an interactive container command for local smoke tests."""
         container_path = os.environ.get(
@@ -176,12 +185,14 @@ class Submitter:
         if Path(container_path).exists():
             singularity = self._sif_runtime_executable()
             if singularity:
+                runtime_args = self._sif_runtime_args()
+                runtime_args = f" {runtime_args}" if runtime_args else ""
                 bind_paths = {str(Path.cwd()), str(self.basedir)}
                 if cvmfs:
                     bind_paths.add("/cvmfs")
                 bind_arg = ",".join(sorted(bind_paths))
                 return (
-                    f"{shlex.quote(singularity)} exec --bind {shlex.quote(bind_arg)} "
+                    f"{shlex.quote(singularity)} exec{runtime_args} --bind {shlex.quote(bind_arg)} "
                     f"--nv {shlex.quote(container_path)} bash -c "
                     f"{shlex.quote(inner_cmd)}"
                 )

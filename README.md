@@ -115,10 +115,18 @@ By default, interactive mode uses the `spine` executable already on `PATH`. If
 `SPINE_CONTAINER_TAG` with Docker/Podman. Use `--interactive-runtime local` to require
 the local executable, or `--interactive-runtime container` to force container
 execution. Docker/Podman fallback requests `linux/amd64` by default; override
-`SPINE_CONTAINER_PLATFORM` if a different platform is needed. If your
-Singularity/Apptainer executable is not available as `singularity` or
-`apptainer` on `PATH` (for example on EAF via CVMFS), set
-`SPINE_CONTAINER_RUNTIME_BIN` to the full executable path.
+`SPINE_CONTAINER_PLATFORM` if a different platform is needed.
+
+### EAF Interactive Container Setup
+
+On EAF, Apptainer may be provided from CVMFS rather than as `apptainer` on
+`PATH`. Interactive container mode can be pointed at that executable directly,
+and can also pass through the extra environment flags needed there:
+
+```bash
+export SPINE_CONTAINER_RUNTIME_BIN=/cvmfs/eaf.opensciencegrid.org/apptainer/bin/apptainer
+export SPINE_CONTAINER_RUNTIME_ARGS="--env LD_PRELOAD= --env LC_ALL=C.UTF-8"
+```
 
 ## Directory Structure
 
@@ -582,6 +590,7 @@ Set by `configure.sh`:
 - `SPINE_CONTAINER_TAG` - Registry image tag for Shifter-style runtimes, including `docker:`
 - `SPINE_CONTAINER_PATH_AUTO` - Tracks whether `SPINE_CONTAINER_PATH` was auto-derived
 - `SPINE_CONTAINER_RUNTIME_BIN` - Optional full path or command name for the Singularity/Apptainer executable used by interactive SIF execution
+- `SPINE_CONTAINER_RUNTIME_ARGS` - Optional extra Singularity/Apptainer arguments for interactive SIF execution
 - `SPINE_CONTAINER_PLATFORM` - Docker/Podman platform for interactive fallback
 
 ## Contributing
