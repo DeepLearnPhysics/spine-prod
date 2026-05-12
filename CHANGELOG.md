@@ -5,6 +5,28 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-05-11
+
+### Added
+- Added the `fsd` detector profile with `infer/fsd` as its configuration root
+  and `s3df_ampere` as its default execution profile
+
+### Changed
+- Added `--output-suffix` and updated default output naming so SPINE writes
+  HDF5 files under the job `output/` directory using input-derived names and
+  the final config stem as the default suffix
+- Updated batch job templates to pass writer output overrides through
+  `--set io.writer.directory` and `--set io.writer.suffix`, while preserving
+  explicit output file paths passed with `--output`
+
+### Fixed
+- Prevented nested generated composite configs from accumulating repeated
+  `_composite` suffixes in their filenames
+
+Full Changelog: [v0.5.0...v0.5.1](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.5.0...v0.5.1)
+
+---
+
 ## [0.5.0] - 2026-05-11
 
 ### Breaking Changes
