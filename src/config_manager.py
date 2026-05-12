@@ -378,8 +378,10 @@ class ConfigManager:
         composite_content += f"# Modifiers: {', '.join(modifiers)}\n"
         composite_content += f"# Generated: {datetime.now().isoformat()}\n\n"
 
-        # Save composite config first to determine its location
-        composite_name = f"{base_name}_{'_'.join(mod_names)}_composite.yaml"
+        # Save composite config first to determine its location. If the base
+        # is already a generated composite, keep only the final composite tag.
+        output_base_name = base_name.removesuffix("_composite")
+        composite_name = f"{output_base_name}_{'_'.join(mod_names)}_composite.yaml"
         composite_path = job_dir / composite_name
 
         # Make all paths relative to the config directory (SPINE_CONFIG_PATH)

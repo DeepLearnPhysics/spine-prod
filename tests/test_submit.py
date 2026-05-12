@@ -934,6 +934,30 @@ class TestCompositeConfig:
             "Composite config with modifiers requires special directory structure"
         )
 
+    def test_create_composite_from_latest_avoids_duplicate_composite_suffix(
+        self, mock_submitter, tmp_path
+    ):
+        """Test composing a generated latest config keeps one composite suffix."""
+        latest_config = mock_submitter.config_mgr.create_latest_config(
+            "nd-lar", tmp_path
+        )
+
+        composite_path = mock_submitter._create_composite_config(
+            base_config=latest_config,
+            modifiers=["single"],
+            job_dir=tmp_path,
+            detector="nd-lar",
+        )
+
+        expected_name = (
+            f"{Path(latest_config).stem.removesuffix('_composite')}"
+            "_single_composite.yaml"
+        )
+
+        assert Path(composite_path).exists()
+        assert Path(composite_path).name == expected_name
+        assert "_composite_single_composite" not in Path(composite_path).name
+
 
 class TestProfileSelection:
     """Tests for profile selection and validation."""
