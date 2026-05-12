@@ -537,7 +537,7 @@ class TestInteractiveExecution:
                 os.environ,
                 {
                     "SPINE_CONTAINER_PATH": str(tmp_path / "missing.sif"),
-                    "SPINE_CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:0.12.0",
+                    "SPINE_CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:0.12.1",
                 },
                 clear=False,
             ),
@@ -555,7 +555,7 @@ class TestInteractiveExecution:
         assert "export NUMBA_NUM_THREADS=64" in command
         assert "docker run --rm" in command
         assert "--platform linux/amd64" in command
-        assert "ghcr.io/deeplearnphysics/spine:0.12.0" in command
+        assert "ghcr.io/deeplearnphysics/spine:0.12.1" in command
         assert "docker:ghcr" not in command
         assert "spine -S" in command
         assert "--set base.world_size=0" in command

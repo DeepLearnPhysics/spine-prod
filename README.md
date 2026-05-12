@@ -25,25 +25,25 @@ source configure.sh
 
 **SPINE Version Control:** Production jobs now run entirely from a tagged SPINE
 container image. The default Shifter tag is
-`docker:ghcr.io/deeplearnphysics/spine:0.12.0`, with the matching S3DF
+`docker:ghcr.io/deeplearnphysics/spine:0.12.1`, with the matching S3DF
 Singularity image derived from the same version at
-`/sdf/data/neutrino/images/spine_v0-12-0.sif`. This container packages SPINE,
+`/sdf/data/neutrino/images/spine_v0-12-1.sif`. This container packages SPINE,
 OpT0Finder, and runtime dependencies, and jobs invoke the container-provided
 `spine` executable directly.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
 ```bash
-export SPINE_CONTAINER_PATH=/path/to/spine_v0-12-0.sif
-export SPINE_CONTAINER_VERSION=0.12.0
+export SPINE_CONTAINER_PATH=/path/to/spine_v0-12-1.sif
+export SPINE_CONTAINER_VERSION=0.12.1
 source configure.sh
 ```
 
 **Updating SPINE Version:** Update the container version and site-local image
 path together:
 ```bash
-export SPINE_CONTAINER_VERSION=0.12.0
-# Default SPINE_CONTAINER_PATH becomes /sdf/data/neutrino/images/spine_v0-12-0.sif
+export SPINE_CONTAINER_VERSION=0.12.1
+# Default SPINE_CONTAINER_PATH becomes /sdf/data/neutrino/images/spine_v0-12-1.sif
 ```
 
 ### 2. Basic Job Submission
