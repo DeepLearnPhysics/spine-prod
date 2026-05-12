@@ -288,6 +288,13 @@ class Submitter:
         return ",".join(resolved_paths) if resolved_paths else None
 
     @staticmethod
+    def _default_bind_paths_for_site(site: Optional[str]) -> Optional[str]:
+        """Return the implicit bind roots required by a site template."""
+        if site == "s3df":
+            return "/sdf/"
+        return None
+
+    @staticmethod
     def _container_tag_for_cli() -> str:
         """Return the configured container tag in Docker/Podman CLI form."""
         version = os.environ.get("SPINE_CONTAINER_VERSION", "0.12.0")
@@ -750,8 +757,13 @@ class Submitter:
             if root
         ]
         if extra_bind_roots:
+            bind_paths = profile_config.get("bind_paths")
+            if not bind_paths:
+                bind_paths = self._default_bind_paths_for_site(
+                    profile_config.get("site", "s3df")
+                )
             profile_config["bind_paths"] = self._merge_bind_paths(
-                profile_config.get("bind_paths"), extra_bind_roots
+                bind_paths, extra_bind_roots
             )
 
         # Get account

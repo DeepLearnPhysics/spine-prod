@@ -848,6 +848,45 @@ class TestBatchSpineOverride:
         assert str(larcv_root) in script
         assert str(flashmatch_root) in script
 
+    def test_submit_job_keeps_default_s3df_bind_root_with_spine_path(
+        self, mock_submitter, tmp_path
+    ):
+        """Test S3DF keeps the default /sdf bind when adding a custom spine path."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        spine_checkout = Path("/sdf/data/neutrino/software/spine-dev")
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
+            patch.object(
+                Submitter,
+                "_resolve_spine_command",
+                return_value=(
+                    f"python3 {spine_checkout / 'bin' / 'run.py'}",
+                    str(spine_checkout),
+                ),
+            ),
+        ):
+            job_ids = mock_submitter.submit_job(
+                config="config/infer/dune10kt-1x2x6/full_chain_260510.yaml",
+                files=[str(input_file)],
+                profile="s3df_ampere",
+                spine_path=str(spine_checkout),
+            )
+
+        assert job_ids == ["12345"]
+
+        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        assert len(scripts) == 1
+
+        script = scripts[0].read_text(encoding="utf-8")
+        assert 'BIND_PATHS="/sdf/,/sdf/data/neutrino/software/spine-dev"' in script
+
     def test_submit_job_accepts_output_suffix(self, mock_submitter, tmp_path):
         """Test batch submission can override the derived output suffix."""
         input_file = tmp_path / "input.root"
