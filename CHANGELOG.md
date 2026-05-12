@@ -5,6 +5,24 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-05-12
+
+### Changed
+- Updated the default SPINE container release to
+  `docker:ghcr.io/deeplearnphysics/spine:0.12.2`
+- Updated the derived default S3DF Singularity image path to
+  `/sdf/data/neutrino/images/spine_v0-12-2.sif`
+- Refreshed the README and quick reference to match the current default
+  container release
+
+### Fixed
+- Pulls in SPINE `v0.12.2`, which fixes a critical truth position attribute
+  unit issue in the upstream runtime container
+
+Full Changelog: [v0.5.2...v0.5.3](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.5.2...v0.5.3)
+
+---
+
 ## [0.5.2] - 2026-05-11
 
 ### Changed
