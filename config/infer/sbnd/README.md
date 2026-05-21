@@ -48,6 +48,20 @@ These weights have been trained using the following files at Polaris:
 - Training set: `/lus/eagle/projects/neutrinoGPU/jmueller/spine_train/datasets/v10_14_02/generic/train/files.txt` (450k)
 - Test set: `/lus/eagle/projects/neutrinoGPU/jmueller/spine_train/datasets/v10_14_02/generic/test/files.txt` (50k)
 
+## May 21st 2026
+
+```shell
+sbnd_full_chain_co_260521.yaml
+```
+
+The following modifications were made w.r.t. the May 1 2026 configuration
+- Update the collection-only model weights
+- Set the GrapPA interaction dE/dx radius to 5 pixels to match the other GrapPA modules
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+
 ## May 1st 2026
 
 ```shell
