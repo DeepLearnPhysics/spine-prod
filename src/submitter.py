@@ -513,6 +513,11 @@ class Submitter:
                 )
             if task_id != 1:
                 raise ValueError("Cannot use --task-id without --source/--source-list")
+            if output is not None or output_suffix is not None:
+                raise ValueError(
+                    "Cannot use --output/--output-suffix without "
+                    "--source/--source-list"
+                )
             print("No input files provided; using inputs defined in the config")
 
         # Detect detector
@@ -593,15 +598,19 @@ class Submitter:
         output_dir, output_suffix = self._default_writer_output_settings(
             job_dir, config, output_suffix
         )
-        if output:
+        if file_list and output:
             output_path = Path(output)
             if output_path.suffix:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
-        else:
+        elif file_list:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
-        output_args = self._format_spine_output_args(output, output_dir, output_suffix)
+        output_args = (
+            self._format_spine_output_args(output, output_dir, output_suffix)
+            if file_list
+            else ""
+        )
         spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
         local_spine_cmd, extra_bind_root = self._resolve_spine_command(spine_path)
         extra_bind_roots = [
@@ -756,6 +765,11 @@ class Submitter:
                     "Cannot use --ntasks/--files-per-task without "
                     "--source/--source-list"
                 )
+            if output is not None or output_suffix is not None:
+                raise ValueError(
+                    "Cannot use --output/--output-suffix without "
+                    "--source/--source-list"
+                )
             print("No input files provided; using inputs defined in the config")
 
         # Detect detector first
@@ -821,15 +835,19 @@ class Submitter:
         output_dir, output_suffix = self._default_writer_output_settings(
             job_dir, config, output_suffix
         )
-        if output:
+        if file_list and output:
             output_path = Path(output)
             if output_path.suffix:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
-        else:
+        elif file_list:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
-        output_args = self._format_spine_output_args(output, output_dir, output_suffix)
+        output_args = (
+            self._format_spine_output_args(output, output_dir, output_suffix)
+            if file_list
+            else ""
+        )
 
         file_list_pattern = None
         file_chunks = [[]]
@@ -956,7 +974,7 @@ class Submitter:
             ),
             "ntasks": ntasks,
             "job_ids": job_ids,
-            "output": output or output_dir,
+            "output": output or (output_dir if output_args else None),
             "output_dir": output_dir,
             "output_suffix": output_suffix,
             "submitted": datetime.now().isoformat(),

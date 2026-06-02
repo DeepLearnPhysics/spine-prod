@@ -41,9 +41,11 @@ echo "Started: $(date)"
 echo "Config: {{ config }}"
 {% if output %}
 echo "Output: {{ output }}"
-{% else %}
+{% elif output_args %}
 echo "Output directory: {{ output_dir }}"
 echo "Output suffix: {{ output_suffix }}"
+{% else %}
+echo "Output: defined in config"
 {% endif %}
 echo "=================================="
 echo

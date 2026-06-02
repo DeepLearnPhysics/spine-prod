@@ -444,6 +444,37 @@ class TestInteractiveExecution:
         assert "--set io.loader.batch_size=1" in run.call_args.args[0]
         assert "FMATCH_BASEDIR" not in run.call_args.args[0]
 
+    def test_run_interactive_uses_config_inputs_without_writer_overrides(
+        self, mock_submitter
+    ):
+        """Test config-owned interactive runs do not override IO or output."""
+        completed = type("Completed", (), {"returncode": 0})()
+
+        with (
+            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/train/icarus/deghost/deghost.yaml",
+                interactive_runtime="local",
+            )
+
+        assert exit_code == 0
+        command = run.call_args.args[0]
+        assert "spine -S" not in command
+        assert "--set io.writer." not in command
+
+    def test_run_interactive_rejects_output_without_files(self, mock_submitter):
+        """Test config-owned interactive runs reject inference output overrides."""
+        with pytest.raises(
+            ValueError,
+            match="Cannot use --output/--output-suffix without --source/--source-list",
+        ):
+            mock_submitter.run_interactive(
+                config="config/train/icarus/deghost/deghost.yaml",
+                output_suffix="custom_reco",
+            )
+
     def test_run_interactive_sources_custom_software_paths(
         self, mock_submitter, tmp_path
     ):
@@ -983,6 +1014,8 @@ class TestBatchSpineOverride:
         script = scripts[0].read_text(encoding="utf-8")
         assert "Using input files defined in the config" in script
         assert " -S $TASK_FILE_LIST" not in script
+        assert "--set io.writer." not in script
+        assert "Output: defined in config" in script
 
     def test_submit_job_rejects_split_flags_without_files(self, mock_submitter):
         """Test config-driven inputs cannot be combined with submit-time splitting."""
@@ -994,6 +1027,18 @@ class TestBatchSpineOverride:
                 config="config/train/icarus/deghost/deghost.yaml",
                 profile="s3df_ampere",
                 ntasks=2,
+            )
+
+    def test_submit_job_rejects_output_without_files(self, mock_submitter):
+        """Test config-owned batch runs reject inference output overrides."""
+        with pytest.raises(
+            ValueError,
+            match="Cannot use --output/--output-suffix without --source/--source-list",
+        ):
+            mock_submitter.submit_job(
+                config="config/train/icarus/deghost/deghost.yaml",
+                profile="s3df_ampere",
+                output_suffix="custom_reco",
             )
 
     def test_submit_job_uses_ntasks_as_target_task_count(
@@ -1249,10 +1294,14 @@ class TestCVMFSOption:
             mock_submitter,
             "job_template_s3df.sbatch",
             file_list_pattern=None,
+            output=None,
+            output_args="",
         )
 
         assert "Using input files defined in the config" in script
         assert " -S $TASK_FILE_LIST" not in script
+        assert "--set io.writer." not in script
+        assert "Output: defined in config" in script
 
     def test_templates_include_spine_set_overrides(self, mock_submitter):
         """Test SPINE --set overrides are rendered into batch commands."""
