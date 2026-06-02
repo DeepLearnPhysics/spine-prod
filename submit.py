@@ -52,8 +52,14 @@ Examples:
   # List available modifiers for a config
   %(prog)s --list-mods infer/icarus/full_chain_co_250625.yaml
 
+  # Split a file list across 20 tasks as evenly as possible
+  %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source-list files.txt --ntasks 20
+
   # Multiple files per task, multiple concurrent tasks
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source-list files.txt --files-per-task 5 --ntasks 20
+
+  # Use the input list already embedded in the config
+  %(prog)s --config config/train/icarus/deghost/deghost.yaml
 
   # Pipeline mode
   %(prog)s --pipeline pipelines/icarus_production.yaml
@@ -114,10 +120,21 @@ Examples:
         help="Resource profile (default: auto-detect)",
     )
     parser.add_argument(
-        "--ntasks", "-n", type=int, help="Number of parallel tasks (default: 1)"
+        "--ntasks",
+        "-n",
+        type=int,
+        help=(
+            "Target number of tasks when --files-per-task is omitted, or array "
+            "concurrency cap when --files-per-task is set"
+        ),
     )
     parser.add_argument(
-        "--files-per-task", type=int, default=1, help="Files per task (default: 1)"
+        "--files-per-task",
+        type=int,
+        help=(
+            "Files per task. If omitted, all explicit inputs run in one task "
+            "unless --ntasks requests an even split"
+        ),
     )
 
     # Job configuration

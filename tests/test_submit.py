@@ -400,6 +400,14 @@ class TestFileChunking:
         assert len(chunks[0][0]) == 3
         assert isinstance(chunks[0][0], list)
 
+    def test_resolve_files_per_task_defaults_to_all_files(self, mock_submitter):
+        """Test omitted splitting flags collapse explicit inputs into one task."""
+        assert mock_submitter._resolve_files_per_task(9) == 9
+
+    def test_resolve_files_per_task_uses_ntasks_for_even_split(self, mock_submitter):
+        """Test ntasks alone distributes files roughly evenly across tasks."""
+        assert mock_submitter._resolve_files_per_task(10, ntasks=3) == 4
+
 
 class TestInteractiveExecution:
     """Tests for direct interactive execution."""
@@ -915,6 +923,120 @@ class TestBatchSpineOverride:
         script = scripts[0].read_text(encoding="utf-8")
         assert "--set io.writer.suffix=custom_reco" in script
 
+    def test_submit_job_defaults_to_single_task_over_all_files(
+        self, mock_submitter, tmp_path
+    ):
+        """Test explicit file lists default to one task containing all files."""
+        input_files = []
+        for idx in range(3):
+            input_file = tmp_path / f"input_{idx}.root"
+            input_file.touch()
+            input_files.append(str(input_file))
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
+        ):
+            job_ids = mock_submitter.submit_job(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=input_files,
+                profile="s3df_ampere",
+            )
+
+        assert job_ids == ["12345"]
+
+        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        assert len(scripts) == 1
+        script = scripts[0].read_text(encoding="utf-8")
+        assert "#SBATCH --array=" not in script
+
+        task_lists = list(mock_submitter.jobs_dir.glob("**/files_chunk_0_task_1.txt"))
+        assert len(task_lists) == 1
+        assert (
+            task_lists[0].read_text(encoding="utf-8").strip().splitlines()
+            == input_files
+        )
+
+    def test_submit_job_uses_config_inputs_when_files_omitted(self, mock_submitter):
+        """Test batch submission can defer input discovery to the config."""
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
+        ):
+            job_ids = mock_submitter.submit_job(
+                config="config/train/icarus/deghost/deghost.yaml",
+                profile="s3df_ampere",
+            )
+
+        assert job_ids == ["12345"]
+
+        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        assert len(scripts) == 1
+        script = scripts[0].read_text(encoding="utf-8")
+        assert "Using input files defined in the config" in script
+        assert " -S $TASK_FILE_LIST" not in script
+
+    def test_submit_job_rejects_split_flags_without_files(self, mock_submitter):
+        """Test config-driven inputs cannot be combined with submit-time splitting."""
+        with pytest.raises(
+            ValueError,
+            match="Cannot use --ntasks/--files-per-task without --source/--source-list",
+        ):
+            mock_submitter.submit_job(
+                config="config/train/icarus/deghost/deghost.yaml",
+                profile="s3df_ampere",
+                ntasks=2,
+            )
+
+    def test_submit_job_uses_ntasks_as_target_task_count(
+        self, mock_submitter, tmp_path
+    ):
+        """Test ntasks alone spreads explicit files across roughly even task sizes."""
+        input_files = []
+        for idx in range(10):
+            input_file = tmp_path / f"input_{idx}.root"
+            input_file.touch()
+            input_files.append(str(input_file))
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
+        ):
+            job_ids = mock_submitter.submit_job(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=input_files,
+                profile="s3df_ampere",
+                ntasks=3,
+            )
+
+        assert job_ids == ["12345"]
+
+        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        assert len(scripts) == 1
+        script = scripts[0].read_text(encoding="utf-8")
+        assert "#SBATCH --array=1-3" in script
+        assert "%3" not in script
+
+        task_lists = sorted(mock_submitter.jobs_dir.glob("**/files_chunk_0_task_*.txt"))
+        assert len(task_lists) == 3
+        task_sizes = [
+            len(path.read_text(encoding="utf-8").strip().splitlines())
+            for path in task_lists
+        ]
+        assert task_sizes == [4, 4, 2]
+
     def test_save_job_metadata(self, mock_submitter, tmp_path):
         """Test saving job metadata to JSON."""
         metadata = {
@@ -1120,6 +1242,17 @@ class TestCVMFSOption:
         assert "${PBS_ARRAY_INDEX}" in script
         assert "apptainer exec" in script
         assert "spine -S" in script
+
+    def test_templates_allow_config_defined_inputs(self, mock_submitter):
+        """Test batch templates can omit submit-time source lists entirely."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_s3df.sbatch",
+            file_list_pattern=None,
+        )
+
+        assert "Using input files defined in the config" in script
+        assert " -S $TASK_FILE_LIST" not in script
 
     def test_templates_include_spine_set_overrides(self, mock_submitter):
         """Test SPINE --set overrides are rendered into batch commands."""

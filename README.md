@@ -68,11 +68,17 @@ export SPINE_CONTAINER_VERSION=0.12.2
 # Use a specific resource profile
 ./submit.py --config infer/icarus/latest --source data/*.root --profile s3df_turing
 
-# Process multiple files per job
+# Process all matched files in a single job (default behavior)
+./submit.py --config infer/icarus/latest --source data/*.root
+
+# Process multiple files per task explicitly
 ./submit.py --config infer/icarus/latest --source data/*.root --files-per-task 5
 
-# Limit parallel tasks
+# Split the file list across 50 tasks as evenly as possible
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
+
+# Use the file list already defined in the config
+./submit.py --config config/train/icarus/deghost/deghost.yaml
 
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
@@ -106,7 +112,7 @@ Interactive mode performs all the same config composition, file chunking, and en
 # Test with modifiers applied
 ./submit.py -I --config infer/icarus/latest --source test.root --apply-mods data lite
 
-# Test a specific task from a file list (if using --files-per-task)
+# Test a specific task from a split file list
 ./submit.py -I --config infer/icarus/latest --source-list files.txt --files-per-task 5 --task-id 2
 ```
 

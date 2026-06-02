@@ -1,5 +1,6 @@
 """Main batch submission orchestrator for SPINE production."""
 
+import math
 import os
 import shlex
 import shutil
@@ -397,14 +398,34 @@ class Submitter:
             "SPINE_CONTAINER_TAG."
         )
 
+    @staticmethod
+    def _resolve_files_per_task(
+        num_files: int,
+        ntasks: Optional[int] = None,
+        files_per_task: Optional[int] = None,
+    ) -> int:
+        """Resolve the effective files-per-task policy for a submission."""
+        if ntasks is not None and ntasks < 1:
+            raise ValueError("--ntasks must be >= 1")
+
+        if files_per_task is not None:
+            if files_per_task < 1:
+                raise ValueError("--files-per-task must be >= 1")
+            return files_per_task
+
+        if ntasks is not None:
+            return max(1, math.ceil(num_files / ntasks))
+
+        return max(1, num_files)
+
     def run_interactive(
         self,
         config: str,
-        files: List[str],
+        files: Optional[List[str]] = None,
         source_type: str = "source",
         output: Optional[str] = None,
         output_suffix: Optional[str] = None,
-        files_per_task: int = 1,
+        files_per_task: Optional[int] = None,
         task_id: int = 1,
         larcv_path: Optional[str] = None,
         flashmatch_path: Optional[str] = None,
@@ -427,8 +448,9 @@ class Submitter:
         ----------
         config : str
             Path to SPINE configuration file
-        files : List[str]
-            List of input files (direct paths/globs or source list path)
+        files : List[str], optional
+            List of input files (direct paths/globs or source list path). If not
+            provided, SPINE uses the inputs already configured in ``config``.
         source_type : str, optional
             Either 'source' (direct paths/globs) or 'source_list' (text file)
         output : str, optional
@@ -436,7 +458,9 @@ class Submitter:
         output_suffix : str, optional
             Output HDF5 suffix when output names are derived from input files
         files_per_task : int, optional
-            Files to process per task, by default 1
+            Files to process per task. If omitted, all explicit input files run
+            in a single task unless ``ntasks``-style splitting is requested by
+            the caller before reaching interactive mode.
         task_id : int, optional
             Which task to run (1-indexed), by default 1
         larcv_path : str, optional
@@ -476,12 +500,20 @@ class Submitter:
                 "interactive_runtime must be one of: 'auto', 'local', 'container'"
             )
 
-        # Parse input files
-        file_list = self.file_handler.parse_files(files, source_type)
-        if not file_list:
-            raise ValueError("No input files found")
-
-        print(f"Found {len(file_list)} file(s) to process")
+        file_list = []
+        if files:
+            file_list = self.file_handler.parse_files(files, source_type)
+            if not file_list:
+                raise ValueError("No input files found")
+            print(f"Found {len(file_list)} file(s) to process")
+        else:
+            if files_per_task is not None:
+                raise ValueError(
+                    "Cannot use --files-per-task without --source/--source-list"
+                )
+            if task_id != 1:
+                raise ValueError("Cannot use --task-id without --source/--source-list")
+            print("No input files provided; using inputs defined in the config")
 
         # Detect detector
         detector = self.config_mgr.detect_detector(config)
@@ -504,34 +536,37 @@ class Submitter:
         if preload:
             self._preload_downloads(config)
 
-        # Chunk files for processing
-        max_array_size = self.profiles["defaults"]["max_array_size"]
-        file_chunks = self.file_handler.chunk_files(
-            file_list, max_array_size, files_per_task
-        )
+        task_file_list = None
+        if file_list:
+            max_array_size = self.profiles["defaults"]["max_array_size"]
+            effective_files_per_task = self._resolve_files_per_task(
+                len(file_list), files_per_task=files_per_task
+            )
+            file_chunks = self.file_handler.chunk_files(
+                file_list, max_array_size, effective_files_per_task
+            )
 
-        # Validate task_id
-        if task_id < 1 or task_id > len(file_chunks):
-            raise ValueError(f"Task ID {task_id} out of range (1-{len(file_chunks)})")
+            if task_id < 1 or task_id > len(file_chunks):
+                raise ValueError(
+                    f"Task ID {task_id} out of range (1-{len(file_chunks)})"
+                )
 
-        # Get the file group for this task (it's a list of file lists)
-        file_group_list = file_chunks[task_id - 1]
+            file_group_list = file_chunks[task_id - 1]
+            task_file_list = job_dir / f"interactive_files_task_{task_id}.txt"
+            with open(task_file_list, "w", encoding="utf-8") as f:
+                for file_group in file_group_list:
+                    for file_path in file_group:
+                        f.write(f"{file_path}\n")
 
-        # Create temporary file list for this task
-        task_file_list = job_dir / f"interactive_files_task_{task_id}.txt"
-        with open(task_file_list, "w", encoding="utf-8") as f:
+            total_files = sum(len(fg) for fg in file_group_list)
+            print(f"\nRunning task {task_id}/{len(file_chunks)}")
+            print(f"Processing {total_files} file(s):")
             for file_group in file_group_list:
-                # Each file_group is a list of file paths
                 for file_path in file_group:
-                    f.write(f"{file_path}\n")
-
-        # Count total files for display
-        total_files = sum(len(fg) for fg in file_group_list)
-        print(f"\nRunning task {task_id}/{len(file_chunks)}")
-        print(f"Processing {total_files} file(s):")
-        for file_group in file_group_list:
-            for file_path in file_group:
-                print(f"  {file_path}")
+                    print(f"  {file_path}")
+        else:
+            print("\nRunning task 1/1")
+            print("Processing inputs defined in the config")
 
         # Build command
         cmd_parts = []
@@ -576,13 +611,13 @@ class Submitter:
         ]
         if extra_bind_roots:
             resolved_bind_paths = self._merge_bind_paths(bind_paths, extra_bind_roots)
-        spine_cmd = (
-            f"{local_spine_cmd or 'spine'} "
-            f"-S {task_file_list} "
-            f"{output_args} "
-            f"-c {config} "
-            f"--log-dir {log_dir}"
+        spine_cmd_parts = [local_spine_cmd or "spine"]
+        if task_file_list is not None:
+            spine_cmd_parts.extend(["-S", str(task_file_list)])
+        spine_cmd_parts.extend(
+            [output_args, "-c", str(config), "--log-dir", str(log_dir)]
         )
+        spine_cmd = " ".join(part for part in spine_cmd_parts if part)
         if spine_cli_overrides:
             spine_cmd = f"{spine_cmd} {spine_cli_overrides}"
         cmd_parts.append(spine_cmd)
@@ -629,14 +664,14 @@ class Submitter:
     def submit_job(
         self,
         config: str,
-        files: List[str],
+        files: Optional[List[str]] = None,
         source_type: str = "source",
         profile: str = "auto",
         job_name: Optional[str] = None,
         output: Optional[str] = None,
         output_suffix: Optional[str] = None,
         ntasks: Optional[int] = None,
-        files_per_task: int = 1,
+        files_per_task: Optional[int] = None,
         dependency: Optional[str] = None,
         larcv_path: Optional[str] = None,
         flashmatch_path: Optional[str] = None,
@@ -655,8 +690,9 @@ class Submitter:
         ----------
         config : str
             Path to SPINE configuration file
-        files : List[str]
-            List of input files (direct paths/globs or source list path)
+        files : List[str], optional
+            List of input files (direct paths/globs or source list path). If not
+            provided, SPINE uses the inputs already configured in ``config``.
         source_type : str, optional
             Either 'source' (direct paths/globs) or 'source_list' (text file),
             by default 'source'
@@ -670,9 +706,11 @@ class Submitter:
             Output HDF5 suffix when output names are derived from input files,
             by default None
         ntasks : int, optional
-            Number of parallel tasks (default: auto), by default None
+            Target number of tasks when ``files_per_task`` is omitted, or the
+            scheduler array concurrency cap when ``files_per_task`` is set.
         files_per_task : int, optional
-            Files to process per task, by default 1
+            Files to process per task. If omitted, all explicit input files run
+            in a single task unless ``ntasks`` requests an even split.
         dependency : str, optional
             Batch scheduler dependency string, by default None
         larcv_path : str, optional
@@ -706,12 +744,19 @@ class Submitter:
         if flashmatch and not flashmatch_path:
             self._warn_flashmatch_noop()
 
-        # Parse input files
-        file_list = self.file_handler.parse_files(files, source_type)
-        if not file_list:
-            raise ValueError("No input files found")
-
-        print(f"Found {len(file_list)} file(s) to process")
+        file_list = []
+        if files:
+            file_list = self.file_handler.parse_files(files, source_type)
+            if not file_list:
+                raise ValueError("No input files found")
+            print(f"Found {len(file_list)} file(s) to process")
+        else:
+            if ntasks is not None or files_per_task is not None:
+                raise ValueError(
+                    "Cannot use --ntasks/--files-per-task without "
+                    "--source/--source-list"
+                )
+            print("No input files provided; using inputs defined in the config")
 
         # Detect detector first
         detector = self.config_mgr.detect_detector(config)
@@ -786,11 +831,19 @@ class Submitter:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
         output_args = self._format_spine_output_args(output, output_dir, output_suffix)
 
-        # Chunk files for array jobs
-        max_array_size = self.profiles["defaults"]["max_array_size"]
-        file_chunks = self.file_handler.chunk_files(
-            file_list, max_array_size, files_per_task
-        )
+        file_list_pattern = None
+        file_chunks = [[]]
+        concurrent_task_limit = None
+        if file_list:
+            max_array_size = self.profiles["defaults"]["max_array_size"]
+            effective_files_per_task = self._resolve_files_per_task(
+                len(file_list), ntasks=ntasks, files_per_task=files_per_task
+            )
+            file_chunks = self.file_handler.chunk_files(
+                file_list, max_array_size, effective_files_per_task
+            )
+            if files_per_task is not None and ntasks is not None:
+                concurrent_task_limit = ntasks
 
         print(f"Splitting into {len(file_chunks)} array job(s)")
 
@@ -801,18 +854,22 @@ class Submitter:
             array_spec = None
             if len(chunk) > 1:
                 array_spec = f"1-{len(chunk)}"
-                if ntasks and ntasks < len(chunk):
-                    array_spec += f"%{ntasks}"
+                if concurrent_task_limit is not None and concurrent_task_limit < len(
+                    chunk
+                ):
+                    array_spec += f"%{concurrent_task_limit}"
 
-            # Create one file list per array task
-            file_list_pattern = str(job_dir / f"files_chunk_{chunk_idx}_task_*.txt")
-            for task_idx, file_group in enumerate(chunk, start=1):
-                task_file_list = (
-                    job_dir / f"files_chunk_{chunk_idx}_task_{task_idx}.txt"
-                )
-                with open(task_file_list, "w", encoding="utf-8") as f:
-                    for file_path in file_group:
-                        f.write(f"{file_path}\n")
+            if file_list:
+                file_list_pattern = str(job_dir / f"files_chunk_{chunk_idx}_task_*.txt")
+                for task_idx, file_group in enumerate(chunk, start=1):
+                    task_file_list = (
+                        job_dir / f"files_chunk_{chunk_idx}_task_{task_idx}.txt"
+                    )
+                    with open(task_file_list, "w", encoding="utf-8") as f:
+                        for file_path in file_group:
+                            f.write(f"{file_path}\n")
+            else:
+                file_list_pattern = None
 
             batch_client = self._get_batch_client(profile_config)
             template = batch_client.load_template(
@@ -853,7 +910,10 @@ class Submitter:
             # Submit
             print(f"\nSubmitting chunk {chunk_idx + 1}/{len(file_chunks)}:")
             print(f"  Script: {script_path}")
-            print(f"  Files: {len(chunk)}")
+            if file_list:
+                print(f"  Files: {sum(len(group) for group in chunk)}")
+            else:
+                print("  Files: config-defined input list")
             print(f"  Profile: {profile} ({profile_config['description']})")
             if chunk_dependency:
                 print(f"  Dependency: {chunk_dependency}")
@@ -884,8 +944,17 @@ class Submitter:
             "cvmfs": cvmfs,
             "profile": profile,
             "profile_config": profile_config,
-            "num_files": len(file_list),
+            "num_files": len(file_list) if file_list else None,
             "num_chunks": len(file_chunks),
+            "files_per_task": files_per_task,
+            "resolved_files_per_task": (
+                self._resolve_files_per_task(
+                    len(file_list), ntasks=ntasks, files_per_task=files_per_task
+                )
+                if file_list
+                else None
+            ),
+            "ntasks": ntasks,
             "job_ids": job_ids,
             "output": output or output_dir,
             "output_dir": output_dir,
@@ -952,7 +1021,7 @@ class Submitter:
                 output=stage.get("output"),
                 output_suffix=stage.get("output_suffix"),
                 ntasks=stage.get("ntasks"),
-                files_per_task=stage.get("files_per_task", 1),
+                files_per_task=stage.get("files_per_task"),
                 dependency=dependency,
                 larcv_path=stage.get("larcv_path", stage.get("larcv_basedir")),
                 flashmatch_path=stage.get("flashmatch_path"),

@@ -12,8 +12,8 @@ stages:
     config: path/to/config.yaml
     files: [input files or pattern]
     profile: s3df_ampere    # optional (default: auto-detect)
-    ntasks: 50              # optional
-    files_per_task: 1       # optional
+    ntasks: 50              # optional, target number of tasks if files_per_task is omitted
+    files_per_task: 5       # optional, overrides even splitting and uses ntasks as concurrency cap
     depends_on: []          # optional list of stage names
 ```
 

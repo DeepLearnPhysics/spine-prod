@@ -63,11 +63,14 @@ provides SPINE, OpT0Finder, and runtime dependencies; batch jobs invoke the
 
 ### Job Control
 ```bash
-# Limit parallel tasks
+# Split the file list across 50 tasks as evenly as possible
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
 # Multiple files per task
 ./submit.py --config infer/icarus/latest --source data/*.root --files-per-task 5
+
+# Use the file list already embedded in the config
+./submit.py --config config/train/icarus/deghost/deghost.yaml
 
 # Custom time limit
 ./submit.py --config infer/icarus/latest --source data.root --time 2:00:00
