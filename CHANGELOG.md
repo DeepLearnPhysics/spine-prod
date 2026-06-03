@@ -5,6 +5,34 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-02
+
+### Added
+- Added config-owned submissions: when no `--source` or `--source-list` is
+  provided, jobs rely on the input configuration already present in the SPINE
+  config and run as a single task.
+- Added a centralized `DEFAULT_SPINE_VERSION` file used by both
+  `configure.sh` and Python fallback container execution.
+
+### Changed
+- Updated the default SPINE container release to
+  `docker:ghcr.io/deeplearnphysics/spine:0.13.2`
+- Updated the derived default S3DF Singularity image path to
+  `/sdf/data/neutrino/images/spine_v0-13-2.sif`
+- Changed explicit file submissions to default to all files in one job instead
+  of one task per file.
+- Changed `--ntasks N` without `--files-per-task` to split explicit input files
+  roughly evenly across `N` tasks.
+- Stopped injecting `io.writer.*` overrides for config-owned submissions.
+- Refreshed the README and quick reference to describe centralized container
+  version handling.
+
+### Fixed
+- Rejected submit-time splitting and output overrides when no explicit file list
+  is provided, avoiding ambiguous training/config-owned behavior.
+
+Full Changelog: [v0.5.3...v0.6.0](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.5.3...v0.6.0)
+
 ## [0.5.3] - 2026-05-12
 
 ### Changed

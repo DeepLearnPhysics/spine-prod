@@ -220,9 +220,26 @@ class Submitter:
         )
 
     @staticmethod
+    def _default_container_version() -> str:
+        """Return the repository default SPINE container version."""
+        version_path = Path(__file__).resolve().parents[1] / "DEFAULT_SPINE_VERSION"
+        with open(version_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+
+    @staticmethod
+    def _container_version() -> str:
+        """Return configured container version, or the repo default fallback."""
+        if os.environ.get("SPINE_PROD_CONFIGURED") == "1":
+            version = os.environ.get("SPINE_CONTAINER_VERSION")
+            if version:
+                return version
+
+        return Submitter._default_container_version()
+
+    @staticmethod
     def _default_container_path() -> str:
         """Build the default local SIF path from the configured SPINE version."""
-        version = os.environ.get("SPINE_CONTAINER_VERSION", "0.12.2")
+        version = Submitter._container_version()
         path_version = version.replace(".", "-")
         return f"/sdf/data/neutrino/images/spine_v{path_version}.sif"
 
@@ -298,7 +315,7 @@ class Submitter:
     @staticmethod
     def _container_tag_for_cli() -> str:
         """Return the configured container tag in Docker/Podman CLI form."""
-        version = os.environ.get("SPINE_CONTAINER_VERSION", "0.12.2")
+        version = Submitter._container_version()
         tag = os.environ.get(
             "SPINE_CONTAINER_TAG", f"docker:ghcr.io/deeplearnphysics/spine:{version}"
         )

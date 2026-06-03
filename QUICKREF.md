@@ -2,11 +2,12 @@
 
 ## Runtime
 
-Production jobs run inside a tagged SPINE container. The default Shifter tag is
-`docker:ghcr.io/deeplearnphysics/spine:0.12.2`, with the S3DF `.sif` derived
-from that version at `/sdf/data/neutrino/images/spine_v0-12-2.sif`. The container
-provides SPINE, OpT0Finder, and runtime dependencies; batch jobs invoke the
-`spine` executable from inside the container.
+Production jobs run inside a tagged SPINE container. The default release is
+recorded in `DEFAULT_SPINE_VERSION`; `configure.sh` exports
+`SPINE_CONTAINER_VERSION` from that value and derives the registry tag and
+default S3DF `.sif` path. The container provides SPINE, OpT0Finder, and runtime
+dependencies; batch jobs invoke the `spine` executable from inside the
+container.
 
 ## Common Commands
 

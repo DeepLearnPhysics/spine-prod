@@ -24,26 +24,25 @@ source configure.sh
 ```
 
 **SPINE Version Control:** Production jobs now run entirely from a tagged SPINE
-container image. The default Shifter tag is
-`docker:ghcr.io/deeplearnphysics/spine:0.12.2`, with the matching S3DF
-Singularity image derived from the same version at
-`/sdf/data/neutrino/images/spine_v0-12-2.sif`. This container packages SPINE,
-OpT0Finder, and runtime dependencies, and jobs invoke the container-provided
-`spine` executable directly.
+container image. The repository default release is recorded in
+`DEFAULT_SPINE_VERSION`; `configure.sh` exports `SPINE_CONTAINER_VERSION` from
+that value and derives the registry tag and default S3DF Singularity image path.
+This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
+invoke the container-provided `spine` executable directly.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
 ```bash
-export SPINE_CONTAINER_PATH=/path/to/spine_v0-12-2.sif
-export SPINE_CONTAINER_VERSION=0.12.2
+export SPINE_CONTAINER_PATH=/path/to/spine.sif
+export SPINE_CONTAINER_VERSION=x.y.z
 source configure.sh
 ```
 
-**Updating SPINE Version:** Update the container version and site-local image
-path together:
+**Updating SPINE Version:** Update the repository default in
+`DEFAULT_SPINE_VERSION`. The default S3DF image path is derived automatically
+as `/sdf/data/neutrino/images/spine_v<version-with-dashes>.sif`.
 ```bash
-export SPINE_CONTAINER_VERSION=0.12.2
-# Default SPINE_CONTAINER_PATH becomes /sdf/data/neutrino/images/spine_v0-12-2.sif
+echo x.y.z > DEFAULT_SPINE_VERSION
 ```
 
 ### 2. Basic Job Submission
@@ -608,6 +607,7 @@ ls -lt jobs/
 Set by `configure.sh`:
 
 - `SPINE_PROD_BASEDIR` - Base directory of this repository
+- `SPINE_PROD_CONFIGURED` - Marker that the shell environment was configured
 - `SPINE_CONFIG_PATH` - Configuration search path
 - `ICARUS_DATA_DIR` - ICARUS data release path
 - `SPINE_CONTAINER_VERSION` - Tagged SPINE container version, without a leading `v`

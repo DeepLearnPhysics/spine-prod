@@ -7,6 +7,7 @@ if [[ -z $FORCE_SPINE_PROD_BASEDIR ]]; then
 else
     export SPINE_PROD_BASEDIR=$FORCE_SPINE_PROD_BASEDIR
 fi
+export SPINE_PROD_CONFIGURED=1
 
 # Setup config search path (prepend once to any existing paths)
 SPINE_PROD_CONFIG_PATH=$SPINE_PROD_BASEDIR/config
@@ -18,7 +19,7 @@ fi
 
 # Define the SPINE container release used by production jobs.
 if [[ -z $SPINE_CONTAINER_VERSION ]]; then
-    export SPINE_CONTAINER_VERSION=0.12.2
+    export SPINE_CONTAINER_VERSION=$(<"$SPINE_PROD_BASEDIR/DEFAULT_SPINE_VERSION")
 fi
 
 # Define path to the container (Singularity/Apptainer .sif file)
@@ -45,6 +46,7 @@ fi
 echo
 printf "\033[93mSPINE_PROD\033[00m FYI shell env. may useful for external packages:\n"
 printf "    \033[95mSPINE_PROD_BASEDIR\033[00m      = $SPINE_PROD_BASEDIR\n"
+printf "    \033[95mSPINE_PROD_CONFIGURED\033[00m    = $SPINE_PROD_CONFIGURED\n"
 printf "    \033[95mSPINE_CONFIG_PATH\033[00m       = $SPINE_CONFIG_PATH\n"
 printf "    \033[95mSPINE_CONTAINER_VERSION\033[00m = $SPINE_CONTAINER_VERSION\n"
 printf "    \033[95mSPINE_CONTAINER_PATH\033[00m    = $SPINE_CONTAINER_PATH\n"

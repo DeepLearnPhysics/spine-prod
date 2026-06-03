@@ -576,7 +576,7 @@ class TestInteractiveExecution:
                 os.environ,
                 {
                     "SPINE_CONTAINER_PATH": str(tmp_path / "missing.sif"),
-                    "SPINE_CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:0.12.2",
+                    "SPINE_CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:9.8.7",
                 },
                 clear=False,
             ),
@@ -594,10 +594,44 @@ class TestInteractiveExecution:
         assert "export NUMBA_NUM_THREADS=64" in command
         assert "docker run --rm" in command
         assert "--platform linux/amd64" in command
-        assert "ghcr.io/deeplearnphysics/spine:0.12.2" in command
+        assert "ghcr.io/deeplearnphysics/spine:9.8.7" in command
         assert "docker:ghcr" not in command
         assert "spine -S" in command
         assert "--set base.world_size=0" in command
+
+    def test_default_container_version_comes_from_repo_file(
+        self, mock_submitter, workspace_root
+    ):
+        """Test Python fallback reads the same default used by configure.sh."""
+        expected = (
+            (workspace_root / "DEFAULT_SPINE_VERSION")
+            .read_text(encoding="utf-8")
+            .strip()
+        )
+
+        with patch.dict(os.environ, {}, clear=True):
+            assert mock_submitter._default_container_version() == expected
+            assert mock_submitter._container_version() == expected
+            assert mock_submitter._container_tag_for_cli().endswith(f":{expected}")
+            assert mock_submitter._default_container_path().endswith(
+                f"spine_v{expected.replace('.', '-')}.sif"
+            )
+
+    def test_container_version_env_override_requires_configured_env(
+        self, mock_submitter
+    ):
+        """Test direct version env overrides are ignored without configure.sh."""
+        expected = mock_submitter._default_container_version()
+
+        with patch.dict(os.environ, {"SPINE_CONTAINER_VERSION": "9.8.7"}, clear=True):
+            assert mock_submitter._container_version() == expected
+
+        with patch.dict(
+            os.environ,
+            {"SPINE_PROD_CONFIGURED": "1", "SPINE_CONTAINER_VERSION": "9.8.7"},
+            clear=True,
+        ):
+            assert mock_submitter._container_version() == "9.8.7"
 
     def test_run_interactive_container_uses_configured_sif_runtime(
         self, mock_submitter, tmp_path
