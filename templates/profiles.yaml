@@ -97,7 +97,7 @@ profiles:
   nersc_gpu_80gb:
     site: nersc
     qos: shared
-    constraint: gpu
+    constraint: gpu&hbm80g
     gpu_type: a100
     gpu_mem: 80g
     gpus_per_node: 1
@@ -137,7 +137,7 @@ profiles:
   nersc_gpu_exclusive_80gb:
     site: nersc
     qos: regular
-    constraint: gpu
+    constraint: gpu&hbm80g
     gpu_type: a100
     gpu_mem: 80g
     gpus_per_node: 4
