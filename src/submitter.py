@@ -442,6 +442,7 @@ class Submitter:
         source_type: str = "source",
         output: Optional[str] = None,
         output_suffix: Optional[str] = None,
+        no_writer: bool = False,
         files_per_task: Optional[int] = None,
         task_id: int = 1,
         larcv_path: Optional[str] = None,
@@ -474,6 +475,9 @@ class Submitter:
             Output file path
         output_suffix : str, optional
             Output HDF5 suffix when output names are derived from input files
+        no_writer : bool, optional
+            Do not inject automatic ``io.writer`` output overrides for explicit
+            file submissions.
         files_per_task : int, optional
             Files to process per task. If omitted, all explicit input files run
             in a single task unless ``ntasks``-style splitting is requested by
@@ -523,6 +527,8 @@ class Submitter:
             if not file_list:
                 raise ValueError("No input files found")
             print(f"Found {len(file_list)} file(s) to process")
+            if no_writer and (output is not None or output_suffix is not None):
+                raise ValueError("Cannot use --no-writer with --output/--output-suffix")
         else:
             if files_per_task is not None:
                 raise ValueError(
@@ -621,11 +627,11 @@ class Submitter:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
-        elif file_list:
+        elif file_list and not no_writer:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
         output_args = (
             self._format_spine_output_args(output, output_dir, output_suffix)
-            if file_list
+            if file_list and not no_writer
             else ""
         )
         spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
@@ -696,6 +702,7 @@ class Submitter:
         job_name: Optional[str] = None,
         output: Optional[str] = None,
         output_suffix: Optional[str] = None,
+        no_writer: bool = False,
         ntasks: Optional[int] = None,
         files_per_task: Optional[int] = None,
         dependency: Optional[str] = None,
@@ -731,6 +738,9 @@ class Submitter:
         output_suffix : str, optional
             Output HDF5 suffix when output names are derived from input files,
             by default None
+        no_writer : bool, optional
+            Do not inject automatic ``io.writer`` output overrides for explicit
+            file submissions.
         ntasks : int, optional
             Target number of tasks when ``files_per_task`` is omitted, or the
             scheduler array concurrency cap when ``files_per_task`` is set.
@@ -776,6 +786,8 @@ class Submitter:
             if not file_list:
                 raise ValueError("No input files found")
             print(f"Found {len(file_list)} file(s) to process")
+            if no_writer and (output is not None or output_suffix is not None):
+                raise ValueError("Cannot use --no-writer with --output/--output-suffix")
         else:
             if ntasks is not None or files_per_task is not None:
                 raise ValueError(
@@ -858,11 +870,11 @@ class Submitter:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
-        elif file_list:
+        elif file_list and not no_writer:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
         output_args = (
             self._format_spine_output_args(output, output_dir, output_suffix)
-            if file_list
+            if file_list and not no_writer
             else ""
         )
 
@@ -977,6 +989,7 @@ class Submitter:
             "flashmatch_path": flashmatch_path,
             "spine_path": spine_path,
             "cvmfs": cvmfs,
+            "no_writer": no_writer,
             "profile": profile,
             "profile_config": profile_config,
             "num_files": len(file_list) if file_list else None,

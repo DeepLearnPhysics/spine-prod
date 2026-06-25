@@ -154,6 +154,14 @@ Examples:
             "(default: final config stem)."
         ),
     )
+    parser.add_argument(
+        "--no-writer",
+        action="store_true",
+        help=(
+            "Do not inject io.writer output overrides for explicit "
+            "--source/--source-list submissions."
+        ),
+    )
     parser.add_argument("--account", "-A", help="Batch scheduler account")
     parser.add_argument("--dependency", "-d", help="Batch scheduler dependency string")
 
@@ -361,6 +369,7 @@ Examples:
                 source_type=source_type,
                 output=args.output,
                 output_suffix=args.output_suffix,
+                no_writer=args.no_writer,
                 files_per_task=args.files_per_task,
                 task_id=args.task_id,
                 larcv_path=args.larcv_path,
@@ -390,6 +399,7 @@ Examples:
                 job_name=args.job_name,
                 output=args.output,
                 output_suffix=args.output_suffix,
+                no_writer=args.no_writer,
                 ntasks=args.ntasks,
                 files_per_task=args.files_per_task,
                 dependency=args.dependency,

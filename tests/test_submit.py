@@ -464,6 +464,30 @@ class TestInteractiveExecution:
         assert "spine -S" not in command
         assert "--set io.writer." not in command
 
+    def test_run_interactive_no_writer_suppresses_writer_overrides(
+        self, mock_submitter, tmp_path
+    ):
+        """Test explicit interactive inputs can opt out of writer overrides."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+        completed = type("Completed", (), {"returncode": 0})()
+
+        with (
+            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                no_writer=True,
+                interactive_runtime="local",
+            )
+
+        assert exit_code == 0
+        command = run.call_args.args[0]
+        assert "spine -S" in command
+        assert "--set io.writer." not in command
+
     def test_run_interactive_rejects_output_without_files(self, mock_submitter):
         """Test config-owned interactive runs reject inference output overrides."""
         with pytest.raises(
@@ -472,6 +496,24 @@ class TestInteractiveExecution:
         ):
             mock_submitter.run_interactive(
                 config="config/train/icarus/deghost/deghost.yaml",
+                output_suffix="custom_reco",
+            )
+
+    def test_run_interactive_rejects_no_writer_with_output_suffix(
+        self, mock_submitter, tmp_path
+    ):
+        """Test no-writer cannot be combined with writer output overrides."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+
+        with pytest.raises(
+            ValueError,
+            match="Cannot use --no-writer with --output/--output-suffix",
+        ):
+            mock_submitter.run_interactive(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                no_writer=True,
                 output_suffix="custom_reco",
             )
 
@@ -1025,6 +1067,56 @@ class TestBatchSpineOverride:
             task_lists[0].read_text(encoding="utf-8").strip().splitlines()
             == input_files
         )
+
+    def test_submit_job_no_writer_suppresses_writer_overrides(
+        self, mock_submitter, tmp_path
+    ):
+        """Test explicit batch inputs can opt out of writer overrides."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
+        ):
+            job_ids = mock_submitter.submit_job(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                profile="s3df_ampere",
+                no_writer=True,
+            )
+
+        assert job_ids == ["12345"]
+
+        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        assert len(scripts) == 1
+        script = scripts[0].read_text(encoding="utf-8")
+        assert " -S $TASK_FILE_LIST" in script
+        assert "--set io.writer." not in script
+        assert "Output: defined in config" in script
+
+    def test_submit_job_rejects_no_writer_with_output_suffix(
+        self, mock_submitter, tmp_path
+    ):
+        """Test no-writer cannot be combined with writer output overrides."""
+        input_file = tmp_path / "input.root"
+        input_file.touch()
+
+        with pytest.raises(
+            ValueError,
+            match="Cannot use --no-writer with --output/--output-suffix",
+        ):
+            mock_submitter.submit_job(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=[str(input_file)],
+                profile="s3df_ampere",
+                no_writer=True,
+                output_suffix="custom_reco",
+            )
 
     def test_submit_job_uses_config_inputs_when_files_omitted(self, mock_submitter):
         """Test batch submission can defer input discovery to the config."""
