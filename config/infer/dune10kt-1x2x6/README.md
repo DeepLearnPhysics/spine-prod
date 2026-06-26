@@ -9,8 +9,9 @@ The configurations below are for DUNE10kt-1x2x6 datasets. This summary is divide
 All DUNE10kt-1x2x6 configs use a **hierarchical YAML include system** with composable components:
 
 ### Main Configurations
-- **`full_chain_260510.yaml`**: May 2026, latest DUNE10kt-1x2x6 full chain config
-- **`full_chain_260202.yaml`**: February 2026, previous DUNE10kt-1x2x6 full chain config
+- **`full_chain_260626.yaml`**: June 2026, latest DUNE10kt-1x2x6 full chain config
+- **`full_chain_260510.yaml`**: May 2026, previous DUNE10kt-1x2x6 full chain config
+- **`full_chain_260202.yaml`**: February 2026, older DUNE10kt-1x2x6 full chain config
 - **`save_truth_260202.yaml`**: February 2026, truth-only output configuration writing truth content to HDF5
 
 ### Component Structure
@@ -30,7 +31,8 @@ Each main config includes modular YAML files:
 - **`model/model_common.yaml`**: Common model architecture
 
 **Post-processing Components:**
-- **`post/post_260202.yaml`**: Post-processing configuration (Jan 2026)
+- **`post/post_260626.yaml`**: Post-processing configuration (June 2026)
+- **`post/post_260202.yaml`**: Post-processing configuration (Feb 2026)
 - **`post/post_common.yaml`**: Common post-processing settings
 
 ### Modifiers
@@ -48,6 +50,21 @@ These weights have been trained/validated using the following files:
 - Test set: `/sdf/data/neutrino/dune/sim/mpvmpr_v1/test_file_list.txt`
 
 This training set has a set of better-tuned ghost labels.
+
+## June 26th 2026
+
+```shell
+full_chain_260626.yaml
+```
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Modular YAML structure with base/io/model/post components
+  - Uses the May 2026 model weights with updated June 2026 post-processing
+
+Changes:
+  - Removed Michel maximum KE cut
+  - Patch incorrect calibration gain value in post-processing
 
 ## May 10th 2026
 

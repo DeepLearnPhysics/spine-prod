@@ -1,9 +1,9 @@
 # Post-processing configuration for DUNE10kt-1x2x6
-# Revision date: February 2, 2026
+# Revision date: June 26, 2026
 
 __meta__:
-  version: "260202"
-  date: "2026-02-02"
+  version: "260626"
+  date: "2026-06-26"
   description: "DUNE10kt-1x2x6 post-processing, latest"
   compatible_with:
     base: ">=260202"
@@ -14,6 +14,12 @@ __meta__:
 include: post_common.yaml
 
 override:
+  # Temporary calibration block to fix the charge scale
+  post.calibration:
+    priority: 10
+    gain:
+      gain: 0.1982 # Corrects for a wrong e-/ADC gain in the model
+
   # Containment configuration
   post.containment:
     run_mode: both
@@ -31,7 +37,7 @@ override:
   post.calo_ke.shower_fudge: 1.2359
 
   # Introduces all the shower-specific post-processors
-  post.shape_logic.maximum_michel_ke: 100
+  # No threshold on maximum michel KE
   post.particle_threshold:
     primary_threshold: 0.1
     priority: 4
