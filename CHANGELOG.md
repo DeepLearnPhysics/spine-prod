@@ -7,9 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-26
+
 ### Added
 - Added `submit.py --no-writer` to suppress automatic `io.writer.*` overrides
   for explicit `--source` and `--source-list` submissions.
+- Added the June 26, 2026 DUNE10kt-1x2x6 full-chain inference configuration,
+  using the May 2026 model weights with updated June post-processing.
+
+### Changed
+- Updated the default SPINE container release to
+  `docker:ghcr.io/deeplearnphysics/spine:0.14.0`
+- Updated the derived default S3DF Singularity image path to
+  `/sdf/data/neutrino/images/spine_v0-14-0.sif`
+
+### Fixed
+- Fixed NERSC 80 GB GPU profiles to request the `gpu&hbm80g` constraint.
+- Updated the DUNE10kt-1x2x6 post-processing configuration to remove the Michel
+  maximum kinetic-energy cut and patch the calibration gain.
+
+Full Changelog: [v0.6.0...v0.6.1](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.6.0...v0.6.1)
 
 ## [0.6.0] - 2026-06-02
 
