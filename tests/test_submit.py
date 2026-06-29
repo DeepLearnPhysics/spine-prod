@@ -1281,10 +1281,10 @@ class TestCompositeConfig:
             detector="nd-lar",
         )
 
-        expected_name = (
-            f"{Path(latest_config).stem.removesuffix('_composite')}"
-            "_single_composite.yaml"
-        )
+        latest_stem = Path(latest_config).stem
+        if latest_stem.endswith("_composite"):
+            latest_stem = latest_stem[: -len("_composite")]
+        expected_name = f"{latest_stem}_single_composite.yaml"
 
         assert Path(composite_path).exists()
         assert Path(composite_path).name == expected_name

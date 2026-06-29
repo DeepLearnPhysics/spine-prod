@@ -380,7 +380,11 @@ class ConfigManager:
 
         # Save composite config first to determine its location. If the base
         # is already a generated composite, keep only the final composite tag.
-        output_base_name = base_name.removesuffix("_composite")
+        output_base_name = (
+            base_name[: -len("_composite")]
+            if base_name.endswith("_composite")
+            else base_name
+        )
         composite_name = f"{output_base_name}_{'_'.join(mod_names)}_composite.yaml"
         composite_path = job_dir / composite_name
 

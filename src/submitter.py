@@ -319,7 +319,7 @@ class Submitter:
         tag = os.environ.get(
             "SPINE_CONTAINER_TAG", f"docker:ghcr.io/deeplearnphysics/spine:{version}"
         )
-        return tag.removeprefix("docker:")
+        return tag[len("docker:") :] if tag.startswith("docker:") else tag
 
     @staticmethod
     def _sif_runtime_executable() -> Optional[str]:
