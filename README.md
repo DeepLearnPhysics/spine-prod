@@ -34,7 +34,7 @@ invoke the container-provided `spine` executable directly.
 container release before sourcing `configure.sh`:
 ```bash
 export SPINE_CONTAINER_PATH=/path/to/spine.sif
-export SPINE_CONTAINER_VERSION=x.y.z
+export SPINE_CONTAINER_VERSION=vx.y.z
 source configure.sh
 ```
 
@@ -42,7 +42,7 @@ source configure.sh
 `DEFAULT_SPINE_VERSION`. The default S3DF image path is derived automatically
 as `/sdf/data/neutrino/images/spine_v<version-with-dashes>.sif`.
 ```bash
-echo x.y.z > DEFAULT_SPINE_VERSION
+echo vx.y.z > DEFAULT_SPINE_VERSION
 ```
 
 ### 2. Basic Job Submission
@@ -610,7 +610,7 @@ Set by `configure.sh`:
 - `SPINE_PROD_CONFIGURED` - Marker that the shell environment was configured
 - `SPINE_CONFIG_PATH` - Configuration search path
 - `ICARUS_DATA_DIR` - ICARUS data release path
-- `SPINE_CONTAINER_VERSION` - Tagged SPINE container version, without a leading `v`
+- `SPINE_CONTAINER_VERSION` - Tagged SPINE container version
 - `SPINE_CONTAINER_PATH` - Singularity/Apptainer image path
 - `SPINE_CONTAINER_TAG` - Registry image tag for Shifter-style runtimes, including `docker:`
 - `SPINE_CONTAINER_PATH_AUTO` - Tracks whether `SPINE_CONTAINER_PATH` was auto-derived

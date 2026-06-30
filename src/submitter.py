@@ -240,6 +240,7 @@ class Submitter:
     def _default_container_path() -> str:
         """Build the default local SIF path from the configured SPINE version."""
         version = Submitter._container_version()
+        version = version[1:] if version.startswith("v") else version
         path_version = version.replace(".", "-")
         return f"/sdf/data/neutrino/images/spine_v{path_version}.sif"
 

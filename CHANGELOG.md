@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-06-30
+
+### Changed
+- Updated the default SPINE container release to
+  `docker:ghcr.io/deeplearnphysics/spine:v0.14.1`
+- Updated the derived default S3DF Singularity image path to
+  `/sdf/data/neutrino/images/spine_v0-14-1.sif`
+
+### Fixed
+- Restored compatibility with Python 3.6-era submit environments by replacing
+  Python 3.9-only string prefix/suffix helpers in submit-time code.
+- Normalized leading `v` container versions when deriving the default S3DF
+  Singularity image path.
+
+Full Changelog: [v0.6.1...v0.6.2](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.6.1...v0.6.2)
+
 ## [0.6.1] - 2026-06-26
 
 ### Added

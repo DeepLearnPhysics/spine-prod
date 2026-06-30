@@ -655,8 +655,11 @@ class TestInteractiveExecution:
             assert mock_submitter._default_container_version() == expected
             assert mock_submitter._container_version() == expected
             assert mock_submitter._container_tag_for_cli().endswith(f":{expected}")
+            expected_path_version = (
+                expected[1:] if expected.startswith("v") else expected
+            )
             assert mock_submitter._default_container_path().endswith(
-                f"spine_v{expected.replace('.', '-')}.sif"
+                f"spine_v{expected_path_version.replace('.', '-')}.sif"
             )
 
     def test_container_version_env_override_requires_configured_env(
