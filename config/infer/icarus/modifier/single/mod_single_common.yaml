@@ -1,8 +1,8 @@
 # Single-cryostat modification for ICARUS configs, common settings
+# Include this after the main config to process single-cryostat simulations
 
 __meta__:
   kind: fragment
-# Include this after the main config to process single-cryostat simulations
 
 override:
   # Collate function does not have to split by cryostat

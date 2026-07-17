@@ -1,8 +1,8 @@
 # Data-only modification for ICARUS configs, common settings
+# Include this after the main config to transform to data-only mode (no truth labels)
 
 __meta__:
   kind: fragment
-# Include this after the main config to transform to data-only mode (no truth labels)
 
 override:
   ### IO overrides ###

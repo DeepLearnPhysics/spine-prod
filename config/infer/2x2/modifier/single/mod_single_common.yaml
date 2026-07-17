@@ -1,8 +1,8 @@
 # Single-module modification for 2x2 configs
+# Include this after the main config to process only a single module
 
 __meta__:
   kind: fragment
-# Include this after the main config to process only a single module
 
 override:
   # Change the detector geometry to single-module
