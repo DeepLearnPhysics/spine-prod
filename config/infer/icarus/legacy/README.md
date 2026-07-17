@@ -12,12 +12,12 @@ Instead of using these legacy configs, compose them dynamically:
 
 **Old way (legacy):**
 ```bash
-spine-prod --config icarus/legacy/icarus_full_chain_data_co_lite_250625.yaml --source data/*.root
+./submit.py --config infer/icarus/legacy/icarus_full_chain_data_co_lite_250625.yaml --source data/*.root
 ```
 
 **New way (recommended):**
 ```bash
-spine-prod --config icarus/full_chain_co_250625 --modifier data,lite --source data/*.root
+./submit.py --config infer/icarus/full_chain_co_250625.yaml --apply-mods data lite --source data/*.root
 ```
 
 ### Migration Examples
@@ -41,7 +41,6 @@ spine-prod --config icarus/full_chain_co_250625 --modifier data,lite --source da
 - **`4ms`**: Use 4ms electron lifetime calibration
 - **`8ms`**: Use 8ms electron lifetime calibration
 - **`transp`**: Apply transparency corrections
-- **`lowbs`**: Use low batch size for memory-constrained environments
 
 See `../modifier/` directory for available modifiers and their implementations.
 

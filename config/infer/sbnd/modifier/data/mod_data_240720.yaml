@@ -2,6 +2,7 @@
 # Revision date: July 20, 2024
 
 __meta__:
+  kind: mod
   name: "data"
   version: "240720"
   date: "2024-07-20"

@@ -25,7 +25,6 @@ Each main config includes modular YAML files:
 
 **Model Components:**
 - **`model/model_260210.yaml`**: Feb 2026 weights and model settings
-- **`model/model_260128.yaml`**: Jan 2026 (v2) weights and model settings
 - **`model/model_common.yaml`**: Common model architecture
 
 **Post-processing Components:**
@@ -60,19 +59,6 @@ Description:
   - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
   - Modular YAML structure with base/io/model/post components
   - Latest production configuration
-
-Known issue(s):
-  - No charged kaon in the training sample
-
-## January 18th 2026
-
-```shell
-full_chain_260128.yaml
-```
-
-Description:
-  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
-  - Modular YAML structure with base/io/model/post components
 
 Known issue(s):
   - No charged kaon in the training sample

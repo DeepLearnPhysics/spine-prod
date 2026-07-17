@@ -13,7 +13,7 @@ The SBND configurations now follow a modular structure where each full chain con
 - **`post/`**: Post-processing configurations including flash matching and analysis modules
 - **`legacy/`**: Archived configurations for backward compatibility
 
-Each top-level configuration file (e.g., `sbnd_full_chain_co_250901.yaml`) includes the appropriate modular components to build the complete chain. This structure makes it easier to:
+Each top-level configuration file (e.g., `full_chain_co_250901.yaml`) includes the appropriate modular components to build the complete chain. This structure makes it easier to:
 - Mix and match components from different versions
 - Update individual parts without duplicating settings
 - Maintain consistency across similar configurations
@@ -25,14 +25,14 @@ Truth-only output configurations are also available as top-level composites, for
 Features that previously required separate config files (e.g., `*_data_*`) are now handled through:
 
 1. **Modifiers** in the `modifier/` directory that can be applied to any base configuration
-2. **CLI options** when running inference (e.g., `--data`, `--lite`)
+2. **CLI composition** with `--apply-mods` when running inference
 3. **Include statements** that compose functionality from different modules
 
 For example:
-- Data-only mode (no truth labels): Apply `modifier/data/mod_data_*.yaml` or use CLI flag
-- Lite output: Use CLI flag for direct lite file output
+- Data-only mode (no truth labels): Apply `modifier/data/mod_data_*.yaml` or use `--apply-mods data`
+- Lite output: Use `--apply-mods lite`
 
-Legacy `.yaml files have been moved to the `legacy/` directory.
+Legacy `.yaml` files have been moved to the `legacy/` directory.
 
 ## Configurations for SBND's Generation II MPVMPR
 
@@ -51,7 +51,7 @@ These weights have been trained using the following files at Polaris:
 ## May 21st 2026
 
 ```shell
-sbnd_full_chain_co_260521.yaml
+full_chain_co_260521.yaml
 ```
 
 The following modifications were made w.r.t. the May 1 2026 configuration
@@ -65,10 +65,10 @@ Description:
 ## May 1st 2026
 
 ```shell
-sbnd_full_chain_co_260501.yaml
+full_chain_co_260501.yaml
 ```
 
-The following modifications were made w.r.t. the March 3 2026 configuration
+The following modifications were made w.r.t. the March 16 2026 configuration
 - Move to the new training sample
 - Move the calibration step before the semantic segmentation stage
 
@@ -96,7 +96,7 @@ These weights have been trained using the following files at Polaris:
 ## March 16th 2026
 
 ```shell
-sbnd_full_chain_co_260316.yaml
+full_chain_co_260316.yaml
 ```
 
 The following modifications were made w.r.t. the earlier March 2026 configuration
@@ -109,7 +109,7 @@ Description:
 ## March 4th 2026
 
 ```shell
-sbnd_full_chain_co_260304.yaml
+full_chain_co_260304.yaml
 ```
 
 The following modifications were made w.r.t. the September 2025 configuration
@@ -122,7 +122,7 @@ Description:
 ## February 18th 2026
 
 ```shell
-sbnd_full_chain_co_260218.yaml
+full_chain_co_260218.yaml
 ```
 
 The following modifications were made w.r.t. the September 2025 configuration
@@ -135,7 +135,7 @@ Description:
 ## September 1st 2025
 
 ```shell
-sbnd_full_chain_co_250901.yaml
+full_chain_co_250901.yaml
 ```
 
 The following modifications were made w.r.t. the August configurations
@@ -154,7 +154,7 @@ Description:
 ## August 18th 2025
 
 ```shell
-sbnd_full_chain_co_250818.yaml
+full_chain_co_250818.yaml
 ```
 
 The following modifications were made w.r.t. the March configurations
@@ -171,7 +171,7 @@ Description:
 ## March 28th 2025
 
 ```shell
-sbnd_full_chain_co_250328.yaml
+full_chain_co_250328.yaml
 ```
 
 The following modifications were made to the `sbndcode` configuration:
@@ -195,7 +195,7 @@ These weights have been trained/validated using the following files:
 ### July 20th 2024
 
 ```shell
-sbnd_full_chain_240720.yaml
+full_chain_240720.yaml
 ```
 
 Description:
@@ -211,7 +211,7 @@ Known issue(s):
 ### August 14th 2024
 
 ```shell
-sbnd_full_chain_240814.yaml
+full_chain_240814.yaml
 ```
 
 Description:
@@ -228,7 +228,7 @@ Known issue(s):
 ### September 18th 2024
 
 ```shell
-sbnd_full_chain_240918.yaml
+full_chain_240918.yaml
 ```
 
 Description:

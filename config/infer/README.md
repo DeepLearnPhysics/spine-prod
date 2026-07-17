@@ -15,9 +15,12 @@ The configurations in this directory are used to:
 Each subdirectory contains detector-specific configurations:
 
 - **`2x2/`**: 2x2 demonstrator detector configurations
+- **`dune10kt-1x2x6/`**: DUNE 10 kt module 1x2x6 configurations
 - **`generic/`**: Generic detector configurations for testing and development
 - **`icarus/`**: ICARUS detector configurations
 - **`nd-lar/`**: DUNE Near Detector Liquid Argon (ND-LAr) configurations
+- **`protodune-sp/`**: ProtoDUNE single-phase configurations
+- **`protodune-vd/`**: ProtoDUNE vertical-drift configurations
 - **`sbnd/`**: Short-Baseline Near Detector (SBND) configurations
 
 ## Configuration Structure
@@ -31,7 +34,7 @@ All detector directories follow a modular structure:
 - **`post/`**: Post-processing including flash matching and analysis tools
 - **`legacy/`**: Archived configurations for backward compatibility
 
-Top-level configuration files (e.g., `detector_full_chain_YYMMDD.yaml`) compose these modules into complete reconstruction chains.
+Top-level configuration files (e.g., `full_chain_YYMMDD.yaml`) compose these modules into complete reconstruction chains. Detector-independent utility configurations, such as `common/litify.yaml`, live under `common/`.
 
 ## Versioning and Reproducibility
 
@@ -46,10 +49,10 @@ Configurations are used with the SPINE inference framework:
 
 ```bash
 # Basic usage
-./submit.py -c <detector>/<config_file>.yaml -s <input_file>
+./submit.py -c infer/<detector>/<config_file>.yaml -s <input_file>
 
 # With modifiers (data-only mode, lite output, etc.)
-./submit.py -c <detector>/<config_file>.yaml -s <input_file> --apply_mods data,lite
+./submit.py -c infer/<detector>/<config_file>.yaml -s <input_file> --apply-mods data lite
 ```
 
 Refer to individual detector README files for detector-specific details, training datasets, and version-specific changes.

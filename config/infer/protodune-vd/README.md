@@ -9,6 +9,7 @@ The configurations below are for ProtoDUNE-VD datasets. This summary is divided 
 All ProtoDUNE-VD configs use a **hierarchical YAML include system** with composable components:
 
 ### Main Configurations
+- **`full_chain_260128.yaml`**: January 2026, latest ProtoDUNE-VD full chain config
 - **`full_chain_260118.yaml`**: January 2026, main ProtoDUNE-VD full chain config
 - **`save_truth_260118.yaml`**: January 2026, truth-only output configuration writing truth content to HDF5
 
@@ -25,10 +26,11 @@ Each main config includes modular YAML files:
 
 **Model Components:**
 - **`model/model_260118.yaml`**: Jan 2026 weights and model settings
-- **`model/model_260118.yaml`**: Jan 2026 (v2) weights and model settings
+- **`model/model_260128.yaml`**: Jan 2026 (v2) weights and model settings
 - **`model/model_common.yaml`**: Common model architecture
 
 **Post-processing Components:**
+- **`post/post_260128.yaml`**: Post-processing configuration (Jan 2026)
 - **`post/post_260118.yaml`**: Post-processing configuration (Jan 2026)
 - **`post/post_common.yaml`**: Common post-processing settings
 

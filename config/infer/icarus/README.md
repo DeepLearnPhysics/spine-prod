@@ -25,15 +25,15 @@ Truth-only output configurations are also available as top-level composites, for
 Features that previously required separate config files (e.g., `*_data_*`, `*_lite_*`, `*_numi_*`) are now handled through:
 
 1. **Modifiers** in the `modifier/` directory that can be applied to any base configuration
-2. **CLI options** when running inference (e.g., `--data`, `--lite`, `--beam-window`)
+2. **CLI composition** with `--apply-mods` when running inference
 3. **Include statements** that compose functionality from different modules
 
 For example:
-- Data-only mode (no truth labels): Apply `modifier/data/mod_data_*.yaml` or use CLI flag
-- Lite output: Use CLI flag for direct lite file output
-- NuMI beam window: Specify beam window timing via CLI or post-processing config
-- Single cryostat: Use appropriate geometry configuration
-- Calibration variations (4ms, 8ms, transparency): Handled upstream or via modifiers
+- Data-only mode (no truth labels): Apply `modifier/data/mod_data_*.yaml` or use `--apply-mods data`
+- Lite output: Use `--apply-mods lite`
+- NuMI beam window: Use `--apply-mods numi`
+- Single cryostat: Use `--apply-mods single`
+- Calibration variations: Use the `4ms`, `8ms`, or `transp` modifiers
 
 Legacy `.yaml` files have been moved to the `legacy/` directory.
 
@@ -99,7 +99,7 @@ These weights have been trained/validated using the following files:
 - Training set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v4/train_file_list.txt`
 - Test set: `/sdf/data/neutrino/icarus/sim/mpvmpr_v4/test_file_list.txt`
 
-This dataset is a superset of v03, with the additional of samples with different
+This dataset is a superset of v03, with the addition of samples with different
 electron lifetimes (4 ms and 8 ms) to match what was recorded during ICARUS run 2.
 
 ### March 25th 2026
@@ -158,7 +158,7 @@ Changes:
     - Compute start straightness
     - Compute particle spread
     - Compute EM shower conversion distance
-  - Use true energy depoisitions (SED) for the contaiment check
+  - Use true energy depositions (SED) for the containment check
   - Use the vertex to update the track orientations (fix track flipping)
 
 

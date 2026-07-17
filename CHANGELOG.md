@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/sdf/data/neutrino/images/spine_v0-15-1.sif`.
 - Declared reusable `*_common.yaml` inference configurations as metadata
   fragments, preventing missing-metadata warnings during composition.
+- Declared versioned modifier configurations as metadata modifiers and the
+  detector-independent litify configuration as a standalone bundle.
+- Corrected stale configuration versions, dates, detector labels, and comments
+  using dated filenames as the source of truth.
+- Refreshed inference READMEs to match the available configurations, modifiers,
+  and current submission CLI.
 
 ## [0.6.2] - 2026-06-30
 

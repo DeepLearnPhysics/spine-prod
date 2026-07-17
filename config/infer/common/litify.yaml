@@ -1,6 +1,10 @@
 # Configuration which turns input SPINE HDF5 files into Lite output HDF5 files
 # This configuration works for any detector
 
+__meta__:
+  kind: bundle
+  description: "Convert SPINE HDF5 files to lite-output HDF5 files"
+
 # Base configuration
 base:
   world_size: 0

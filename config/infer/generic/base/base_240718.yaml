@@ -1,4 +1,4 @@
-# Base common configuration for generic simulations (includes geometry and builder)
+# Base configuration for generic simulations
 # Revision date: July 18, 2024
 
 __meta__:

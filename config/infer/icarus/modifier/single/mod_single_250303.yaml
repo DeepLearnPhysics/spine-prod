@@ -2,6 +2,7 @@
 # Revision date: March 3, 2025
 
 __meta__:
+  kind: mod
   name: "single"
   version: "250303"
   date: "2025-03-03"

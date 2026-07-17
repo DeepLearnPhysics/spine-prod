@@ -12,8 +12,8 @@ This module provides automated tests for SPINE-prod configuration files:
 3. **Metadata Stripping**: Verifies that __meta__ blocks are properly removed
    from final configurations and don't pollute the SPINE runtime config.
 
-4. **Fragment Metadata**: Verifies that reusable *_common.yaml files declare
-   themselves as configuration fragments.
+4. **Metadata Contracts**: Verifies fragment and modifier kinds and ensures
+   metadata versions and dates agree with authoritative dated filenames.
 
 To run tests:
     pytest tests/test_config_validation.py -v
@@ -21,6 +21,7 @@ To run tests:
 To add a new detector for testing, add it to DETECTOR_BASE_CONFIGS dict.
 """
 
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -29,6 +30,11 @@ import yaml
 
 CONFIG_INFER_ROOT = Path(__file__).parent.parent / "config" / "infer"
 COMMON_CONFIGS = sorted(CONFIG_INFER_ROOT.rglob("*_common.yaml"))
+VERSIONED_MODIFIER_CONFIGS = sorted(
+    config_path
+    for config_path in CONFIG_INFER_ROOT.rglob("*.yaml")
+    if "modifier" in config_path.parts and not config_path.stem.endswith("_common")
+)
 
 try:
     from spine.config import load_config_file
@@ -45,6 +51,41 @@ def test_common_configs_are_fragments(config_path):
         config = yaml.load(config_file, Loader=yaml.BaseLoader)
 
     assert config.get("__meta__", {}).get("kind") == "fragment"
+
+
+@pytest.mark.parametrize(
+    "config_path", VERSIONED_MODIFIER_CONFIGS, ids=lambda path: str(path)
+)
+def test_versioned_modifiers_declare_mod_kind(config_path):
+    """Versioned modifier configurations must use modifier semantics."""
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = yaml.load(config_file, Loader=yaml.BaseLoader)
+
+    assert config.get("__meta__", {}).get("kind") == "mod"
+
+
+@pytest.mark.parametrize(
+    "config_path", sorted(CONFIG_INFER_ROOT.rglob("*.yaml")), ids=lambda path: str(path)
+)
+def test_metadata_version_matches_filename(config_path):
+    """Dated filenames are authoritative for metadata versions and dates."""
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = yaml.load(config_file, Loader=yaml.BaseLoader)
+
+    metadata = config.get("__meta__", {})
+    if "version" not in metadata:
+        return
+
+    match = re.search(r"_(\d{6})(?:_|$)", config_path.stem)
+    assert match is not None, "Versioned metadata requires a dated filename"
+
+    filename_version = match.group(1)
+    assert metadata["version"] == filename_version
+
+    expected_date = (
+        f"20{filename_version[:2]}-{filename_version[2:4]}-{filename_version[4:]}"
+    )
+    assert metadata["date"] == expected_date
 
 
 def load_config_with_includes(config_path):

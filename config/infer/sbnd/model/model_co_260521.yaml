@@ -1,9 +1,9 @@
 # SBND model configuration
-# Revision date: May 1, 2026
+# Revision date: May 21, 2026
 
 __meta__:
-  version: "260501"
-  date: "2026-05-01"
+  version: "260521"
+  date: "2026-05-21"
   description: "SBND model with collection-only charge rescaling"
   compatible_with:
     base: ">=260501"

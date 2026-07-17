@@ -1,4 +1,4 @@
-# Base common configuration for ND-LAr (includes geometry and builder)
+# Base configuration for ND-LAr
 # Revision date: August 19, 2024
 
 __meta__:

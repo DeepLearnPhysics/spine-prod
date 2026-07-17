@@ -1,5 +1,5 @@
 # Overlay modification for ND-LAr configs
-# Include this after the main config to transform to lite-output mode (no heavy data products)
+# Include this after the main config to overlay four images
 
 __meta__:
   kind: fragment

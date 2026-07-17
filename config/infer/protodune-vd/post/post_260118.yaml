@@ -1,10 +1,10 @@
-# Post-processing configuration for ICARUS
+# Post-processing configuration for ProtoDUNE-VD
 # Revision date: January 18, 2026
 
 __meta__:
   version: "260118"
   date: "2026-01-18"
-  description: "ICARUS post-processing, latest"
+  description: "ProtoDUNE-VD post-processing for January 2026"
   compatible_with:
     base: ">=260118"
     io: ">=260118"

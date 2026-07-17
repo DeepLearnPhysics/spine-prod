@@ -1,7 +1,8 @@
 # Data-only modification for ICARUS configs
-# Revision date: June 25, 2025
+# Revision date: March 3, 2025
 
 __meta__:
+  kind: mod
   name: "data"
   version: "250303"
   date: "2025-03-03"

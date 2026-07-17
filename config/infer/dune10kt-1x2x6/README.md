@@ -18,11 +18,11 @@ All DUNE10kt-1x2x6 configs use a **hierarchical YAML include system** with compo
 Each main config includes modular YAML files:
 
 **Base Components:**
-- **`base/base_260202.yaml`**: Geometry and base settings (Jan 2026)
+- **`base/base_260202.yaml`**: Geometry and base settings (Feb 2026)
 - **`base/base_common.yaml`**: Common base configuration
 
 **IO Components:**
-- **`io/io_260202.yaml`**: IO configuration (Jan 2026)
+- **`io/io_260202.yaml`**: IO configuration (Feb 2026)
 - **`io/io_common.yaml`**: Common IO settings
 
 **Model Components:**
