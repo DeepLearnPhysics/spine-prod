@@ -1,5 +1,6 @@
 """Tests for download preloading utilities."""
 
+import builtins
 import importlib.util
 import os
 import subprocess
@@ -150,6 +151,55 @@ def test_preload_downloads_loads_config(tmp_path):
     assert calls == [str(config.resolve())]
 
 
+def test_preload_downloads_sets_environment_and_loads_multiple_configs(
+    tmp_path, monkeypatch
+):
+    """Test cache settings and list inputs are forwarded to SPINE."""
+    configs = [tmp_path / "first.yaml", tmp_path / "second.yaml"]
+    for config in configs:
+        config.touch()
+    calls = []
+
+    monkeypatch.setitem(
+        sys.modules,
+        "spine.config.download",
+        type("DownloadModule", (), {"get_cache_dir": staticmethod(lambda: "cache")})(),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "spine.config.load",
+        type(
+            "LoadModule",
+            (),
+            {"load_config_file": staticmethod(lambda path: calls.append(path))},
+        )(),
+    )
+    monkeypatch.delenv("SPINE_PROD_BASEDIR", raising=False)
+    cache_dir = tmp_path / "~/cache"
+
+    loaded = preload.preload_downloads(configs, tmp_path, cache_dir)
+
+    assert loaded == [config.resolve() for config in configs]
+    assert calls == [str(config.resolve()) for config in configs]
+    assert os.environ["SPINE_PROD_BASEDIR"] == str(tmp_path)
+    assert os.environ["SPINE_CACHE_DIR"] == str(cache_dir.expanduser())
+
+
+def test_preload_downloads_reports_missing_spine_tools(tmp_path, monkeypatch):
+    """Test an actionable error is raised when SPINE cannot be imported."""
+    real_import = builtins.__import__
+
+    def reject_spine(name, *args, **kwargs):
+        if name.startswith("spine.config"):
+            raise ImportError("spine unavailable")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", reject_spine)
+
+    with pytest.raises(RuntimeError, match="Could not import SPINE config tools"):
+        preload.preload_downloads("config.yaml", tmp_path)
+
+
 def test_script_wrapper_delegates_to_preload(tmp_path):
     """Test the optional script wrapper delegates to src.preload."""
     spec = importlib.util.spec_from_file_location("preload_downloads", SCRIPT_PATH)
@@ -182,3 +232,34 @@ def test_script_wrapper_delegates_to_preload(tmp_path):
             str(tmp_path / "cache"),
         )
     ]
+
+
+def test_script_wrapper_loads_preload_function():
+    """Test the wrapper's isolated loader returns the implementation function."""
+    spec = importlib.util.spec_from_file_location("preload_downloads", SCRIPT_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    loaded = module.load_preload_downloads()
+
+    assert loaded.__name__ == "preload_downloads"
+    assert loaded.__module__ == "spine_prod_preload"
+
+
+def test_script_wrapper_reports_preload_errors(tmp_path, capsys):
+    """Test wrapper failures become a nonzero exit code and concise message."""
+    spec = importlib.util.spec_from_file_location("preload_downloads", SCRIPT_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.load_preload_downloads = lambda: lambda *args, **kwargs: (
+        _ for _ in ()
+    ).throw(RuntimeError("download failed"))
+
+    old_argv = sys.argv
+    try:
+        sys.argv = [str(SCRIPT_PATH), "config.yaml"]
+        assert module.main() == 1
+    finally:
+        sys.argv = old_argv
+
+    assert "ERROR: download failed" in capsys.readouterr().err

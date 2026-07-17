@@ -22,6 +22,8 @@ To add a new detector for testing, add it to DETECTOR_BASE_CONFIGS dict.
 """
 
 import re
+import warnings
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -38,10 +40,13 @@ VERSIONED_MODIFIER_CONFIGS = sorted(
 
 try:
     from spine.config import load_config_file
+    from spine.config.api import VALID_KINDS
 
     SPINE_AVAILABLE = True
+    SPINE_SUPPORTS_FRAGMENTS = "fragment" in VALID_KINDS
 except ImportError:
     SPINE_AVAILABLE = False
+    SPINE_SUPPORTS_FRAGMENTS = False
 
 
 @pytest.mark.parametrize("config_path", COMMON_CONFIGS, ids=lambda path: str(path))
@@ -102,10 +107,51 @@ def load_config_with_includes(config_path):
     config_path = Path(config_path)
 
     # Mock download_from_url at the point where it's used in the loader
-    with patch("spine.config.loader.download_from_url") as mock_download:
+    with (
+        patch("spine.config.loader.download_from_url") as mock_download,
+        warnings.catch_warnings(),
+    ):
+        # SPINE releases before fragment support mistake kind-only fragment
+        # metadata for a missing block. Do not hide this warning from releases
+        # that understand the current metadata contract.
+        if not SPINE_SUPPORTS_FRAGMENTS:
+            warnings.filterwarnings(
+                "ignore",
+                message=r"Included file '.*' has no __meta__ block\..*",
+                category=UserWarning,
+            )
+            warnings.filterwarnings(
+                "ignore",
+                message=r"Invalid __meta__\.kind: 'fragment'.*",
+                category=UserWarning,
+            )
+
         # Return a fake path instead of downloading
         mock_download.return_value = "/fake/weights/checkpoint.ckpt"
         return load_config_file(str(config_path))
+
+
+@contextmanager
+def ignore_expected_legacy_metadata_warnings():
+    """Ignore metadata diagnostics expected while loading legacy bundles.
+
+    Metadata correctness is tested independently above. Older SPINE loaders do
+    not recognize ``kind: fragment`` and infer metadata presence only from a
+    version or description, so valid fragment metadata produces a misleading
+    "no __meta__ block" warning during legacy compatibility checks.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"Included file '.*' has no __meta__ block\..*",
+            category=UserWarning,
+        )
+        warnings.filterwarnings(
+            "ignore",
+            message=r"Invalid __meta__\.kind: 'fragment'.*",
+            category=UserWarning,
+        )
+        yield
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
@@ -200,7 +246,8 @@ class TestConfigValidation:
         failed_configs = []
         for config_file in yaml_files:
             try:
-                cfg = load_config_with_includes(config_file)
+                with ignore_expected_legacy_metadata_warnings():
+                    cfg = load_config_with_includes(config_file)
                 assert cfg is not None, "Config loaded but returned None"
                 assert isinstance(cfg, dict), "Config must be a dict"
                 assert "__meta__" not in cfg, "__meta__ should be stripped"

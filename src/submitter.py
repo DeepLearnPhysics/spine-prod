@@ -1106,8 +1106,7 @@ class Submitter:
                     # Wait for all dependent stages to complete
                     dep_jobs = []
                     for dep_stage in dependent_stages:
-                        if dep_stage in job_map:
-                            dep_jobs.extend(job_map[dep_stage])
+                        dep_jobs.extend(job_map[dep_stage])
 
                     if dep_jobs:
                         dependency = f"afterok:{':'.join(dep_jobs)}"

@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-# Add parent directory to path to import submit
+# Add parent directory to path to import the source package
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from submit import Submitter  # noqa: E402
+from src.submitter import Submitter  # noqa: E402
 
 
 @pytest.fixture

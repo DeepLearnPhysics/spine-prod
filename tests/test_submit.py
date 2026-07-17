@@ -1,1551 +1,190 @@
-"""Tests for submit.py functionality.
+"""Tests for the submit.py command-line entry point."""
 
-This module provides integration tests for the batch submission system,
-testing actual code paths in submit.py to ensure proper coverage reporting.
-
-Tests include:
-1. **Modifier Discovery**: Tests _discover_modifiers() and list_modifiers()
-2. **Version Resolution**: Tests _resolve_modifier_version()
-3. **Latest Config Generation**: Tests _create_latest_config()
-4. **Configuration Loading**: Tests load_profiles()
-
-These tests exercise the actual Python code to provide meaningful coverage metrics.
-"""
-
-import io
-import json
-import os
-from pathlib import Path
-from unittest.mock import patch
+import sys
+from unittest.mock import Mock, patch
 
 import pytest
-import yaml
-
-from src.client import PBSClient, SlurmClient
-from submit import Submitter
-
-
-class TestModifierDiscovery:
-    """Tests for modifier discovery and resolution."""
-
-    def test_discover_modifiers_icarus(self, mock_submitter, infer_root):
-        """Test discovering modifiers for ICARUS detector."""
-        # Test with a real ICARUS config that has modifiers
-        icarus_configs = list((infer_root / "icarus").glob("full_chain_*.yaml"))
-        if not icarus_configs:
-            pytest.skip("No ICARUS configs found for testing")
-
-        config_path = str(icarus_configs[0])
-        modifiers = mock_submitter._discover_modifiers(config_path)
-
-        # Should be a dict with modifier names as keys
-        assert isinstance(modifiers, dict)
-
-        # If there are modifiers, verify structure
-        for mod_name, versions in modifiers.items():
-            assert isinstance(mod_name, str)
-            assert isinstance(versions, list)
-            # Each version should be a Path object
-            for version_path in versions:
-                assert isinstance(version_path, Path)
-                assert version_path.exists()
-
-    def test_list_modifiers_public_api(self, mock_submitter, infer_root):
-        """Test the public list_modifiers() API."""
-        icarus_configs = list((infer_root / "icarus").glob("full_chain_*.yaml"))
-        if not icarus_configs:
-            pytest.skip("No ICARUS configs found for testing")
-
-        config_path = str(icarus_configs[0])
-        result = mock_submitter.list_modifiers(config_path)
-
-        # Should return a dict with detector info and modifiers
-        assert isinstance(result, dict)
-        assert "config_name" in result
-        assert "base_version" in result
-        assert "modifiers" in result
-
-        # Verify modifiers structure
-        modifiers = result["modifiers"]
-        for mod_name, mod_info in modifiers.items():
-            assert "available" in mod_info
-            assert "selected" in mod_info
-            assert isinstance(mod_info["available"], list)
-
-
-class TestVersionResolution:
-    """Tests for modifier version resolution logic."""
-
-    def test_resolve_modifier_version_explicit(self, mock_submitter):
-        """Test resolving modifier with explicit version."""
-        # Create mock version paths
-        versions = [
-            Path("/fake/mod_data_240719.yaml"),
-            Path("/fake/mod_data_250115.yaml"),
-            Path("/fake/mod_data_250625.yaml"),
-        ]
-
-        # Resolve with explicit version
-        result = mock_submitter._resolve_modifier_version(
-            mod_name="data",
-            available_versions=versions,
-            base_version="250625",
-            explicit_version="250115",
-        )
-
-        assert result == Path("/fake/mod_data_250115.yaml")
-
-    def test_resolve_modifier_version_latest(self, mock_submitter):
-        """Test resolving modifier to latest version."""
-        versions = [
-            Path("/fake/mod_data_240719.yaml"),
-            Path("/fake/mod_data_250115.yaml"),
-            Path("/fake/mod_data_250625.yaml"),
-        ]
-
-        result = mock_submitter._resolve_modifier_version(
-            mod_name="data",
-            available_versions=versions,
-            base_version="250625",
-            explicit_version=None,
-        )
-
-        # Should pick version matching base or latest
-        assert result == Path("/fake/mod_data_250625.yaml")
-
-    def test_resolve_modifier_version_fallback(self, mock_submitter):
-        """Test fallback to latest when base version not found."""
-        versions = [
-            Path("/fake/mod_data_240719.yaml"),
-            Path("/fake/mod_data_250115.yaml"),
-        ]
-
-        result = mock_submitter._resolve_modifier_version(
-            mod_name="data",
-            available_versions=versions,
-            base_version="250625",  # Not available
-            explicit_version=None,
-        )
-
-        # Should fall back to latest available
-        assert result == Path("/fake/mod_data_250115.yaml")
-
-
-class TestLatestConfigGeneration:
-    """Tests for dynamic 'latest' config generation."""
-
-    def test_create_latest_config_icarus(self, mock_submitter, infer_root):
-        """Test creating a 'latest' config for ICARUS."""
-        icarus_dir = infer_root / "icarus"
-        if not icarus_dir.exists():
-            pytest.skip("ICARUS configs not found")
-
-        # Test with icarus detector
-        config_path = mock_submitter._create_latest_config(
-            detector="icarus", job_dir=mock_submitter.jobs_dir
-        )
-
-        # Should create a config file in job_dir
-        config_path_obj = Path(config_path)
-        assert config_path_obj.exists()
-        assert "latest" in config_path_obj.name
-        assert config_path_obj.suffix == ".yaml"
-
-        # Config should be valid YAML
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
-            assert "include" in config
-            assert isinstance(config["include"], list)
-
-    def test_create_latest_config_with_modifiers(self, mock_submitter, infer_root):
-        """Test creating a 'latest' config."""
-        icarus_dir = infer_root / "icarus"
-        if not icarus_dir.exists():
-            pytest.skip("ICARUS configs not found")
-
-        config_path = mock_submitter._create_latest_config(
-            detector="icarus", job_dir=mock_submitter.jobs_dir
-        )
-
-        config_path_obj = Path(config_path)
-        assert config_path_obj.exists()
-
-        # Config should be valid YAML with includes
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
-            includes = config.get("include", [])
-            # Should have base, io, model, post components
-            assert len(includes) >= 4
-
-
-class TestProfileLoading:
-    """Tests for profile configuration loading."""
-
-    def test_load_profiles_default(self, workspace_root):
-        """Test loading default profiles.yaml."""
-        submitter = Submitter(basedir=workspace_root)
-
-        # Should load profiles successfully
-        assert submitter.profiles is not None
-        assert "profiles" in submitter.profiles
-        assert "detectors" in submitter.profiles
-
-        # Verify some expected profiles exist
-        profiles = submitter.profiles["profiles"]
-        assert "s3df_ampere" in profiles or "gpu_large" in profiles
-
-    def test_detector_config_paths(self, workspace_root):
-        """Test that detector configs_dir paths are correct."""
-        submitter = Submitter(basedir=workspace_root)
-
-        detectors = submitter.profiles.get("detectors", {})
-        for detector_name, detector_config in detectors.items():
-            configs_dir = detector_config.get("configs_dir", "")
-            # Should use infer/ not config/
-            assert "infer/" in configs_dir
-            assert "config/" not in configs_dir
-
-
-class TestEnvironmentVariables:
-    """Tests for environment variable handling."""
-
-    def test_basedir_from_env(self, workspace_root):
-        """Test SPINE_PROD_BASEDIR environment variable."""
-        with patch.dict(
-            os.environ, {"SPINE_PROD_BASEDIR": str(workspace_root)}, clear=False
-        ):
-            submitter = Submitter()
-            assert submitter.basedir == workspace_root
-
-    def test_basedir_explicit_override(self, workspace_root, tmp_path):
-        """Test explicit basedir overrides environment."""
-        with patch.dict(os.environ, {"SPINE_PROD_BASEDIR": str(tmp_path)}, clear=False):
-            submitter = Submitter(basedir=workspace_root)
-            assert submitter.basedir == workspace_root
-
-
-class TestConfigPathHandling:
-    """Tests for configuration path resolution."""
-
-    def test_detect_latest_config(self, mock_submitter):
-        """Test detecting 'latest' config shorthand."""
-        test_cases = [
-            "icarus/latest",
-            "icarus/latest.yaml",
-            "infer/icarus/latest",
-            "infer/icarus",
-            "infer/dune10kt-1x2x6",
-        ]
-
-        for config_path in test_cases:
-            is_latest, config_name = mock_submitter._classify_config_request(
-                config_path
-            )
-            assert is_latest is True
-            assert config_name == "latest"
-
-    def test_absolute_vs_relative_paths(self, workspace_root):
-        """Test handling of absolute vs relative config paths."""
-        # Both should work
-
-        rel_path = "config/infer/icarus/full_chain_co_250625.yaml"
-        abs_path = workspace_root / rel_path
-
-        # Check paths exist
-        assert abs_path.exists(), f"Config not found: {abs_path}"
-
-
-class TestDetectorDetection:
-    """Tests for detector auto-detection."""
-
-    def test_detect_detector_icarus(self, mock_submitter):
-        """Test auto-detecting ICARUS from config path."""
-        result = mock_submitter._detect_detector("infer/icarus/latest.yaml")
-        assert result == "icarus"
-
-    def test_detect_detector_sbnd(self, mock_submitter):
-        """Test auto-detecting SBND from config path."""
-        result = mock_submitter._detect_detector("infer/sbnd/full_chain_240720.yaml")
-        assert result == "sbnd"
-
-    def test_detect_detector_2x2(self, mock_submitter):
-        """Test auto-detecting 2x2 from config path."""
-        result = mock_submitter._detect_detector("infer/2x2/latest")
-        assert result == "2x2"
-
-    def test_detect_detector_generic(self, mock_submitter):
-        """Test fallback for unknown detectors."""
-        result = mock_submitter._detect_detector("some/random/config.yaml")
-        assert result == "unknown_detector"
-
-    def test_detect_detector_dune10kt_1x2x6(self, mock_submitter):
-        """Test auto-detecting DUNE10kt-1x2x6 from config path."""
-        result = mock_submitter._detect_detector("infer/dune10kt-1x2x6")
-        assert result == "dune10kt-1x2x6"
-
-
-class TestVersionExtraction:
-    """Tests for version extraction from config names."""
-
-    def test_extract_version_yymmdd(self, mock_submitter):
-        """Test extracting YYMMDD version format."""
-        config_path = Path("full_chain_co_250625.yaml")
-        version = mock_submitter._extract_version(config_path)
-        assert version == "250625"
-
-    def test_extract_version_data_modifier(self, mock_submitter):
-        """Test extracting version from data modifier."""
-        config_path = Path("mod_data_250115.yaml")
-        version = mock_submitter._extract_version(config_path)
-        assert version == "250115"
-
-    def test_extract_version_no_version(self, mock_submitter):
-        """Test handling files without version."""
-        config_path = Path("base_common.yaml")
-        version = mock_submitter._extract_version(config_path)
-        assert version is None
-
-    def test_extract_version_legacy_format(self, mock_submitter):
-        """Test extracting version from legacy format."""
-        config_path = Path("full_chain_240719.yaml")
-        version = mock_submitter._extract_version(config_path)
-        assert version == "240719"
-
-
-class TestFileHandling:
-    """Tests for file parsing and handling."""
-
-    def test_parse_files_single_file(self, mock_submitter, tmp_path):
-        """Test parsing single file."""
-        test_file = tmp_path / "test.root"
-        test_file.touch()
-
-        files = mock_submitter._parse_files([str(test_file)])
-        assert len(files) == 1
-        assert files[0] == str(test_file)
-
-    def test_parse_files_glob_pattern(self, mock_submitter, tmp_path):
-        """Test parsing glob patterns."""
-        # Create test files
-        for i in range(3):
-            (tmp_path / f"data_{i}.root").touch()
-
-        pattern = str(tmp_path / "data_*.root")
-        files = mock_submitter._parse_files([pattern])
-        assert len(files) == 3
-        assert all(f.endswith(".root") for f in files)
-
-    def test_parse_files_from_list(self, mock_submitter, tmp_path):
-        """Test parsing files from a source list file."""
-        # Create test files
-        test_files = []
-        for i in range(3):
-            f = tmp_path / f"file_{i}.root"
-            f.touch()
-            test_files.append(str(f))
-
-        # Create file list
-        file_list = tmp_path / "files.txt"
-        file_list.write_text("\n".join(test_files))
-
-        files = mock_submitter._parse_files([str(file_list)], source_type="source_list")
-        assert len(files) == 3
-        assert all(f.endswith(".root") for f in files)
-
-    def test_parse_files_direct_paths(self, mock_submitter, tmp_path):
-        """Test parsing direct file paths."""
-        # Create test files
-        files_to_create = []
-        for i in range(3):
-            f = tmp_path / f"file_{i}.root"
-            f.touch()
-            files_to_create.append(str(f))
-
-        files = mock_submitter._parse_files(files_to_create, source_type="source")
-        assert len(files) == 3
-        assert all(f.endswith(".root") for f in files)
-
-
-class TestFileChunking:
-    """Tests for file chunking logic."""
-
-    def test_chunk_files_basic(self, mock_submitter):
-        """Test basic file chunking."""
-        files = [f"file_{i}.root" for i in range(10)]
-
-        chunks = mock_submitter._chunk_files(files, max_array_size=99, files_per_task=2)
-        # 10 files / 2 per task = 5 groups, all fit in one chunk
-        assert len(chunks) == 1
-        assert len(chunks[0]) == 5  # 5 groups
-
-    def test_chunk_files_multiple_chunks(self, mock_submitter):
-        """Test chunking with array size limit."""
-        # Create enough files to exceed max_array_size
-        files = [f"file_{i}.root" for i in range(50)]
-
-        chunks = mock_submitter._chunk_files(files, max_array_size=10, files_per_task=1)
-        # 50 files / 1 per task = 50 groups, split into chunks of 10
-        assert len(chunks) == 5
-        assert all(len(chunk) <= 10 for chunk in chunks)
-
-    def test_chunk_files_per_task(self, mock_submitter):
-        """Test multiple files per task."""
-        files = [f"file_{i}.root" for i in range(9)]
-
-        chunks = mock_submitter._chunk_files(files, max_array_size=99, files_per_task=3)
-        # 9 files / 3 per task = 3 groups
-        assert len(chunks) == 1
-        assert len(chunks[0]) == 3
-        # Each group should have 3 files as a list
-        assert len(chunks[0][0]) == 3
-        assert isinstance(chunks[0][0], list)
-
-    def test_resolve_files_per_task_defaults_to_all_files(self, mock_submitter):
-        """Test omitted splitting flags collapse explicit inputs into one task."""
-        assert mock_submitter._resolve_files_per_task(9) == 9
-
-    def test_resolve_files_per_task_uses_ntasks_for_even_split(self, mock_submitter):
-        """Test ntasks alone distributes files roughly evenly across tasks."""
-        assert mock_submitter._resolve_files_per_task(10, ntasks=3) == 4
-
-
-class TestInteractiveExecution:
-    """Tests for direct interactive execution."""
-
-    def test_run_interactive_uses_bash_for_source(self, mock_submitter, tmp_path):
-        """Test interactive mode uses bash so source commands work."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        completed = type("Completed", (), {"returncode": 0})()
-
-        with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                flashmatch=True,
-                set_overrides=["base.world_size=0", "io.loader.batch_size=1"],
-                interactive_runtime="local",
-            )
-
-        assert exit_code == 0
-        run.assert_called_once()
-        _, kwargs = run.call_args
-        assert kwargs["shell"] is True
-        assert kwargs["executable"] == "/bin/bash"
-        assert "export NUMBA_NUM_THREADS=64" in run.call_args.args[0]
-        assert "spine -S" in run.call_args.args[0]
-        assert " -o " not in run.call_args.args[0]
-        assert "--set io.writer.directory=" in run.call_args.args[0]
-        assert "--set io.writer.suffix=full_chain_co_260316" in run.call_args.args[0]
-        assert "--set base.world_size=0" in run.call_args.args[0]
-        assert "--set io.loader.batch_size=1" in run.call_args.args[0]
-        assert "FMATCH_BASEDIR" not in run.call_args.args[0]
-
-    def test_run_interactive_uses_config_inputs_without_writer_overrides(
-        self, mock_submitter
-    ):
-        """Test config-owned interactive runs do not override IO or output."""
-        completed = type("Completed", (), {"returncode": 0})()
-
-        with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/train/icarus/deghost/deghost.yaml",
-                interactive_runtime="local",
-            )
-
-        assert exit_code == 0
-        command = run.call_args.args[0]
-        assert "spine -S" not in command
-        assert "--set io.writer." not in command
-
-    def test_run_interactive_no_writer_suppresses_writer_overrides(
-        self, mock_submitter, tmp_path
-    ):
-        """Test explicit interactive inputs can opt out of writer overrides."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        completed = type("Completed", (), {"returncode": 0})()
-
-        with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                no_writer=True,
-                interactive_runtime="local",
-            )
-
-        assert exit_code == 0
-        command = run.call_args.args[0]
-        assert "spine -S" in command
-        assert "--set io.writer." not in command
-
-    def test_run_interactive_rejects_output_without_files(self, mock_submitter):
-        """Test config-owned interactive runs reject inference output overrides."""
-        with pytest.raises(
-            ValueError,
-            match="Cannot use --output/--output-suffix without --source/--source-list",
-        ):
-            mock_submitter.run_interactive(
-                config="config/train/icarus/deghost/deghost.yaml",
-                output_suffix="custom_reco",
-            )
-
-    def test_run_interactive_rejects_no_writer_with_output_suffix(
-        self, mock_submitter, tmp_path
-    ):
-        """Test no-writer cannot be combined with writer output overrides."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-
-        with pytest.raises(
-            ValueError,
-            match="Cannot use --no-writer with --output/--output-suffix",
-        ):
-            mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                no_writer=True,
-                output_suffix="custom_reco",
-            )
-
-    def test_run_interactive_sources_custom_software_paths(
-        self, mock_submitter, tmp_path
-    ):
-        """Test custom software paths source their configure scripts before SPINE."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        larcv_root = tmp_path / "larcv"
-        flashmatch_root = tmp_path / "flashmatch"
-        larcv_root.mkdir()
-        flashmatch_root.mkdir()
-        (larcv_root / "configure.sh").write_text("export LARCV=1\n", encoding="utf-8")
-        (flashmatch_root / "configure.sh").write_text(
-            "export FMATCH=1\n", encoding="utf-8"
-        )
-        completed = type("Completed", (), {"returncode": 0})()
-
-        with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                larcv_path=str(larcv_root),
-                flashmatch_path=str(flashmatch_root),
-                interactive_runtime="local",
-            )
-
-        assert exit_code == 0
-        command = run.call_args.args[0]
-        assert f"source {larcv_root / 'configure.sh'}" in command
-        assert f"source {flashmatch_root / 'configure.sh'}" in command
-        assert "spine -S" in command
-
-    def test_run_interactive_flashmatch_is_warned_noop(self, mock_submitter, tmp_path):
-        """Test --flashmatch is accepted but does not change execution."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        completed = type("Completed", (), {"returncode": 0})()
-
-        with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed),
-            patch("sys.stderr", new_callable=io.StringIO) as stderr,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                flashmatch=True,
-                interactive_runtime="local",
-            )
-
-        assert exit_code == 0
-        assert "no-op" in stderr.getvalue()
-
-    def test_run_interactive_rejects_invalid_set_override(
-        self, mock_submitter, tmp_path
-    ):
-        """Test invalid --set overrides fail before execution."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-
-        with pytest.raises(ValueError, match="Expected KEY=VALUE"):
-            mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                set_overrides=["base.world_size"],
-                interactive_runtime="local",
-            )
-
-    def test_run_interactive_rejects_quoted_set_override(
-        self, mock_submitter, tmp_path
-    ):
-        """Test unsafe --set values fail before script rendering."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-
-        with pytest.raises(ValueError, match="Whitespace and quotes"):
-            mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                set_overrides=["model.name='full chain'"],
-                interactive_runtime="local",
-            )
-
-    def test_run_interactive_auto_falls_back_to_docker_container(
-        self, mock_submitter, tmp_path
-    ):
-        """Test auto interactive mode falls back to SPINE_CONTAINER_TAG when spine is absent."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        completed = type("Completed", (), {"returncode": 0})()
-
-        def fake_which(command):
-            return "/usr/bin/docker" if command == "docker" else None
-
-        with (
-            patch.dict(
-                os.environ,
-                {
-                    "SPINE_CONTAINER_PATH": str(tmp_path / "missing.sif"),
-                    "SPINE_CONTAINER_TAG": "docker:ghcr.io/deeplearnphysics/spine:9.8.7",
-                },
-                clear=False,
-            ),
-            patch("src.submitter.shutil.which", side_effect=fake_which),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                set_overrides=["base.world_size=0"],
-            )
-
-        assert exit_code == 0
-        command = run.call_args.args[0]
-        assert "export NUMBA_NUM_THREADS=64" in command
-        assert "docker run --rm" in command
-        assert "--platform linux/amd64" in command
-        assert "ghcr.io/deeplearnphysics/spine:9.8.7" in command
-        assert "docker:ghcr" not in command
-        assert "spine -S" in command
-        assert "--set base.world_size=0" in command
-
-    def test_default_container_version_comes_from_repo_file(
-        self, mock_submitter, workspace_root
-    ):
-        """Test Python fallback reads the same default used by configure.sh."""
-        expected = (
-            (workspace_root / "DEFAULT_SPINE_VERSION")
-            .read_text(encoding="utf-8")
-            .strip()
-        )
-
-        with patch.dict(os.environ, {}, clear=True):
-            assert mock_submitter._default_container_version() == expected
-            assert mock_submitter._container_version() == expected
-            assert mock_submitter._container_tag_for_cli().endswith(f":{expected}")
-            expected_path_version = (
-                expected[1:] if expected.startswith("v") else expected
-            )
-            assert mock_submitter._default_container_path().endswith(
-                f"spine_v{expected_path_version.replace('.', '-')}.sif"
-            )
-
-    def test_container_version_env_override_requires_configured_env(
-        self, mock_submitter
-    ):
-        """Test direct version env overrides are ignored without configure.sh."""
-        expected = mock_submitter._default_container_version()
-
-        with patch.dict(os.environ, {"SPINE_CONTAINER_VERSION": "9.8.7"}, clear=True):
-            assert mock_submitter._container_version() == expected
-
-        with patch.dict(
-            os.environ,
-            {"SPINE_PROD_CONFIGURED": "1", "SPINE_CONTAINER_VERSION": "9.8.7"},
-            clear=True,
-        ):
-            assert mock_submitter._container_version() == "9.8.7"
-
-    def test_run_interactive_container_uses_configured_sif_runtime(
-        self, mock_submitter, tmp_path
-    ):
-        """Test interactive container mode honors a configured SIF runtime binary."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        container = tmp_path / "spine.sif"
-        container.touch()
-        completed = type("Completed", (), {"returncode": 0})()
-
-        def fake_which(command):
-            if command == "spine":
-                return None
-            if command == "/cvmfs/eaf.opensciencegrid.org/apptainer/bin/apptainer":
-                return command
-            return None
-
-        with (
-            patch.dict(
-                os.environ,
-                {
-                    "SPINE_CONTAINER_PATH": str(container),
-                    "SPINE_CONTAINER_RUNTIME_BIN": "/cvmfs/eaf.opensciencegrid.org/apptainer/bin/apptainer",
-                },
-                clear=False,
-            ),
-            patch("src.submitter.shutil.which", side_effect=fake_which),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                interactive_runtime="container",
-            )
-
-        assert exit_code == 0
-        command = run.call_args.args[0]
-        assert "/cvmfs/eaf.opensciencegrid.org/apptainer/bin/apptainer exec" in command
-        assert str(container) in command
-
-    def test_run_interactive_container_uses_configured_sif_runtime_args(
-        self, mock_submitter, tmp_path
-    ):
-        """Test interactive container mode appends configured SIF runtime args."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        container = tmp_path / "spine.sif"
-        container.touch()
-        completed = type("Completed", (), {"returncode": 0})()
-
-        def fake_which(command):
-            if command == "spine":
-                return None
-            if command == "/cvmfs/eaf.opensciencegrid.org/apptainer/bin/apptainer":
-                return command
-            return None
-
-        with (
-            patch.dict(
-                os.environ,
-                {
-                    "SPINE_CONTAINER_PATH": str(container),
-                    "SPINE_CONTAINER_RUNTIME_BIN": "/cvmfs/eaf.opensciencegrid.org/apptainer/bin/apptainer",
-                    "SPINE_CONTAINER_RUNTIME_ARGS": "--env LD_PRELOAD= --env LC_ALL=C.UTF-8",
-                },
-                clear=False,
-            ),
-            patch("src.submitter.shutil.which", side_effect=fake_which),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                interactive_runtime="container",
-            )
-
-        assert exit_code == 0
-        command = run.call_args.args[0]
-        assert "--env LD_PRELOAD=" in command
-        assert "--env LC_ALL=C.UTF-8" in command
-        assert str(container) in command
-
-    def test_run_interactive_container_uses_bind_path_overrides(
-        self, mock_submitter, tmp_path
-    ):
-        """Test interactive container mode appends configured bind path overrides."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        container = tmp_path / "spine.sif"
-        container.touch()
-        completed = type("Completed", (), {"returncode": 0})()
-
-        def fake_which(command):
-            if command == "spine":
-                return None
-            if (
-                command
-                == "/cvmfs/oasis.opensciencegrid.org/mis/apptainer/current/bin/apptainer"
-            ):
-                return command
-            return None
-
-        with (
-            patch.dict(
-                os.environ,
-                {
-                    "SPINE_CONTAINER_PATH": str(container),
-                    "SPINE_CONTAINER_RUNTIME_BIN": "/cvmfs/oasis.opensciencegrid.org/mis/apptainer/current/bin/apptainer",
-                },
-                clear=False,
-            ),
-            patch("src.submitter.shutil.which", side_effect=fake_which),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                interactive_runtime="container",
-                bind_paths="/exp/dune",
-            )
-
-        assert exit_code == 0
-        command = run.call_args.args[0]
-        assert "--bind" in command
-        assert "/exp/dune" in command
-        assert str(container) in command
-
-    def test_run_interactive_local_uses_spine_path_run_py(
-        self, mock_submitter, tmp_path
-    ):
-        """Test local interactive mode can target a SPINE checkout via --spine-path."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        spine_checkout = tmp_path / "spine"
-        (spine_checkout / "bin").mkdir(parents=True)
-        run_py = spine_checkout / "bin" / "run.py"
-        run_py.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
-        completed = type("Completed", (), {"returncode": 0})()
-
-        with (
-            patch("src.submitter.shutil.which", return_value=None),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                interactive_runtime="local",
-                spine_path=str(spine_checkout),
-            )
-
-        assert exit_code == 0
-        command = run.call_args.args[0]
-        assert str(run_py) in command
-        assert "spine -S" not in command
-        assert "python3 " in command
-
-    def test_run_interactive_accepts_output_suffix(self, mock_submitter, tmp_path):
-        """Test interactive mode can override the derived output suffix."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        completed = type("Completed", (), {"returncode": 0})()
-
-        with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
-        ):
-            exit_code = mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                output_suffix="custom_reco",
-                interactive_runtime="local",
-            )
-
-        assert exit_code == 0
-        command = run.call_args.args[0]
-        assert "--set io.writer.suffix=custom_reco" in command
-
-    def test_run_interactive_local_rejects_invalid_spine_path(
-        self, mock_submitter, tmp_path
-    ):
-        """Test invalid --spine-path values fail clearly."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-
-        with (pytest.raises(RuntimeError, match="--spine-path"),):
-            mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                interactive_runtime="local",
-                spine_path=str(tmp_path / "missing-checkout"),
-            )
-
-    def test_run_interactive_local_requires_spine_on_path(
-        self, mock_submitter, tmp_path
-    ):
-        """Test local interactive mode fails clearly if spine is unavailable."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-
-        with (
-            patch("src.submitter.shutil.which", return_value=None),
-            pytest.raises(
-                RuntimeError, match="SPINE.*PATH|--spine-path|SPINE_LOCAL_PATH"
-            ),
-        ):
-            mock_submitter.run_interactive(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                interactive_runtime="local",
-            )
-
-
-class TestJobDirectory:
-    """Tests for job directory creation."""
-
-    def test_create_job_dir(self, mock_submitter):
-        """Test creating timestamped job directory."""
-        job_name = "test_job"
-        job_dir = mock_submitter._create_job_dir(job_name)
-
-        assert job_dir.exists()
-        assert job_dir.is_dir()
-        assert job_name in str(job_dir)
-        # Should have timestamp in name
-        assert any(char.isdigit() for char in job_dir.name)
-
-    def test_job_dir_under_jobs(self, mock_submitter):
-        """Test that job dir is created under jobs/."""
-        job_dir = mock_submitter._create_job_dir("test")
-        assert mock_submitter.jobs_dir in job_dir.parents
-
-
-class TestJobMetadata:
-    """Tests for job metadata handling."""
-
-
-class TestBatchSpineOverride:
-    """Tests for explicit SPINE runtime overrides in batch mode."""
-
-    def test_submit_job_uses_spine_path_and_merges_bind_root(
-        self, mock_submitter, tmp_path
-    ):
-        """Test batch submission writes the overridden SPINE command into scripts."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        spine_checkout = tmp_path / "spine"
-        larcv_root = tmp_path / "larcv"
-        flashmatch_root = tmp_path / "flashmatch"
-        (spine_checkout / "bin").mkdir(parents=True)
-        larcv_root.mkdir()
-        flashmatch_root.mkdir()
-        (larcv_root / "configure.sh").write_text("export LARCV=1\n", encoding="utf-8")
-        (flashmatch_root / "configure.sh").write_text(
-            "export FMATCH=1\n", encoding="utf-8"
-        )
-        run_py = spine_checkout / "bin" / "run.py"
-        run_py.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
-
-        with (
-            patch.object(
-                mock_submitter,
-                "_get_batch_client",
-                return_value=mock_submitter.batch_client,
-            ),
-            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
-        ):
-            job_ids = mock_submitter.submit_job(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                profile="s3df_ampere",
-                larcv_path=str(larcv_root),
-                flashmatch_path=str(flashmatch_root),
-                spine_path=str(spine_checkout),
-            )
-
-        assert job_ids == ["12345"]
-
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
-        assert len(scripts) == 1
-
-        script = scripts[0].read_text(encoding="utf-8")
-        assert f"python3 {run_py} -S $TASK_FILE_LIST" in script
-        assert str(spine_checkout) in script
-        assert f'source "{larcv_root / "configure.sh"}"' in script
-        assert f'source "{flashmatch_root / "configure.sh"}"' in script
-        assert str(larcv_root) in script
-        assert str(flashmatch_root) in script
-
-    def test_submit_job_keeps_default_s3df_bind_root_with_spine_path(
-        self, mock_submitter, tmp_path
-    ):
-        """Test S3DF keeps the default /sdf bind when adding a custom spine path."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-        spine_checkout = Path("/sdf/data/neutrino/software/spine-dev")
-
-        with (
-            patch.object(
-                mock_submitter,
-                "_get_batch_client",
-                return_value=mock_submitter.batch_client,
-            ),
-            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
-            patch.object(
-                Submitter,
-                "_resolve_spine_command",
-                return_value=(
-                    f"python3 {spine_checkout / 'bin' / 'run.py'}",
-                    str(spine_checkout),
-                ),
-            ),
-        ):
-            job_ids = mock_submitter.submit_job(
-                config="config/infer/dune10kt-1x2x6/full_chain_260510.yaml",
-                files=[str(input_file)],
-                profile="s3df_ampere",
-                spine_path=str(spine_checkout),
-            )
-
-        assert job_ids == ["12345"]
-
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
-        assert len(scripts) == 1
-
-        script = scripts[0].read_text(encoding="utf-8")
-        assert 'BIND_PATHS="/sdf/,/sdf/data/neutrino/software/spine-dev"' in script
-
-    def test_submit_job_accepts_output_suffix(self, mock_submitter, tmp_path):
-        """Test batch submission can override the derived output suffix."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-
-        with (
-            patch.object(
-                mock_submitter,
-                "_get_batch_client",
-                return_value=mock_submitter.batch_client,
-            ),
-            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
-        ):
-            job_ids = mock_submitter.submit_job(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                profile="s3df_ampere",
-                output_suffix="custom_reco",
-            )
-
-        assert job_ids == ["12345"]
-
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
-        assert len(scripts) == 1
-
-        script = scripts[0].read_text(encoding="utf-8")
-        assert "--set io.writer.suffix=custom_reco" in script
-
-    def test_submit_job_defaults_to_single_task_over_all_files(
-        self, mock_submitter, tmp_path
-    ):
-        """Test explicit file lists default to one task containing all files."""
-        input_files = []
-        for idx in range(3):
-            input_file = tmp_path / f"input_{idx}.root"
-            input_file.touch()
-            input_files.append(str(input_file))
-
-        with (
-            patch.object(
-                mock_submitter,
-                "_get_batch_client",
-                return_value=mock_submitter.batch_client,
-            ),
-            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
-        ):
-            job_ids = mock_submitter.submit_job(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=input_files,
-                profile="s3df_ampere",
-            )
-
-        assert job_ids == ["12345"]
-
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
-        assert len(scripts) == 1
-        script = scripts[0].read_text(encoding="utf-8")
-        assert "#SBATCH --array=" not in script
-
-        task_lists = list(mock_submitter.jobs_dir.glob("**/files_chunk_0_task_1.txt"))
-        assert len(task_lists) == 1
-        assert (
-            task_lists[0].read_text(encoding="utf-8").strip().splitlines()
-            == input_files
-        )
-
-    def test_submit_job_no_writer_suppresses_writer_overrides(
-        self, mock_submitter, tmp_path
-    ):
-        """Test explicit batch inputs can opt out of writer overrides."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-
-        with (
-            patch.object(
-                mock_submitter,
-                "_get_batch_client",
-                return_value=mock_submitter.batch_client,
-            ),
-            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
-        ):
-            job_ids = mock_submitter.submit_job(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                profile="s3df_ampere",
-                no_writer=True,
-            )
-
-        assert job_ids == ["12345"]
-
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
-        assert len(scripts) == 1
-        script = scripts[0].read_text(encoding="utf-8")
-        assert " -S $TASK_FILE_LIST" in script
-        assert "--set io.writer." not in script
-        assert "Output: defined in config" in script
-
-    def test_submit_job_rejects_no_writer_with_output_suffix(
-        self, mock_submitter, tmp_path
-    ):
-        """Test no-writer cannot be combined with writer output overrides."""
-        input_file = tmp_path / "input.root"
-        input_file.touch()
-
-        with pytest.raises(
-            ValueError,
-            match="Cannot use --no-writer with --output/--output-suffix",
-        ):
-            mock_submitter.submit_job(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=[str(input_file)],
-                profile="s3df_ampere",
-                no_writer=True,
-                output_suffix="custom_reco",
-            )
-
-    def test_submit_job_uses_config_inputs_when_files_omitted(self, mock_submitter):
-        """Test batch submission can defer input discovery to the config."""
-        with (
-            patch.object(
-                mock_submitter,
-                "_get_batch_client",
-                return_value=mock_submitter.batch_client,
-            ),
-            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
-        ):
-            job_ids = mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
-                profile="s3df_ampere",
-            )
-
-        assert job_ids == ["12345"]
-
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
-        assert len(scripts) == 1
-        script = scripts[0].read_text(encoding="utf-8")
-        assert "Using input files defined in the config" in script
-        assert " -S $TASK_FILE_LIST" not in script
-        assert "--set io.writer." not in script
-        assert "Output: defined in config" in script
-
-    def test_submit_job_rejects_split_flags_without_files(self, mock_submitter):
-        """Test config-driven inputs cannot be combined with submit-time splitting."""
-        with pytest.raises(
-            ValueError,
-            match="Cannot use --ntasks/--files-per-task without --source/--source-list",
-        ):
-            mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
-                profile="s3df_ampere",
-                ntasks=2,
-            )
-
-    def test_submit_job_rejects_output_without_files(self, mock_submitter):
-        """Test config-owned batch runs reject inference output overrides."""
-        with pytest.raises(
-            ValueError,
-            match="Cannot use --output/--output-suffix without --source/--source-list",
-        ):
-            mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
-                profile="s3df_ampere",
-                output_suffix="custom_reco",
-            )
-
-    def test_submit_job_uses_ntasks_as_target_task_count(
-        self, mock_submitter, tmp_path
-    ):
-        """Test ntasks alone spreads explicit files across roughly even task sizes."""
-        input_files = []
-        for idx in range(10):
-            input_file = tmp_path / f"input_{idx}.root"
-            input_file.touch()
-            input_files.append(str(input_file))
-
-        with (
-            patch.object(
-                mock_submitter,
-                "_get_batch_client",
-                return_value=mock_submitter.batch_client,
-            ),
-            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
-        ):
-            job_ids = mock_submitter.submit_job(
-                config="config/infer/sbnd/full_chain_co_260316.yaml",
-                files=input_files,
-                profile="s3df_ampere",
-                ntasks=3,
-            )
-
-        assert job_ids == ["12345"]
-
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
-        assert len(scripts) == 1
-        script = scripts[0].read_text(encoding="utf-8")
-        assert "#SBATCH --array=1-3" in script
-        assert "%3" not in script
-
-        task_lists = sorted(mock_submitter.jobs_dir.glob("**/files_chunk_0_task_*.txt"))
-        assert len(task_lists) == 3
-        task_sizes = [
-            len(path.read_text(encoding="utf-8").strip().splitlines())
-            for path in task_lists
-        ]
-        assert task_sizes == [4, 4, 2]
-
-    def test_save_job_metadata(self, mock_submitter, tmp_path):
-        """Test saving job metadata to JSON."""
-        metadata = {
-            "config": "infer/icarus/latest.yaml",
-            "files": ["file1.root", "file2.root"],
-            "profile": "s3df_ampere",
-            "timestamp": "2026-01-05T10:00:00",
-        }
-
-        mock_submitter._save_job_metadata(tmp_path, metadata)
-
-        metadata_file = tmp_path / "job_metadata.json"
-        assert metadata_file.exists()
-
-        # Verify contents
-        with open(metadata_file) as f:
-            loaded = json.load(f)
-            assert loaded["config"] == metadata["config"]
-            assert loaded["profile"] == metadata["profile"]
-            assert len(loaded["files"]) == 2
-
-
-class TestCompositeConfig:
-    """Tests for composite config creation."""
-
-    def test_create_composite_config_basic(self, mock_submitter, tmp_path, infer_root):
-        """Test creating a composite config."""
-        # Use a real ICARUS config
-        icarus_configs = list((infer_root / "icarus").glob("full_chain_*.yaml"))
-        if not icarus_configs:
-            pytest.skip("No ICARUS configs found")
-
-        base_config = str(icarus_configs[0])
-        composite_path = mock_submitter._create_composite_config(
-            base_config=base_config,
-            modifiers=[],
-            job_dir=tmp_path,
-            detector="icarus",
-        )
-
-        assert Path(composite_path).exists()
-        assert "composite" in composite_path
-
-        # Verify it's valid YAML
-        with open(composite_path) as f:
-            config = yaml.safe_load(f)
-            assert "include" in config
-
-    def test_create_composite_with_modifiers(
-        self, mock_submitter, tmp_path, infer_root
-    ):
-        """Test creating composite config with modifiers."""
-        # We need a config that's in the same directory as modifiers
-        # The top-level full_chain configs don't have modifiers in their directory
-        pytest.skip(
-            "Composite config with modifiers requires special directory structure"
-        )
-
-    def test_create_composite_from_latest_avoids_duplicate_composite_suffix(
-        self, mock_submitter, tmp_path
-    ):
-        """Test composing a generated latest config keeps one composite suffix."""
-        latest_config = mock_submitter.config_mgr.create_latest_config(
-            "nd-lar", tmp_path
-        )
-
-        composite_path = mock_submitter._create_composite_config(
-            base_config=latest_config,
-            modifiers=["single"],
-            job_dir=tmp_path,
-            detector="nd-lar",
-        )
-
-        latest_stem = Path(latest_config).stem
-        if latest_stem.endswith("_composite"):
-            latest_stem = latest_stem[: -len("_composite")]
-        expected_name = f"{latest_stem}_single_composite.yaml"
-
-        assert Path(composite_path).exists()
-        assert Path(composite_path).name == expected_name
-        assert "_composite_single_composite" not in Path(composite_path).name
-
-
-class TestProfileSelection:
-    """Tests for profile selection and validation."""
-
-    def test_get_profile_explicit(self, mock_submitter):
-        """Test getting an explicit profile."""
-        profile = mock_submitter._get_profile("s3df_ampere")
-        assert profile is not None
-        assert "partition" in profile or "nodes" in profile
-
-    def test_get_profile_with_detector(self, mock_submitter):
-        """Test getting profile with detector defaults."""
-        profile = mock_submitter._get_profile("auto", detector="icarus")
-        assert profile is not None
-
-    def test_get_profile_auto_fallback(self, mock_submitter):
-        """Test auto profile selection with fallback."""
-        # Should fall back to default if available
-        profile = mock_submitter._get_profile("auto", detector="generic")
-        assert profile is not None
-
-
-class TestCVMFSOption:
-    """Tests for opt-in CVMFS container exposure."""
-
-    def _render_template(self, mock_submitter, template_name, **kwargs):
-        """Render a job template with minimal defaults."""
-        template = mock_submitter.batch_client.load_template(template_name)
-        defaults = {
-            "account": "test-account",
-            "partition": "test-partition",
-            "qos": "test-qos",
-            "queue": "debug",
-            "constraint": None,
-            "gpus": 0,
-            "gpus_per_node": 0,
-            "nodes": 1,
-            "system": "polaris",
-            "cpus_per_node": 32,
-            "cpus_per_task": 1,
-            "mem_per_cpu": "1g",
-            "mem": "1g",
-            "filesystems": "home:grand:eagle",
-            "place": None,
-            "time": "00:10:00",
-            "array_spec": None,
-            "job_name": "test-job",
-            "log_dir": "/tmp/logs",
-            "dependency": None,
-            "config": "/tmp/config.yaml",
-            "output": "/tmp/output.h5",
-            "output_dir": "/tmp/output",
-            "output_suffix": "config",
-            "output_args": "--set io.writer.file_name=/tmp/output.h5",
-            "basedir": "/tmp/spine-prod",
-            "file_list_pattern": "/tmp/files_*.txt",
-            "larcv_path": None,
-            "flashmatch_path": None,
-            "flashmatch": False,
-            "cvmfs": False,
-            "bind_paths": None,
-            "spine_cmd": "spine",
-            "spine_cli_overrides": "",
-        }
-        defaults.update(kwargs)
-        return template.render(**defaults)
-
-    def test_s3df_does_not_bind_cvmfs_by_default(self, mock_submitter):
-        """Test S3DF leaves CVMFS out of bind paths by default."""
-        script = self._render_template(mock_submitter, "job_template_s3df.sbatch")
-
-        assert 'BIND_PATHS="/sdf/"' in script
-        assert "/cvmfs/" not in script
-
-    def test_s3df_honors_custom_bind_paths(self, mock_submitter):
-        """Test S3DF bind roots can be overridden through template context."""
-        script = self._render_template(
-            mock_submitter,
-            "job_template_s3df.sbatch",
-            bind_paths="/sdf/,/eaf/,/tmp/work",
-        )
-
-        assert 'BIND_PATHS="/sdf/,/eaf/,/tmp/work"' in script
-
-    def test_s3df_binds_cvmfs_when_requested(self, mock_submitter):
-        """Test S3DF adds CVMFS to bind paths when requested."""
-        script = self._render_template(
-            mock_submitter, "job_template_s3df.sbatch", cvmfs=True
-        )
-
-        assert 'BIND_PATHS="/sdf/"' in script
-        assert 'BIND_PATHS="$BIND_PATHS,/cvmfs/"' in script
-
-    def test_nersc_does_not_load_cvmfs_module_by_default(self, mock_submitter):
-        """Test NERSC leaves Shifter CVMFS module out by default."""
-        script = self._render_template(mock_submitter, "job_template_nersc.sbatch")
-
-        assert "--module=cvmfs" not in script
-
-    def test_nersc_loads_cvmfs_module_when_requested(self, mock_submitter):
-        """Test NERSC adds Shifter CVMFS module when requested."""
-        script = self._render_template(
-            mock_submitter, "job_template_nersc.sbatch", cvmfs=True
-        )
-
-        assert 'SHIFTER_MODULES+=("--module=cvmfs")' in script
-
-    def test_anl_template_uses_pbs_and_array_index(self, mock_submitter):
-        """Test ANL template uses PBS directives and PBS array variables."""
-        script = self._render_template(
-            mock_submitter,
-            "job_template_anl.pbs",
-            array_spec="1-4",
-            gpus_per_node=1,
-        )
-
-        assert "#PBS -A test-account" in script
-        assert "#PBS -q debug" in script
-        assert "#PBS -J 1-4" in script
-        assert "ngpus=1" in script
-        assert "${PBS_ARRAY_INDEX}" in script
-        assert "apptainer exec" in script
-        assert "spine -S" in script
-
-    def test_templates_allow_config_defined_inputs(self, mock_submitter):
-        """Test batch templates can omit submit-time source lists entirely."""
-        script = self._render_template(
-            mock_submitter,
-            "job_template_s3df.sbatch",
-            file_list_pattern=None,
-            output=None,
-            output_args="",
-        )
-
-        assert "Using input files defined in the config" in script
-        assert " -S $TASK_FILE_LIST" not in script
-        assert "--set io.writer." not in script
-        assert "Output: defined in config" in script
-
-    def test_templates_include_spine_set_overrides(self, mock_submitter):
-        """Test SPINE --set overrides are rendered into batch commands."""
-        script = self._render_template(
-            mock_submitter,
-            "job_template_s3df.sbatch",
-            spine_cli_overrides="--set base.world_size=0 --set io.loader.batch_size=1",
-        )
-
-        assert "--set base.world_size=0" in script
-        assert "--set io.loader.batch_size=1" in script
-
-    def test_templates_allow_custom_spine_command(self, mock_submitter):
-        """Test batch templates can override the SPINE executable."""
-        script = self._render_template(
-            mock_submitter,
-            "job_template_s3df.sbatch",
-            spine_cmd="python3 /tmp/spine/bin/run.py",
-            bind_paths="/sdf/,/tmp/spine",
-        )
-
-        assert "python3 /tmp/spine/bin/run.py -S $TASK_FILE_LIST" in script
-        assert 'BIND_PATHS="/sdf/,/tmp/spine"' in script
-
-    def test_templates_use_writer_directory_and_suffix_by_default(self, mock_submitter):
-        """Test batch templates can avoid forcing a writer file name."""
-        script = self._render_template(
-            mock_submitter,
-            "job_template_s3df.sbatch",
-            output=None,
-            output_dir="/tmp/job/output",
-            output_suffix="full_chain_260501",
-            output_args=(
-                "--set io.writer.directory=/tmp/job/output "
-                "--set io.writer.suffix=full_chain_260501"
-            ),
-        )
-
-        assert "-o /tmp/output.h5" not in script
-        assert "--set io.writer.directory=/tmp/job/output" in script
-        assert "--set io.writer.suffix=full_chain_260501" in script
-
-    def test_templates_use_writer_file_name_for_explicit_output(self, mock_submitter):
-        """Test explicit output files still avoid the deprecated -o shortcut."""
-        script = self._render_template(
-            mock_submitter,
-            "job_template_s3df.sbatch",
-            output="/tmp/output.h5",
-            output_args="--set io.writer.file_name=/tmp/output.h5",
-        )
-
-        assert " -o " not in script
-        assert "--set io.writer.file_name=/tmp/output.h5" in script
-
-    def test_templates_source_custom_software_paths(self, mock_submitter):
-        """Test batch templates source custom software configure scripts."""
-        script = self._render_template(
-            mock_submitter,
-            "job_template_s3df.sbatch",
-            larcv_path="/tmp/larcv",
-            flashmatch_path="/tmp/flashmatch",
-        )
-
-        assert 'source "/tmp/larcv/configure.sh"' in script
-        assert 'source "/tmp/flashmatch/configure.sh"' in script
-
-
-class TestBatchClients:
-    """Tests for scheduler-specific batch clients."""
-
-    def test_client_package_exports_concrete_clients(self):
-        """Test client package exports concrete clients only."""
-        assert SlurmClient is not None
-        assert PBSClient is not None
-
-    def test_pbs_client_parses_qsub_job_id(self, tmp_path):
-        """Test PBS client parses qsub stdout."""
-        script_path = tmp_path / "job.pbs"
-        script_path.write_text("#!/bin/bash\n")
-        client = PBSClient(tmp_path, tmp_path)
-
-        completed = type(
-            "Completed",
-            (),
-            {"returncode": 0, "stdout": "12345.polaris-pbs-01\n", "stderr": ""},
-        )()
-        with patch("src.client.pbs.subprocess.run", return_value=completed):
-            job_id = client.submit(script_path)
-
-        assert job_id == "12345.polaris-pbs-01"
-
-    def test_submitter_selects_pbs_client_for_anl(self, mock_submitter):
-        """Test ANL profiles select the PBS client."""
-        client = mock_submitter._get_batch_client({"site": "anl", "scheduler": "pbs"})
-
-        assert isinstance(client, PBSClient)
-        assert mock_submitter._get_template_name({"site": "anl"}) == (
-            "job_template_anl.pbs"
-        )
-
-
-class TestPreloadDownloads:
-    """Tests for submit-time download preloading."""
-
-    def test_preload_downloads_invokes_helper(self, mock_submitter, workspace_root):
-        """Test submitter invokes the preload helper with the requested config."""
-        with patch("src.submitter.preload_downloads") as preload:
-            mock_submitter._preload_downloads("infer/2x2/full_chain_240819.yaml")
-
-        preload.assert_called_once_with(
-            "infer/2x2/full_chain_240819.yaml", workspace_root
-        )
-
-    def test_preload_downloads_raises_on_failure(self, mock_submitter):
-        """Test preload failures stop submission before jobs are queued."""
-        with patch("src.submitter.preload_downloads", side_effect=RuntimeError("boom")):
-            with pytest.raises(RuntimeError, match="boom"):
-                mock_submitter._preload_downloads("infer/2x2/full_chain_240819.yaml")
+
+import submit
+
+
+def run_main(*args, submitter=None):
+    """Run the CLI with a mocked Submitter instance."""
+    submitter = submitter or Mock()
+    with patch.object(sys, "argv", ["submit.py", *args]), patch.object(
+        submit, "Submitter", return_value=submitter
+    ) as submitter_class:
+        result = submit.main()
+    return result, submitter, submitter_class
+
+
+def test_list_modifiers_prints_discovered_versions(capsys):
+    submitter = Mock()
+    submitter.list_modifiers.return_value = {
+        "config_name": "full_chain_250101",
+        "base_version": "250101",
+        "modifiers": {
+            "data": {"selected": "250101", "available": ["241201", "250101"]}
+        },
+    }
+
+    result, _, submitter_class = run_main(
+        "--list-mods", "infer/example/full_chain_250101.yaml", submitter=submitter
+    )
+
+    assert result == 0
+    submitter_class.assert_called_once_with(central_dir=False)
+    submitter.list_modifiers.assert_called_once_with(
+        "infer/example/full_chain_250101.yaml"
+    )
+    assert "data" in capsys.readouterr().out
+
+
+def test_list_modifiers_reports_lookup_errors(capsys):
+    submitter = Mock()
+    submitter.list_modifiers.side_effect = FileNotFoundError("missing config")
+
+    result, _, _ = run_main("--list-mods", "missing.yaml", submitter=submitter)
+
+    assert result == 1
+    assert "ERROR: missing config" in capsys.readouterr().err
+
+
+def test_list_modifiers_prints_multiple_usage_example(capsys):
+    submitter = Mock()
+    submitter.list_modifiers.return_value = {
+        "config_name": "full_chain.yaml",
+        "base_version": None,
+        "modifiers": {
+            "data": {"selected": "250101", "available": ["250101"]},
+            "lite": {"selected": "250102", "available": ["250102"]},
+        },
+    }
+
+    result, _, _ = run_main("--list-mods", "full_chain.yaml", submitter=submitter)
+
+    assert result == 0
+    output = capsys.readouterr().out
+    assert "version: unversioned" in output
+    assert "--apply-mods data lite" in output
+
+
+def test_list_modifiers_explains_empty_result(capsys):
+    submitter = Mock()
+    submitter.list_modifiers.return_value = {
+        "config_name": "full_chain.yaml",
+        "base_version": None,
+        "modifiers": {},
+    }
+
+    result, _, _ = run_main(
+        "--list-mods", "infer/example/full_chain.yaml", submitter=submitter
+    )
+
+    assert result == 0
+    output = capsys.readouterr().out
+    assert "(none found)" in output
+    assert "example/modifier/" in output
+
+
+def test_interactive_mode_forwards_runtime_options():
+    submitter = Mock()
+    submitter.run_interactive.return_value = 7
+
+    result, _, _ = run_main(
+        "--config",
+        "config.yaml",
+        "--source-list",
+        "files.txt",
+        "--interactive",
+        "--task-id",
+        "3",
+        "--interactive-runtime",
+        "container",
+        "--set",
+        "base.world_size=0",
+        submitter=submitter,
+    )
+
+    assert result == 7
+    submitter.run_interactive.assert_called_once()
+    kwargs = submitter.run_interactive.call_args.kwargs
+    assert kwargs["files"] == ["files.txt"]
+    assert kwargs["source_type"] == "source_list"
+    assert kwargs["task_id"] == 3
+    assert kwargs["interactive_runtime"] == "container"
+    assert kwargs["set_overrides"] == ["base.world_size=0"]
+
+
+def test_batch_mode_forwards_profile_overrides(capsys):
+    submitter = Mock()
+    submitter.submit_job.return_value = ["123", "124"]
+
+    result, _, submitter_class = run_main(
+        "--config",
+        "config.yaml",
+        "--source",
+        "input.root",
+        "--central-dir",
+        "--partition",
+        "gpu",
+        "--gpus-per-node",
+        "4",
+        "--bind-paths",
+        "/data,/scratch",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    submitter_class.assert_called_once_with(central_dir=True)
+    kwargs = submitter.submit_job.call_args.kwargs
+    assert kwargs["source_type"] == "source"
+    assert kwargs["files"] == ["input.root"]
+    assert kwargs["partition"] == "gpu"
+    assert kwargs["gpus_per_node"] == 4
+    assert kwargs["bind_paths"] == "/data,/scratch"
+    assert "Submitted job IDs: 123, 124" in capsys.readouterr().out
+
+
+def test_pipeline_mode_prints_stage_jobs(capsys):
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {"reco": ["42"], "post": ["43"]}
+
+    result, _, _ = run_main(
+        "--pipeline", "pipeline.yaml", "--preload", submitter=submitter
+    )
+
+    assert result == 0
+    submitter.submit_pipeline.assert_called_once_with(
+        "pipeline.yaml", dry_run=False, preload=True
+    )
+    output = capsys.readouterr().out
+    assert "reco: 42" in output
+    assert "post: 43" in output
+
+
+def test_submission_errors_return_failure(capsys):
+    submitter = Mock()
+    submitter.submit_job.side_effect = RuntimeError("scheduler unavailable")
+
+    result, _, _ = run_main("--config", "config.yaml", submitter=submitter)
+
+    assert result == 1
+    assert "ERROR: scheduler unavailable" in capsys.readouterr().err
+
+
+def test_local_output_warns_that_option_is_deprecated(capsys):
+    submitter = Mock()
+    submitter.submit_job.return_value = []
+
+    result, _, _ = run_main(
+        "--config", "config.yaml", "--local-output", submitter=submitter
+    )
+
+    assert result == 0
+    assert "--local-output is deprecated" in capsys.readouterr().err
+
+
+def test_pipeline_rejects_interactive_mode():
+    with pytest.raises(SystemExit, match="2"):
+        run_main("--pipeline", "pipeline.yaml", "--interactive")
