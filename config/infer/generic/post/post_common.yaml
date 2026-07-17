@@ -1,5 +1,8 @@
 # Post-processing common configuration for generic simulations
 
+__meta__:
+  kind: fragment
+
 # Run post-processors
 post:
   shape_logic:

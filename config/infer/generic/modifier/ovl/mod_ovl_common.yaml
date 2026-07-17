@@ -1,4 +1,7 @@
 # Overlay modification for generic simulation configs
+
+__meta__:
+  kind: fragment
 # Include this after the main config to overlay four images (no heavy data products)
 
 override:

@@ -1,5 +1,8 @@
 # Base common configuration for ProtoDUNE-VD (includes geometry and builder)
 
+__meta__:
+  kind: fragment
+
 # Base configuration
 base:
   world_size: 1

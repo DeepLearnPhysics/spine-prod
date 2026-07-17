@@ -1,5 +1,8 @@
 # Model common configuration for ProtoDUNE-VD
 
+__meta__:
+  kind: fragment
+
 # Model configuration
 model:
   name: full_chain

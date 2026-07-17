@@ -1,5 +1,8 @@
 # Post-processing common configuration for ProtoDUNE-VD
 
+__meta__:
+  kind: fragment
+
 # Post-processors
 post:
   # apply_calibrations varies by config - override in specific configs

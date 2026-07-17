@@ -1,5 +1,8 @@
 # Base common configuration for generic simulations (includes builder)
 
+__meta__:
+  kind: fragment
+
 # Base configuration
 base:
   world_size: 1

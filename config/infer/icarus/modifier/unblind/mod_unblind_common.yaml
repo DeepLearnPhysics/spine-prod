@@ -1,4 +1,7 @@
 # Unblind-data modification for ICARUS configs, common settings
+
+__meta__:
+  kind: fragment
 # Include this after the main config to transform to only process unblinded data
 
 override:

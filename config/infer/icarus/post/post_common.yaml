@@ -1,5 +1,8 @@
 # Post-processing common configuration for ICARUS
 
+__meta__:
+  kind: fragment
+
 # Post-processors
 post:
   # trigger varies by config - override in specific configs

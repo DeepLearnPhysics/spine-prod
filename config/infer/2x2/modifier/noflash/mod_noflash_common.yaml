@@ -1,4 +1,7 @@
 # No-flash modification for 2x2 configs
+
+__meta__:
+  kind: fragment
 # Include this after the main config to remove flash parsing and output
 
 override:

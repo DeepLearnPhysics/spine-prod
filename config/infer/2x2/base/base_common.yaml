@@ -1,5 +1,8 @@
 # Base common configuration for 2x2 (includes geometry and builder)
 
+__meta__:
+  kind: fragment
+
 # Base configuration
 base:
   world_size: 1

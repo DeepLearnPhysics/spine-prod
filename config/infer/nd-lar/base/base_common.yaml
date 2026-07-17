@@ -1,5 +1,8 @@
 # Base common configuration for ND-LAr (includes geometry and builder)
 
+__meta__:
+  kind: fragment
+
 # Base configuration
 base:
   world_size: 1

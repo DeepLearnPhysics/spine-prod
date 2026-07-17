@@ -1,5 +1,8 @@
 # Post-processing common configuration for 2x2
 
+__meta__:
+  kind: fragment
+
 # Run post-processors
 post:
   shape_logic:

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Updated the default SPINE container release to
+  `docker:ghcr.io/deeplearnphysics/spine:v0.15.1`.
+- Updated the derived default S3DF Singularity image path to
+  `/sdf/data/neutrino/images/spine_v0-15-1.sif`.
+- Declared reusable `*_common.yaml` inference configurations as metadata
+  fragments, preventing missing-metadata warnings during composition.
+
 ## [0.6.2] - 2026-06-30
 
 ### Changed

@@ -1,5 +1,8 @@
 # Post-processing common configuration for SBND
 
+__meta__:
+  kind: fragment
+
 # Post-processors
 post:
   direction:

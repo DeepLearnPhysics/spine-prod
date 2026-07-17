@@ -1,5 +1,8 @@
 # IO common configuration for 2x2
 
+__meta__:
+  kind: fragment
+
 # IO configuration
 io:
   loader:

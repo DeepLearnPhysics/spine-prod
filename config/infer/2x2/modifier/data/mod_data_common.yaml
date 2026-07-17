@@ -1,4 +1,7 @@
 # Data-only modification for 2x2 configs, common settings
+
+__meta__:
+  kind: fragment
 # Include this after the main config to transform to data-only mode (no truth labels)
 
 override:

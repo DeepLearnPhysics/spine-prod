@@ -1,5 +1,8 @@
 # IO common configuration for SBND
 
+__meta__:
+  kind: fragment
+
 # IO configuration
 io:
   loader:

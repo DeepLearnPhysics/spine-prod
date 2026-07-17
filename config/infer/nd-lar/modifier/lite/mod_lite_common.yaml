@@ -1,4 +1,7 @@
 # Lite-output modification for ND-LAr configs
+
+__meta__:
+  kind: fragment
 # Include this after the main config to transform to lite-output mode (no heavy data products)
 
 override:

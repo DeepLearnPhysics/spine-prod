@@ -12,6 +12,9 @@ This module provides automated tests for SPINE-prod configuration files:
 3. **Metadata Stripping**: Verifies that __meta__ blocks are properly removed
    from final configurations and don't pollute the SPINE runtime config.
 
+4. **Fragment Metadata**: Verifies that reusable *_common.yaml files declare
+   themselves as configuration fragments.
+
 To run tests:
     pytest tests/test_config_validation.py -v
 
@@ -22,6 +25,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import yaml
+
+CONFIG_INFER_ROOT = Path(__file__).parent.parent / "config" / "infer"
+COMMON_CONFIGS = sorted(CONFIG_INFER_ROOT.rglob("*_common.yaml"))
 
 try:
     from spine.config import load_config_file
@@ -29,6 +36,15 @@ try:
     SPINE_AVAILABLE = True
 except ImportError:
     SPINE_AVAILABLE = False
+
+
+@pytest.mark.parametrize("config_path", COMMON_CONFIGS, ids=lambda path: str(path))
+def test_common_configs_are_fragments(config_path):
+    """Reusable common configurations must declare fragment metadata."""
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = yaml.load(config_file, Loader=yaml.BaseLoader)
+
+    assert config.get("__meta__", {}).get("kind") == "fragment"
 
 
 def load_config_with_includes(config_path):

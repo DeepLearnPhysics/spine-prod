@@ -1,5 +1,8 @@
 # Model common configuration for DUNE10kt-1x2x6
 
+__meta__:
+  kind: fragment
+
 # Model configuration
 model:
   name: full_chain
