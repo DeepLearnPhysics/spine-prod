@@ -5,7 +5,18 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.1] - 2026-07-20
+
+### Changed
+- Updated the default SPINE container release to `docker:ghcr.io/deeplearnphysics/spine:v0.15.3`.
+- Updated the derived default S3DF Singularity image path to `/sdf/data/neutrino/images/spine_v0-15-3.sif`.
+- Replaced generic `io.writer.*` overrides with SPINE's dedicated `--output`, `--output-dir`, and `--output-suffix` options.
+- Deprecated `submit.py --no-writer`, which is no longer needed with SPINE v0.15.3 or newer.
+
+### Fixed
+- Prevented explicit-source jobs using configurations without an `io.writer` block from creating an incomplete writer configuration and crashing.
+
+Full Changelog: [v0.7.0...v0.7.1](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.7.0...v0.7.1)
 
 ## [0.7.0] - 2026-07-17
 
