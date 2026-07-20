@@ -484,7 +484,13 @@ class TestSubmitterHelpers:
         output = tmp_path / "result.h5"
         assert (
             mock_submitter._format_spine_output_args(str(output), "unused", "unused")
-            == f"--set io.writer.file_name={output}"
+            == f"--output {output}"
+        )
+        assert (
+            mock_submitter._format_spine_output_args(
+                None, "/tmp/job output", "reco output"
+            )
+            == "--output-dir '/tmp/job output' --output-suffix 'reco output'"
         )
         assert (
             mock_submitter._merge_bind_paths(" /data, /scratch, /data ", ["/extra", ""])
@@ -770,8 +776,8 @@ class TestInteractiveExecution:
         assert "export NUMBA_NUM_THREADS=64" in run.call_args.args[0]
         assert "spine -S" in run.call_args.args[0]
         assert " -o " not in run.call_args.args[0]
-        assert "--set io.writer.directory=" in run.call_args.args[0]
-        assert "--set io.writer.suffix=full_chain_co_260316" in run.call_args.args[0]
+        assert "--output-dir " in run.call_args.args[0]
+        assert "--output-suffix full_chain_co_260316" in run.call_args.args[0]
         assert "--set base.world_size=0" in run.call_args.args[0]
         assert "--set io.loader.batch_size=1" in run.call_args.args[0]
         assert "FMATCH_BASEDIR" not in run.call_args.args[0]
@@ -794,10 +800,11 @@ class TestInteractiveExecution:
         assert exit_code == 0
         command = run.call_args.args[0]
         assert "spine -S" not in command
-        assert "--set io.writer." not in command
+        assert "--output-dir" not in command
+        assert "--output-suffix" not in command
 
-    def test_run_interactive_no_writer_suppresses_writer_overrides(
-        self, mock_submitter, tmp_path
+    def test_run_interactive_no_writer_is_deprecated_and_suppresses_output_options(
+        self, mock_submitter, tmp_path, capsys
     ):
         """Test explicit interactive inputs can opt out of writer overrides."""
         input_file = tmp_path / "input.root"
@@ -818,7 +825,9 @@ class TestInteractiveExecution:
         assert exit_code == 0
         command = run.call_args.args[0]
         assert "spine -S" in command
-        assert "--set io.writer." not in command
+        assert "--output-dir" not in command
+        assert "--output-suffix" not in command
+        assert "--no-writer is deprecated" in capsys.readouterr().out
 
     def test_run_interactive_rejects_output_without_files(self, mock_submitter):
         """Test config-owned interactive runs reject inference output overrides."""
@@ -1185,7 +1194,7 @@ class TestInteractiveExecution:
 
         assert exit_code == 0
         command = run.call_args.args[0]
-        assert "--set io.writer.suffix=custom_reco" in command
+        assert "--output-suffix custom_reco" in command
 
     def test_run_interactive_local_rejects_invalid_spine_path(
         self, mock_submitter, tmp_path
@@ -1482,7 +1491,7 @@ class TestBatchSpineOverride:
         assert len(scripts) == 1
 
         script = scripts[0].read_text(encoding="utf-8")
-        assert "--set io.writer.suffix=custom_reco" in script
+        assert "--output-suffix custom_reco" in script
 
     def test_submit_job_defaults_to_single_task_over_all_files(
         self, mock_submitter, tmp_path
@@ -1522,8 +1531,8 @@ class TestBatchSpineOverride:
             == input_files
         )
 
-    def test_submit_job_no_writer_suppresses_writer_overrides(
-        self, mock_submitter, tmp_path
+    def test_submit_job_no_writer_is_deprecated_and_suppresses_output_options(
+        self, mock_submitter, tmp_path, capsys
     ):
         """Test explicit batch inputs can opt out of writer overrides."""
         input_file = tmp_path / "input.root"
@@ -1550,8 +1559,10 @@ class TestBatchSpineOverride:
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert " -S $TASK_FILE_LIST" in script
-        assert "--set io.writer." not in script
+        assert "--output-dir" not in script
+        assert "--output-suffix" not in script
         assert "Output: defined in config" in script
+        assert "--no-writer is deprecated" in capsys.readouterr().out
 
     def test_submit_job_rejects_no_writer_with_output_suffix(
         self, mock_submitter, tmp_path
@@ -1594,7 +1605,8 @@ class TestBatchSpineOverride:
         script = scripts[0].read_text(encoding="utf-8")
         assert "Using input files defined in the config" in script
         assert " -S $TASK_FILE_LIST" not in script
-        assert "--set io.writer." not in script
+        assert "--output-dir" not in script
+        assert "--output-suffix" not in script
         assert "Output: defined in config" in script
 
     def test_submit_job_rejects_split_flags_without_files(self, mock_submitter):
@@ -1797,7 +1809,7 @@ class TestCVMFSOption:
             "output": "/tmp/output.h5",
             "output_dir": "/tmp/output",
             "output_suffix": "config",
-            "output_args": "--set io.writer.file_name=/tmp/output.h5",
+            "output_args": "--output /tmp/output.h5",
             "basedir": "/tmp/spine-prod",
             "file_list_pattern": "/tmp/files_*.txt",
             "larcv_path": None,
@@ -1880,7 +1892,8 @@ class TestCVMFSOption:
 
         assert "Using input files defined in the config" in script
         assert " -S $TASK_FILE_LIST" not in script
-        assert "--set io.writer." not in script
+        assert "--output-dir" not in script
+        assert "--output-suffix" not in script
         assert "Output: defined in config" in script
 
     def test_templates_include_spine_set_overrides(self, mock_submitter):
@@ -1915,26 +1928,25 @@ class TestCVMFSOption:
             output_dir="/tmp/job/output",
             output_suffix="full_chain_260501",
             output_args=(
-                "--set io.writer.directory=/tmp/job/output "
-                "--set io.writer.suffix=full_chain_260501"
+                "--output-dir /tmp/job/output " "--output-suffix full_chain_260501"
             ),
         )
 
         assert "-o /tmp/output.h5" not in script
-        assert "--set io.writer.directory=/tmp/job/output" in script
-        assert "--set io.writer.suffix=full_chain_260501" in script
+        assert "--output-dir /tmp/job/output" in script
+        assert "--output-suffix full_chain_260501" in script
 
     def test_templates_use_writer_file_name_for_explicit_output(self, mock_submitter):
-        """Test explicit output files still avoid the deprecated -o shortcut."""
+        """Test explicit output files use SPINE's dedicated output option."""
         script = self._render_template(
             mock_submitter,
             "job_template_s3df.sbatch",
             output="/tmp/output.h5",
-            output_args="--set io.writer.file_name=/tmp/output.h5",
+            output_args="--output /tmp/output.h5",
         )
 
         assert " -o " not in script
-        assert "--set io.writer.file_name=/tmp/output.h5" in script
+        assert "--output /tmp/output.h5" in script
 
     def test_templates_source_custom_software_paths(self, mock_submitter):
         """Test batch templates source custom software configure scripts."""

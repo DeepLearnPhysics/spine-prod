@@ -208,15 +208,24 @@ class Submitter:
         if output:
             output_path = Path(output)
             if output_path.suffix:
-                return f"--set io.writer.file_name={shlex.quote(output)}"
+                return f"--output {shlex.quote(output)}"
 
             directory = output
 
         return " ".join(
             [
-                f"--set io.writer.directory={shlex.quote(directory)}",
-                f"--set io.writer.suffix={shlex.quote(suffix)}",
+                f"--output-dir {shlex.quote(directory)}",
+                f"--output-suffix {shlex.quote(suffix)}",
             ]
+        )
+
+    @staticmethod
+    def _warn_no_writer_deprecated() -> None:
+        """Warn that SPINE now handles configurations without a writer safely."""
+        print(
+            "WARNING: --no-writer is deprecated and no longer needed with "
+            "SPINE v0.15.3+. SPINE now ignores output options when the config "
+            "has no io.writer block."
         )
 
     @staticmethod
@@ -477,8 +486,9 @@ class Submitter:
         output_suffix : str, optional
             Output HDF5 suffix when output names are derived from input files
         no_writer : bool, optional
-            Do not inject automatic ``io.writer`` output overrides for explicit
-            file submissions.
+            Deprecated. Do not pass automatic SPINE output options for explicit
+            file submissions. SPINE v0.15.3+ safely ignores these options when
+            the configuration has no writer.
         files_per_task : int, optional
             Files to process per task. If omitted, all explicit input files run
             in a single task unless ``ntasks``-style splitting is requested by
@@ -516,6 +526,8 @@ class Submitter:
         """
         if flashmatch and not flashmatch_path:
             self._warn_flashmatch_noop()
+        if no_writer:
+            self._warn_no_writer_deprecated()
 
         if interactive_runtime not in ("auto", "local", "container"):
             raise ValueError(
@@ -740,8 +752,9 @@ class Submitter:
             Output HDF5 suffix when output names are derived from input files,
             by default None
         no_writer : bool, optional
-            Do not inject automatic ``io.writer`` output overrides for explicit
-            file submissions.
+            Deprecated. Do not pass automatic SPINE output options for explicit
+            file submissions. SPINE v0.15.3+ safely ignores these options when
+            the configuration has no writer.
         ntasks : int, optional
             Target number of tasks when ``files_per_task`` is omitted, or the
             scheduler array concurrency cap when ``files_per_task`` is set.
@@ -780,6 +793,8 @@ class Submitter:
         """
         if flashmatch and not flashmatch_path:
             self._warn_flashmatch_noop()
+        if no_writer:
+            self._warn_no_writer_deprecated()
 
         file_list = []
         if files:

@@ -158,8 +158,10 @@ Examples:
         "--no-writer",
         action="store_true",
         help=(
-            "Do not inject io.writer output overrides for explicit "
-            "--source/--source-list submissions."
+            "DEPRECATED: suppress automatic output options for explicit "
+            "--source/--source-list submissions. This is no longer needed "
+            "with SPINE v0.15.3+, which safely ignores output options when "
+            "the config has no io.writer block."
         ),
     )
     parser.add_argument("--account", "-A", help="Batch scheduler account")
