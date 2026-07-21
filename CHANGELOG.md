@@ -5,6 +5,16 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-07-21
+
+### Changed
+- Made deprecated `submit.py --no-writer` a warning-only no-op. Automatic output options are always passed to SPINE, which safely ignores them when no writer is configured.
+
+### Fixed
+- Prevented `--no-writer` from suppressing the managed output directory when a configuration does contain a writer, which could place generated HDF5 files in the submission directory.
+
+Full Changelog: [v0.7.1...v0.7.2](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.7.1...v0.7.2)
+
 ## [0.7.1] - 2026-07-20
 
 ### Changed

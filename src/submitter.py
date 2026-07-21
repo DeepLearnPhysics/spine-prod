@@ -221,11 +221,11 @@ class Submitter:
 
     @staticmethod
     def _warn_no_writer_deprecated() -> None:
-        """Warn that SPINE now handles configurations without a writer safely."""
+        """Warn that the deprecated no-writer option is ignored."""
         print(
-            "WARNING: --no-writer is deprecated and no longer needed with "
-            "SPINE v0.15.3+. SPINE now ignores output options when the config "
-            "has no io.writer block."
+            "WARNING: --no-writer is deprecated and ignored with SPINE "
+            "v0.15.3+. Output options are still passed; SPINE safely ignores "
+            "them when the config has no io.writer block."
         )
 
     @staticmethod
@@ -486,9 +486,8 @@ class Submitter:
         output_suffix : str, optional
             Output HDF5 suffix when output names are derived from input files
         no_writer : bool, optional
-            Deprecated. Do not pass automatic SPINE output options for explicit
-            file submissions. SPINE v0.15.3+ safely ignores these options when
-            the configuration has no writer.
+            Deprecated and ignored. SPINE v0.15.3+ safely ignores output options
+            when the configuration has no writer.
         files_per_task : int, optional
             Files to process per task. If omitted, all explicit input files run
             in a single task unless ``ntasks``-style splitting is requested by
@@ -540,8 +539,6 @@ class Submitter:
             if not file_list:
                 raise ValueError("No input files found")
             print(f"Found {len(file_list)} file(s) to process")
-            if no_writer and (output is not None or output_suffix is not None):
-                raise ValueError("Cannot use --no-writer with --output/--output-suffix")
         else:
             if files_per_task is not None:
                 raise ValueError(
@@ -640,11 +637,11 @@ class Submitter:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
-        elif file_list and not no_writer:
+        elif file_list:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
         output_args = (
             self._format_spine_output_args(output, output_dir, output_suffix)
-            if file_list and not no_writer
+            if file_list
             else ""
         )
         spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
@@ -752,9 +749,8 @@ class Submitter:
             Output HDF5 suffix when output names are derived from input files,
             by default None
         no_writer : bool, optional
-            Deprecated. Do not pass automatic SPINE output options for explicit
-            file submissions. SPINE v0.15.3+ safely ignores these options when
-            the configuration has no writer.
+            Deprecated and ignored. SPINE v0.15.3+ safely ignores output options
+            when the configuration has no writer.
         ntasks : int, optional
             Target number of tasks when ``files_per_task`` is omitted, or the
             scheduler array concurrency cap when ``files_per_task`` is set.
@@ -802,8 +798,6 @@ class Submitter:
             if not file_list:
                 raise ValueError("No input files found")
             print(f"Found {len(file_list)} file(s) to process")
-            if no_writer and (output is not None or output_suffix is not None):
-                raise ValueError("Cannot use --no-writer with --output/--output-suffix")
         else:
             if ntasks is not None or files_per_task is not None:
                 raise ValueError(
@@ -886,11 +880,11 @@ class Submitter:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
-        elif file_list and not no_writer:
+        elif file_list:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
         output_args = (
             self._format_spine_output_args(output, output_dir, output_suffix)
-            if file_list and not no_writer
+            if file_list
             else ""
         )
 

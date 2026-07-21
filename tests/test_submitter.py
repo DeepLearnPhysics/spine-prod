@@ -803,10 +803,10 @@ class TestInteractiveExecution:
         assert "--output-dir" not in command
         assert "--output-suffix" not in command
 
-    def test_run_interactive_no_writer_is_deprecated_and_suppresses_output_options(
+    def test_run_interactive_no_writer_is_deprecated_and_ignored(
         self, mock_submitter, tmp_path, capsys
     ):
-        """Test explicit interactive inputs can opt out of writer overrides."""
+        """Test deprecated no-writer leaves automatic output options enabled."""
         input_file = tmp_path / "input.root"
         input_file.touch()
         completed = type("Completed", (), {"returncode": 0})()
@@ -825,9 +825,10 @@ class TestInteractiveExecution:
         assert exit_code == 0
         command = run.call_args.args[0]
         assert "spine -S" in command
-        assert "--output-dir" not in command
-        assert "--output-suffix" not in command
-        assert "--no-writer is deprecated" in capsys.readouterr().out
+        assert "--output-dir" in command
+        assert "--output-suffix full_chain_co_260316" in command
+        warning = capsys.readouterr().out
+        assert "--no-writer is deprecated and ignored" in warning
 
     def test_run_interactive_rejects_output_without_files(self, mock_submitter):
         """Test config-owned interactive runs reject inference output overrides."""
@@ -840,23 +841,28 @@ class TestInteractiveExecution:
                 output_suffix="custom_reco",
             )
 
-    def test_run_interactive_rejects_no_writer_with_output_suffix(
+    def test_run_interactive_ignores_no_writer_with_output_suffix(
         self, mock_submitter, tmp_path
     ):
-        """Test no-writer cannot be combined with writer output overrides."""
+        """Test an explicit output suffix wins over deprecated no-writer."""
         input_file = tmp_path / "input.root"
         input_file.touch()
+        completed = type("Completed", (), {"returncode": 0})()
 
-        with pytest.raises(
-            ValueError,
-            match="Cannot use --no-writer with --output/--output-suffix",
+        with (
+            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.submitter.subprocess.run", return_value=completed) as run,
         ):
-            mock_submitter.run_interactive(
+            exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
                 files=[str(input_file)],
                 no_writer=True,
                 output_suffix="custom_reco",
+                interactive_runtime="local",
             )
+
+        assert exit_code == 0
+        assert "--output-suffix custom_reco" in run.call_args.args[0]
 
     def test_run_interactive_sources_custom_software_paths(
         self, mock_submitter, tmp_path
@@ -1531,10 +1537,10 @@ class TestBatchSpineOverride:
             == input_files
         )
 
-    def test_submit_job_no_writer_is_deprecated_and_suppresses_output_options(
+    def test_submit_job_no_writer_is_deprecated_and_ignored(
         self, mock_submitter, tmp_path, capsys
     ):
-        """Test explicit batch inputs can opt out of writer overrides."""
+        """Test deprecated no-writer leaves automatic output options enabled."""
         input_file = tmp_path / "input.root"
         input_file.touch()
 
@@ -1559,29 +1565,39 @@ class TestBatchSpineOverride:
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert " -S $TASK_FILE_LIST" in script
-        assert "--output-dir" not in script
-        assert "--output-suffix" not in script
-        assert "Output: defined in config" in script
-        assert "--no-writer is deprecated" in capsys.readouterr().out
+        assert "--output-dir" in script
+        assert "--output-suffix full_chain_co_260316" in script
+        assert "Output directory:" in script
+        warning = capsys.readouterr().out
+        assert "--no-writer is deprecated and ignored" in warning
 
-    def test_submit_job_rejects_no_writer_with_output_suffix(
+    def test_submit_job_ignores_no_writer_with_output_suffix(
         self, mock_submitter, tmp_path
     ):
-        """Test no-writer cannot be combined with writer output overrides."""
+        """Test an explicit output suffix wins over deprecated no-writer."""
         input_file = tmp_path / "input.root"
         input_file.touch()
 
-        with pytest.raises(
-            ValueError,
-            match="Cannot use --no-writer with --output/--output-suffix",
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
         ):
-            mock_submitter.submit_job(
+            job_ids = mock_submitter.submit_job(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
                 files=[str(input_file)],
                 profile="s3df_ampere",
                 no_writer=True,
                 output_suffix="custom_reco",
             )
+
+        assert job_ids == ["12345"]
+        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        assert len(scripts) == 1
+        assert "--output-suffix custom_reco" in scripts[0].read_text(encoding="utf-8")
 
     def test_submit_job_uses_config_inputs_when_files_omitted(self, mock_submitter):
         """Test batch submission can defer input discovery to the config."""

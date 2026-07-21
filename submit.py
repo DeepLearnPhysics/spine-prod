@@ -158,10 +158,9 @@ Examples:
         "--no-writer",
         action="store_true",
         help=(
-            "DEPRECATED: suppress automatic output options for explicit "
-            "--source/--source-list submissions. This is no longer needed "
-            "with SPINE v0.15.3+, which safely ignores output options when "
-            "the config has no io.writer block."
+            "DEPRECATED and ignored with SPINE v0.15.3+. Output options are "
+            "always passed; SPINE safely ignores them when the config has no "
+            "io.writer block."
         ),
     )
     parser.add_argument("--account", "-A", help="Batch scheduler account")
