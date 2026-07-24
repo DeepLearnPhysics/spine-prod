@@ -104,6 +104,4 @@ Known issue(s):
   - Undertrained (deghosting + transfer) in order to converge for the workshop
   - Mistake in the drift velocity, which is set x10 too large (undercorrecting for lifetime)
 
----
-
 *For more details on each component, see the corresponding YAML files in the subdirectories.*

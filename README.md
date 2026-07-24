@@ -149,16 +149,19 @@ export SPINE_CONTAINER_RUNTIME_ARGS="--env LD_PRELOAD= --env LC_ALL=C.UTF-8"
 ```
 spine-prod/
 ├── configure.sh             # Environment setup script
-├── submit.py                # Main submission orchestrator (NEW!)
+├── submit.py                # Main submission orchestrator
 ├── README.md                # This file
 │
 ├── config/                  # All SPINE configs (inference & training)
 │   ├── infer/               # Inference configs (referenced as infer/...)
-│   │   ├── icarus/          # ICARUS detector configs
-│   │   ├── sbnd/            # SBND detector configs
 │   │   ├── 2x2/             # 2x2 detector configs
-│   │   ├── nd-lar/          # ND-LAr detector configs
+│   │   ├── dune10kt-1x2x6/  # DUNE 10 kt module 1x2x6 configs
 │   │   ├── generic/         # Generic (no detector) configs
+│   │   ├── icarus/          # ICARUS detector configs
+│   │   ├── nd-lar/          # ND-LAr detector configs
+│   │   ├── protodune-sp/    # ProtoDUNE single-phase configs
+│   │   ├── protodune-vd/    # ProtoDUNE vertical-drift configs
+│   │   ├── sbnd/            # SBND detector configs
 │   │   └── common/          # Shared configs
 │   └── train/               # Training configs (referenced as train/...)
 ├── templates/               # Job templates
@@ -702,8 +705,9 @@ pre-commit run --all-files
 All configuration files are automatically validated in CI to ensure they parse correctly:
 
 ```python
-from config import load_config
-config = load_config('infer/icarus/latest.yaml')
+from spine.config import load_config_file
+
+config = load_config_file("config/infer/icarus/full_chain_co_260501.yaml")
 ```
 
 ## Related Tools

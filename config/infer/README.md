@@ -36,6 +36,16 @@ All detector directories follow a modular structure:
 
 Top-level configuration files (e.g., `full_chain_YYMMDD.yaml`) compose these modules into complete reconstruction chains. Detector-independent utility configurations, such as `common/litify.yaml`, live under `common/`.
 
+## Metadata Contract
+
+SPINE configuration metadata uses the top-level `__meta__` block:
+
+- Reusable `*_common.yaml` files declare `kind: fragment`.
+- Versioned files under `modifier/` declare `kind: mod` and include modifier identity and version metadata.
+- Standalone detector-independent configurations such as `common/litify.yaml` declare `kind: bundle`.
+
+This distinction allows SPINE to identify reusable fragments, validate modifier composition, and avoid treating partial configurations as standalone bundles.
+
 ## Versioning and Reproducibility
 
 Configurations are versioned by date (YYMMDD format) to ensure reproducibility:

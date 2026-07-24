@@ -2,22 +2,23 @@
 
 ## Overview
 
-The SPINE production submission system has been refactored into a modular structure for better maintainability and readability. The original 1,500+ line monolithic `submit.py` has been reorganized into focused modules.
+The SPINE production submission system uses a thin command-line entry point backed by focused modules for configuration management, file handling, scheduler integration, preloading, and job orchestration.
 
 ## Structure
 
 ```
 spine-prod/
-├── submit.py                # Main CLI entry point (295 lines)
+├── submit.py                # Main CLI entry point
 ├── src/                     # Source code modules
 │   ├── __init__.py         # Package initialization
 │   ├── client/             # Batch scheduler clients
 │   │   ├── base.py         # Shared template/job metadata helpers
 │   │   ├── slurm.py        # SLURM sbatch client
 │   │   └── pbs.py          # PBS qsub client
-│   ├── config_manager.py   # Configuration and profile management (560 lines)
-│   ├── file_handler.py     # File parsing and chunking (81 lines)
-│   └── submitter.py        # Main orchestration class (522 lines)
+│   ├── config_manager.py   # Configuration and profile management
+│   ├── file_handler.py     # File parsing and chunking
+│   ├── preload.py          # SPINE download preloading
+│   └── submitter.py        # Main orchestration class
 ├── templates/              # Batch job templates
 ├── config/                 # SPINE configurations
 └── jobs/                   # Job output directories
@@ -67,16 +68,14 @@ spine-prod/
 
 ## Usage
 
-No changes to user-facing commands - all existing scripts and workflows continue to work:
-
 ```bash
-# Basic usage (unchanged)
-./submit.py --config infer/icarus/latest.yaml --source-list files.txt
+# Basic usage
+./submit.py --config infer/icarus/latest --source-list files.txt
 
-# All features still available
-./submit.py --pipeline pipelines/production.yaml
+# Additional modes
+./submit.py --pipeline pipelines/icarus_production_example.yaml
 ./submit.py --interactive --config ... --source test.root
-./submit.py --list-mods infer/icarus/config.yaml
+./submit.py --list-mods infer/icarus/full_chain_co_260501.yaml
 ```
 
 ## Imports for Programmatic Use

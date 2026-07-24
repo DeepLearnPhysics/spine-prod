@@ -81,6 +81,4 @@ Known issue(s):
     (in this case single beam-like particles)
   - No charged kaon in the training sample
 
----
-
 *For more details on each component, see the corresponding YAML files in the subdirectories.*

@@ -63,6 +63,4 @@ Description:
 Known issue(s):
   - No charged kaon in the training sample
 
----
-
 *For more details on each component, see the corresponding YAML files in the subdirectories.*
