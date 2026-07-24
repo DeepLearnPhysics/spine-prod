@@ -2,6 +2,7 @@
 # Revision date: January 15, 2025
 
 __meta__:
+  kind: bundle
   version: "250115"
   date: "2025-01-15"
   description: "ICARUS model with average charge rescaling, v3 dataset"

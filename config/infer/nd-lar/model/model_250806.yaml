@@ -2,6 +2,7 @@
 # Revision date: August 6, 2025
 
 __meta__:
+  kind: bundle
   version: "250806"
   date: "2025-08-06"
   description: "ND-LAr model first full weights release"

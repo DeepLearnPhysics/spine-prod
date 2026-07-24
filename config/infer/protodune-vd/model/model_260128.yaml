@@ -2,6 +2,7 @@
 # Revision date: January 28, 2026
 
 __meta__:
+  kind: bundle
   version: "260128"
   date: "2026-01-28"
   description: "ProtoDUNE-VD collection-only model with in-chain calibration, v0 dataset"

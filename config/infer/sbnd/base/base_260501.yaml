@@ -2,6 +2,7 @@
 # Revision date: May 1, 2026
 
 __meta__:
+  kind: bundle
   version: "260501"
   date: "2026-05-01"
   description: "Base SBND configuration for May 2026 weights"

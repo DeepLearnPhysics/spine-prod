@@ -1,6 +1,12 @@
 # ICARUS full chain configuration with collection-only model
 # Revision date: March 3, 2025
 
+__meta__:
+  kind: bundle
+  version: "250303"
+  date: "2025-03-03"
+  description: "ICARUS full chain configuration with collection-only model"
+
 include:
   - base/base_240719.yaml
   - io/io_240812.yaml

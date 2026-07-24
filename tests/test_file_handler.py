@@ -40,6 +40,21 @@ def test_parse_direct_sources_expands_globs_and_warns_for_missing(
     assert f"WARNING: File not found: {missing}" in capsys.readouterr().out
 
 
+def test_parse_direct_sources_sorts_each_glob(handler, monkeypatch):
+    matches = {
+        "first/*.root": ["first/b.root", "first/a.root"],
+        "second/*.root": ["second/d.root", "second/c.root"],
+    }
+    monkeypatch.setattr("src.file_handler.glob.glob", matches.__getitem__)
+
+    assert handler.parse_files(list(matches)) == [
+        "first/a.root",
+        "first/b.root",
+        "second/c.root",
+        "second/d.root",
+    ]
+
+
 @pytest.mark.parametrize(
     ("files", "max_array_size", "files_per_task", "expected"),
     [

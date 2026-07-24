@@ -2,6 +2,7 @@
 # Revision date: May 1, 2026
 
 __meta__:
+  kind: bundle
   version: "260501"
   date: "2026-05-01"
   description: "ICARUS collection-only model with in-chain calibration, v5 dataset, fixed GrapPA encoder radii settings"

@@ -1,3 +1,7 @@
+__meta__:
+  kind: bundle
+  description: "ICARUS deghosting training configuration"
+
 # Base configuration
 base:
   world_size: 4

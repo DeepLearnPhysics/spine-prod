@@ -2,6 +2,7 @@
 # Revision date: August 5, 2024
 
 __meta__:
+  kind: bundle
   version: "240805"
   date: "2024-08-05"
   description: "IO configuration for generic simulations August 2024"

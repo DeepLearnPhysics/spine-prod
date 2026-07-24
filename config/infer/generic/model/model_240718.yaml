@@ -2,6 +2,7 @@
 # Revision date: July 18, 2024
 
 __meta__:
+  kind: bundle
   version: "240718"
   date: "2024-07-18"
   description: "Generic simulation model 2x2 weights (debug)"

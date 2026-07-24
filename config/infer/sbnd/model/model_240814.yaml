@@ -2,6 +2,7 @@
 # Revision date: August 14, 2024
 
 __meta__:
+  kind: bundle
   version: "240814"
   date: "2024-08-14"
   description: "SBND model with average charge rescaling"

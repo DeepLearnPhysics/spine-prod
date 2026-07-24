@@ -1,6 +1,12 @@
 # SBND full chain configuration
 # Revision date: February 18, 2026
 
+__meta__:
+  kind: bundle
+  version: "260218"
+  date: "2026-02-18"
+  description: "SBND full chain configuration"
+
 include:
   - base/base_240720.yaml
   - io/io_260218.yaml

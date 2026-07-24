@@ -1,6 +1,12 @@
 # Generic simulation full chain configuration
 # Revision date: July 18, 2024
 
+__meta__:
+  kind: bundle
+  version: "240718"
+  date: "2024-07-18"
+  description: "Generic simulation full chain configuration"
+
 include:
   - base/base_240718.yaml
   - io/io_240718.yaml

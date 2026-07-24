@@ -1,6 +1,12 @@
 # SBND full chain configuration
 # Revision date: July 20, 2024
 
+__meta__:
+  kind: bundle
+  version: "240720"
+  date: "2024-07-20"
+  description: "SBND full chain configuration"
+
 include:
   - base/base_240720.yaml
   - io/io_240720.yaml

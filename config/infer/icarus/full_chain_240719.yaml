@@ -1,6 +1,12 @@
 # ICARUS full chain configuration
 # Revision date: July 19, 2024
 
+__meta__:
+  kind: bundle
+  version: "240719"
+  date: "2024-07-19"
+  description: "ICARUS full chain configuration"
+
 include:
   - base/base_240719.yaml
   - io/io_240719.yaml

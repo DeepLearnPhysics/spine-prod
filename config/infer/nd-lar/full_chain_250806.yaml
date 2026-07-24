@@ -1,6 +1,12 @@
 # ND-LAr full chain configuration
 # Revision date: August 6, 2025
 
+__meta__:
+  kind: bundle
+  version: "250806"
+  date: "2025-08-06"
+  description: "ND-LAr full chain configuration"
+
 include:
   - base/base_240819.yaml
   - io/io_240819.yaml

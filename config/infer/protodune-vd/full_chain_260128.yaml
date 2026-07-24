@@ -1,6 +1,12 @@
 # ProtoDUNE-VD full chain configuration
 # Revision date: January 18, 2026
 
+__meta__:
+  kind: bundle
+  version: "260128"
+  date: "2026-01-28"
+  description: "ProtoDUNE-VD full chain configuration"
+
 include:
   - base/base_260118.yaml
   - io/io_260118.yaml

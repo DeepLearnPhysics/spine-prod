@@ -2,6 +2,7 @@
 # Revision date: May 21, 2026
 
 __meta__:
+  kind: bundle
   version: "260521"
   date: "2026-05-21"
   description: "SBND model with collection-only charge rescaling"

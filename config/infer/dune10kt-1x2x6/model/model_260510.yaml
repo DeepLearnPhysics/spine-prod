@@ -2,6 +2,7 @@
 # Revision date: May 10, 2026
 
 __meta__:
+  kind: bundle
   version: "260510"
   date: "2026-05-10"
   description: "DUNE10kt-1x2x6 collection-only model with in-chain calibration, v1 dataset"

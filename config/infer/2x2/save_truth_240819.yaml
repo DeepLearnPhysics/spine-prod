@@ -1,6 +1,12 @@
 # 2x2 truth saving configuration
 # Revision date: August 19, 2024
 
+__meta__:
+  kind: bundle
+  version: "240819"
+  date: "2024-08-19"
+  description: "2x2 truth saving configuration"
+
 include:
   - base/base_240719.yaml
   - io/io_240819.yaml

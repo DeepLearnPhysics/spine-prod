@@ -12,8 +12,9 @@ This module provides automated tests for SPINE-prod configuration files:
 3. **Metadata Stripping**: Verifies that __meta__ blocks are properly removed
    from final configurations and don't pollute the SPINE runtime config.
 
-4. **Metadata Contracts**: Verifies fragment and modifier kinds and ensures
-   metadata versions and dates agree with authoritative dated filenames.
+4. **Metadata Contracts**: Verifies explicit bundle, fragment, and modifier
+   kinds and ensures metadata versions and dates agree with authoritative
+   dated filenames.
 
 To run tests:
     pytest tests/test_config_validation.py -v
@@ -31,7 +32,22 @@ import pytest
 import yaml
 
 CONFIG_INFER_ROOT = Path(__file__).parent.parent / "config" / "infer"
+CONFIG_ROOT = CONFIG_INFER_ROOT.parent
+ACTIVE_CONFIGS = sorted(
+    [
+        config_path
+        for config_path in CONFIG_ROOT.rglob("*.yaml")
+        if "legacy" not in config_path.parts
+    ]
+    + list((CONFIG_ROOT / "train" / "config").rglob("*.cfg"))
+)
 COMMON_CONFIGS = sorted(CONFIG_INFER_ROOT.rglob("*_common.yaml"))
+COMPOSITE_CONFIGS = sorted(
+    config_path
+    for pattern in ("full_chain_*.yaml", "save_truth_*.yaml")
+    for config_path in CONFIG_INFER_ROOT.rglob(pattern)
+    if "legacy" not in config_path.parts
+)
 VERSIONED_MODIFIER_CONFIGS = sorted(
     config_path
     for config_path in CONFIG_INFER_ROOT.rglob("*.yaml")
@@ -47,6 +63,24 @@ try:
 except ImportError:
     SPINE_AVAILABLE = False
     SPINE_SUPPORTS_FRAGMENTS = False
+
+
+@pytest.mark.parametrize("config_path", ACTIVE_CONFIGS, ids=lambda path: str(path))
+def test_active_configs_declare_explicit_kind(config_path):
+    """Every maintained configuration must declare its metadata semantics."""
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = yaml.load(config_file, Loader=yaml.BaseLoader)
+
+    assert config.get("__meta__", {}).get("kind") in {"bundle", "fragment", "mod"}
+
+
+@pytest.mark.parametrize("config_path", COMPOSITE_CONFIGS, ids=lambda path: str(path))
+def test_composite_configs_are_bundles(config_path):
+    """Executable full-chain and truth-saving composites must be bundles."""
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = yaml.load(config_file, Loader=yaml.BaseLoader)
+
+    assert config.get("__meta__", {}).get("kind") == "bundle"
 
 
 @pytest.mark.parametrize("config_path", COMMON_CONFIGS, ids=lambda path: str(path))

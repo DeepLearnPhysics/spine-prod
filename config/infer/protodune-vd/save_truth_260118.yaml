@@ -1,6 +1,12 @@
 # ProtoDUNE-VD truth saving configuration
 # Revision date: January 18, 2026
 
+__meta__:
+  kind: bundle
+  version: "260118"
+  date: "2026-01-18"
+  description: "ProtoDUNE-VD truth saving configuration"
+
 include:
   - base/base_260118.yaml
   - io/io_260118.yaml

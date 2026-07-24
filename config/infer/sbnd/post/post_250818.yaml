@@ -2,6 +2,7 @@
 # Revision date: August 18, 2025
 
 __meta__:
+  kind: bundle
   version: "250818"
   date: "2025-08-18"
   description: "SBND post-processing"

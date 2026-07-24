@@ -173,6 +173,16 @@ class ConfigManager:
         match = re.search(r"_(\d{6})(?:_|\.|$)", config_path.stem)
         return match.group(1) if match else None
 
+    @staticmethod
+    def _bundle_metadata(description: str, version: Optional[str] = None) -> str:
+        """Format explicit bundle metadata for a generated configuration."""
+        metadata = {"kind": "bundle"}
+        if version:
+            metadata["version"] = version
+            metadata["date"] = datetime.strptime(version, "%y%m%d").date().isoformat()
+        metadata["description"] = description
+        return yaml.safe_dump({"__meta__": metadata}, sort_keys=False) + "\n"
+
     def resolve_modifier_version(
         self,
         mod_name: str,
@@ -377,6 +387,10 @@ class ConfigManager:
         composite_content += f"# Base: {base_config}\n"
         composite_content += f"# Modifiers: {', '.join(modifiers)}\n"
         composite_content += f"# Generated: {datetime.now().isoformat()}\n\n"
+        composite_content += self._bundle_metadata(
+            f"Auto-generated composite configuration based on {config_path.name}",
+            base_version,
+        )
 
         # Save composite config first to determine its location. If the base
         # is already a generated composite, keep only the final composite tag.
@@ -523,6 +537,9 @@ class ConfigManager:
         if latest_version:
             composite_content += f"# Latest version: {latest_version}\n"
         composite_content += "\n"
+        composite_content += self._bundle_metadata(
+            f"Auto-generated latest {detector} configuration", latest_version
+        )
 
         composite_content += "include:\n"
         for component in component_dirs:

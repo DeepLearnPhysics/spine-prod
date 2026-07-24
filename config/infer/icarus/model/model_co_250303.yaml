@@ -2,6 +2,7 @@
 # Revision date: March 3, 2025
 
 __meta__:
+  kind: bundle
   version: "250303"
   date: "2025-03-03"
   description: "ICARUS collection-only model with in-chain calibration, v4 dataset"

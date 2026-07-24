@@ -2,6 +2,7 @@
 # Revision date: June 26, 2026
 
 __meta__:
+  kind: bundle
   version: "260626"
   date: "2026-06-26"
   description: "DUNE10kt-1x2x6 post-processing, latest"

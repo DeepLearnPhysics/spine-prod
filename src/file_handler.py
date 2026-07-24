@@ -40,7 +40,7 @@ class FileHandler:
             for item in file_input:
                 if "*" in item or "?" in item:
                     # Expand glob
-                    files.extend(glob.glob(item))
+                    files.extend(sorted(glob.glob(item)))
                 else:
                     # Direct file path
                     if os.path.exists(item):

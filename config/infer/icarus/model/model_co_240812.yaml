@@ -2,6 +2,7 @@
 # Revision date: August 12, 2024
 
 __meta__:
+  kind: bundle
   version: "240812"
   date: "2024-08-12"
   description: "ICARUS collection-only model, v2 dataset"

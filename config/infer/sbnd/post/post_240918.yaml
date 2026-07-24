@@ -2,6 +2,7 @@
 # Revision date: September 18, 2024
 
 __meta__:
+  kind: bundle
   version: "240918"
   date: "2024-09-18"
   description: "SBND post-processing for September 2024 weights"

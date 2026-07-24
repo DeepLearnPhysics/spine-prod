@@ -153,6 +153,15 @@ def test_create_composite_config_resolves_named_and_custom_modifiers(manager, tm
 
     content = result.read_text()
     assert result.name == "full_chain_250101_data_custom_composite.yaml"
+    metadata = yaml.safe_load(content)["__meta__"]
+    assert metadata == {
+        "kind": "bundle",
+        "version": "250101",
+        "date": "2025-01-01",
+        "description": (
+            "Auto-generated composite configuration based on " "full_chain_250101.yaml"
+        ),
+    }
     assert "infer/icarus/full_chain_250101.yaml" in content
     assert "infer/icarus/modifier/data/mod_data_250101.yaml" in content
     assert str(custom) in content
@@ -335,6 +344,12 @@ def test_create_latest_config_selects_latest_components(manager, tmp_path):
 
     assert result.name == "icarus_latest_250101_composite.yaml"
     content = result.read_text()
+    assert yaml.safe_load(content)["__meta__"] == {
+        "kind": "bundle",
+        "version": "250101",
+        "date": "2025-01-01",
+        "description": "Auto-generated latest icarus configuration",
+    }
     assert "infer/icarus/base/base_250101.yaml" in content
     assert "infer/icarus/io/io_custom.yaml" in content
     assert "base_240101.yaml" not in content
@@ -362,7 +377,12 @@ def test_create_latest_config_supports_only_unversioned_component(manager, tmp_p
     result = Path(manager.create_latest_config("custom", tmp_path))
 
     assert result.name == "custom_latest_composite.yaml"
-    assert "Latest version:" not in result.read_text()
+    content = result.read_text()
+    assert "Latest version:" not in content
+    assert yaml.safe_load(content)["__meta__"] == {
+        "kind": "bundle",
+        "description": "Auto-generated latest custom configuration",
+    }
 
 
 def test_create_latest_config_uses_absolute_path_when_relpath_fails(
