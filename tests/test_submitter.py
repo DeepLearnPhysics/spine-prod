@@ -614,6 +614,7 @@ class TestSubmitterHelpers:
                 {
                     "SPINE_CONTAINER_PATH": str(tmp_path / "missing.sif"),
                     "ICARUS_DATA_DIR": "/data/icarus",
+                    "SBND_DATA_DIR": "/data/sbnd",
                 },
                 clear=False,
             ),
@@ -627,6 +628,7 @@ class TestSubmitterHelpers:
         assert f"{mock_submitter.basedir}:{mock_submitter.basedir}" in command
         assert "-v /cvmfs:/cvmfs:ro" in command
         assert "-e ICARUS_DATA_DIR=/data/icarus" in command
+        assert "-e SBND_DATA_DIR=/data/sbnd" in command
 
     def test_existing_sif_falls_back_to_docker_without_sif_runtime(
         self, mock_submitter, tmp_path

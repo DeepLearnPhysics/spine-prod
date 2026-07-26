@@ -443,11 +443,12 @@ There is no need to pass `--flashmatch`. The flag is accepted only for backward
 compatibility and is ignored. Use `--flashmatch-path` to source a custom
 flash-matching setup instead.
 
-For sites without CVMFS, point ICARUS configs at a local copy of the
-`icarus_data` release directory before sourcing `configure.sh`:
+For sites without CVMFS, point detector configs at local copies of their data
+release directories before sourcing `configure.sh`:
 
 ```bash
 export ICARUS_DATA_DIR=/path/to/icarus_data
+export SBND_DATA_DIR=/path/to/sbnd_data
 source configure.sh
 ```
 
@@ -612,7 +613,8 @@ Set by `configure.sh`:
 - `SPINE_PROD_BASEDIR` - Base directory of this repository
 - `SPINE_PROD_CONFIGURED` - Marker that the shell environment was configured
 - `SPINE_CONFIG_PATH` - Configuration search path
-- `ICARUS_DATA_DIR` - ICARUS data release path
+- `ICARUS_DATA_DIR` - ICARUS data release path; defaults to the standard ICARUS CVMFS location
+- `SBND_DATA_DIR` - SBND data release path; defaults to `/cvmfs/sbnd.opensciencegrid.org/products/sbnd/sbnd_data/`
 - `SPINE_CONTAINER_VERSION` - Tagged SPINE container version
 - `SPINE_CONTAINER_PATH` - Singularity/Apptainer image path
 - `SPINE_CONTAINER_TAG` - Registry image tag for Shifter-style runtimes, including `docker:`

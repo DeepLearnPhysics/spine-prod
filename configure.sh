@@ -44,6 +44,11 @@ if [[ -z $ICARUS_DATA_DIR ]]; then
     export ICARUS_DATA_DIR=/cvmfs/icarus.opensciencegrid.org/products/icarus/icarus_data
 fi
 
+# If SBND_DATA_DIR is not set, default to the standard location on CVMFS.
+if [[ -z $SBND_DATA_DIR ]]; then
+    export SBND_DATA_DIR=/cvmfs/sbnd.opensciencegrid.org/products/sbnd/sbnd_data/
+fi
+
 echo
 printf "\033[93mSPINE_PROD\033[00m FYI shell env. may useful for external packages:\n"
 printf "    \033[95mSPINE_PROD_BASEDIR\033[00m      = $SPINE_PROD_BASEDIR\n"
@@ -53,6 +58,7 @@ printf "    \033[95mSPINE_CONTAINER_VERSION\033[00m = $SPINE_CONTAINER_VERSION\n
 printf "    \033[95mSPINE_CONTAINER_PATH\033[00m    = $SPINE_CONTAINER_PATH\n"
 printf "    \033[95mSPINE_CONTAINER_TAG\033[00m     = $SPINE_CONTAINER_TAG\n"
 printf "    \033[95mICARUS_DATA_DIR\033[00m         = $ICARUS_DATA_DIR\n"
+printf "    \033[95mSBND_DATA_DIR\033[00m           = $SBND_DATA_DIR\n"
 
 echo
 echo "Finished configuration."

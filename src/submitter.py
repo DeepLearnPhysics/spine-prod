@@ -406,10 +406,10 @@ class Submitter:
                 f"-e SPINE_PROD_BASEDIR={shlex.quote(basedir)}",
                 f"-e SPINE_CONFIG_PATH={shlex.quote(os.environ.get('SPINE_CONFIG_PATH', str(self.basedir / 'config')))}",
             ]
-            if os.environ.get("ICARUS_DATA_DIR"):
-                env_args.append(
-                    f"-e ICARUS_DATA_DIR={shlex.quote(os.environ['ICARUS_DATA_DIR'])}"
-                )
+            for data_dir_var in ("ICARUS_DATA_DIR", "SBND_DATA_DIR"):
+                if os.environ.get(data_dir_var):
+                    data_dir = shlex.quote(os.environ[data_dir_var])
+                    env_args.append(f"-e {data_dir_var}={data_dir}")
 
             return (
                 f"{shlex.quote(docker)} run --rm {platform_arg}{' '.join(volume_args)} "
