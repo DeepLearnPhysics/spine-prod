@@ -34,7 +34,8 @@ else
 fi
 
 # Define container tag (Shifter image tag for NERSC or local docker execution)
-DEFAULT_CONTAINER_TAG=docker:ghcr.io/deeplearnphysics/spine:${SPINE_CONTAINER_VERSION}
+SPINE_CONTAINER_REGISTRY_VERSION=${SPINE_CONTAINER_VERSION#v}
+DEFAULT_CONTAINER_TAG=docker:ghcr.io/deeplearnphysics/spine:${SPINE_CONTAINER_REGISTRY_VERSION}
 if [[ -z $SPINE_CONTAINER_TAG ]]; then
     export SPINE_CONTAINER_TAG=$DEFAULT_CONTAINER_TAG
 fi

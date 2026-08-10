@@ -1027,6 +1027,18 @@ class TestInteractiveExecution:
         ):
             assert mock_submitter._container_version() == "9.8.7"
 
+    def test_container_tag_strips_release_prefix(self, mock_submitter):
+        """Test Git-style release versions map to unprefixed GHCR tags."""
+        with patch.dict(
+            os.environ,
+            {"SPINE_PROD_CONFIGURED": "1", "SPINE_CONTAINER_VERSION": "v9.8.7"},
+            clear=True,
+        ):
+            assert (
+                mock_submitter._container_tag_for_cli()
+                == "ghcr.io/deeplearnphysics/spine:9.8.7"
+            )
+
     def test_run_interactive_container_uses_configured_sif_runtime(
         self, mock_submitter, tmp_path
     ):

@@ -326,6 +326,7 @@ class Submitter:
     def _container_tag_for_cli() -> str:
         """Return the configured container tag in Docker/Podman CLI form."""
         version = Submitter._container_version()
+        version = version[1:] if version.startswith("v") else version
         tag = os.environ.get(
             "SPINE_CONTAINER_TAG", f"docker:ghcr.io/deeplearnphysics/spine:{version}"
         )

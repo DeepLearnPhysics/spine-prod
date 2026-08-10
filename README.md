@@ -34,7 +34,7 @@ invoke the container-provided `spine` executable directly.
 container release before sourcing `configure.sh`:
 ```bash
 export SPINE_CONTAINER_PATH=/path/to/spine.sif
-export SPINE_CONTAINER_VERSION=vx.y.z
+export SPINE_CONTAINER_VERSION=x.y.z
 source configure.sh
 ```
 
@@ -42,7 +42,7 @@ source configure.sh
 `DEFAULT_SPINE_VERSION`. The default S3DF image path is derived automatically
 as `/sdf/data/neutrino/images/spine_v<version-with-dashes>.sif`.
 ```bash
-echo vx.y.z > DEFAULT_SPINE_VERSION
+echo x.y.z > DEFAULT_SPINE_VERSION
 ```
 
 ### 2. Basic Job Submission
