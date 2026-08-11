@@ -22,6 +22,7 @@ import pytest
 import yaml
 
 from src.client import PBSClient, SlurmClient
+from src.run_manager import RunManager
 from src.submitter import Submitter
 
 
@@ -544,7 +545,7 @@ class TestSubmitterHelpers:
         with patch.dict(os.environ, {}, clear=True):
             submitter = Submitter(basedir=tmp_path, central_dir=True)
 
-        assert submitter.jobs_dir == tmp_path / "jobs"
+        assert submitter.jobs_dir == tmp_path / "runs"
         assert "SPINE_PROD_BASEDIR not set" in capsys.readouterr().out
 
     def test_runtime_helpers_report_invalid_configuration(
@@ -1342,7 +1343,7 @@ class TestBatchSpineOverride:
             str(latest), ["data"], job_dir, detector="icarus"
         )
         preload.assert_called_once_with(str(composite))
-        scripts = sorted(job_dir.glob("submit_chunk_*.sbatch"))
+        scripts = sorted(job_dir.glob("scheduler/chunk_*/submit.sbatch"))
         assert len(scripts) == 3
         assert "#SBATCH --array=1-2%1" in scripts[0].read_text()
         assert "#SBATCH --dependency=afterok:5" in scripts[0].read_text()
@@ -1350,6 +1351,228 @@ class TestBatchSpineOverride:
         assert profile_config["bind_paths"].startswith("/sdf/")
         assert profile_config["account"]
         assert "--flashmatch is deprecated" in capsys.readouterr().err
+
+    @pytest.mark.parametrize(
+        "kwargs, message",
+        [
+            ({"stage": "unknown"}, "stage must be one of"),
+            ({"stage": "train"}, "--run-dir is required"),
+            ({"resume": True}, "valid only for training"),
+            ({"validation_name": "data"}, "valid only for validation"),
+        ],
+    )
+    def test_submit_job_validates_lifecycle_options(
+        self, mock_submitter, kwargs, message
+    ):
+        """Test lifecycle-only options are rejected outside their stage."""
+        with pytest.raises(ValueError, match=message):
+            mock_submitter.submit_job(
+                config="config/train/icarus/deghost/deghost.yaml", **kwargs
+            )
+
+    def test_submit_job_rejects_explicit_training_sources(
+        self, mock_submitter, tmp_path
+    ):
+        """Test persistent training uses the loader configured by SPINE."""
+        source = tmp_path / "input.root"
+        source.touch()
+        with pytest.raises(ValueError, match="not supported for train"):
+            mock_submitter.submit_job(
+                config="config/train/icarus/deghost/deghost.yaml",
+                files=[str(source)],
+                stage="train",
+                run_dir=str(tmp_path / "run"),
+            )
+
+    def test_submit_job_rejects_nonempty_explicit_inference_run(
+        self, mock_submitter, tmp_path
+    ):
+        """Test explicit inference runs cannot mix with existing artifacts."""
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (run_dir / "artifact").touch()
+        with pytest.raises(ValueError, match="Inference run directory is not empty"):
+            mock_submitter.submit_job(
+                config="config/train/icarus/deghost/deghost.yaml",
+                run_dir=str(run_dir),
+            )
+
+    def test_submit_job_creates_explicit_inference_run(self, mock_submitter, tmp_path):
+        """Test inference may use a caller-selected new run directory."""
+        run_dir = tmp_path / "chosen-run"
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value=None),
+        ):
+            assert (
+                mock_submitter.submit_job(
+                    config="config/train/icarus/deghost/deghost.yaml",
+                    run_dir=str(run_dir),
+                )
+                == []
+            )
+
+        assert run_dir.is_dir()
+        assert (run_dir / "job_metadata.json").is_file()
+
+    def test_submit_training_and_resume_share_run_artifacts(
+        self, mock_submitter, tmp_path
+    ):
+        """Test training creation and resume reuse logs, weights, and metadata."""
+        run_dir = tmp_path / "experiments" / "deghost" / "default"
+        config = "config/train/icarus/deghost/deghost.yaml"
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train-1"),
+        ):
+            assert mock_submitter.submit_job(
+                config=config,
+                profile="s3df_ampere",
+                stage="train",
+                run_dir=str(run_dir),
+                tensorboard=True,
+            ) == ["train-1"]
+
+        first_script = next(run_dir.glob("submissions/train/*/submit.sbatch"))
+        first_text = first_script.read_text(encoding="utf-8")
+        assert f"--log-dir {run_dir}" in first_text
+        assert f"--weight-prefix {run_dir}/weights/snapshot" in first_text
+        assert "base.tensorboard=" in first_text
+        assert f"{run_dir}/tensorboard/train" in first_text
+        assert (run_dir / "run_metadata.json").is_file()
+
+        saved = run_dir / "weights" / "snapshot-99999.ckpt"
+        saved.touch()
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train-2"),
+        ):
+            assert mock_submitter.submit_job(
+                config=config,
+                profile="s3df_ampere",
+                stage="train",
+                run_dir=str(run_dir),
+                resume=True,
+            ) == ["train-2"]
+
+        scripts = sorted(run_dir.glob("submissions/train/*/submit.sbatch"))
+        resumed_text = scripts[-1].read_text(encoding="utf-8")
+        assert f"--weight-path {saved}" in resumed_text
+        assert "--resume" in resumed_text
+        assert "restore_optimizer" not in resumed_text
+        metadata = json.loads((scripts[-1].parent / "job_metadata.json").read_text())
+        assert metadata["stage"] == "train"
+        assert metadata["resume_checkpoint"] == str(saved)
+
+    def test_submit_validation_selects_missing_checkpoints_and_noops(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        """Test validation submits only checkpoints without complete CSV logs."""
+        run_dir = tmp_path / "experiments" / "deghost" / "default"
+        train_config = "config/train/icarus/deghost/deghost.yaml"
+        val_config = "config/train/config/uresnet_ppn/uresnet_ppn_val.cfg"
+        RunManager.prepare_training_run(run_dir, train_config)
+        first = run_dir / "weights" / "snapshot-9.ckpt"
+        second = run_dir / "weights" / "snapshot-19.ckpt"
+        first.touch()
+        second.touch()
+        (run_dir / "inference_log-0000010.csv").write_text(
+            "iter,loss\n0,1\n", encoding="utf-8"
+        )
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(
+                mock_submitter.batch_client, "submit", return_value="val-1"
+            ) as submit,
+        ):
+            assert mock_submitter.submit_job(
+                config=val_config,
+                profile="s3df_ampere",
+                stage="validation",
+                run_dir=str(run_dir),
+                tensorboard=True,
+            ) == ["val-1"]
+            submit.assert_called_once()
+
+        submission = next(run_dir.glob("submissions/validation/*"))
+        assert submission.is_dir()
+        assert (submission / "weights.txt").read_text().splitlines() == [str(second)]
+        script = (submission / "submit.sbatch").read_text(encoding="utf-8")
+        assert f"--log-dir {run_dir}" in script
+        assert f"--weight-list {submission}/weights.txt" in script
+        assert "model.weight_path=null" in script
+        assert "base.tensorboard=" in script
+        assert f"{run_dir}/tensorboard/validation" in script
+
+        (run_dir / "inference_log-0000020.csv").write_text(
+            "iter,loss\n0,1\n", encoding="utf-8"
+        )
+        with patch.object(mock_submitter.batch_client, "submit") as submit:
+            assert (
+                mock_submitter.submit_job(
+                    config=val_config,
+                    profile="s3df_ampere",
+                    stage="validation",
+                    run_dir=str(run_dir),
+                )
+                == []
+            )
+            submit.assert_not_called()
+        assert "Validation is up to date" in capsys.readouterr().out
+
+    def test_submit_named_validation_can_rerun_all_checkpoints(
+        self, mock_submitter, tmp_path
+    ):
+        """Test named validation gets isolated logs and an explicit overwrite plan."""
+        run_dir = tmp_path / "run"
+        train_config = "config/train/icarus/deghost/deghost.yaml"
+        val_config = "config/train/config/uresnet_ppn/uresnet_ppn_val.cfg"
+        RunManager.prepare_training_run(run_dir, train_config)
+        saved = run_dir / "weights" / "snapshot-4.ckpt"
+        saved.touch()
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="val"),
+        ):
+            assert mock_submitter.submit_job(
+                config=val_config,
+                profile="s3df_ampere",
+                stage="validation",
+                run_dir=str(run_dir),
+                validation_name="data",
+                rerun_validation=True,
+                tensorboard=True,
+            ) == ["val"]
+
+        submission = next(run_dir.glob("submissions/validation/data/*"))
+        script = (submission / "submit.sbatch").read_text(encoding="utf-8")
+        assert f"--log-dir {run_dir}/validation/data" in script
+        assert "base.overwrite_log=true" in script
+        assert "base.tensorboard=" in script
+        assert f"{run_dir}/tensorboard/validation/data" in script
 
     def test_submit_job_rejects_missing_explicit_inputs(self, mock_submitter, tmp_path):
         with pytest.raises(ValueError, match="No input files found"):
@@ -1435,7 +1658,9 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        scripts = list(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        )
         assert len(scripts) == 1
 
         script = scripts[0].read_text(encoding="utf-8")
@@ -1479,7 +1704,9 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        scripts = list(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        )
         assert len(scripts) == 1
 
         script = scripts[0].read_text(encoding="utf-8")
@@ -1507,7 +1734,9 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        scripts = list(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        )
         assert len(scripts) == 1
 
         script = scripts[0].read_text(encoding="utf-8")
@@ -1539,17 +1768,26 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        scripts = list(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        )
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert "#SBATCH --array=" not in script
+        assert 'TASK_DIR="' in script
+        assert "--output-dir $TASK_DIR/output" in script
+        assert "--log-dir $TASK_DIR/logs" in script
 
-        task_lists = list(mock_submitter.jobs_dir.glob("**/files_chunk_0_task_1.txt"))
+        task_lists = list(
+            mock_submitter.jobs_dir.glob("**/tasks/chunk_000/task_1/inputs.txt")
+        )
         assert len(task_lists) == 1
         assert (
             task_lists[0].read_text(encoding="utf-8").strip().splitlines()
             == input_files
         )
+        assert (task_lists[0].parent / "output").is_dir()
+        assert (task_lists[0].parent / "logs").is_dir()
 
     def test_submit_job_no_writer_is_deprecated_and_ignored(
         self, mock_submitter, tmp_path, capsys
@@ -1575,7 +1813,9 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        scripts = list(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        )
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert " -S $TASK_FILE_LIST" in script
@@ -1609,7 +1849,9 @@ class TestBatchSpineOverride:
             )
 
         assert job_ids == ["12345"]
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        scripts = list(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        )
         assert len(scripts) == 1
         assert "--output-suffix custom_reco" in scripts[0].read_text(encoding="utf-8")
 
@@ -1630,7 +1872,9 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        scripts = list(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        )
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert "Using input files defined in the config" in script
@@ -1690,13 +1934,17 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(mock_submitter.jobs_dir.glob("**/submit_chunk_0.sbatch"))
+        scripts = list(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        )
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert "#SBATCH --array=1-3" in script
         assert "%3" not in script
 
-        task_lists = sorted(mock_submitter.jobs_dir.glob("**/files_chunk_0_task_*.txt"))
+        task_lists = sorted(
+            mock_submitter.jobs_dir.glob("**/tasks/chunk_000/task_*/inputs.txt")
+        )
         assert len(task_lists) == 3
         task_sizes = [
             len(path.read_text(encoding="utf-8").strip().splitlines())
@@ -1842,6 +2090,8 @@ class TestCVMFSOption:
             "output_args": "--output /tmp/output.h5",
             "basedir": "/tmp/spine-prod",
             "file_list_pattern": "/tmp/files_*.txt",
+            "task_dir_pattern": "/tmp/tasks/task_*",
+            "spine_log_dir": "/tmp/spine-logs",
             "larcv_path": None,
             "flashmatch_path": None,
             "flashmatch": False,

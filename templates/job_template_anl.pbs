@@ -53,9 +53,11 @@ fi
 
 {% if file_list_pattern and array_spec %}
 # Get file list for this array task
+TASK_DIR="{{ task_dir_pattern | replace('*', '${PBS_ARRAY_INDEX}') }}"
 TASK_FILE_LIST="{{ file_list_pattern | replace('*', '${PBS_ARRAY_INDEX}') }}"
 {% elif file_list_pattern %}
 # Single job: use the single file list
+TASK_DIR="{{ task_dir_pattern | replace('*', '1') }}"
 TASK_FILE_LIST="{{ file_list_pattern | replace('*', '1') }}"
 {% endif %}
 
@@ -104,7 +106,7 @@ APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD source {{ (larcv_path ~ '/configure.sh
 APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
-APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD {{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD {{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 RUN_CMD="apptainer exec $APPTAINER_BIND_OPTS --fakeroot --nv $SPINE_CONTAINER_PATH bash -c '$APPTAINER_INNER_CMD'"
 
 echo "Running: $RUN_CMD"

@@ -10,12 +10,13 @@ base:
   unwrap: false
   log_dir: null # Set by user at runtime
   log_step: 1
-  train:
-    weight_prefix: null # Set by user at runtime
-    save_step: 10000 # 10k/35k -> 0.6 epoch
-    optimizer:
-      name: Adam
-      lr: 0.001
+
+train:
+  weight_prefix: null # Set by user at runtime
+  save_step: 10000 # 10k/35k -> 0.6 epoch
+  optimizer:
+    name: Adam
+    lr: 0.001
 
 # IO configuration
 io:

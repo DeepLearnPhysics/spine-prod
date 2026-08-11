@@ -7,7 +7,7 @@ recorded in `DEFAULT_SPINE_VERSION`; `configure.sh` exports
 `SPINE_CONTAINER_VERSION` from that value and derives the registry tag and
 default S3DF `.sif` path. The container provides SPINE, OpT0Finder, and runtime
 dependencies; batch jobs invoke the `spine` executable from inside the
-container.
+container. The current default is SPINE v0.17.0.
 
 ## Common Commands
 
@@ -70,8 +70,20 @@ container.
 # Multiple files per task
 ./submit.py --config infer/icarus/latest --source data/*.root --files-per-task 5
 
-# Use the file list already embedded in the config
-./submit.py --config config/train/icarus/deghost/deghost.yaml
+# Start a persistent training run using config-owned inputs
+./submit.py --config config/train/icarus/deghost/deghost.yaml \
+  --stage train --run-dir /path/to/experiments/deghost/default
+
+# Resume from the latest numeric checkpoint
+./submit.py --config config/train/icarus/deghost/deghost.yaml \
+  --stage train --run-dir /path/to/experiments/deghost/default --resume
+
+# Resume verifies a v0.17.0 checksum sidecar when present; legacy checkpoints
+# without sidecars remain supported.
+
+# Validate only checkpoints without complete validation logs
+./submit.py --config /path/to/deghost_val.yaml \
+  --stage validation --run-dir /path/to/experiments/deghost/default
 
 # Custom time limit
 ./submit.py --config infer/icarus/latest --source data.root --time 2:00:00
@@ -107,7 +119,7 @@ scontrol show job JOB_ID
 scancel JOB_ID
 
 # View logs
-tail -f jobs/*/logs/*.out
+tail -f runs/*/scheduler/chunk_*/logs/*.out
 
 # Resource usage
 seff JOB_ID
@@ -161,17 +173,20 @@ infer/icarus/latest.cfg
 | Unknown modifier | Use `--list-mods CONFIG` to see available modifier |
 | Out of memory | Use `--profile s3df_ampere` or `--mem-per-cpu 16g` |
 | Job timeout | Use `--time 4:00:00` |
-| Need more info | Check `jobs/*/job_metadata.json` |
+| Need more info | Check `runs/*/job_metadata.json` |
 
-## Job Directory Structure
+## Inference Run Structure
 
 ```
-jobs/TIMESTAMP_JOBNAME/
-├── job_metadata.json      # All job info
-├── files_chunk_*.txt      # Input files
-├── submit_chunk_*.sbatch  # Submission scripts
-├── logs/                  # SLURM logs
-└── output/                # Results
+runs/TIMESTAMP_JOBNAME/
+├── job_metadata.json
+├── scheduler/chunk_*/
+│   ├── submit.sbatch
+│   └── logs/
+└── tasks/chunk_*/task_*/
+    ├── inputs.txt
+    ├── logs/
+    └── output/
 ```
 
 ## Full Help

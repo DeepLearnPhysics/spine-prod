@@ -31,7 +31,8 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# SLURM job directories (generated at runtime)
+# Scheduler run directories (generated at runtime); jobs/ is the legacy root.
+runs/
 jobs/
 
 # Cache directories (for downloaded weights, etc.)

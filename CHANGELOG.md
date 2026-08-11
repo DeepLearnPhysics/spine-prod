@@ -5,6 +5,41 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added persistent `--stage train|validation --run-dir ...` workflows with
+  deterministic checkpoint resume, stage-specific submission records,
+  TensorBoard directories, named validation suites, and incremental validation
+  that skips checkpoints with complete associated logs.
+- Added optional explicit run directories for inference.
+- Added checkpoint-integrity checks for SPINE v0.17.0 SHA-256 sidecars while
+  retaining support for legacy checkpoints without sidecars.
+- Added a data-only litification modifier for productions that should omit
+  truth products.
+- Added `SBND_DATA_DIR` environment support for site-specific SBND calibration
+  and data resources.
+
+### Changed
+- Updated the default SPINE container release to
+  `docker:ghcr.io/deeplearnphysics/spine:0.17.0`.
+- Training resumes now use SPINE's explicit strict `--resume` interface, which
+  restores optimizer, scheduler, epoch, RNG, and loader continuation state.
+- Migrated checked-in training recipes to SPINE's canonical top-level `train`
+  block.
+- Declared maintained configurations with explicit bundle, fragment, or
+  modifier metadata and expanded validation of those contracts.
+- Refreshed repository, inference, training, and source documentation.
+- Renamed the automatic artifact root from `jobs/` to `runs/`.
+- Isolated default inference outputs, input lists, and SPINE logs by scheduler
+  task under chunked task directories instead of writing every result into one
+  flat output directory.
+
+### Fixed
+- Normalized the default SPINE version value so GHCR tags do not acquire a
+  stray `v`, while retaining the expected `v` in derived S3DF image filenames.
+- Aligned environment-summary output emitted by `configure.sh`.
+
 ## [0.7.2] - 2026-07-21
 
 ### Changed

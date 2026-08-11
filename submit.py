@@ -58,8 +58,12 @@ Examples:
   # Multiple files per task, multiple concurrent tasks
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source-list files.txt --files-per-task 5 --ntasks 20
 
-  # Use the input list already embedded in the config
-  %(prog)s --config config/train/icarus/deghost/deghost.yaml
+  # Start or resume a persistent training run
+  %(prog)s --config config/train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default
+  %(prog)s --config config/train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default --resume
+
+  # Validate only checkpoints missing an associated validation log
+  %(prog)s --config /path/to/deghost_val.yaml --stage validation --run-dir /path/to/experiments/deghost/default
 
   # Pipeline mode
   %(prog)s --pipeline pipelines/icarus_production.yaml
@@ -140,6 +144,43 @@ Examples:
     # Job configuration
     parser.add_argument("--job-name", "-j", help="Custom job name")
     parser.add_argument(
+        "--stage",
+        choices=["inference", "train", "validation"],
+        default="inference",
+        help="Run lifecycle stage (default: inference)",
+    )
+    parser.add_argument(
+        "--run-dir",
+        help=(
+            "Persistent run directory. Required for train and validation; "
+            "optional for inference."
+        ),
+    )
+    resume_group = parser.add_mutually_exclusive_group()
+    resume_group.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume training from the numerically latest run checkpoint",
+    )
+    resume_group.add_argument(
+        "--resume-from",
+        help="Resume training from a specific checkpoint in the run weights directory",
+    )
+    parser.add_argument(
+        "--validation-name",
+        help="Name an additional validation suite; unnamed validation is canonical",
+    )
+    parser.add_argument(
+        "--rerun-validation",
+        action="store_true",
+        help="Validate every checkpoint even when an associated log already exists",
+    )
+    parser.add_argument(
+        "--tensorboard",
+        action="store_true",
+        help="Enable TensorBoard logging in the stage-specific run directory",
+    )
+    parser.add_argument(
         "--output",
         "-o",
         help=(
@@ -171,14 +212,14 @@ Examples:
     dir_group.add_argument(
         "--central-dir",
         action="store_true",
-        help="Write job directories and logs to the central spine-prod/jobs directory "
+        help="Write automatic run directories to the central spine-prod/runs directory "
         "instead of the current working directory (default).",
     )
     dir_group.add_argument(
         "--local-output",
         action="store_true",
         help="(DEPRECATED: This is now the default behavior and will be removed in a future version. "
-        "Use --central-dir to write to spine-prod/jobs instead.)",
+        "Use --central-dir to write to spine-prod/runs instead.)",
     )
 
     # Software paths
@@ -279,11 +320,11 @@ Examples:
         print(
             "WARNING: --local-output is deprecated and now the default behavior. "
             "This flag will be removed in a future version. "
-            "Use --central-dir to write to spine-prod/jobs instead.",
+            "Use --central-dir to write to spine-prod/runs instead.",
             file=sys.stderr,
         )
 
-    # Initialize submitter (central_dir True means write to spine-prod/jobs)
+    # Initialize submitter (central_dir True means write to spine-prod/runs)
     submitter = Submitter(central_dir=getattr(args, "central_dir", False))
 
     # Handle --list-mods
@@ -327,6 +368,21 @@ Examples:
     # Interactive mode not supported for pipelines
     if args.interactive and args.pipeline:
         parser.error("--interactive mode is not supported with --pipeline")
+    lifecycle_options = any(
+        [
+            args.run_dir,
+            args.resume,
+            args.resume_from,
+            args.validation_name,
+            args.rerun_validation,
+            args.tensorboard,
+            args.stage != "inference",
+        ]
+    )
+    if args.interactive and lifecycle_options:
+        parser.error("run lifecycle options are currently supported in batch mode only")
+    if args.pipeline and lifecycle_options:
+        parser.error("run lifecycle options must be specified within a pipeline stage")
 
     # Build profile overrides
     profile_overrides = {}
@@ -413,6 +469,13 @@ Examples:
                 preload=args.preload,
                 set_overrides=args.set_overrides,
                 spine_path=args.spine_path,
+                stage=args.stage,
+                run_dir=args.run_dir,
+                resume=args.resume,
+                resume_from=args.resume_from,
+                validation_name=args.validation_name,
+                rerun_validation=args.rerun_validation,
+                tensorboard=args.tensorboard,
                 **profile_overrides,
             )
 

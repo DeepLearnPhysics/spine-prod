@@ -30,8 +30,6 @@ def test_create_job_dir_and_save_metadata(tmp_path):
     client.save_job_metadata(job_dir, {"job_id": "123"})
 
     assert job_dir.name.endswith("_reco")
-    assert (job_dir / "logs").is_dir()
-    assert (job_dir / "output").is_dir()
     assert json.loads((job_dir / "job_metadata.json").read_text()) == {"job_id": "123"}
 
 

@@ -35,12 +35,10 @@ class BatchClient:
             return Template(f.read())
 
     def create_job_dir(self, job_name: str) -> Path:
-        """Create directory for job artifacts."""
+        """Create an automatically named run directory."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         job_dir = self.jobs_dir / f"{timestamp}_{job_name}"
         job_dir.mkdir(parents=True, exist_ok=True)
-        (job_dir / "logs").mkdir(exist_ok=True)
-        (job_dir / "output").mkdir(exist_ok=True)
         return job_dir
 
     def save_job_metadata(self, job_dir: Path, metadata: Dict):

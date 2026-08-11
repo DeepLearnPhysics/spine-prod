@@ -18,10 +18,11 @@ spine-prod/
 │   ├── config_manager.py   # Configuration and profile management
 │   ├── file_handler.py     # File parsing and chunking
 │   ├── preload.py          # SPINE download preloading
+│   ├── run_manager.py      # Persistent training and validation lifecycle
 │   └── submitter.py        # Main orchestration class
 ├── templates/              # Batch job templates
 ├── config/                 # SPINE configurations
-└── jobs/                   # Job output directories
+└── runs/                   # Automatic inference run directories
 ```
 
 ## Module Responsibilities
@@ -57,6 +58,12 @@ spine-prod/
 - Handles job submission workflow
 - Pipeline management
 - Interactive execution mode
+
+### `src/run_manager.py`
+- Create and validate persistent training runs
+- Resolve numeric resume checkpoints
+- Plan incremental and named validation suites
+- Create stage-specific scheduler submission directories
 
 ## Benefits
 

@@ -16,6 +16,7 @@ from .client import PBSClient, SlurmClient
 from .config_manager import ConfigManager
 from .file_handler import FileHandler
 from .preload import preload_downloads
+from .run_manager import RunManager
 
 
 class Submitter:
@@ -94,7 +95,7 @@ class Submitter:
         basedir : Optional[Path], optional
             Base directory of spine-prod, by default None (use script location)
         central_dir : bool, optional
-            Write job dirs to spine-prod/jobs instead of cwd/jobs, by default False
+            Write run dirs to spine-prod/runs instead of cwd/runs, by default False
         """
         # Always use the project base for resources
         self.basedir = basedir or Path(__file__).parent.parent
@@ -104,9 +105,9 @@ class Submitter:
         self.file_handler = FileHandler()
 
         if central_dir:
-            jobs_dir = self.basedir / "jobs"
+            jobs_dir = self.basedir / "runs"
         else:
-            jobs_dir = Path(os.getcwd()) / "jobs"
+            jobs_dir = Path(os.getcwd()) / "runs"
         jobs_dir.mkdir(exist_ok=True)
 
         self.jobs_dir = jobs_dir
@@ -726,6 +727,13 @@ class Submitter:
         preload: bool = False,
         set_overrides: Optional[List[str]] = None,
         spine_path: Optional[str] = None,
+        stage: str = "inference",
+        run_dir: Optional[str] = None,
+        resume: bool = False,
+        resume_from: Optional[str] = None,
+        validation_name: Optional[str] = None,
+        rerun_validation: bool = False,
+        tensorboard: bool = False,
         **profile_overrides,
     ) -> List[str]:
         """Submit batch job for SPINE processing.
@@ -780,6 +788,20 @@ class Submitter:
         spine_path : str, optional
             Override the SPINE executable with a checkout directory or an
             explicit executable path.
+        stage : str, optional
+            Lifecycle stage: inference, train, or validation.
+        run_dir : str, optional
+            Explicit persistent run directory. Required for train and validation.
+        resume : bool, optional
+            Resume training from the numerically latest checkpoint.
+        resume_from : str, optional
+            Resume training from a specific checkpoint within the run.
+        validation_name : str, optional
+            Name for a non-primary validation suite.
+        rerun_validation : bool, optional
+            Include checkpoints that already have complete validation logs.
+        tensorboard : bool, optional
+            Enable stage-specific TensorBoard event logging.
         **profile_overrides
             Override profile settings
 
@@ -792,6 +814,22 @@ class Submitter:
             self._warn_flashmatch_noop()
         if no_writer:
             self._warn_no_writer_deprecated()
+
+        if stage not in ("inference", "train", "validation"):
+            raise ValueError("stage must be one of: inference, train, validation")
+        if stage != "inference" and not run_dir:
+            raise ValueError(f"--run-dir is required for the {stage} stage")
+        if stage != "train" and (resume or resume_from):
+            raise ValueError("--resume and --resume-from are valid only for training")
+        if stage != "validation" and (validation_name or rerun_validation):
+            raise ValueError(
+                "--validation-name and --rerun-validation are valid only for validation"
+            )
+        if stage != "inference" and files:
+            raise ValueError(
+                f"Explicit --source/--source-list inputs are not supported for {stage}; "
+                "configure the training or validation loader in SPINE"
+            )
 
         file_list = []
         if files:
@@ -821,12 +859,24 @@ class Submitter:
         if not job_name:
             job_name = f"spine_{detector}_{config_name}"
 
-        job_dir = self.batch_client.create_job_dir(job_name)
+        if run_dir:
+            job_dir = Path(run_dir).expanduser().resolve()
+            if stage == "inference":
+                if job_dir.exists() and any(job_dir.iterdir()):
+                    raise ValueError(f"Inference run directory is not empty: {job_dir}")
+                job_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            job_dir = self.batch_client.create_job_dir(job_name)
+
+        config_workspace = job_dir
+        if stage != "inference":
+            config_workspace = job_dir / ".spine-prod" / "configs"
+            config_workspace.mkdir(parents=True, exist_ok=True)
 
         # Handle "latest" config generation
         if is_latest:
             print(f"\nDetected 'latest' config request for {detector}")
-            config = self.config_mgr.create_latest_config(detector, job_dir)
+            config = self.config_mgr.create_latest_config(detector, config_workspace)
             config_name = Path(config).stem
 
         # Apply modifiers if specified
@@ -834,7 +884,10 @@ class Submitter:
         if apply_mods:
             # Pass detector if config was generated (to find modifiers in config dir)
             config = self.config_mgr.create_composite_config(
-                config, apply_mods, job_dir, detector=detector if is_latest else None
+                config,
+                apply_mods,
+                config_workspace,
+                detector=detector if is_latest else None,
             )
 
         if preload:
@@ -872,6 +925,75 @@ class Submitter:
                 "account", self.profiles["defaults"]["account"]
             )
 
+        submission_dir = None
+        spine_log_dir = str(job_dir / "logs")
+        lifecycle_args = []
+        selected_checkpoints = []
+        resume_checkpoint = None
+        if stage == "train":
+            resume_checkpoint = RunManager.prepare_training_run(
+                job_dir, config, resume=resume, resume_from=resume_from
+            )
+            submission_dir = RunManager.create_submission_dir(job_dir, "train")
+            spine_log_dir = str(job_dir)
+            lifecycle_args.extend(
+                ["--weight-prefix", shlex.quote(str(job_dir / "weights" / "snapshot"))]
+            )
+            if resume_checkpoint is not None:
+                lifecycle_args.extend(
+                    ["--weight-path", shlex.quote(str(resume_checkpoint))]
+                )
+                lifecycle_args.append("--resume")
+            if tensorboard:
+                tensorboard_cfg = (
+                    "{log_dir: " + str(job_dir / "tensorboard" / "train") + "}"
+                )
+                lifecycle_args.extend(
+                    [
+                        "--set",
+                        shlex.quote(f"base.tensorboard={tensorboard_cfg}"),
+                    ]
+                )
+        elif stage == "validation":
+            spine_log_path, selected_checkpoints = RunManager.prepare_validation(
+                job_dir,
+                config,
+                validation_name=validation_name,
+                rerun=rerun_validation,
+            )
+            spine_log_dir = str(spine_log_path)
+            if not selected_checkpoints:
+                print("Validation is up to date; no scheduler job submitted")
+                return []
+            submission_dir = RunManager.create_submission_dir(
+                job_dir, "validation", validation_name
+            )
+            weight_list = submission_dir / "weights.txt"
+            with open(weight_list, "w", encoding="utf-8") as stream:
+                for checkpoint in selected_checkpoints:
+                    stream.write(f"{checkpoint}\n")
+            lifecycle_args.extend(["--weight-list", shlex.quote(str(weight_list))])
+            lifecycle_args.extend(["--set", "model.weight_path=null"])
+            if rerun_validation:
+                lifecycle_args.extend(["--set", "base.overwrite_log=true"])
+            if tensorboard:
+                tensorboard_dir = job_dir / "tensorboard" / "validation"
+                if validation_name:
+                    tensorboard_dir /= validation_name
+                tensorboard_cfg = "{log_dir: " + str(tensorboard_dir) + "}"
+                lifecycle_args.extend(
+                    [
+                        "--set",
+                        shlex.quote(f"base.tensorboard={tensorboard_cfg}"),
+                    ]
+                )
+
+        if lifecycle_args:
+            extra_args = " ".join(lifecycle_args)
+            spine_cli_overrides = " ".join(
+                part for part in [spine_cli_overrides, extra_args] if part
+            )
+
         output_dir, output_suffix = self._default_writer_output_settings(
             job_dir, config, output_suffix
         )
@@ -881,11 +1003,9 @@ class Submitter:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
-        elif file_list:
-            Path(output_dir).mkdir(parents=True, exist_ok=True)
         output_args = (
             self._format_spine_output_args(output, output_dir, output_suffix)
-            if file_list
+            if file_list and output
             else ""
         )
 
@@ -908,6 +1028,18 @@ class Submitter:
         job_ids = []
         chunk_dependency = dependency  # Track dependency for chunk chaining
         for chunk_idx, chunk in enumerate(file_chunks):
+            chunk_name = f"chunk_{chunk_idx:03d}"
+            task_dir_pattern = None
+            chunk_output_args = output_args
+            chunk_spine_log_dir = spine_log_dir
+            if stage == "inference":
+                scheduler_dir = job_dir / "scheduler" / chunk_name
+            else:
+                assert submission_dir is not None
+                scheduler_dir = submission_dir
+            scheduler_log_dir = scheduler_dir / "logs"
+            scheduler_log_dir.mkdir(parents=True, exist_ok=True)
+
             # Render SBATCH script
             array_spec = None
             if len(chunk) > 1:
@@ -918,14 +1050,25 @@ class Submitter:
                     array_spec += f"%{concurrent_task_limit}"
 
             if file_list:
-                file_list_pattern = str(job_dir / f"files_chunk_{chunk_idx}_task_*.txt")
+                task_chunk_dir = job_dir / "tasks" / chunk_name
+                task_dir_pattern = str(task_chunk_dir / "task_*")
+                file_list_pattern = f"{task_dir_pattern}/inputs.txt"
                 for task_idx, file_group in enumerate(chunk, start=1):
-                    task_file_list = (
-                        job_dir / f"files_chunk_{chunk_idx}_task_{task_idx}.txt"
-                    )
+                    task_dir = task_chunk_dir / f"task_{task_idx}"
+                    (task_dir / "logs").mkdir(parents=True, exist_ok=True)
+                    (task_dir / "output").mkdir(exist_ok=True)
+                    task_file_list = task_dir / "inputs.txt"
                     with open(task_file_list, "w", encoding="utf-8") as f:
                         for file_path in file_group:
                             f.write(f"{file_path}\n")
+                chunk_spine_log_dir = "$TASK_DIR/logs"
+                if not output:
+                    chunk_output_args = " ".join(
+                        [
+                            "--output-dir $TASK_DIR/output",
+                            f"--output-suffix {shlex.quote(output_suffix)}",
+                        ]
+                    )
             else:
                 file_list_pattern = None
 
@@ -939,15 +1082,21 @@ class Submitter:
                 job_name=(
                     f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
                 ),
-                log_dir=str(job_dir / "logs"),
+                log_dir=str(scheduler_log_dir),
                 dependency=chunk_dependency,
                 basedir=str(self.basedir),
                 file_list_pattern=file_list_pattern,
+                task_dir_pattern=task_dir_pattern,
+                spine_log_dir=chunk_spine_log_dir,
                 config=config,
                 output=output,
-                output_dir=output_dir,
+                output_dir=(
+                    f"{task_dir_pattern}/output"
+                    if task_dir_pattern and not output
+                    else output_dir
+                ),
                 output_suffix=output_suffix,
-                output_args=output_args,
+                output_args=chunk_output_args,
                 larcv_path=larcv_path,
                 flashmatch_path=flashmatch_path,
                 flashmatch=flashmatch,
@@ -958,9 +1107,7 @@ class Submitter:
             )
 
             # Write script
-            script_path = (
-                job_dir / f"submit_chunk_{chunk_idx}{batch_client.script_suffix}"
-            )
+            script_path = scheduler_dir / f"submit{batch_client.script_suffix}"
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(script_content)
             script_path.chmod(0o755)
@@ -991,6 +1138,8 @@ class Submitter:
         metadata = {
             "spine_prod_version": __version__,
             "job_name": job_name,
+            "stage": stage,
+            "run_dir": str(job_dir),
             "detector": detector,
             "config": config,
             "original_config": original_config if apply_mods else config,
@@ -1015,16 +1164,27 @@ class Submitter:
             ),
             "ntasks": ntasks,
             "job_ids": job_ids,
-            "output": output or (output_dir if output_args else None),
-            "output_dir": output_dir,
+            "output": output or (str(job_dir / "tasks") if file_list else None),
+            "output_dir": (
+                output_dir if output else str(job_dir / "tasks") if file_list else None
+            ),
             "output_suffix": output_suffix,
+            "resume_checkpoint": (
+                str(resume_checkpoint) if resume_checkpoint is not None else None
+            ),
+            "validation_name": validation_name,
+            "selected_checkpoints": [str(path) for path in selected_checkpoints],
+            "tensorboard": tensorboard,
             "submitted": datetime.now().isoformat(),
             "command": " ".join(sys.argv),
         }
-        self.batch_client.save_job_metadata(job_dir, metadata)
+        metadata_dir = submission_dir or job_dir
+        self.batch_client.save_job_metadata(metadata_dir, metadata)
+        if stage == "train":
+            RunManager.record_training_jobs(job_dir, job_ids)
 
-        print(f"\nJob directory: {job_dir}")
-        print(f"Job metadata: {job_dir}/job_metadata.json")
+        print(f"\nRun directory: {job_dir}")
+        print(f"Submission metadata: {metadata_dir}/job_metadata.json")
 
         return job_ids
 
@@ -1088,6 +1248,13 @@ class Submitter:
                 cvmfs=stage.get("cvmfs", False),
                 dry_run=dry_run,
                 preload=preload,
+                stage=stage.get("stage", "inference"),
+                run_dir=stage.get("run_dir"),
+                resume=stage.get("resume", False),
+                resume_from=stage.get("resume_from"),
+                validation_name=stage.get("validation_name"),
+                rerun_validation=stage.get("rerun_validation", False),
+                tensorboard=stage.get("tensorboard", False),
             )
 
             job_map[stage_name] = job_ids

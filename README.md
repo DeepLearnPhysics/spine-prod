@@ -29,6 +29,7 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
+The current default is SPINE v0.17.0.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
@@ -76,8 +77,9 @@ echo x.y.z > DEFAULT_SPINE_VERSION
 # Split the file list across 50 tasks as evenly as possible
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
-# Use the file list already defined in the config
-./submit.py --config config/train/icarus/deghost/deghost.yaml
+# Start a persistent training run using the loader defined in the config
+./submit.py --config config/train/icarus/deghost/deghost.yaml \
+  --stage train --run-dir /path/to/experiments/deghost/default
 
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
@@ -175,7 +177,7 @@ spine-prod/
 │
 ├── scripts/                 # Utility scripts
 ├── tests/                   # Test suite
-└── jobs/                    # Job artifacts (auto-created)
+└── runs/                    # Automatic inference run artifacts
 ```
 
 ## Configuration System
@@ -303,6 +305,180 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 ./scripts/preload_downloads.py infer/2x2/full_chain_240819.yaml
 ```
 
+## Training and Validation Runs
+
+Inference submissions are disposable, independently named productions, but a
+training is a persistent experiment that may span several scheduler jobs. Use
+an explicit `--run-dir` for training and validation so that checkpoints, CSV
+logs, TensorBoard events, and submission records remain associated.
+
+### Start a Training Run
+
+The training configuration owns the model, data loader, optimizer, total epoch
+count, checkpoint interval, and optional on-the-fly validation. SPINE v0.17.0
+uses a top-level `train` block and an optional sibling `validation` block;
+spine-prod owns artifact locations. Inputs for training and validation must be
+configured in SPINE rather than passed through `--source` or `--source-list`.
+
+For a new production, running validation in the training process is the
+recommended strategy. It evaluates the live model at checkpoint boundaries,
+keeps training and validation metrics in one log stream, and can drive early
+stopping, best-checkpoint promotion, and checkpoint-bound learning-rate
+schedulers. A minimal configuration shape is:
+
+```yaml
+base:
+  epochs: 250
+
+train:
+  save_step: 10000
+  optimizer:
+    name: Adam
+    lr: 0.001
+
+validation:
+  file_keys: /path/to/validation/*.root
+  fraction: 1.0
+  early_stopping:
+    monitor: loss
+    mode: min
+    patience: 5
+  best_checkpoint:
+    monitor: loss
+    mode: min
+```
+
+```bash
+./submit.py \
+  --config config/train/icarus/deghost/deghost.yaml \
+  --stage train \
+  --run-dir /path/to/experiments/deghost/default \
+  --profile nersc_gpu_exclusive \
+  --tensorboard \
+  --set io.loader.dataset.file_keys=/path/to/train_file_list.txt
+```
+
+A new training run refuses to use a nonempty directory. Its artifact layout is:
+
+```text
+experiments/deghost/default/
+├── run_metadata.json
+├── train_log-0000000.csv
+├── weights/
+│   ├── snapshot-9999.ckpt
+│   ├── snapshot-9999.ckpt.sha256
+│   ├── snapshot-best.ckpt
+│   └── snapshot-best.ckpt.sha256
+├── tensorboard/
+│   ├── train/
+│   └── validation/
+└── submissions/
+    └── train/
+        └── TIMESTAMP/
+            ├── job_metadata.json
+            ├── submit.sbatch
+            └── logs/
+```
+
+Use sibling run directories such as `default`, `augment`, and `ablate` for
+comparable variants of one experiment.
+
+### Resume Training
+
+If training is interrupted, resume the same run explicitly:
+
+```bash
+./submit.py \
+  --config config/train/icarus/deghost/deghost.yaml \
+  --stage train \
+  --run-dir /path/to/experiments/deghost/default \
+  --profile nersc_gpu_exclusive \
+  --resume
+```
+
+spine-prod's `--resume` selects the checkpoint with the largest numeric suffix,
+passes that exact path together with SPINE's strict `--resume` flag, reuses
+`weights/snapshot` as the checkpoint prefix, and writes a new
+`train_log-<start>.csv` segment beside the old log. SPINE v0.17.0 restores all
+available optimizer, scheduler, epoch, RNG, and loader continuation state;
+missing state required by strict resume is an error. SPINE's `TrainDrawer`
+concatenates the log segments. To roll back intentionally, use
+`--resume-from RUN_DIR/weights/snapshot-N.ckpt`. An existing run cannot be
+reused without one of these resume options.
+
+New SPINE checkpoints include an adjacent SHA-256 sidecar. spine-prod verifies
+that sidecar before resuming or scheduling validation and rejects a mismatch.
+Older checkpoints without sidecars remain valid and are used without integrity
+verification.
+
+The configured epoch count remains the total target, not a number of additional
+epochs. To extend a run without changing the stored configuration file, pass a
+runtime override such as `--set base.epochs=400` when resuming.
+
+### Run Validation Independently
+
+Attach standalone validation to the training run:
+
+```bash
+./submit.py \
+  --config /path/to/deghost_val.yaml \
+  --stage validation \
+  --run-dir /path/to/experiments/deghost/default \
+  --profile nersc_gpu \
+  --tensorboard
+```
+
+spine-prod scans `weights/snapshot-*.ckpt`, identifies complete associated
+`inference_log-*.csv` files, writes only the missing checkpoint paths to the
+submission's `weights.txt`, and passes that list to SPINE. Repeating the command
+therefore validates only new checkpoints; if none are missing it exits without
+submitting a scheduler job. Empty or malformed validation logs do not count as
+complete. `--rerun-validation` deliberately selects every checkpoint again.
+
+The unnamed validation is the run's primary validation series and writes its
+CSV files beside the training logs, which is the layout expected by
+`TrainDrawer`. Additional suites use an isolated name:
+
+```bash
+./submit.py \
+  --config /path/to/deghost_data_val.yaml \
+  --stage validation \
+  --validation-name data \
+  --run-dir /path/to/experiments/deghost/default
+```
+
+Named CSV logs live under `validation/<name>/`, and their TensorBoard events
+live under `tensorboard/validation/<name>/`. Validation identity includes the
+configuration digest; changing a suite's configuration requires a new name or
+an explicit `--rerun-validation`.
+
+With SPINE v0.17.0, the primary validation configured alongside `train` needs
+only the training command. Standalone validation remains useful for legacy
+runs, alternate datasets, and checkpoints produced without integrated
+validation or after changing the validation policy.
+
+### Compare Training Runs
+
+The primary CSV layout can be passed directly to SPINE's `TrainDrawer`:
+
+```python
+from spine.vis.drawer.train import TrainDrawer
+
+drawer = TrainDrawer("/path/to/experiments/deghost")
+drawer.draw(
+    model=["default", "augment", "ablate"],
+    metric="loss",
+    smoothing=100,
+)
+```
+
+TensorBoard discovers the corresponding train and validation event streams
+recursively:
+
+```bash
+tensorboard --logdir /path/to/experiments/deghost
+```
+
 ## Pipeline Mode
 
 Pipelines allow you to chain multiple processing stages with automatic dependency management.
@@ -334,23 +510,37 @@ stages:
 ./submit.py --pipeline pipelines/my_pipeline.yaml
 ```
 
-## Job Management
+## Run Management
 
 ### Job Artifacts
 
-Each submission creates a timestamped directory in `jobs/`:
+Inference creates a timestamped directory in `runs/` automatically. Explicit
+inputs are divided into scheduler chunks and each array task receives its own
+input list, SPINE logs, and output directory:
 
 ```
-jobs/20260101_143022_spine_icarus_latest/
-├── job_metadata.json           # Complete job metadata
-├── files_chunk_0.txt          # Input file lists
-├── submit_chunk_0.sbatch      # Generated submission script (.sbatch or .pbs)
-├── logs/                      # Batch stdout/stderr
-│   ├── spine_icarus_latest_12345_1.out
-│   └── spine_icarus_latest_12345_1.err
-└── output/                    # Output files
-    └── spine_icarus_latest.h5
+runs/20260810_143022_spine_icarus_latest/
+├── job_metadata.json
+├── scheduler/
+│   └── chunk_000/
+│       ├── submit.sbatch
+│       └── logs/                 # Scheduler stdout/stderr
+└── tasks/
+    └── chunk_000/
+        ├── task_1/
+        │   ├── inputs.txt
+        │   ├── logs/             # SPINE CSV logs
+        │   └── output/           # Outputs for this task only
+        └── task_2/
+            ├── inputs.txt
+            ├── logs/
+            └── output/
 ```
+
+Chunk directories also bound the number of entries in each task directory.
+Use an explicit `--output` only when a deliberately shared or externally
+managed output location is required. An optional `--run-dir` can select a
+specific new inference directory; it must be empty.
 
 ### Monitoring Jobs
 
@@ -368,7 +558,7 @@ qstat -u $USER
 qstat -fx <job_id>
 
 # View logs
-tail -f jobs/<job_dir>/logs/spine_*.out
+tail -f runs/<run_dir>/scheduler/chunk_*/logs/*.out
 
 # Cancel job on SLURM
 scancel <job_id>
@@ -535,8 +725,8 @@ pip install jinja2 pyyaml
 
 ### Job Failures
 
-1. Check batch logs in `jobs/<job_dir>/logs/`
-2. Review job metadata in `jobs/<job_dir>/job_metadata.json`
+1. Check batch logs in `runs/<run_dir>/scheduler/chunk_*/logs/`
+2. Review run metadata in `runs/<run_dir>/job_metadata.json`
 3. Test configuration on a single file with `--dry-run`
 4. Verify input files exist and are accessible
 
@@ -602,8 +792,8 @@ seff <job_id>
 Job metadata is automatically saved. Keep important job directories:
 
 ```bash
-# Jobs are in timestamped directories
-ls -lt jobs/
+# Inference runs are in timestamped directories
+ls -lt runs/
 ```
 
 ## Environment Variables

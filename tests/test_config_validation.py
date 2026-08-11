@@ -41,6 +41,10 @@ ACTIVE_CONFIGS = sorted(
     ]
     + list((CONFIG_ROOT / "train" / "config").rglob("*.cfg"))
 )
+TRAIN_CONFIGS = sorted(
+    list((CONFIG_ROOT / "train" / "config").rglob("*.cfg"))
+    + list((CONFIG_ROOT / "train").rglob("*.yaml"))
+)
 COMMON_CONFIGS = sorted(CONFIG_INFER_ROOT.rglob("*_common.yaml"))
 COMPOSITE_CONFIGS = sorted(
     config_path
@@ -72,6 +76,15 @@ def test_active_configs_declare_explicit_kind(config_path):
         config = yaml.load(config_file, Loader=yaml.BaseLoader)
 
     assert config.get("__meta__", {}).get("kind") in {"bundle", "fragment", "mod"}
+
+
+@pytest.mark.parametrize("config_path", TRAIN_CONFIGS, ids=lambda path: str(path))
+def test_training_configs_use_canonical_top_level_train(config_path):
+    """Training recipes must not rely on SPINE's deprecated base.train layout."""
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = yaml.load(config_file, Loader=yaml.BaseLoader)
+
+    assert "train" not in config.get("base", {})
 
 
 @pytest.mark.parametrize("config_path", COMPOSITE_CONFIGS, ids=lambda path: str(path))

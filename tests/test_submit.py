@@ -146,6 +146,33 @@ def test_batch_mode_forwards_profile_overrides(capsys):
     assert "Submitted job IDs: 123, 124" in capsys.readouterr().out
 
 
+def test_batch_mode_forwards_run_lifecycle_options():
+    submitter = Mock()
+    submitter.submit_job.return_value = []
+
+    result, _, _ = run_main(
+        "--config",
+        "val.yaml",
+        "--stage",
+        "validation",
+        "--run-dir",
+        "/runs/default",
+        "--validation-name",
+        "data",
+        "--rerun-validation",
+        "--tensorboard",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    kwargs = submitter.submit_job.call_args.kwargs
+    assert kwargs["stage"] == "validation"
+    assert kwargs["run_dir"] == "/runs/default"
+    assert kwargs["validation_name"] == "data"
+    assert kwargs["rerun_validation"] is True
+    assert kwargs["tensorboard"] is True
+
+
 def test_pipeline_mode_prints_stage_jobs(capsys):
     submitter = Mock()
     submitter.submit_pipeline.return_value = {"reco": ["42"], "post": ["43"]}
@@ -188,3 +215,15 @@ def test_local_output_warns_that_option_is_deprecated(capsys):
 def test_pipeline_rejects_interactive_mode():
     with pytest.raises(SystemExit, match="2"):
         run_main("--pipeline", "pipeline.yaml", "--interactive")
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("--config", "train.yaml", "--interactive", "--stage", "train"),
+        ("--pipeline", "pipeline.yaml", "--run-dir", "/runs/default"),
+    ],
+)
+def test_non_batch_modes_reject_run_lifecycle_options(args):
+    with pytest.raises(SystemExit, match="2"):
+        run_main(*args)

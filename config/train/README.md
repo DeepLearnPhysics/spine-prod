@@ -30,23 +30,45 @@ Training configurations typically include:
 - **Augmentation**: Data augmentation strategies
 - **Validation**: Validation datasets and metrics
 
+SPINE v0.17.0 uses a top-level `train` block and an optional sibling
+`validation` block. Integrated validation at checkpoint boundaries is
+recommended for new training productions because it records the validation
+metrics with the training process and supports early stopping and stable best
+checkpoints.
+
 ## Versioning and Reproducibility
 
 Training configurations preserve the names used for each training campaign. Where a dated version is present, it uses the same YYMMDD convention as inference configurations. Each recipe should document the setup used to produce its corresponding weights and link those weights to the appropriate configuration under `config/infer/`.
 
 ## Usage
 
-Training configurations are used with the SPINE training framework:
+Training configurations are submitted as persistent named runs:
 
 ```bash
 # Basic training
-./submit.py -c config/train/icarus/deghost/deghost.yaml
+./submit.py -c config/train/icarus/deghost/deghost.yaml \
+  --stage train --run-dir /path/to/experiments/deghost/default
 
 # Multi-GPU training
-./submit.py -c config/train/icarus/deghost/deghost.yaml --gpus 4
+./submit.py -c config/train/icarus/deghost/deghost.yaml \
+  --stage train --run-dir /path/to/experiments/deghost/default --gpus 4
 
-# Resume training
-./submit.py -c config/train/icarus/deghost/deghost.yaml --set model.weight_path=/path/to/checkpoint.ckpt
+# Strictly resume complete training state from the latest checkpoint
+./submit.py -c config/train/icarus/deghost/deghost.yaml \
+  --stage train --run-dir /path/to/experiments/deghost/default --resume
+```
+
+spine-prod selects the latest numeric checkpoint, verifies its SPINE v0.17.0
+checksum sidecar when present, and forwards SPINE's explicit `--resume` flag.
+Legacy checkpoints without checksum sidecars remain supported. Use
+`--resume-from RUN_DIR/weights/snapshot-N.ckpt` for an intentional rollback.
+
+For an alternate dataset or a legacy training without integrated validation,
+run standalone incremental validation against the same run directory:
+
+```bash
+./submit.py -c /path/to/validation.yaml \
+  --stage validation --run-dir /path/to/experiments/deghost/default
 ```
 
 ## Model Weights

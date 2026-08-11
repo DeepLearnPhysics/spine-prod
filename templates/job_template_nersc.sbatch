@@ -60,6 +60,7 @@ fi
 
 {% if file_list_pattern and array_spec %}
 # Get file list for this array task
+TASK_DIR="{{ task_dir_pattern | replace('*', '${SLURM_ARRAY_TASK_ID}') }}"
 TASK_FILE_LIST="{{ file_list_pattern | replace('*', '${SLURM_ARRAY_TASK_ID}') }}"
 
 # Verify first file exists
@@ -75,6 +76,7 @@ cat "$TASK_FILE_LIST"
 echo
 {% elif file_list_pattern %}
 # Single job: use the single file list
+TASK_DIR="{{ task_dir_pattern | replace('*', '1') }}"
 TASK_FILE_LIST="{{ file_list_pattern | replace('*', '1') }}"
 FIRST_FILE=$(head -n 1 "$TASK_FILE_LIST")
 if [[ ! -f "$FIRST_FILE" ]]; then
@@ -106,7 +108,7 @@ INNER_CMD="${INNER_CMD}source {{ (larcv_path ~ '/configure.sh')|tojson }}; "
 INNER_CMD="${INNER_CMD}source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
-INNER_CMD="${INNER_CMD}{{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ log_dir }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+INNER_CMD="${INNER_CMD}{{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 
 # Add Shifter modules requested by the job profile/options
 SHIFTER_MODULES=()

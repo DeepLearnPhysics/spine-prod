@@ -45,8 +45,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Add SPINE to Python path
-        run: echo "PYTHONPATH=${{ github.workspace }}/spine/src:$PYTHONPATH" >> $GITHUB_ENV
+      - name: Install the production SPINE configuration API
+        if: matrix.python-version != '3.9'
+        run: |
+          SPINE_VERSION="$(cat DEFAULT_SPINE_VERSION)"
+          python -m pip install "spine==$SPINE_VERSION"
+          python -c "import spine; assert spine.__version__ == '$SPINE_VERSION'"
 
       - name: Run tests
         run: pytest -v --cov=. --cov-report=xml
