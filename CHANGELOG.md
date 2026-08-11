@@ -5,7 +5,7 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-08-10
 
 ### Added
 - Added persistent `--stage train|validation --run-dir ...` workflows with
@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Normalized the default SPINE version value so GHCR tags do not acquire a
   stray `v`, while retaining the expected `v` in derived S3DF image filenames.
 - Aligned environment-summary output emitted by `configure.sh`.
+
+Full Changelog: [v0.7.2...v0.8.0](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.7.2...v0.8.0)
 
 ## [0.7.2] - 2026-07-21
 
