@@ -1,0 +1,23 @@
+# SBND charge-scale detector variation
+# Revision date: August 13, 2026
+
+__meta__:
+  kind: mod
+  name: "charge_scale"
+  version: "260813"
+  date: "2026-08-13"
+  description: "Charge-scale detector variation"
+  applies_to: [mc]
+  compatible_with:
+    model: "<260501"
+
+override:
+  model.network_input.meta: meta
+
+  model.modules.chain.calibration: apply
+  model.modules.calibration:
+    stage: segmentation
+    response:
+      # Apply the response variation before charge calibrations.
+      priority: 10
+      response_func: 1.00582*x - 0.0001188*x*x - 4.4164e-8*x*x*x + 1.04071e-11*x*x*x*x

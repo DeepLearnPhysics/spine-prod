@@ -1,25 +1,28 @@
-# SBND backward SCE map variation
+# SBND forward SCE map variation
 # Revision date: August 13, 2026
 
 __meta__:
   kind: mod
-  name: "backward_scemap"
+  name: "sce_forward"
   version: "260813"
   date: "2026-08-13"
-  description: "Apply backward SCE map variation"
+  description: "Forward SCE detector variation"
   applies_to: [mc]
   compatible_with:
-    post: ">=240720"
+    model: "<260501"
+  conflicts_with: [sce_backward]
 
 override:
   model.network_input.meta: meta
-  
+
   model.modules.chain.calibration: apply
   model.modules.calibration:
     stage: segmentation
     field:
+      # Apply the displacement before charge calibrations.
+      priority: 10
       map_file: $SBND_DATA_DIR/v01_42_00/SCEoffsets/SCEoffsets_SBND_E500_dualmap_voxelTH3.root
-      map_prefix: TrueBkwd_Displacement
+      map_prefix: TrueFwd_Displacement
       map_suffixes: [_E, _W]
       map_selection_axis: 0
       map_selection_boundaries: [0.0]
