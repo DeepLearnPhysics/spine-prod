@@ -1,0 +1,20 @@
+# ICARUS 0x SCE detector variation modifier 
+# Revision date: August 13, 2026
+
+__meta__:
+  kind: mod
+  name: "backward_scemap"
+  version: "260813"
+  date: "2026-08-13"
+  description: "Backward SCE map variation"
+  applies_to: [mc]
+  compatible_with:
+    model: ">=250303"
+  
+override:
+  model.network_input.meta: meta
+
+  model.modules.calibration.field:
+    priority: 10
+    map_file: /lus/eagle/projects/neutrinoGPU/jzettle/databases/SCE/SCEoffsets_ICARUS_E500_voxelTH3.root
+    map_prefix: TrueBkwd_Displacement
