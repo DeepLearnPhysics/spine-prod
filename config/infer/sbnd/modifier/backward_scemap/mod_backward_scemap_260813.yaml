@@ -18,7 +18,7 @@ override:
   model.modules.calibration:
     stage: segmentation
     field:
-      map_file: /lus/eagle/projects/neutrinoGPU/jzettle/databases/SCE/SCEoffsets_SBND_E500_dualmap_voxelTH3.root
+      map_file: $SBND_DATA/v01_42_00/SCEoffsets/SCEoffsets_SBND_E500_dualmap_voxelTH3.root
       map_prefix: TrueBkwd_Displacement
       map_suffixes: [_E, _W]
       map_selection_axis: 0

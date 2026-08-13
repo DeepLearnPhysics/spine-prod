@@ -16,5 +16,5 @@ override:
 
   model.modules.calibration.field:
     priority: 10
-    map_file: /lus/eagle/projects/neutrinoGPU/jzettle/databases/SCE/SCEoffsets_ICARUS_E500_voxelTH3.root
+    map_file: $ICARUS_DATA_DIR/v10_06_06/icarus_data/SCEoffsets/SCEoffsets_ICARUS_E500_voxelTH3.root
     map_prefix: TrueBkwd_Displacement
