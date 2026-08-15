@@ -8,28 +8,18 @@ __meta__:
   date: "2026-08-13"
   description: "Charge-scale detector variation"
   applies_to: [mc]
-  
-override:
-  model.network_input.meta: meta
+  compatible_with:
+    model: ">=250303"
 
-  model.modules.calibration:
-    stage: segmentation
-    response:
-      response_func: 1.0279*x - 0.000287*x*x + 2.4915e-7*x*x*x - 4.522989e-11*x*x*x*x
-    smearing:
-      # Apply the smearing after the response function
-      distribution: normal
-      mode: multiplicative
-      mean: 1.0
-      scale: 0.14953
-    gain:
-      gain: 79.9169 # e-/ADC
-    recombination:
-      model: mbox
-      efield: 0.4938 # kV/cm
-      mip_dedx: 2.105168 # MeV/cm
-    lifetime:
-      lifetime_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_elifetime_data.db
-      driftv_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
-    transparency:
-      transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
+override:
+  model.modules.calibration.response:
+    # Apply the response variation before charge calibrations.
+    priority: 10
+    response_func: 1.0279*x - 0.000287*x*x + 2.4915e-7*x*x*x - 4.522989e-11*x*x*x*x
+  model.modules.calibration.smearing:
+    # Apply the smearing after the response function
+    priority: 9
+    distribution: normal
+    mode: multiplicative
+    mean: 1.0
+    scale: 0.14953

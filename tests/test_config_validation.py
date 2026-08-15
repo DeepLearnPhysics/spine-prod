@@ -393,3 +393,64 @@ class TestConfigValidation:
         assert (
             config["post"]["apply_calibrations"]["depositions_source"] == "depositions"
         )
+
+    def test_icarus_charge_scale_only_adds_response_and_smearing(
+        self, config_infer_root, tmp_path
+    ):
+        """The ICARUS variation preserves calibration supplied by the base model."""
+        icarus_root = config_infer_root / "icarus"
+        modifier = (
+            icarus_root / "modifier" / "charge_scale" / "mod_charge_scale_260813.yaml"
+        )
+        modifier_config = yaml.safe_load(modifier.read_text(encoding="utf-8"))
+        assert modifier_config["__meta__"]["compatible_with"] == {"model": ">=250303"}
+        assert set(modifier_config["override"]) == {
+            "model.modules.calibration.response",
+            "model.modules.calibration.smearing",
+        }
+
+        composite = tmp_path / "composite.yaml"
+        composite.write_text(
+            yaml.safe_dump(
+                {
+                    "include": [
+                        str(icarus_root / "full_chain_co_260501.yaml"),
+                        str(modifier),
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        config = load_config_with_includes(composite)
+        calibration = config["model"]["modules"]["calibration"]
+        assert calibration["stage"] == "segmentation"
+        assert calibration["gain"]["gain"] == 79.9169
+        assert "recombination" in calibration
+        assert "lifetime" in calibration
+        assert "transparency" in calibration
+        assert calibration["response"]["priority"] == 10
+        assert calibration["smearing"]["priority"] == 9
+
+    def test_icarus_charge_scale_accepts_first_in_chain_calibration(
+        self, config_infer_root, tmp_path
+    ):
+        """The first ICARUS model with in-chain calibration supports the modifier."""
+        icarus_root = config_infer_root / "icarus"
+        modifier = (
+            icarus_root / "modifier" / "charge_scale" / "mod_charge_scale_260813.yaml"
+        )
+        composite = tmp_path / "composite.yaml"
+        composite.write_text(
+            yaml.safe_dump(
+                {
+                    "include": [
+                        str(icarus_root / "full_chain_co_250303.yaml"),
+                        str(modifier),
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        config = load_config_with_includes(composite)
+        assert "response" in config["model"]["modules"]["calibration"]

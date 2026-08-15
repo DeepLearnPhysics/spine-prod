@@ -28,5 +28,5 @@ override:
       mode: multiplicative
       mean: 1.0
       scale: 0.0511
-      
+
   post.apply_calibrations.depositions_source: depositions
