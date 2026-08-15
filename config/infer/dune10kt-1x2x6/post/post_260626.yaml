@@ -18,6 +18,7 @@ override:
   # Temporary calibration block to fix the charge scale
   post.calibration:
     priority: 10
+    depositions_source: depositions
     gain:
       gain: 0.1982 # Corrects for a wrong e-/ADC gain in the model
 
