@@ -21,3 +21,5 @@ override:
       # Apply the response variation before charge calibrations.
       priority: 10
       response_func: 1.00582*x - 0.0001188*x*x - 4.4164e-8*x*x*x + 1.04071e-11*x*x*x*x
+
+  post.apply_calibrations.depositions_source: depositions

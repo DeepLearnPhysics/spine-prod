@@ -352,3 +352,44 @@ class TestConfigValidation:
             for cfg, err in failed_configs:
                 error_msg += f"  - {cfg}: {err}\n"
             pytest.fail(error_msg)
+
+    @pytest.mark.parametrize(
+        "relative_path",
+        [
+            "dune10kt-1x2x6/full_chain_260626.yaml",
+            "protodune-vd/full_chain_260128.yaml",
+        ],
+    )
+    def test_chained_post_calibrations_continue_from_calibrated_depositions(
+        self, config_infer_root, relative_path
+    ):
+        """Production post gains must preserve the preceding model calibration."""
+        config = load_config_with_includes(config_infer_root / relative_path)
+        assert config["post"]["calibration"]["depositions_source"] == "depositions"
+
+    def test_sbnd_charge_scale_continues_from_varied_depositions(
+        self, config_infer_root, tmp_path
+    ):
+        """The fully resolved charge-scale variation propagates into calorimetry."""
+        sbnd_root = config_infer_root / "sbnd"
+        composite = tmp_path / "composite.yaml"
+        composite.write_text(
+            yaml.safe_dump(
+                {
+                    "include": [
+                        str(sbnd_root / "full_chain_co_260316.yaml"),
+                        str(
+                            sbnd_root
+                            / "modifier"
+                            / "charge_scale"
+                            / "mod_charge_scale_260813.yaml"
+                        ),
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        config = load_config_with_includes(composite)
+        assert (
+            config["post"]["apply_calibrations"]["depositions_source"] == "depositions"
+        )
