@@ -1,0 +1,25 @@
+# ICARUS charge-scale detector variation
+# Revision date: August 13, 2026
+
+__meta__:
+  kind: mod
+  name: "charge_scale"
+  version: "260813"
+  date: "2026-08-13"
+  description: "Charge-scale detector variation"
+  applies_to: [mc]
+  compatible_with:
+    model: ">=250303"
+
+override:
+  model.modules.calibration.response:
+    # Apply the response variation before charge calibrations.
+    priority: 10
+    response_func: 1.0279*x - 0.000287*x*x + 2.4915e-7*x*x*x - 4.522989e-11*x*x*x*x
+  model.modules.calibration.smearing:
+    # Apply the smearing after the response function
+    priority: 9
+    distribution: normal
+    mode: multiplicative
+    mean: 1.0
+    scale: 0.14953
