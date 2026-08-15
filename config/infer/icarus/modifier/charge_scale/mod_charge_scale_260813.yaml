@@ -1,0 +1,35 @@
+# ICARUS charge-scale detector variation
+# Revision date: August 13, 2026
+
+__meta__:
+  kind: mod
+  name: "charge_scale"
+  version: "260813"
+  date: "2026-08-13"
+  description: "Charge-scale detector variation"
+  applies_to: [mc]
+  
+override:
+  model.network_input.meta: meta
+
+  model.modules.calibration:
+    stage: segmentation
+    response:
+      response_func: 1.04*x - 0.000599*x*x + 2.08372e-7*x*x*x - 1.7506e-11*x*x*x*x
+    smearing:
+      # Apply the smearing after the response function
+      distribution: normal
+      mode: multiplicative
+      mean: 1.0
+      scale: 0.0511
+    gain:
+      gain: 79.9169 # e-/ADC
+    recombination:
+      model: mbox
+      efield: 0.4938 # kV/cm
+      mip_dedx: 2.105168 # MeV/cm
+    lifetime:
+      lifetime_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_elifetime_data.db
+      driftv_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
+    transparency:
+      transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
