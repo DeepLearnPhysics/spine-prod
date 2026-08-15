@@ -17,6 +17,7 @@ include: post_common.yaml
 override:
   # Correct for the gain mistake in the pre-calibration
   post.calibration:
+    depositions_source: depositions
     gain:
       gain: 14.2857 # 200 e-/ADC, 14.0 applied in pre-calibration --> 200/14 = 14.2857
     priority: 7
