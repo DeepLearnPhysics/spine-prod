@@ -178,6 +178,22 @@ def load_config_with_includes(config_path):
         return load_config_file(str(config_path))
 
 
+def write_composite_config(tmp_path, base_config, modifier_config):
+    """Create a temporary bundle which applies a modifier to a base config."""
+    composite_path = tmp_path / "composite.yaml"
+    composite_path.write_text(
+        yaml.safe_dump(
+            {
+                "__meta__": {"kind": "bundle"},
+                "include": [str(base_config), str(modifier_config)],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return composite_path
+
+
 @contextmanager
 def ignore_expected_legacy_metadata_warnings():
     """Ignore metadata diagnostics expected while loading legacy bundles.
@@ -352,3 +368,56 @@ class TestConfigValidation:
             for cfg, err in failed_configs:
                 error_msg += f"  - {cfg}: {err}\n"
             pytest.fail(error_msg)
+
+    def test_sbnd_gen2_data_modifier_configures_in_model_calibration(
+        self, config_infer_root, tmp_path
+    ):
+        """Gen-II data uses the centrally distributed lifetime and YZ maps."""
+        sbnd_root = config_infer_root / "sbnd"
+        composite = write_composite_config(
+            tmp_path,
+            sbnd_root / "full_chain_co_260521.yaml",
+            sbnd_root / "modifier" / "data" / "mod_data_260501.yaml",
+        )
+
+        config = load_config_with_includes(composite)
+        calibration = config["model"]["modules"]["calibration"]
+
+        assert config["model"]["network_input"]["run_info"] == "run_info"
+        assert calibration["gain"]["gain"] == 45.652
+        assert calibration["lifetime"] == {
+            "lifetime_db": (
+                "$SBND_DATA_DIR/v01_42_00/CalibrationDatabase/tpc_elifetime.db"
+            ),
+            "lifetime_db_value_keys": [
+                "etau_sce_spatial_east",
+                "etau_sce_spatial_west",
+            ],
+            "lifetime_db_value_scale": 1000.0,
+            "driftv": 0.1563,
+        }
+        assert calibration["transparency"] == {
+            "transparency_file": (
+                "$SBND_DATA_DIR/v01_42_00/YZmaps/yz_data2025_v10_14_02.root"
+            ),
+            "map_type": "correction",
+        }
+        assert "apply_calibrations" not in config["post"]
+
+    @pytest.mark.parametrize(
+        ("base_name", "modifier_name"),
+        [
+            ("full_chain_co_260521.yaml", "mod_data_250901.yaml"),
+            ("full_chain_co_250901.yaml", "mod_data_260501.yaml"),
+        ],
+    )
+    def test_sbnd_data_modifiers_reject_wrong_calibration_stage(
+        self, config_infer_root, tmp_path, base_name, modifier_name
+    ):
+        """Post- and model-calibration modifiers cannot cross the 260501 boundary."""
+        sbnd_root = config_infer_root / "sbnd"
+        modifier = sbnd_root / "modifier" / "data" / modifier_name
+        composite = write_composite_config(tmp_path, sbnd_root / base_name, modifier)
+
+        with pytest.raises(Exception, match="compatible"):
+            load_config_with_includes(composite)

@@ -5,6 +5,17 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added an SBND Gen-II data modifier for calibrated production.
+
+### Changed
+- Updated the default SPINE container release to
+  `docker:ghcr.io/deeplearnphysics/spine:0.17.1`.
+- Restricted SBND data modifiers to the calibration stage provided by their
+  compatible model and post-processing configurations.
+
 ## [0.8.1] - 2026-08-13
 
 ### Added

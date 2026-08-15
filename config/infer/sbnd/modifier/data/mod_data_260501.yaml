@@ -1,0 +1,33 @@
+# Data-only modification for SBND configs with in-model calibration
+# Revision date: May 1, 2026
+
+__meta__:
+  kind: mod
+  name: "data"
+  version: "260501"
+  date: "2026-05-01"
+  description: "Data-only configuration with Gen-II calibration"
+  applies_to: [data]
+  compatible_with:
+    model: ">=260501"
+    post: ">=260501"
+
+include: mod_data_common.yaml
+
+override:
+  ### Model overrides ###
+  # Provide the run number needed for the lifetime database lookup.
+  model.network_input.run_info: run_info
+
+  # Set calibration parameters for data before semantic segmentation.
+  model.modules.calibration.gain.gain: 45.652 # e-/ADC
+  model.modules.calibration.lifetime:
+    lifetime_db: $SBND_DATA_DIR/v01_42_00/CalibrationDatabase/tpc_elifetime.db
+    lifetime_db_value_keys:
+      - etau_sce_spatial_east
+      - etau_sce_spatial_west
+    lifetime_db_value_scale: 1000.0 # ms to us
+    driftv: 0.1563 # cm/us
+  model.modules.calibration.transparency:
+    transparency_file: $SBND_DATA_DIR/v01_42_00/YZmaps/yz_data2025_v10_14_02.root
+    map_type: correction
