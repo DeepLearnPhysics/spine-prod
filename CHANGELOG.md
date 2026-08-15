@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added an SBND Gen-II data modifier for calibrated production.
 - Added a generic staged-training prototype that trains UResNet-PPN,
   materializes its canonical semantic predictions and adapted cluster truth,
   and trains standalone Graph-SPICE from aligned raw data and cache inputs.
@@ -27,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added first-class forwarding for SPINE runtime resource and duration options.
 
 ### Changed
+- Restricted SBND data modifiers to the calibration stage provided by their
+  compatible model and post-processing configurations.
 - Separated detector-independent model structures from detector-specific model
   revisions under `config/model/common/` and `config/model/generic/`.
 - Moved the standard full-chain analyzer and metric-report recipes under

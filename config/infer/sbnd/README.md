@@ -32,6 +32,12 @@ For example:
 - Data-only mode (no truth labels): Apply `modifier/data/mod_data_*.yaml` or use `--apply-mods data`
 - Lite output: Use `--apply-mods lite`
 
+The May 2026 models apply calibration before semantic segmentation. Their
+`data` modifier therefore configures the in-model lifetime and YZ corrections
+from `SBND_DATA_DIR`; earlier data modifiers configure the post-processing
+calibration stage instead. Modifier compatibility metadata prevents either
+calibration style from being applied across this boundary.
+
 Legacy `.yaml` files have been moved to the `legacy/` directory.
 
 ## Configurations for SBND's Generation II MPVMPR

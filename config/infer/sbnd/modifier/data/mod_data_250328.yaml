@@ -9,7 +9,8 @@ __meta__:
   description: "Data-only configuration"
   applies_to: [data]
   compatible_with:
-    post: ">=240720"
+    model: "<260501"
+    post: "<260501"
 
 include: mod_data_common.yaml
 
