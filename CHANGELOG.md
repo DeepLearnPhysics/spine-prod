@@ -5,6 +5,15 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-08-13
+
+### Added
+- Added forward and backward space-charge-effect detector variation modifiers
+  for ICARUS and SBND production workflows.
+- Added an SBND charge-scale detector variation modifier.
+
+Full Changelog: [v0.8.0...v0.8.1](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.8.0...v0.8.1)
+
 ## [0.8.0] - 2026-08-10
 
 ### Added
