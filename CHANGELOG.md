@@ -5,6 +5,26 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-08-15
+
+### Added
+- Added an ICARUS charge-scale detector variation modifier which applies
+  response and smearing before the existing in-chain charge calibrations.
+
+### Changed
+- Updated the SBND charge-scale response parameters and added charge smearing.
+- Updated the default SPINE container release to
+  `docker:ghcr.io/deeplearnphysics/spine:0.17.1`.
+
+### Fixed
+- Preserved preceding in-chain calibrations when applying downstream charge
+  corrections in DUNE10kt-1x2x6, ProtoDUNE-VD, and the SBND charge-scale
+  variation.
+- Restricted the ICARUS charge-scale modifier to model configurations with
+  in-chain calibration and prevented it from replacing the base calibration.
+
+Full Changelog: [v0.8.1...v0.8.2](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.8.1...v0.8.2)
+
 ## [0.8.1] - 2026-08-13
 
 ### Added
