@@ -5,6 +5,16 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3] - 2026-08-20
+
+### Added
+- Added SBND post-deghosting gain detector variations with -5% and +5% charge
+  scales.
+- Added an SBND 15% charge-smearing detector variation which retains the
+  central response correction.
+
+Full Changelog: [v0.8.2...v0.8.3](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.8.2...v0.8.3)
+
 ## [0.8.2] - 2026-08-15
 
 ### Added
