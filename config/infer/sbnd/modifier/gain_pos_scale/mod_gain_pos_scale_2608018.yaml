@@ -1,0 +1,25 @@
+# SBND post-deghost +5% detector variation
+# Revision date: August 18, 2026
+
+__meta__:
+  kind: mod
+  name: "gain_pos_scale"
+  version: "260818"
+  date: "2026-08-18"
+  description: "Post de-ghost +5% detector variation"
+  applies_to: [mc]
+  compatible_with:
+    model: "<260501"
+
+override:
+  model.network_input.meta: meta
+
+  model.modules.chain.calibration: apply
+  model.modules.calibration:
+    stage: segmentation
+    gain:
+    # Apply the gain variation before charge calibrations.
+      priority: 10
+      gain: 1.05
+    
+  post.apply_calibrations.depositions_source: depositions

@@ -1,0 +1,32 @@
+# SBND smearing only detector variation
+# Revision date: August 18, 2026
+
+__meta__:
+  kind: mod
+  name: "smearing"
+  version: "260818"
+  date: "2026-08-18"
+  description: "Smearing detector variation"
+  applies_to: [mc]
+  compatible_with:
+    model: "<260501"
+
+override:
+  model.network_input.meta: meta
+
+  model.modules.chain.calibration: apply
+  model.modules.calibration:
+    stage: segmentation
+    response:
+      # Apply the response variation before charge calibrations.
+      priority: 10
+      response_func: 0.9894425*x + 7.6032e-7*x*x - 2.552e-7*x*x*x + 6.74704e-11*x*x*x*x
+    smearing:
+      # Apply the smearing after the response function
+      priority: 9
+      distribution: normal
+      mode: multiplicative
+      mean: 1.0
+      scale: 0.15
+
+  post.apply_calibrations.depositions_source: depositions
