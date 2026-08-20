@@ -1,4 +1,4 @@
-# SBND post-deghost +5% detector variation
+# SBND post-deghosting +5% gain detector variation
 # Revision date: August 18, 2026
 
 __meta__:
@@ -6,10 +6,11 @@ __meta__:
   name: "gain_pos_scale"
   version: "260818"
   date: "2026-08-18"
-  description: "Post de-ghost +5% detector variation"
+  description: "Post-deghosting +5% gain detector variation"
   applies_to: [mc]
   compatible_with:
     model: "<260501"
+  conflicts_with: [gain_neg_scale]
 
 override:
   model.network_input.meta: meta
@@ -18,8 +19,8 @@ override:
   model.modules.calibration:
     stage: segmentation
     gain:
-    # Apply the gain variation before charge calibrations.
+      # Apply the multiplicative gain variation before post-deghosting calibration.
       priority: 10
       gain: 1.05
-    
+
   post.apply_calibrations.depositions_source: depositions
