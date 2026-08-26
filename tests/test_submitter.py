@@ -546,7 +546,18 @@ class TestSubmitterHelpers:
             submitter = Submitter(basedir=tmp_path, central_dir=True)
 
         assert submitter.jobs_dir == tmp_path / "runs"
+        assert not submitter.jobs_dir.exists()
         assert "SPINE_PROD_BASEDIR not set" in capsys.readouterr().out
+
+    def test_init_does_not_create_default_jobs_directory(
+        self, workspace_root, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+
+        submitter = Submitter(basedir=workspace_root)
+
+        assert submitter.jobs_dir == tmp_path / "runs"
+        assert not submitter.jobs_dir.exists()
 
     def test_runtime_helpers_report_invalid_configuration(
         self, mock_submitter, tmp_path

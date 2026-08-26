@@ -82,6 +82,7 @@ def test_new_training_run_allows_internal_config_workspace(tmp_path):
     config = write_config(tmp_path / "train.yaml")
     run_dir = tmp_path / "default"
     (run_dir / ".spine-prod" / "configs").mkdir(parents=True)
+    (run_dir / "precreated" / "empty" / "directories").mkdir(parents=True)
 
     assert RunManager.prepare_training_run(run_dir, config) is None
 
