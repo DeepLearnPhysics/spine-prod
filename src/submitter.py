@@ -108,7 +108,6 @@ class Submitter:
             jobs_dir = self.basedir / "runs"
         else:
             jobs_dir = Path(os.getcwd()) / "runs"
-        jobs_dir.mkdir(exist_ok=True)
 
         self.jobs_dir = jobs_dir
         self.batch_client = SlurmClient(self.basedir, jobs_dir)

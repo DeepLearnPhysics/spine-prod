@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Made `train/...` and other configuration paths resolve relative to the
   standard `config/` search root, consistently with `infer/...` paths.
+- Allowed new training runs to use directories containing only empty directory
+  structure while continuing to reject material pre-existing content.
+- Avoided creating the default `runs/` directory when an explicit run directory
+  means it will not be used.
 
 ## [0.8.3] - 2026-08-20
 

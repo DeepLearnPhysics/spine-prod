@@ -112,12 +112,15 @@ class RunManager:
             raise ValueError(
                 f"Training run already exists at {run_dir}; pass --resume to continue it"
             )
-        existing = (
-            []
-            if not run_dir.exists()
-            else [path for path in run_dir.iterdir() if path.name != ".spine-prod"]
-        )
-        if existing:
+        material_content = []
+        if run_dir.exists():
+            for path in run_dir.rglob("*"):
+                relative = path.relative_to(run_dir)
+                if relative.parts[0] == ".spine-prod":
+                    continue
+                if path.is_symlink() or not path.is_dir():
+                    material_content.append(path)
+        if material_content:
             raise ValueError(f"New training run directory is not empty: {run_dir}")
 
         run_dir.mkdir(parents=True, exist_ok=True)
