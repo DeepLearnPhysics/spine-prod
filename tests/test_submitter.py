@@ -1389,7 +1389,7 @@ class TestBatchSpineOverride:
             patch.object(mock_submitter.batch_client, "submit", return_value="train"),
         ):
             assert mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
+                config="train/generic/uresnet.yaml",
                 files=[str(train_source)],
                 validation_files=[str(validation_source)],
                 stage="train",
@@ -1403,6 +1403,12 @@ class TestBatchSpineOverride:
         assert validation_manifest.read_text().splitlines() == [str(validation_source)]
 
         script = (submission / "submit.sbatch").read_text(encoding="utf-8")
+        assert (
+            str(
+                mock_submitter.basedir / "config" / "train" / "generic" / "uresnet.yaml"
+            )
+            in script
+        )
         assert f"--source-list {train_manifest}" in script
         assert f"--val-source-list {validation_manifest}" in script
         assert "#SBATCH --array=" not in script
@@ -1675,7 +1681,7 @@ class TestBatchSpineOverride:
         ):
             assert (
                 mock_submitter.submit_job(
-                    "config.yaml",
+                    "infer/generic/full_chain_240718.yaml",
                     files=[str(input_file)],
                     job_name="custom_job",
                     output=str(output),

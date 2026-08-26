@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Updated the minimum/default SPINE runtime to v1.0.2.
 
+### Fixed
+- Made `train/...` and other configuration paths resolve relative to the
+  standard `config/` search root, consistently with `infer/...` paths.
+
 ## [0.8.3] - 2026-08-20
 
 ### Added

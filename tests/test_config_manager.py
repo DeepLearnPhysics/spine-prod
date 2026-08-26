@@ -55,6 +55,40 @@ def test_detect_detector_returns_unknown_for_unrecognized_path(manager):
     assert manager.detect_detector("infer/other/base.yaml") == "unknown_detector"
 
 
+def test_resolve_config_path_supports_spine_and_repository_relative_paths(
+    manager, tmp_path, monkeypatch
+):
+    config = tmp_path / "config" / "train" / "generic" / "uresnet.yaml"
+    config.parent.mkdir(parents=True)
+    config.touch()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+
+    assert manager.resolve_config_path(str(config)) == config
+    assert manager.resolve_config_path("train/generic/uresnet.yaml") == config
+    assert manager.resolve_config_path("config/train/generic/uresnet.yaml") == config
+
+
+def test_resolve_config_path_uses_spine_config_path(manager, tmp_path, monkeypatch):
+    external_root = tmp_path / "external"
+    config = external_root / "custom" / "model.yaml"
+    config.parent.mkdir(parents=True)
+    config.touch()
+    monkeypatch.setenv("SPINE_CONFIG_PATH", str(external_root))
+
+    assert manager.resolve_config_path("custom/model.yaml") == config
+
+
+def test_resolve_config_path_reports_attempted_locations(manager, tmp_path):
+    with pytest.raises(
+        FileNotFoundError, match="Config not found: missing.yaml"
+    ) as err:
+        manager.resolve_config_path("missing.yaml")
+
+    assert str(tmp_path / "config" / "missing.yaml") in str(err.value)
+
+
 def test_discover_modifiers_uses_versioned_directory_layout(manager, tmp_path):
     detector_dir = tmp_path / "config" / "infer" / "icarus"
     modifier_dir = detector_dir / "modifier" / "data"
