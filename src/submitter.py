@@ -871,8 +871,15 @@ class Submitter:
         # Detect detector first
         detector = self.config_mgr.detect_detector(config)
 
-        # Create job directory first (needed for composite/latest config generation)
+        # Classify before resolving because latest may be a directory shorthand
+        # or a virtual path that is materialized in the job workspace below.
         is_latest, config_name = self._classify_config_request(config)
+
+        # Resolve ordinary files before persistent lifecycle bookkeeping reads
+        # them. Latest shorthands are directories or virtual paths and are
+        # materialized below instead.
+        if not is_latest:
+            config = str(self.config_mgr.resolve_config_path(config))
 
         if not job_name:
             job_name = f"spine_{detector}_{config_name}"
