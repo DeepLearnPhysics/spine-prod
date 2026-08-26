@@ -86,7 +86,11 @@ echo "Files in this task:"
 cat "$TASK_FILE_LIST"
 echo
 {% else %}
+{% if input_manifest %}
+echo "Using input file list: {{ input_manifest }}"
+{% else %}
 echo "Using input files defined in the config"
+{% endif %}
 echo
 {% endif %}
 

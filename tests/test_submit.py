@@ -173,6 +173,33 @@ def test_batch_mode_forwards_run_lifecycle_options():
     assert kwargs["tensorboard"] is True
 
 
+def test_batch_mode_forwards_training_and_validation_sources():
+    """Training and validation sources are forwarded independently."""
+    submitter = Mock()
+    submitter.submit_job.return_value = []
+
+    result, _, _ = run_main(
+        "--config",
+        "train.yaml",
+        "--stage",
+        "train",
+        "--run-dir",
+        "/runs/default",
+        "--source-list",
+        "train.txt",
+        "--val-source-list",
+        "validation.txt",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    kwargs = submitter.submit_job.call_args.kwargs
+    assert kwargs["files"] == ["train.txt"]
+    assert kwargs["source_type"] == "source_list"
+    assert kwargs["validation_files"] == ["validation.txt"]
+    assert kwargs["validation_source_type"] == "source_list"
+
+
 def test_pipeline_mode_prints_stage_jobs(capsys):
     submitter = Mock()
     submitter.submit_pipeline.return_value = {"reco": ["42"], "post": ["43"]}
@@ -225,5 +252,17 @@ def test_pipeline_rejects_interactive_mode():
     ],
 )
 def test_non_batch_modes_reject_run_lifecycle_options(args):
+    with pytest.raises(SystemExit, match="2"):
+        run_main(*args)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("--config", "train.yaml", "--interactive", "--val-source", "val.root"),
+        ("--pipeline", "pipeline.yaml", "--val-source", "val.root"),
+    ],
+)
+def test_non_batch_modes_reject_validation_sources(args):
     with pytest.raises(SystemExit, match="2"):
         run_main(*args)

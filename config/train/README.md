@@ -49,14 +49,14 @@ Training configurations are submitted as persistent named runs:
 # Basic training
 ./submit.py -c config/train/generic/uresnet.yaml \
   --stage train --run-dir /path/to/experiments/uresnet/default \
-  --set io.loader.dataset.file_keys=/path/to/train_file_list.txt \
-  --set validation.file_keys=/path/to/validation_file_list.txt
+  --source-list /path/to/train_file_list.txt \
+  --val-source-list /path/to/validation_file_list.txt
 
 # Multi-GPU training
 ./submit.py -c config/train/generic/uresnet.yaml \
   --stage train --run-dir /path/to/experiments/uresnet/default --gpus 4 \
-  --set io.loader.dataset.file_keys=/path/to/train_file_list.txt \
-  --set validation.file_keys=/path/to/validation_file_list.txt
+  --source-list /path/to/train_file_list.txt \
+  --val-source-list /path/to/validation_file_list.txt
 
 # Strictly resume complete training state from the latest checkpoint
 ./submit.py -c config/train/generic/uresnet.yaml \

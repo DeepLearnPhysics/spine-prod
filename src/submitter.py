@@ -710,6 +710,8 @@ class Submitter:
         config: str,
         files: Optional[List[str]] = None,
         source_type: str = "source",
+        validation_files: Optional[List[str]] = None,
+        validation_source_type: str = "source",
         profile: str = "auto",
         job_name: Optional[str] = None,
         output: Optional[str] = None,
@@ -748,6 +750,10 @@ class Submitter:
         source_type : str, optional
             Either 'source' (direct paths/globs) or 'source_list' (text file),
             by default 'source'
+        validation_files : List[str], optional
+            Validation input files, globs, or one validation source-list path.
+        validation_source_type : str, optional
+            Either 'source' or 'source_list' for ``validation_files``.
         profile : str, optional
             Resource profile name or 'auto', by default 'auto'
         job_name : str, optional
@@ -825,10 +831,13 @@ class Submitter:
             raise ValueError(
                 "--validation-name and --rerun-validation are valid only for validation"
             )
-        if stage != "inference" and files:
+        if validation_files and stage != "train":
             raise ValueError(
-                f"Explicit --source/--source-list inputs are not supported for {stage}; "
-                "configure the training or validation loader in SPINE"
+                "--val-source and --val-source-list are valid only for training"
+            )
+        if stage != "inference" and (ntasks is not None or files_per_task is not None):
+            raise ValueError(
+                "--ntasks and --files-per-task are valid only for inference"
             )
 
         file_list = []
@@ -849,6 +858,15 @@ class Submitter:
                     "--source/--source-list"
                 )
             print("No input files provided; using inputs defined in the config")
+
+        validation_file_list = []
+        if validation_files:
+            validation_file_list = self.file_handler.parse_files(
+                validation_files, validation_source_type
+            )
+            if not validation_file_list:
+                raise ValueError("No validation input files found")
+            print(f"Found {len(validation_file_list)} validation file(s)")
 
         # Detect detector first
         detector = self.config_mgr.detect_detector(config)
@@ -930,6 +948,8 @@ class Submitter:
         lifecycle_args = []
         selected_checkpoints = []
         resume_checkpoint = None
+        input_manifest = None
+        validation_input_manifest = None
         if stage == "train":
             resume_checkpoint = RunManager.prepare_training_run(
                 job_dir, config, resume=resume, resume_from=resume_from
@@ -988,6 +1008,27 @@ class Submitter:
                     ]
                 )
 
+        if stage != "inference" and file_list:
+            assert submission_dir is not None
+            input_manifest = submission_dir / "inputs.txt"
+            with open(input_manifest, "w", encoding="utf-8") as stream:
+                for file_path in file_list:
+                    stream.write(f"{file_path}\n")
+            lifecycle_args.extend(["--source-list", shlex.quote(str(input_manifest))])
+
+        if validation_file_list:
+            assert submission_dir is not None
+            validation_input_manifest = submission_dir / "validation_inputs.txt"
+            with open(validation_input_manifest, "w", encoding="utf-8") as stream:
+                for file_path in validation_file_list:
+                    stream.write(f"{file_path}\n")
+            lifecycle_args.extend(
+                [
+                    "--val-source-list",
+                    shlex.quote(str(validation_input_manifest)),
+                ]
+            )
+
         if lifecycle_args:
             extra_args = " ".join(lifecycle_args)
             spine_cli_overrides = " ".join(
@@ -1012,7 +1053,7 @@ class Submitter:
         file_list_pattern = None
         file_chunks = [[]]
         concurrent_task_limit = None
-        if file_list:
+        if stage == "inference" and file_list:
             max_array_size = self.profiles["defaults"]["max_array_size"]
             effective_files_per_task = self._resolve_files_per_task(
                 len(file_list), ntasks=ntasks, files_per_task=files_per_task
@@ -1049,7 +1090,7 @@ class Submitter:
                 ):
                     array_spec += f"%{concurrent_task_limit}"
 
-            if file_list:
+            if stage == "inference" and file_list:
                 task_chunk_dir = job_dir / "tasks" / chunk_name
                 task_dir_pattern = str(task_chunk_dir / "task_*")
                 file_list_pattern = f"{task_dir_pattern}/inputs.txt"
@@ -1086,6 +1127,7 @@ class Submitter:
                 dependency=chunk_dependency,
                 basedir=str(self.basedir),
                 file_list_pattern=file_list_pattern,
+                input_manifest=(str(input_manifest) if input_manifest else None),
                 task_dir_pattern=task_dir_pattern,
                 spine_log_dir=chunk_spine_log_dir,
                 config=config,
@@ -1145,6 +1187,16 @@ class Submitter:
             "original_config": original_config if apply_mods else config,
             "applied_modifiers": apply_mods or [],
             "set_overrides": set_overrides or [],
+            "source_type": source_type if files else None,
+            "source_inputs": files or [],
+            "source_manifest": str(input_manifest) if input_manifest else None,
+            "validation_source_type": (
+                validation_source_type if validation_files else None
+            ),
+            "validation_source_inputs": validation_files or [],
+            "validation_source_manifest": (
+                str(validation_input_manifest) if validation_input_manifest else None
+            ),
             "larcv_path": larcv_path,
             "flashmatch_path": flashmatch_path,
             "spine_path": spine_path,
@@ -1159,14 +1211,21 @@ class Submitter:
                 self._resolve_files_per_task(
                     len(file_list), ntasks=ntasks, files_per_task=files_per_task
                 )
-                if file_list
+                if stage == "inference" and file_list
                 else None
             ),
             "ntasks": ntasks,
             "job_ids": job_ids,
-            "output": output or (str(job_dir / "tasks") if file_list else None),
+            "output": output
+            or (str(job_dir / "tasks") if stage == "inference" and file_list else None),
             "output_dir": (
-                output_dir if output else str(job_dir / "tasks") if file_list else None
+                output_dir
+                if output
+                else (
+                    str(job_dir / "tasks")
+                    if stage == "inference" and file_list
+                    else None
+                )
             ),
             "output_suffix": output_suffix,
             "resume_checkpoint": (
