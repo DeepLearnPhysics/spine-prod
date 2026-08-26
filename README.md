@@ -29,7 +29,8 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v0.17.1.
+The current default is SPINE v1.0.0. Maintained configurations require SPINE
+v1.0.0 or later.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
@@ -315,7 +316,7 @@ logs, TensorBoard events, and submission records remain associated.
 ### Start a Training Run
 
 The training configuration owns the model, data loader, optimizer, total epoch
-count, checkpoint interval, and optional on-the-fly validation. SPINE v0.17.0
+count, checkpoint interval, and optional on-the-fly validation. SPINE v1.0.0
 uses a top-level `train` block and an optional sibling `validation` block;
 spine-prod owns artifact locations. Inputs for training and validation must be
 configured in SPINE rather than passed through `--source` or `--source-list`.
@@ -399,7 +400,7 @@ If training is interrupted, resume the same run explicitly:
 spine-prod's `--resume` selects the checkpoint with the largest numeric suffix,
 passes that exact path together with SPINE's strict `--resume` flag, reuses
 `weights/snapshot` as the checkpoint prefix, and writes a new
-`train_log-<start>.csv` segment beside the old log. SPINE v0.17.0 restores all
+`train_log-<start>.csv` segment beside the old log. SPINE v1.0.0 restores all
 available optimizer, scheduler, epoch, RNG, and loader continuation state;
 missing state required by strict resume is an error. SPINE's `TrainDrawer`
 concatenates the log segments. To roll back intentionally, use
@@ -452,7 +453,7 @@ live under `tensorboard/validation/<name>/`. Validation identity includes the
 configuration digest; changing a suite's configuration requires a new name or
 an explicit `--rerun-validation`.
 
-With SPINE v0.17.0, the primary validation configured alongside `train` needs
+With SPINE v1.0.0, the primary validation configured alongside `train` needs
 only the training command. Standalone validation remains useful for legacy
 runs, alternate datasets, and checkpoints produced without integrated
 validation or after changing the validation policy.

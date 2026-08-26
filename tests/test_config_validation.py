@@ -22,6 +22,7 @@ To run tests:
 To add a new detector for testing, add it to DETECTOR_BASE_CONFIGS dict.
 """
 
+import os
 import re
 import warnings
 from contextlib import contextmanager
@@ -85,6 +86,25 @@ def test_training_configs_use_canonical_top_level_train(config_path):
         config = yaml.load(config_file, Loader=yaml.BaseLoader)
 
     assert "train" not in config.get("base", {})
+
+
+def test_default_uresnet_matches_generic_full_chain():
+    """The shared UResNet definition must match the generic full chain."""
+    network_path = CONFIG_ROOT / "model" / "uresnet" / "network.yaml"
+    loss_path = CONFIG_ROOT / "model" / "uresnet" / "loss.yaml"
+    full_chain_path = CONFIG_INFER_ROOT / "generic" / "model" / "model_common.yaml"
+
+    with open(network_path, "r", encoding="utf-8") as config_file:
+        network = yaml.safe_load(config_file)
+    with open(loss_path, "r", encoding="utf-8") as config_file:
+        loss = yaml.safe_load(config_file)
+    with open(full_chain_path, "r", encoding="utf-8") as config_file:
+        full_chain = yaml.safe_load(config_file)
+
+    network.pop("__meta__")
+    loss.pop("__meta__")
+    assert network == full_chain["model"]["modules"]["uresnet_ppn"]["uresnet"]
+    assert loss == full_chain["model"]["modules"]["uresnet_ppn_loss"]["uresnet_loss"]
 
 
 @pytest.mark.parametrize("config_path", COMPOSITE_CONFIGS, ids=lambda path: str(path))
@@ -155,6 +175,7 @@ def load_config_with_includes(config_path):
 
     # Mock download_from_url at the point where it's used in the loader
     with (
+        patch.dict(os.environ, {"SPINE_CONFIG_PATH": str(CONFIG_ROOT)}),
         patch("spine.config.loader.download_from_url") as mock_download,
         warnings.catch_warnings(),
     ):

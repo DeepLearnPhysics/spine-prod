@@ -15,6 +15,7 @@ The configurations in this directory are used to:
 The currently populated configuration trees are:
 
 - **`config/`**: Legacy component and full-chain `.cfg` training recipes
+- **`generic/`**: YAML benchmark recipes for the generic dataset
 - **`icarus/`**: YAML training configurations for ICARUS
 
 The `dune10kt-1x2x6/` directory is reserved for future checked-in DUNE 10 kt training configurations and is not currently populated.
@@ -30,7 +31,7 @@ Training configurations typically include:
 - **Augmentation**: Data augmentation strategies
 - **Validation**: Validation datasets and metrics
 
-SPINE v0.17.0 uses a top-level `train` block and an optional sibling
+SPINE v1.0.0 uses a top-level `train` block and an optional sibling
 `validation` block. Integrated validation at checkpoint boundaries is
 recommended for new training productions because it records the validation
 metrics with the training process and supports early stopping and stable best
@@ -46,19 +47,23 @@ Training configurations are submitted as persistent named runs:
 
 ```bash
 # Basic training
-./submit.py -c config/train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default
+./submit.py -c config/train/generic/uresnet.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default \
+  --set io.loader.dataset.file_keys=/path/to/train_file_list.txt \
+  --set validation.file_keys=/path/to/validation_file_list.txt
 
 # Multi-GPU training
-./submit.py -c config/train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default --gpus 4
+./submit.py -c config/train/generic/uresnet.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default --gpus 4 \
+  --set io.loader.dataset.file_keys=/path/to/train_file_list.txt \
+  --set validation.file_keys=/path/to/validation_file_list.txt
 
 # Strictly resume complete training state from the latest checkpoint
-./submit.py -c config/train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default --resume
+./submit.py -c config/train/generic/uresnet.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default --resume
 ```
 
-spine-prod selects the latest numeric checkpoint, verifies its SPINE v0.17.0
+spine-prod selects the latest numeric checkpoint, verifies its SPINE
 checksum sidecar when present, and forwards SPINE's explicit `--resume` flag.
 Legacy checkpoints without checksum sidecars remain supported. Use
 `--resume-from RUN_DIR/weights/snapshot-N.ckpt` for an intentional rollback.
