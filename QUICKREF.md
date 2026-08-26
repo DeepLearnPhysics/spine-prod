@@ -7,7 +7,8 @@ recorded in `DEFAULT_SPINE_VERSION`; `configure.sh` exports
 `SPINE_CONTAINER_VERSION` from that value and derives the registry tag and
 default S3DF `.sif` path. The container provides SPINE, OpT0Finder, and runtime
 dependencies; batch jobs invoke the `spine` executable from inside the
-container. The current default is SPINE v0.17.1.
+container. The current default is SPINE v1.0.0; maintained configurations
+require SPINE v1.0.0 or later.
 
 ## Common Commands
 
@@ -78,7 +79,7 @@ container. The current default is SPINE v0.17.1.
 ./submit.py --config config/train/icarus/deghost/deghost.yaml \
   --stage train --run-dir /path/to/experiments/deghost/default --resume
 
-# Resume verifies a v0.17.0 checksum sidecar when present; legacy checkpoints
+# Resume verifies the SPINE checkpoint checksum sidecar when present; legacy checkpoints
 # without sidecars remain supported.
 
 # Validate only checkpoints without complete validation logs
