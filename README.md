@@ -29,8 +29,8 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v1.0.0. Maintained configurations require SPINE
-v1.0.0 or later.
+The current default is SPINE v1.0.2. Maintained configurations require SPINE
+v1.0.2 or later.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
@@ -318,8 +318,9 @@ logs, TensorBoard events, and submission records remain associated.
 The training configuration owns the model, data loader, optimizer, total epoch
 count, checkpoint interval, and optional on-the-fly validation. SPINE v1.0.0
 uses a top-level `train` block and an optional sibling `validation` block;
-spine-prod owns artifact locations. Inputs for training and validation must be
-configured in SPINE rather than passed through `--source` or `--source-list`.
+spine-prod owns artifact locations. Inputs may remain in the configuration or
+be supplied at submission time with `--source`/`--source-list` for training and
+`--val-source`/`--val-source-list` for integrated validation.
 
 For a new production, running validation in the training process is the
 recommended strategy. It evaluates the live model at checkpoint boundaries,
@@ -356,7 +357,8 @@ validation:
   --run-dir /path/to/experiments/deghost/default \
   --profile nersc_gpu_exclusive \
   --tensorboard \
-  --set io.loader.dataset.file_keys=/path/to/train_file_list.txt
+  --source-list /path/to/train_file_list.txt \
+  --val-source-list /path/to/validation_file_list.txt
 ```
 
 A new training run refuses to use a nonempty directory. Its artifact layout is:

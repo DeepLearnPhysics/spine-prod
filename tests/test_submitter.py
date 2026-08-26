@@ -1370,18 +1370,86 @@ class TestBatchSpineOverride:
                 config="config/train/icarus/deghost/deghost.yaml", **kwargs
             )
 
-    def test_submit_job_rejects_explicit_training_sources(
+    def test_submit_job_forwards_explicit_training_sources(
         self, mock_submitter, tmp_path
     ):
-        """Test persistent training uses the loader configured by SPINE."""
-        source = tmp_path / "input.root"
+        """Training sources are normalized into persistent submission manifests."""
+        train_source = tmp_path / "train.root"
+        validation_source = tmp_path / "validation.root"
+        train_source.touch()
+        validation_source.touch()
+        run_dir = tmp_path / "run"
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            assert mock_submitter.submit_job(
+                config="config/train/icarus/deghost/deghost.yaml",
+                files=[str(train_source)],
+                validation_files=[str(validation_source)],
+                stage="train",
+                run_dir=str(run_dir),
+            ) == ["train"]
+
+        submission = next(run_dir.glob("submissions/train/*"))
+        train_manifest = submission / "inputs.txt"
+        validation_manifest = submission / "validation_inputs.txt"
+        assert train_manifest.read_text().splitlines() == [str(train_source)]
+        assert validation_manifest.read_text().splitlines() == [str(validation_source)]
+
+        script = (submission / "submit.sbatch").read_text(encoding="utf-8")
+        assert f"--source-list {train_manifest}" in script
+        assert f"--val-source-list {validation_manifest}" in script
+        assert "#SBATCH --array=" not in script
+        assert not (run_dir / "tasks").exists()
+
+        metadata = json.loads((submission / "job_metadata.json").read_text())
+        assert metadata["source_manifest"] == str(train_manifest)
+        assert metadata["validation_source_manifest"] == str(validation_manifest)
+
+    def test_submit_job_rejects_validation_sources_outside_training(
+        self, mock_submitter, tmp_path
+    ):
+        """Checkpoint-bound validation sources apply only to training runs."""
+        source = tmp_path / "validation.root"
         source.touch()
-        with pytest.raises(ValueError, match="not supported for train"):
+        with pytest.raises(ValueError, match="valid only for training"):
+            mock_submitter.submit_job(
+                config="config/infer/generic/full_chain_240718.yaml",
+                validation_files=[str(source)],
+            )
+
+    def test_submit_job_rejects_empty_validation_sources(
+        self, mock_submitter, tmp_path
+    ):
+        """Training validation sources must resolve to at least one file."""
+        missing_source = tmp_path / "missing.root"
+        with pytest.raises(ValueError, match="No validation input files found"):
+            mock_submitter.submit_job(
+                config="config/train/icarus/deghost/deghost.yaml",
+                validation_files=[str(missing_source)],
+                stage="train",
+                run_dir=str(tmp_path / "run"),
+            )
+
+    def test_submit_job_rejects_training_source_splitting(
+        self, mock_submitter, tmp_path
+    ):
+        """Training datasets must not be split into independent array jobs."""
+        source = tmp_path / "train.root"
+        source.touch()
+        with pytest.raises(ValueError, match="valid only for inference"):
             mock_submitter.submit_job(
                 config="config/train/icarus/deghost/deghost.yaml",
                 files=[str(source)],
                 stage="train",
                 run_dir=str(tmp_path / "run"),
+                files_per_task=1,
             )
 
     def test_submit_job_rejects_nonempty_explicit_inference_run(

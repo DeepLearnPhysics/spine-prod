@@ -98,6 +98,19 @@ Examples:
         help="Text file containing input file paths (one per line)",
     )
 
+    # Validation inputs for checkpoint-bound validation during training
+    val_source_group = parser.add_mutually_exclusive_group()
+    val_source_group.add_argument(
+        "--val-source",
+        nargs="+",
+        help="Validation input files or glob patterns",
+    )
+    val_source_group.add_argument(
+        "--val-source-list",
+        nargs=1,
+        help="Text file containing validation input paths (one per line)",
+    )
+
     # Configuration modifiers
     parser.add_argument(
         "--apply-mods",
@@ -383,6 +396,14 @@ Examples:
         parser.error("run lifecycle options are currently supported in batch mode only")
     if args.pipeline and lifecycle_options:
         parser.error("run lifecycle options must be specified within a pipeline stage")
+    if args.interactive and (args.val_source or args.val_source_list):
+        parser.error(
+            "validation source options are currently supported in batch mode only"
+        )
+    if args.pipeline and (args.val_source or args.val_source_list):
+        parser.error(
+            "validation source options must be specified within a pipeline stage"
+        )
 
     # Build profile overrides
     profile_overrides = {}
@@ -447,11 +468,17 @@ Examples:
             # Determine which source type was provided
             files = args.source if args.source else args.source_list
             source_type = "source" if args.source else "source_list"
+            validation_files = (
+                args.val_source if args.val_source else args.val_source_list
+            )
+            validation_source_type = "source" if args.val_source else "source_list"
 
             job_ids = submitter.submit_job(
                 config=args.config,
                 files=files,
                 source_type=source_type,
+                validation_files=validation_files,
+                validation_source_type=validation_source_type,
                 profile=args.profile,
                 job_name=args.job_name,
                 output=args.output,
