@@ -12,9 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   training benchmark with integrated validation.
 - Added first-class training and validation source forwarding through
   `--source`/`--source-list` and `--val-source`/`--val-source-list`.
+- Added first-class forwarding for SPINE runtime resource and duration options.
 
 ### Changed
-- Updated the minimum/default SPINE runtime to v1.0.2.
+- Updated the minimum/default SPINE runtime to v1.0.4.
+- Replaced generic TensorBoard `--set` overrides with SPINE's native
+  `--tensorboard` and `--tensorboard-dir` options.
+- Aligned SPINE world size with the effective scheduler GPU allocation and
+  rejected conflicting explicit process counts.
 
 ### Fixed
 - Made `train/...` and other configuration paths resolve relative to the

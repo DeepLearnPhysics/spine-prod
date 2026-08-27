@@ -101,8 +101,16 @@ def test_interactive_mode_forwards_runtime_options():
         "3",
         "--interactive-runtime",
         "container",
+        "--world-size",
+        "4",
+        "--minibatch-size",
+        "2",
+        "--num-workers",
+        "8",
+        "--epochs",
+        "25",
         "--set",
-        "base.world_size=0",
+        "model.detect_anomaly=true",
         submitter=submitter,
     )
 
@@ -113,7 +121,11 @@ def test_interactive_mode_forwards_runtime_options():
     assert kwargs["source_type"] == "source_list"
     assert kwargs["task_id"] == 3
     assert kwargs["interactive_runtime"] == "container"
-    assert kwargs["set_overrides"] == ["base.world_size=0"]
+    assert kwargs["world_size"] == 4
+    assert kwargs["minibatch_size"] == 2
+    assert kwargs["num_workers"] == 8
+    assert kwargs["epochs"] == 25
+    assert kwargs["set_overrides"] == ["model.detect_anomaly=true"]
 
 
 def test_batch_mode_forwards_profile_overrides(capsys):
@@ -132,6 +144,10 @@ def test_batch_mode_forwards_profile_overrides(capsys):
         "4",
         "--bind-paths",
         "/data,/scratch",
+        "--batch-size",
+        "16",
+        "--iterations",
+        "100",
         submitter=submitter,
     )
 
@@ -143,6 +159,8 @@ def test_batch_mode_forwards_profile_overrides(capsys):
     assert kwargs["partition"] == "gpu"
     assert kwargs["gpus_per_node"] == 4
     assert kwargs["bind_paths"] == "/data,/scratch"
+    assert kwargs["batch_size"] == 16
+    assert kwargs["iterations"] == 100
     assert "Submitted job IDs: 123, 124" in capsys.readouterr().out
 
 

@@ -182,6 +182,11 @@ class Submitter:
                 raise ValueError(
                     f"Invalid --set override '{override}'. Expected KEY=VALUE."
                 )
+            if override.split("=", 1)[0].strip() == "base.world_size":
+                raise ValueError(
+                    "base.world_size is managed from the GPU allocation; "
+                    "use --world-size only as a matching assertion"
+                )
             if any(char.isspace() for char in override) or any(
                 char in override for char in ("'", '"')
             ):
@@ -192,6 +197,53 @@ class Submitter:
             formatted.append(f"--set {override}")
 
         return " ".join(formatted)
+
+    @staticmethod
+    def _format_spine_runtime_options(
+        world_size: Optional[int] = None,
+        batch_size: Optional[int] = None,
+        minibatch_size: Optional[int] = None,
+        num_workers: Optional[int] = None,
+        epochs: Optional[float] = None,
+        iterations: Optional[int] = None,
+    ) -> str:
+        """Format first-class SPINE runtime CLI overrides."""
+        options = [
+            ("--world-size", world_size),
+            ("--batch-size", batch_size),
+            ("--minibatch-size", minibatch_size),
+            ("--num-workers", num_workers),
+            ("--epochs", epochs),
+            ("--iterations", iterations),
+        ]
+        return " ".join(
+            f"{flag} {value}" for flag, value in options if value is not None
+        )
+
+    @staticmethod
+    def _align_world_size(
+        profile_config: Dict, requested_world_size: Optional[int]
+    ) -> Optional[int]:
+        """Align SPINE process count with the scheduler GPU allocation."""
+        site = profile_config.get("site", "s3df")
+        if site == "s3df" and "gpus" in profile_config:
+            allocated_gpus = int(profile_config["gpus"])
+        elif site != "s3df" and "gpus_per_node" in profile_config:
+            nodes = int(profile_config.get("nodes", 1))
+            if nodes != 1:
+                raise ValueError(
+                    "Multi-node GPU submissions are not supported; use a single node"
+                )
+            allocated_gpus = int(profile_config["gpus_per_node"])
+        else:
+            return requested_world_size
+
+        if requested_world_size is not None and requested_world_size != allocated_gpus:
+            raise ValueError(
+                f"--world-size {requested_world_size} conflicts with the "
+                f"scheduler allocation of {allocated_gpus} GPU(s)"
+            )
+        return allocated_gpus
 
     @staticmethod
     def _default_writer_output_settings(
@@ -463,6 +515,12 @@ class Submitter:
         apply_mods: Optional[List[str]] = None,
         preload: bool = False,
         set_overrides: Optional[List[str]] = None,
+        world_size: Optional[int] = None,
+        batch_size: Optional[int] = None,
+        minibatch_size: Optional[int] = None,
+        num_workers: Optional[int] = None,
+        epochs: Optional[float] = None,
+        iterations: Optional[int] = None,
         interactive_runtime: str = "auto",
         bind_paths: Optional[str] = None,
         spine_path: Optional[str] = None,
@@ -510,6 +568,18 @@ class Submitter:
             Preload !download assets before execution, by default False
         set_overrides : List[str], optional
             SPINE config overrides in KEY=VALUE form, passed as ``--set``.
+        world_size : int, optional
+            Number of local SPINE processes/devices.
+        batch_size : int, optional
+            Global SPINE data-loader batch size.
+        minibatch_size : int, optional
+            Per-process/GPU SPINE data-loader batch size.
+        num_workers : int, optional
+            Number of SPINE data-loader workers.
+        epochs : float, optional
+            Number of SPINE training epochs.
+        iterations : int, optional
+            Number of SPINE driver iterations.
         interactive_runtime : str, optional
             Runtime for interactive execution: 'auto', 'local', or 'container'.
         bind_paths : str, optional
@@ -646,6 +716,14 @@ class Submitter:
             else ""
         )
         spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
+        spine_runtime_options = self._format_spine_runtime_options(
+            world_size,
+            batch_size,
+            minibatch_size,
+            num_workers,
+            epochs,
+            iterations,
+        )
         local_spine_cmd, extra_bind_root = self._resolve_spine_command(spine_path)
         extra_bind_roots = [
             root
@@ -661,8 +739,11 @@ class Submitter:
             [output_args, "-c", str(config), "--log-dir", str(log_dir)]
         )
         spine_cmd = " ".join(part for part in spine_cmd_parts if part)
-        if spine_cli_overrides:
-            spine_cmd = f"{spine_cmd} {spine_cli_overrides}"
+        spine_options = " ".join(
+            part for part in [spine_runtime_options, spine_cli_overrides] if part
+        )
+        if spine_options:
+            spine_cmd = f"{spine_cmd} {spine_options}"
         cmd_parts.append(spine_cmd)
 
         # Join with && for proper sequencing
@@ -727,6 +808,12 @@ class Submitter:
         dry_run: bool = False,
         preload: bool = False,
         set_overrides: Optional[List[str]] = None,
+        world_size: Optional[int] = None,
+        batch_size: Optional[int] = None,
+        minibatch_size: Optional[int] = None,
+        num_workers: Optional[int] = None,
+        epochs: Optional[float] = None,
+        iterations: Optional[int] = None,
         spine_path: Optional[str] = None,
         stage: str = "inference",
         run_dir: Optional[str] = None,
@@ -790,6 +877,18 @@ class Submitter:
             Preload !download assets before submitting, by default False
         set_overrides : List[str], optional
             SPINE config overrides in KEY=VALUE form, passed as ``--set``.
+        world_size : int, optional
+            Number of local SPINE processes/devices.
+        batch_size : int, optional
+            Global SPINE data-loader batch size.
+        minibatch_size : int, optional
+            Per-process/GPU SPINE data-loader batch size.
+        num_workers : int, optional
+            Number of SPINE data-loader workers.
+        epochs : float, optional
+            Number of SPINE training epochs.
+        iterations : int, optional
+            Number of SPINE driver iterations.
         spine_path : str, optional
             Override the SPINE executable with a checkout directory or an
             explicit executable path.
@@ -926,7 +1025,21 @@ class Submitter:
 
         # Detect detector and get profile
         profile_config = self.config_mgr.get_profile(profile, detector)
+        site = profile_config.get("site", "s3df")
+        if site == "s3df" and "gpus_per_node" in profile_overrides:
+            raise ValueError("--gpus-per-node is not valid for S3DF profiles")
+        if site != "s3df" and "gpus" in profile_overrides:
+            raise ValueError(f"--gpus is not valid for {site.upper()} profiles")
         profile_config.update(profile_overrides)
+        world_size = self._align_world_size(profile_config, world_size)
+        spine_runtime_options = self._format_spine_runtime_options(
+            world_size,
+            batch_size,
+            minibatch_size,
+            num_workers,
+            epochs,
+            iterations,
+        )
         extra_bind_roots = [
             root
             for root in [larcv_bind_root, flashmatch_bind_root, extra_bind_root]
@@ -973,11 +1086,9 @@ class Submitter:
             if tensorboard:
                 lifecycle_args.extend(
                     [
-                        "--set",
-                        "base.tensorboard={}",
-                        "--set",
-                        "base.tensorboard.log_dir="
-                        + str(job_dir / "tensorboard" / "train"),
+                        "--tensorboard",
+                        "--tensorboard-dir",
+                        shlex.quote(str(job_dir / "tensorboard" / "train")),
                     ]
                 )
         elif stage == "validation":
@@ -1008,10 +1119,9 @@ class Submitter:
                     tensorboard_dir /= validation_name
                 lifecycle_args.extend(
                     [
-                        "--set",
-                        "base.tensorboard={}",
-                        "--set",
-                        f"base.tensorboard.log_dir={tensorboard_dir}",
+                        "--tensorboard",
+                        "--tensorboard-dir",
+                        shlex.quote(str(tensorboard_dir)),
                     ]
                 )
 
@@ -1036,11 +1146,12 @@ class Submitter:
                 ]
             )
 
-        if lifecycle_args:
-            extra_args = " ".join(lifecycle_args)
-            spine_cli_overrides = " ".join(
-                part for part in [spine_cli_overrides, extra_args] if part
-            )
+        extra_args = " ".join(lifecycle_args)
+        spine_cli_overrides = " ".join(
+            part
+            for part in [spine_runtime_options, spine_cli_overrides, extra_args]
+            if part
+        )
 
         output_dir, output_suffix = self._default_writer_output_settings(
             job_dir, config, output_suffix
@@ -1194,6 +1305,12 @@ class Submitter:
             "original_config": original_config if apply_mods else config,
             "applied_modifiers": apply_mods or [],
             "set_overrides": set_overrides or [],
+            "world_size": world_size,
+            "batch_size": batch_size,
+            "minibatch_size": minibatch_size,
+            "num_workers": num_workers,
+            "epochs": epochs,
+            "iterations": iterations,
             "source_type": source_type if files else None,
             "source_inputs": files or [],
             "source_manifest": str(input_manifest) if input_manifest else None,
@@ -1321,6 +1438,12 @@ class Submitter:
                 validation_name=stage.get("validation_name"),
                 rerun_validation=stage.get("rerun_validation", False),
                 tensorboard=stage.get("tensorboard", False),
+                world_size=stage.get("world_size"),
+                batch_size=stage.get("batch_size"),
+                minibatch_size=stage.get("minibatch_size"),
+                num_workers=stage.get("num_workers"),
+                epochs=stage.get("epochs"),
+                iterations=stage.get("iterations"),
             )
 
             job_map[stage_name] = job_ids

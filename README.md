@@ -29,8 +29,8 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v1.0.2. Maintained configurations require SPINE
-v1.0.2 or later.
+The current default is SPINE v1.0.4. Maintained configurations require SPINE
+v1.0.4 or later.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
@@ -79,7 +79,7 @@ echo x.y.z > DEFAULT_SPINE_VERSION
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
 # Start a persistent training run using the loader defined in the config
-./submit.py --config config/train/icarus/deghost/deghost.yaml \
+./submit.py --config train/icarus/deghost/deghost.yaml \
   --stage train --run-dir /path/to/experiments/deghost/default
 
 # Run a multi-stage pipeline
@@ -109,7 +109,7 @@ Interactive mode performs all the same config composition, file chunking, and en
 ./submit.py -I --config infer/icarus/latest --source /path/to/test.root
 
 # Force container-backed interactive execution
-./submit.py -I --interactive-runtime container --config infer/generic/latest --source test.root --set base.world_size=0
+./submit.py -I --interactive-runtime container --config infer/generic/latest --source test.root --world-size 0
 
 # Test with modifiers applied
 ./submit.py -I --config infer/icarus/latest --source test.root --apply-mods data lite
@@ -133,7 +133,7 @@ instead of the `spine` executable on `PATH`. The checkout root is added to
 container bind paths automatically where supported.
 
 ```bash
-./submit.py --spine-path /path/to/spine -I --interactive-runtime local --config infer/generic/latest --source test.root --set base.world_size=0
+./submit.py --spine-path /path/to/spine -I --interactive-runtime local --config infer/generic/latest --source test.root --world-size 0
 ```
 
 ### EAF Interactive Container Setup
@@ -283,6 +283,11 @@ Profile allocations are designed to:
 
 Profiles are auto-detected based on detector and config, or can be specified explicitly:
 
+For batch jobs, spine-prod derives SPINE's world size from the effective GPU
+allocation after applying profile overrides. For example, `--gpus 4` both
+requests four GPUs and launches four SPINE processes. `--world-size` is an
+optional assertion and is rejected when it disagrees with the allocation.
+
 ```bash
 # Auto-detect (default)
 ./submit.py --config infer/icarus/latest --source data.root
@@ -297,7 +302,7 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 ./submit.py --config infer/icarus/latest --source data.root --time 2:00:00 --cpus-per-task 8
 
 # Override SPINE configuration values at runtime
-./submit.py --config infer/generic/latest --source data.root --set base.world_size=0
+./submit.py --config infer/generic/latest --source data.root --batch-size 1
 
 # Preload model weights on the submit host before submitting
 ./submit.py --config infer/2x2/full_chain_240819.yaml --source data.root --profile anl_polaris_debug --preload
@@ -352,7 +357,7 @@ validation:
 
 ```bash
 ./submit.py \
-  --config config/train/icarus/deghost/deghost.yaml \
+  --config train/icarus/deghost/deghost.yaml \
   --stage train \
   --run-dir /path/to/experiments/deghost/default \
   --profile nersc_gpu_exclusive \
@@ -392,7 +397,7 @@ If training is interrupted, resume the same run explicitly:
 
 ```bash
 ./submit.py \
-  --config config/train/icarus/deghost/deghost.yaml \
+  --config train/icarus/deghost/deghost.yaml \
   --stage train \
   --run-dir /path/to/experiments/deghost/default \
   --profile nersc_gpu_exclusive \
@@ -416,7 +421,7 @@ verification.
 
 The configured epoch count remains the total target, not a number of additional
 epochs. To extend a run without changing the stored configuration file, pass a
-runtime override such as `--set base.epochs=400` when resuming.
+runtime override such as `--epochs 400` when resuming.
 
 ### Run Validation Independently
 
