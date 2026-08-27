@@ -1531,8 +1531,11 @@ class TestBatchSpineOverride:
         first_text = first_script.read_text(encoding="utf-8")
         assert f"--log-dir {run_dir}" in first_text
         assert f"--weight-prefix {run_dir}/weights/snapshot" in first_text
-        assert "base.tensorboard=" in first_text
-        assert f"{run_dir}/tensorboard/train" in first_text
+        assert (
+            "--set base.tensorboard={} "
+            f"--set base.tensorboard.log_dir={run_dir}/tensorboard/train"
+        ) in first_text
+        assert "base.tensorboard={log_dir:" not in first_text
         assert (run_dir / "run_metadata.json").is_file()
 
         saved = run_dir / "weights" / "snapshot-99999.ckpt"
@@ -1604,8 +1607,10 @@ class TestBatchSpineOverride:
         assert f"--log-dir {run_dir}" in script
         assert f"--weight-list {submission}/weights.txt" in script
         assert "model.weight_path=null" in script
-        assert "base.tensorboard=" in script
-        assert f"{run_dir}/tensorboard/validation" in script
+        assert (
+            "--set base.tensorboard={} "
+            f"--set base.tensorboard.log_dir={run_dir}/tensorboard/validation"
+        ) in script
 
         (run_dir / "inference_log-0000020.csv").write_text(
             "iter,loss\n0,1\n", encoding="utf-8"
@@ -1656,8 +1661,10 @@ class TestBatchSpineOverride:
         script = (submission / "submit.sbatch").read_text(encoding="utf-8")
         assert f"--log-dir {run_dir}/validation/data" in script
         assert "base.overwrite_log=true" in script
-        assert "base.tensorboard=" in script
-        assert f"{run_dir}/tensorboard/validation/data" in script
+        assert (
+            "--set base.tensorboard={} "
+            f"--set base.tensorboard.log_dir={run_dir}/tensorboard/validation/data"
+        ) in script
 
     def test_submit_job_rejects_missing_explicit_inputs(self, mock_submitter, tmp_path):
         with pytest.raises(ValueError, match="No input files found"):
