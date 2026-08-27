@@ -971,13 +971,13 @@ class Submitter:
                 )
                 lifecycle_args.append("--resume")
             if tensorboard:
-                tensorboard_cfg = (
-                    "{log_dir: " + str(job_dir / "tensorboard" / "train") + "}"
-                )
                 lifecycle_args.extend(
                     [
                         "--set",
-                        shlex.quote(f"base.tensorboard={tensorboard_cfg}"),
+                        "base.tensorboard={}",
+                        "--set",
+                        "base.tensorboard.log_dir="
+                        + str(job_dir / "tensorboard" / "train"),
                     ]
                 )
         elif stage == "validation":
@@ -1006,11 +1006,12 @@ class Submitter:
                 tensorboard_dir = job_dir / "tensorboard" / "validation"
                 if validation_name:
                     tensorboard_dir /= validation_name
-                tensorboard_cfg = "{log_dir: " + str(tensorboard_dir) + "}"
                 lifecycle_args.extend(
                     [
                         "--set",
-                        shlex.quote(f"base.tensorboard={tensorboard_cfg}"),
+                        "base.tensorboard={}",
+                        "--set",
+                        f"base.tensorboard.log_dir={tensorboard_dir}",
                     ]
                 )
 

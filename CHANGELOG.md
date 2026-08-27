@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   structure while continuing to reject material pre-existing content.
 - Avoided creating the default `runs/` directory when an explicit run directory
   means it will not be used.
+- Fixed lifecycle-generated TensorBoard overrides being split by the scheduler
+  shell before reaching SPINE.
 
 ## [0.8.3] - 2026-08-20
 
