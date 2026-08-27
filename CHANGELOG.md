@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   means it will not be used.
 - Fixed lifecycle-generated TensorBoard overrides being split by the scheduler
   shell before reaching SPINE.
+- Made re-sourcing `configure.sh` refresh automatically derived container
+  version, tag, and path values without replacing explicit user overrides.
 
 ## [0.8.3] - 2026-08-20
 
