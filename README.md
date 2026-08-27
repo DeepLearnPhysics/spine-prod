@@ -42,9 +42,12 @@ source configure.sh
 
 **Updating SPINE Version:** Update the repository default in
 `DEFAULT_SPINE_VERSION`. The default S3DF image path is derived automatically
-as `/sdf/data/neutrino/images/spine_v<version-with-dashes>.sif`.
+as `/sdf/data/neutrino/images/spine_v<version-with-dashes>.sif`. Re-source
+`configure.sh` after changing the file; automatically derived version, tag, and
+path values refresh together, while explicit overrides remain unchanged.
 ```bash
 echo x.y.z > DEFAULT_SPINE_VERSION
+source configure.sh
 ```
 
 ### 2. Basic Job Submission
@@ -816,7 +819,9 @@ Set by `configure.sh`:
 - `SPINE_CONTAINER_VERSION` - Tagged SPINE container version
 - `SPINE_CONTAINER_PATH` - Singularity/Apptainer image path
 - `SPINE_CONTAINER_TAG` - Registry image tag for Shifter-style runtimes, including `docker:`
+- `SPINE_CONTAINER_VERSION_AUTO` - Tracks whether the version follows the repository default
 - `SPINE_CONTAINER_PATH_AUTO` - Tracks whether `SPINE_CONTAINER_PATH` was auto-derived
+- `SPINE_CONTAINER_TAG_AUTO` - Tracks whether the registry tag was auto-derived
 - `SPINE_CONTAINER_RUNTIME_BIN` - Optional full path or command name for the Singularity/Apptainer executable used by interactive SIF execution
 - `SPINE_CONTAINER_RUNTIME_ARGS` - Optional extra Singularity/Apptainer arguments for interactive SIF execution
 - `SPINE_CONTAINER_PLATFORM` - Docker/Podman platform for interactive fallback

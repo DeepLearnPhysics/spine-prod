@@ -17,27 +17,49 @@ elif [[ :$SPINE_CONFIG_PATH: != *:$SPINE_PROD_CONFIG_PATH:* ]]; then
     export SPINE_CONFIG_PATH=$SPINE_PROD_CONFIG_PATH:$SPINE_CONFIG_PATH
 fi
 
-# Define the SPINE container release used by production jobs.
-if [[ -z $SPINE_CONTAINER_VERSION ]]; then
-    export SPINE_CONTAINER_VERSION=$(<"$SPINE_PROD_BASEDIR/DEFAULT_SPINE_VERSION")
+# Define the SPINE container release used by production jobs. Automatically
+# generated values refresh when the repository default changes, while values
+# modified by the user after configuration are preserved as explicit overrides.
+DEFAULT_CONTAINER_VERSION=$(<"$SPINE_PROD_BASEDIR/DEFAULT_SPINE_VERSION")
+if [[ -z ${SPINE_CONTAINER_VERSION:-} || \
+      ( ${SPINE_CONTAINER_VERSION_AUTO:-0} == 1 && \
+        ${SPINE_CONTAINER_VERSION:-} == ${SPINE_CONTAINER_VERSION_AUTO_VALUE:-} ) ]]; then
+    export SPINE_CONTAINER_VERSION=$DEFAULT_CONTAINER_VERSION
+    export SPINE_CONTAINER_VERSION_AUTO=1
+    export SPINE_CONTAINER_VERSION_AUTO_VALUE=$SPINE_CONTAINER_VERSION
+else
+    export SPINE_CONTAINER_VERSION_AUTO=0
+    unset SPINE_CONTAINER_VERSION_AUTO_VALUE
 fi
 
 # Define path to the container (Singularity/Apptainer .sif file)
 SPINE_CONTAINER_PATH_VERSION=${SPINE_CONTAINER_VERSION#v}
 SPINE_CONTAINER_PATH_VERSION=${SPINE_CONTAINER_PATH_VERSION//./-}
 DEFAULT_CONTAINER_PATH=/sdf/data/neutrino/images/spine_v${SPINE_CONTAINER_PATH_VERSION}.sif
-if [[ -z $SPINE_CONTAINER_PATH || ${SPINE_CONTAINER_PATH_AUTO:-0} == 1 ]]; then
+if [[ -z ${SPINE_CONTAINER_PATH:-} || \
+      ( ${SPINE_CONTAINER_PATH_AUTO:-0} == 1 && \
+        ( -z ${SPINE_CONTAINER_PATH_AUTO_VALUE:-} || \
+          ${SPINE_CONTAINER_PATH:-} == ${SPINE_CONTAINER_PATH_AUTO_VALUE:-} ) ) ]]; then
     export SPINE_CONTAINER_PATH=$DEFAULT_CONTAINER_PATH
     export SPINE_CONTAINER_PATH_AUTO=1
+    export SPINE_CONTAINER_PATH_AUTO_VALUE=$SPINE_CONTAINER_PATH
 else
     export SPINE_CONTAINER_PATH_AUTO=0
+    unset SPINE_CONTAINER_PATH_AUTO_VALUE
 fi
 
 # Define container tag (Shifter image tag for NERSC or local docker execution)
 SPINE_CONTAINER_REGISTRY_VERSION=${SPINE_CONTAINER_VERSION#v}
 DEFAULT_CONTAINER_TAG=docker:ghcr.io/deeplearnphysics/spine:${SPINE_CONTAINER_REGISTRY_VERSION}
-if [[ -z $SPINE_CONTAINER_TAG ]]; then
+if [[ -z ${SPINE_CONTAINER_TAG:-} || \
+      ( ${SPINE_CONTAINER_TAG_AUTO:-0} == 1 && \
+        ${SPINE_CONTAINER_TAG:-} == ${SPINE_CONTAINER_TAG_AUTO_VALUE:-} ) ]]; then
     export SPINE_CONTAINER_TAG=$DEFAULT_CONTAINER_TAG
+    export SPINE_CONTAINER_TAG_AUTO=1
+    export SPINE_CONTAINER_TAG_AUTO_VALUE=$SPINE_CONTAINER_TAG
+else
+    export SPINE_CONTAINER_TAG_AUTO=0
+    unset SPINE_CONTAINER_TAG_AUTO_VALUE
 fi
 
 # If ICARUS_DATA_DIR is not set, default to the standard location on CVMFS.

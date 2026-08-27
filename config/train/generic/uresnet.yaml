@@ -6,7 +6,7 @@ include: model/uresnet/default.yaml
 
 base:
   world_size: 1
-  epochs: 25.0
+  epochs: 50.0
   seed: 0
   unwrap: false
   log_dir: null
