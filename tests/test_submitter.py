@@ -426,6 +426,43 @@ class TestFileChunking:
 class TestSubmitterHelpers:
     """Tests for scheduler, path, and template selection helpers."""
 
+    def test_format_spine_runtime_options(self, mock_submitter):
+        assert mock_submitter._format_spine_runtime_options(
+            world_size=4,
+            batch_size=16,
+            minibatch_size=2,
+            num_workers=8,
+            epochs=25.0,
+            iterations=100,
+        ) == (
+            "--world-size 4 --batch-size 16 --minibatch-size 2 "
+            "--num-workers 8 --epochs 25.0 --iterations 100"
+        )
+        assert mock_submitter._format_spine_runtime_options() == ""
+
+        with pytest.raises(ValueError, match="managed from the GPU allocation"):
+            mock_submitter._format_spine_set_overrides(["base.world_size=4"])
+
+    def test_align_world_size_with_scheduler_gpus(self, mock_submitter):
+        assert mock_submitter._align_world_size({"site": "s3df", "gpus": 4}, None) == 4
+        assert (
+            mock_submitter._align_world_size(
+                {"site": "nersc", "gpus_per_node": 4}, None
+            )
+            == 4
+        )
+        assert mock_submitter._align_world_size({"site": "s3df", "gpus": 0}, None) == 0
+        assert mock_submitter._align_world_size({"site": "custom"}, 2) == 2
+
+        with pytest.raises(ValueError, match="conflicts with the scheduler"):
+            mock_submitter._align_world_size(
+                {"site": "s3df", "gpus": 2}, requested_world_size=4
+            )
+        with pytest.raises(ValueError, match="Multi-node"):
+            mock_submitter._align_world_size(
+                {"site": "anl", "gpus_per_node": 4, "nodes": 2}, None
+            )
+
     def test_classify_config_request_covers_shorthand_and_absolute_paths(
         self, mock_submitter, workspace_root
     ):
@@ -778,7 +815,11 @@ class TestInteractiveExecution:
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
                 files=[str(input_file)],
                 flashmatch=True,
-                set_overrides=["base.world_size=0", "io.loader.batch_size=1"],
+                world_size=1,
+                minibatch_size=2,
+                num_workers=4,
+                iterations=10,
+                set_overrides=["model.detect_anomaly=true"],
                 interactive_runtime="local",
             )
 
@@ -792,8 +833,11 @@ class TestInteractiveExecution:
         assert " -o " not in run.call_args.args[0]
         assert "--output-dir " in run.call_args.args[0]
         assert "--output-suffix full_chain_co_260316" in run.call_args.args[0]
-        assert "--set base.world_size=0" in run.call_args.args[0]
-        assert "--set io.loader.batch_size=1" in run.call_args.args[0]
+        assert "--world-size 1" in run.call_args.args[0]
+        assert "--minibatch-size 2" in run.call_args.args[0]
+        assert "--num-workers 4" in run.call_args.args[0]
+        assert "--iterations 10" in run.call_args.args[0]
+        assert "--set model.detect_anomaly=true" in run.call_args.args[0]
         assert "FMATCH_BASEDIR" not in run.call_args.args[0]
 
     def test_run_interactive_uses_config_inputs_without_writer_overrides(
@@ -989,7 +1033,7 @@ class TestInteractiveExecution:
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
                 files=[str(input_file)],
-                set_overrides=["base.world_size=0"],
+                world_size=0,
             )
 
         assert exit_code == 0
@@ -1000,7 +1044,7 @@ class TestInteractiveExecution:
         assert "ghcr.io/deeplearnphysics/spine:9.8.7" in command
         assert "docker:ghcr" not in command
         assert "spine -S" in command
-        assert "--set base.world_size=0" in command
+        assert "--world-size 0" in command
 
     def test_default_container_version_comes_from_repo_file(
         self, mock_submitter, workspace_root
@@ -1381,6 +1425,27 @@ class TestBatchSpineOverride:
                 config="config/train/icarus/deghost/deghost.yaml", **kwargs
             )
 
+    @pytest.mark.parametrize(
+        ("profile", "kwargs", "message"),
+        [
+            (
+                "s3df_ampere",
+                {"gpus_per_node": 2},
+                "--gpus-per-node is not valid",
+            ),
+            ("nersc_gpu", {"gpus": 2}, "--gpus is not valid"),
+        ],
+    )
+    def test_submit_job_rejects_site_incompatible_gpu_options(
+        self, mock_submitter, profile, kwargs, message
+    ):
+        with pytest.raises(ValueError, match=message):
+            mock_submitter.submit_job(
+                config="infer/generic/full_chain_240718.yaml",
+                profile=profile,
+                **kwargs,
+            )
+
     def test_submit_job_forwards_explicit_training_sources(
         self, mock_submitter, tmp_path
     ):
@@ -1532,10 +1597,9 @@ class TestBatchSpineOverride:
         assert f"--log-dir {run_dir}" in first_text
         assert f"--weight-prefix {run_dir}/weights/snapshot" in first_text
         assert (
-            "--set base.tensorboard={} "
-            f"--set base.tensorboard.log_dir={run_dir}/tensorboard/train"
-        ) in first_text
-        assert "base.tensorboard={log_dir:" not in first_text
+            f"--tensorboard --tensorboard-dir {run_dir}/tensorboard/train" in first_text
+        )
+        assert "base.tensorboard=" not in first_text
         assert (run_dir / "run_metadata.json").is_file()
 
         saved = run_dir / "weights" / "snapshot-99999.ckpt"
@@ -1608,9 +1672,9 @@ class TestBatchSpineOverride:
         assert f"--weight-list {submission}/weights.txt" in script
         assert "model.weight_path=null" in script
         assert (
-            "--set base.tensorboard={} "
-            f"--set base.tensorboard.log_dir={run_dir}/tensorboard/validation"
-        ) in script
+            f"--tensorboard --tensorboard-dir {run_dir}/tensorboard/validation"
+            in script
+        )
 
         (run_dir / "inference_log-0000020.csv").write_text(
             "iter,loss\n0,1\n", encoding="utf-8"
@@ -1662,9 +1726,9 @@ class TestBatchSpineOverride:
         assert f"--log-dir {run_dir}/validation/data" in script
         assert "base.overwrite_log=true" in script
         assert (
-            "--set base.tensorboard={} "
-            f"--set base.tensorboard.log_dir={run_dir}/tensorboard/validation/data"
-        ) in script
+            f"--tensorboard --tensorboard-dir "
+            f"{run_dir}/tensorboard/validation/data" in script
+        )
 
     def test_submit_job_rejects_missing_explicit_inputs(self, mock_submitter, tmp_path):
         with pytest.raises(ValueError, match="No input files found"):
@@ -1704,6 +1768,10 @@ class TestBatchSpineOverride:
                     job_name="custom_job",
                     output=str(output),
                     larcv_path=str(larcv_root),
+                    gpus=4,
+                    batch_size=8,
+                    num_workers=4,
+                    epochs=2.5,
                     dry_run=True,
                 )
                 == []
@@ -1711,6 +1779,13 @@ class TestBatchSpineOverride:
 
         assert output.parent.is_dir()
         assert profile_config["bind_paths"] == f"/existing,{larcv_root}"
+        script = next(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        ).read_text(encoding="utf-8")
+        assert "#SBATCH --gpus=4" in script
+        assert "--world-size 4 --batch-size 8 --num-workers 4 --epochs 2.5" in script
+        metadata_path = next(mock_submitter.jobs_dir.glob("**/job_metadata.json"))
+        assert json.loads(metadata_path.read_text())["world_size"] == 4
 
     def test_submit_job_uses_spine_path_and_merges_bind_root(
         self, mock_submitter, tmp_path

@@ -47,19 +47,23 @@ Training configurations are submitted as persistent named runs:
 
 ```bash
 # Basic training
-./submit.py -c config/train/generic/uresnet.yaml \
+./submit.py -c train/generic/uresnet.yaml \
   --stage train --run-dir /path/to/experiments/uresnet/default \
   --source-list /path/to/train_file_list.txt \
   --val-source-list /path/to/validation_file_list.txt
 
+# --gpus controls both scheduler allocation and SPINE world size. An explicit
+# --world-size is accepted only when it matches the allocated GPU count.
+
 # Multi-GPU training
-./submit.py -c config/train/generic/uresnet.yaml \
-  --stage train --run-dir /path/to/experiments/uresnet/default --gpus 4 \
+./submit.py -c train/generic/uresnet.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default \
+  --gpus 4 \
   --source-list /path/to/train_file_list.txt \
   --val-source-list /path/to/validation_file_list.txt
 
 # Strictly resume complete training state from the latest checkpoint
-./submit.py -c config/train/generic/uresnet.yaml \
+./submit.py -c train/generic/uresnet.yaml \
   --stage train --run-dir /path/to/experiments/uresnet/default --resume
 ```
 

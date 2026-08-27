@@ -47,7 +47,7 @@ Examples:
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source data/*.root --apply-mods data lite
 
   # Override SPINE config values at runtime
-  %(prog)s --config infer/generic/latest --source test.root --set base.world_size=0
+  %(prog)s --config infer/generic/latest --source test.root --batch-size 1
 
   # List available modifiers for a config
   %(prog)s --list-mods infer/icarus/full_chain_co_250625.yaml
@@ -59,8 +59,8 @@ Examples:
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source-list files.txt --files-per-task 5 --ntasks 20
 
   # Start or resume a persistent training run
-  %(prog)s --config config/train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default
-  %(prog)s --config config/train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default --resume
+  %(prog)s --config train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default
+  %(prog)s --config train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default --resume
 
   # Validate only checkpoints missing an associated validation log
   %(prog)s --config /path/to/deghost_val.yaml --stage validation --run-dir /path/to/experiments/deghost/default
@@ -152,6 +152,43 @@ Examples:
             "Files per task. If omitted, all explicit inputs run in one task "
             "unless --ntasks requests an even split"
         ),
+    )
+
+    # First-class SPINE runtime overrides
+    parser.add_argument(
+        "--world-size",
+        type=int,
+        help=(
+            "Assert the SPINE process count; batch jobs infer it from the "
+            "scheduler GPU allocation"
+        ),
+    )
+    batch_size_group = parser.add_mutually_exclusive_group()
+    batch_size_group.add_argument(
+        "--batch-size",
+        type=int,
+        help="Global SPINE data-loader batch size",
+    )
+    batch_size_group.add_argument(
+        "--minibatch-size",
+        type=int,
+        help="Per-process/GPU SPINE data-loader batch size",
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        help="Number of SPINE data-loader worker processes",
+    )
+    duration_group = parser.add_mutually_exclusive_group()
+    duration_group.add_argument(
+        "--epochs",
+        type=float,
+        help="Number of SPINE training epochs",
+    )
+    duration_group.add_argument(
+        "--iterations",
+        type=int,
+        help="Number of SPINE driver iterations",
     )
 
     # Job configuration
@@ -457,6 +494,12 @@ Examples:
                 apply_mods=args.apply_mods,
                 preload=args.preload,
                 set_overrides=args.set_overrides,
+                world_size=args.world_size,
+                batch_size=args.batch_size,
+                minibatch_size=args.minibatch_size,
+                num_workers=args.num_workers,
+                epochs=args.epochs,
+                iterations=args.iterations,
                 interactive_runtime=args.interactive_runtime,
                 bind_paths=args.bind_paths,
                 spine_path=args.spine_path,
@@ -495,6 +538,12 @@ Examples:
                 dry_run=args.dry_run,
                 preload=args.preload,
                 set_overrides=args.set_overrides,
+                world_size=args.world_size,
+                batch_size=args.batch_size,
+                minibatch_size=args.minibatch_size,
+                num_workers=args.num_workers,
+                epochs=args.epochs,
+                iterations=args.iterations,
                 spine_path=args.spine_path,
                 stage=args.stage,
                 run_dir=args.run_dir,
