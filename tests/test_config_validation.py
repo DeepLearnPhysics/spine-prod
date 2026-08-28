@@ -107,6 +107,49 @@ def test_default_uresnet_matches_generic_full_chain():
     assert loss == full_chain["model"]["modules"]["uresnet_ppn_loss"]["uresnet_loss"]
 
 
+def test_default_uresnet_ppn_matches_generic_full_chain():
+    """The shared UResNet-PPN definition must match the generic full chain."""
+    ppn_path = CONFIG_ROOT / "model" / "uresnet_ppn" / "ppn.yaml"
+    ppn_loss_path = CONFIG_ROOT / "model" / "uresnet_ppn" / "ppn_loss.yaml"
+    full_chain_path = CONFIG_INFER_ROOT / "generic" / "model" / "model_common.yaml"
+
+    with open(ppn_path, "r", encoding="utf-8") as config_file:
+        ppn = yaml.safe_load(config_file)
+    with open(ppn_loss_path, "r", encoding="utf-8") as config_file:
+        ppn_loss = yaml.safe_load(config_file)
+    with open(full_chain_path, "r", encoding="utf-8") as config_file:
+        full_chain = yaml.safe_load(config_file)
+
+    ppn.pop("__meta__")
+    ppn_loss.pop("__meta__")
+    assert ppn == full_chain["model"]["modules"]["uresnet_ppn"]["ppn"]
+    expected_ppn_loss = full_chain["model"]["modules"]["uresnet_ppn_loss"][
+        "ppn_loss"
+    ].copy()
+    expected_ppn_loss["restrict_to_clusters"] = True
+    assert ppn_loss == expected_ppn_loss
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_default_uresnet_ppn_reuses_default_uresnet():
+    """UResNet-PPN must resolve the shared UResNet network and loss fragments."""
+    uresnet = load_config_with_includes(
+        CONFIG_ROOT / "model" / "uresnet" / "default.yaml"
+    )
+    uresnet_ppn = load_config_with_includes(
+        CONFIG_ROOT / "model" / "uresnet_ppn" / "default.yaml"
+    )
+
+    assert (
+        uresnet_ppn["model"]["modules"]["uresnet"]
+        == uresnet["model"]["modules"]["uresnet"]
+    )
+    assert (
+        uresnet_ppn["model"]["modules"]["uresnet_loss"]
+        == uresnet["model"]["modules"]["uresnet_loss"]
+    )
+
+
 @pytest.mark.parametrize("config_path", COMPOSITE_CONFIGS, ids=lambda path: str(path))
 def test_composite_configs_are_bundles(config_path):
     """Executable full-chain and truth-saving composites must be bundles."""

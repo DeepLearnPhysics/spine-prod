@@ -25,3 +25,7 @@ repository configuration root is available to SPINE.
 The generic full-chain configuration uses the default UResNet architecture, so
 there is intentionally no `model/generic/uresnet.yaml` override. A detector
 variant should be introduced only when it changes a model-owned parameter.
+
+Composite models reuse their component definitions. For example,
+`model/uresnet_ppn/default.yaml` imports the UResNet network and loss from
+`model/uresnet/` and adds only the PPN network, loss, and model interface.
