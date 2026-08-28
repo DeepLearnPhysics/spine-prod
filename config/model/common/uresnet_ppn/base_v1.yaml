@@ -1,0 +1,21 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 standalone UResNet-PPN model
+
+model:
+  name: uresnet_ppn
+  weight_path: null
+
+  network_input:
+    data: data
+
+  loss_input:
+    seg_label: seg_label
+    ppn_label: ppn_label
+    clust_label: clust_label
+
+  modules:
+    uresnet: !include model/common/uresnet/network_v1.yaml
+    ppn: !include model/common/uresnet_ppn/ppn_v1.yaml
+    uresnet_loss: !include model/common/uresnet/loss_v1.yaml
+    ppn_loss: !include model/common/uresnet_ppn/ppn_loss_v1.yaml

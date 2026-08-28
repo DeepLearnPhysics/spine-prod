@@ -1,6 +1,6 @@
 __meta__:
   kind: fragment
-  description: Default UResNet semantic-segmentation network
+  description: SPINE v1 UResNet semantic-segmentation network
 
 num_input: 1
 num_classes: 5

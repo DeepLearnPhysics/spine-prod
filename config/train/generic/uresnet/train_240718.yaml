@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic UResNet semantic-segmentation training benchmark
+
+include:
+  - model/generic/uresnet/model_240718.yaml
+  - train/generic/uresnet/base_v1.yaml

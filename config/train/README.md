@@ -39,7 +39,18 @@ checkpoints.
 
 ## Versioning and Reproducibility
 
-Training configurations preserve the names used for each training campaign. Where a dated version is present, it uses the same YYMMDD convention as inference configurations. Each recipe should document the setup used to produce its corresponding weights and link those weights to the appropriate configuration under `config/infer/`.
+Each model directory contains a SPINE-schema training fragment such as
+`base_v1.yaml` and immutable dated runnable bundles such as
+`train_240718.yaml`. The runnable bundle pins the detector model revision with
+the same date under `config/model/`; production submissions must use the dated
+path rather than a mutable `latest` alias. Each recipe should document the
+setup used to produce its corresponding weights and link those weights to the
+appropriate configuration under `config/infer/`.
+
+Sister training bundles are added only when the component model actually
+changes between inference revisions. Generic UResNet has one bundle because
+its model did not change between the `240718` and `240805` full-chain releases;
+UResNet-PPN and Graph-SPICE have one for each revision.
 
 ## Usage
 
@@ -47,7 +58,7 @@ Training configurations are submitted as persistent named runs:
 
 ```bash
 # Basic training
-./submit.py -c train/generic/uresnet.yaml \
+./submit.py -c train/generic/uresnet/train_240718.yaml \
   --stage train --run-dir /path/to/experiments/uresnet/default \
   --source-list /path/to/train_file_list.txt \
   --val-source-list /path/to/validation_file_list.txt
@@ -56,14 +67,14 @@ Training configurations are submitted as persistent named runs:
 # --world-size is accepted only when it matches the allocated GPU count.
 
 # Multi-GPU training
-./submit.py -c train/generic/uresnet.yaml \
+./submit.py -c train/generic/uresnet/train_240718.yaml \
   --stage train --run-dir /path/to/experiments/uresnet/default \
   --gpus 4 \
   --source-list /path/to/train_file_list.txt \
   --val-source-list /path/to/validation_file_list.txt
 
 # Strictly resume complete training state from the latest checkpoint
-./submit.py -c train/generic/uresnet.yaml \
+./submit.py -c train/generic/uresnet/train_240718.yaml \
   --stage train --run-dir /path/to/experiments/uresnet/default --resume
 ```
 

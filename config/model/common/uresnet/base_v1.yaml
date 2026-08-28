@@ -1,0 +1,17 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 standalone UResNet semantic-segmentation model
+
+model:
+  name: uresnet
+  weight_path: null
+
+  network_input:
+    data: data
+
+  loss_input:
+    seg_label: seg_label
+
+  modules:
+    uresnet: !include model/common/uresnet/network_v1.yaml
+    uresnet_loss: !include model/common/uresnet/loss_v1.yaml

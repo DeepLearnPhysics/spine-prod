@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic Graph-SPICE model revision with radius graph construction
+
+include: model/common/graph_spice/base_v1.yaml
+
+override:
+  model.modules.graph_spice.embedder.uresnet.spatial_size: 768
+  model.modules.graph_spice.constructor.graph:
+    name: radius
+    r: 1.9

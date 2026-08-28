@@ -63,8 +63,8 @@ class ConfigManager:
         Relative paths are checked from the current working directory, the
         spine-prod repository root, its ``config`` directory, and each entry
         in ``SPINE_CONFIG_PATH``. This makes repository-relative forms such as
-        ``config/train/generic/uresnet.yaml`` and SPINE-style forms such as
-        ``train/generic/uresnet.yaml`` equivalent.
+        ``config/train/generic/uresnet/train_240718.yaml`` and SPINE-style
+        forms such as ``train/generic/uresnet/train_240718.yaml`` equivalent.
         """
         config_path = Path(config).expanduser()
         if config_path.is_absolute():

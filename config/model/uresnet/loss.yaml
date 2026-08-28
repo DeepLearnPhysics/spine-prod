@@ -1,5 +1,0 @@
-__meta__:
-  kind: fragment
-  description: Default UResNet semantic-segmentation loss
-
-balance_loss: false

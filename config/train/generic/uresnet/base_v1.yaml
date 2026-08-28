@@ -1,0 +1,48 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 generic UResNet training policy and data schema
+
+base:
+  world_size: 1
+  epochs: 50.0
+  seed: 0
+  unwrap: false
+  log_dir: null
+  log_step: 1
+
+io:
+  loader:
+    minibatch_size: 256
+    shuffle: false
+    num_workers: 8
+    collate_fn: all
+    sampler:
+      name: random_sequence
+      seed: 0
+    dataset:
+      name: larcv
+      file_keys: null
+      schema:
+        data:
+          parser: sparse3d
+          sparse_event: sparse3d_pcluster
+        seg_label:
+          parser: sparse3d
+          sparse_event: sparse3d_pcluster_semantics
+
+train:
+  weight_prefix: null
+  save_epoch: 1.0
+  optimizer:
+    name: Adam
+    lr: 0.001
+
+validation:
+  file_keys: null
+  fraction: 1.0
+  early_stopping:
+    monitor: loss
+    mode: min
+    patience: 5
+    min_delta: 0.0
+  best_checkpoint: true

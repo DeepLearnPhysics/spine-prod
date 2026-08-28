@@ -1,0 +1,13 @@
+__meta__:
+  kind: bundle
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic Graph-SPICE training benchmark with KNN graph construction
+
+include:
+  - model/generic/graph_spice/model_240718.yaml
+  - train/generic/graph_spice/base_v1.yaml
+
+override:
+  # Cluster construction is an inference output and is unnecessary in training.
+  model.modules.graph_spice.make_clusters: false

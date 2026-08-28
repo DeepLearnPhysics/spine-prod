@@ -1,0 +1,5 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 UResNet semantic-segmentation loss
+
+balance_loss: false

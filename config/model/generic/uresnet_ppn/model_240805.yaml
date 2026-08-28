@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic UResNet-PPN model revision without endpoint classification
+
+include: model/common/uresnet_ppn/base_v1.yaml
+
+override:
+  model.modules.ppn.classify_endpoints: false
+  model.modules.ppn_loss.restrict_to_clusters: true

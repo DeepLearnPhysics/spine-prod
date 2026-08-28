@@ -46,6 +46,9 @@ TRAIN_CONFIGS = sorted(
     list((CONFIG_ROOT / "train" / "config").rglob("*.cfg"))
     + list((CONFIG_ROOT / "train").rglob("*.yaml"))
 )
+GENERIC_TRAIN_BUNDLES = sorted(
+    (CONFIG_ROOT / "train" / "generic").glob("*/train_*.yaml")
+)
 COMMON_CONFIGS = sorted(CONFIG_INFER_ROOT.rglob("*_common.yaml"))
 COMPOSITE_CONFIGS = sorted(
     config_path
@@ -88,10 +91,46 @@ def test_training_configs_use_canonical_top_level_train(config_path):
     assert "train" not in config.get("base", {})
 
 
+@pytest.mark.parametrize(
+    "config_path", GENERIC_TRAIN_BUNDLES, ids=lambda path: str(path)
+)
+def test_generic_training_bundles_pin_their_model_revision(config_path):
+    """Every dated generic training bundle must pin one matching model revision."""
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = yaml.safe_load(config_file)
+
+    model_version = config["__meta__"]["version"]
+    model_includes = [
+        include for include in config["include"] if include.startswith("model/generic/")
+    ]
+    assert len(model_includes) == 1
+    assert model_includes[0].endswith(f"model_{model_version}.yaml")
+
+
+def test_generic_training_variants_follow_component_model_changes():
+    """Sister recipes exist only for components that changed between releases."""
+    variants = {
+        model_dir.name: {
+            yaml.safe_load(config_path.read_text(encoding="utf-8"))["__meta__"][
+                "version"
+            ]
+            for config_path in model_dir.glob("train_*.yaml")
+        }
+        for model_dir in (CONFIG_ROOT / "train" / "generic").iterdir()
+        if model_dir.is_dir() and list(model_dir.glob("train_*.yaml"))
+    }
+
+    assert variants == {
+        "uresnet": {"240718"},
+        "uresnet_ppn": {"240718", "240805"},
+        "graph_spice": {"240718", "240805"},
+    }
+
+
 def test_default_uresnet_matches_generic_full_chain():
     """The shared UResNet definition must match the generic full chain."""
-    network_path = CONFIG_ROOT / "model" / "uresnet" / "network.yaml"
-    loss_path = CONFIG_ROOT / "model" / "uresnet" / "loss.yaml"
+    network_path = CONFIG_ROOT / "model" / "common" / "uresnet" / "network_v1.yaml"
+    loss_path = CONFIG_ROOT / "model" / "common" / "uresnet" / "loss_v1.yaml"
     full_chain_path = CONFIG_INFER_ROOT / "generic" / "model" / "model_common.yaml"
 
     with open(network_path, "r", encoding="utf-8") as config_file:
@@ -109,8 +148,10 @@ def test_default_uresnet_matches_generic_full_chain():
 
 def test_default_uresnet_ppn_matches_generic_full_chain():
     """The shared UResNet-PPN definition must match the generic full chain."""
-    ppn_path = CONFIG_ROOT / "model" / "uresnet_ppn" / "ppn.yaml"
-    ppn_loss_path = CONFIG_ROOT / "model" / "uresnet_ppn" / "ppn_loss.yaml"
+    ppn_path = CONFIG_ROOT / "model" / "common" / "uresnet_ppn" / "ppn_v1.yaml"
+    ppn_loss_path = (
+        CONFIG_ROOT / "model" / "common" / "uresnet_ppn" / "ppn_loss_v1.yaml"
+    )
     full_chain_path = CONFIG_INFER_ROOT / "generic" / "model" / "model_common.yaml"
 
     with open(ppn_path, "r", encoding="utf-8") as config_file:
@@ -134,10 +175,10 @@ def test_default_uresnet_ppn_matches_generic_full_chain():
 def test_default_uresnet_ppn_reuses_default_uresnet():
     """UResNet-PPN must resolve the shared UResNet network and loss fragments."""
     uresnet = load_config_with_includes(
-        CONFIG_ROOT / "model" / "uresnet" / "default.yaml"
+        CONFIG_ROOT / "model" / "common" / "uresnet" / "base_v1.yaml"
     )
     uresnet_ppn = load_config_with_includes(
-        CONFIG_ROOT / "model" / "uresnet_ppn" / "default.yaml"
+        CONFIG_ROOT / "model" / "common" / "uresnet_ppn" / "base_v1.yaml"
     )
 
     assert (
@@ -148,6 +189,37 @@ def test_default_uresnet_ppn_reuses_default_uresnet():
         uresnet_ppn["model"]["modules"]["uresnet_loss"]
         == uresnet["model"]["modules"]["uresnet_loss"]
     )
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize("version", ["240718", "240805"])
+def test_generic_graph_spice_matches_generic_full_chain(version):
+    """The generic Graph-SPICE definition must match the generic full chain."""
+    graph_spice = load_config_with_includes(
+        CONFIG_ROOT / "model" / "generic" / "graph_spice" / f"model_{version}.yaml"
+    )
+    full_chain = load_config_with_includes(
+        CONFIG_INFER_ROOT / "generic" / "model" / f"model_{version}.yaml"
+    )
+
+    modules = graph_spice["model"]["modules"]
+    full_chain_modules = full_chain["model"]["modules"]
+    assert modules["graph_spice"] == full_chain_modules["graph_spice"]
+    assert modules["graph_spice_loss"] == full_chain_modules["graph_spice_loss"]
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_graph_spice_uses_a_dedicated_uresnet_embedder():
+    """Graph-SPICE must own its specialized UResNet configuration."""
+    embedder_path = CONFIG_ROOT / "model" / "common" / "graph_spice" / "uresnet_v1.yaml"
+    with open(embedder_path, "r", encoding="utf-8") as config_file:
+        embedder = yaml.safe_load(config_file)
+
+    assert "include" not in embedder
+    assert embedder["num_input"] == 4
+    assert embedder["input_kernel"] == 5
+    assert embedder["spatial_size"] is None
+    assert "num_classes" not in embedder
 
 
 @pytest.mark.parametrize("config_path", COMPOSITE_CONFIGS, ids=lambda path: str(path))
@@ -180,7 +252,7 @@ def test_versioned_modifiers_declare_mod_kind(config_path):
 
 
 @pytest.mark.parametrize(
-    "config_path", sorted(CONFIG_INFER_ROOT.rglob("*.yaml")), ids=lambda path: str(path)
+    "config_path", sorted(CONFIG_ROOT.rglob("*.yaml")), ids=lambda path: str(path)
 )
 def test_metadata_version_matches_filename(config_path):
     """Dated filenames are authoritative for metadata versions and dates."""
@@ -377,17 +449,17 @@ class TestConfigValidation:
         get_detector_dirs.__func__(Path(__file__).parent.parent / "config" / "train"),
     )
     def test_train_detector_base_configs(self, config_train_root, detector):
-        """Test that all top-level YAML training configurations for a detector parse correctly.
-
-        Automatically discovers and tests all .yaml files in the detector root directory
-        (excludes subdirectories).
-        """
+        """Test that all runnable YAML training bundles parse correctly."""
         detector_dir = config_train_root / detector
         if not detector_dir.exists():
             pytest.skip(f"Detector directory not found: {detector_dir}")
 
-        # Find all YAML files in detector root (not in subdirectories)
-        yaml_files = [f for f in detector_dir.glob("*.yaml") if f.is_file()]
+        yaml_files = []
+        for config_path in detector_dir.rglob("*.yaml"):
+            with open(config_path, "r", encoding="utf-8") as config_file:
+                config = yaml.load(config_file, Loader=yaml.BaseLoader)
+            if config.get("__meta__", {}).get("kind") == "bundle":
+                yaml_files.append(config_path)
 
         if not yaml_files:
             pytest.skip(f"No YAML files found in {detector_dir}")
