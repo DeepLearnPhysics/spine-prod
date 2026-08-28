@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added reusable default UResNet model fragments and a generic UResNet
   training benchmark with integrated validation.
+- Added a compositional UResNet-PPN model and generic training benchmark which
+  reuse the default UResNet backbone and loss.
 - Added first-class training and validation source forwarding through
   `--source`/`--source-list` and `--val-source`/`--val-source-list`.
 - Added first-class forwarding for SPINE runtime resource and duration options.

@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  description: Default point proposal loss
+
+mask_loss: CE
+resolution: 5.0
+restrict_to_clusters: true

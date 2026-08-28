@@ -1,0 +1,21 @@
+__meta__:
+  kind: fragment
+  description: Default standalone UResNet-PPN model
+
+model:
+  name: uresnet_ppn
+  weight_path: null
+
+  network_input:
+    data: data
+
+  loss_input:
+    seg_label: seg_label
+    ppn_label: ppn_label
+    clust_label: clust_label
+
+  modules:
+    uresnet: !include model/uresnet/network.yaml
+    ppn: !include model/uresnet_ppn/ppn.yaml
+    uresnet_loss: !include model/uresnet/loss.yaml
+    ppn_loss: !include model/uresnet_ppn/ppn_loss.yaml
