@@ -4,28 +4,35 @@ This directory owns model definitions shared by training and inference. Model
 files must not own datasets, training schedules, deployed checkpoint paths, or
 post-processing settings.
 
-Each model directory may contain:
+The tree separates two independent forms of versioning:
 
-- reusable network and loss fragments inserted with `!include`;
-- a `default.yaml` fragment defining the standalone model interface; and
-- detector-specific variants only when the architecture genuinely differs.
+- `common/` contains detector-independent model structures tied to a SPINE
+  model-schema generation, such as `base_v1.yaml` and `network_v1.yaml`.
+- detector directories such as `generic/` contain immutable dated model
+  revisions which derive from a pinned common structure and supply all
+  detector-dependent parameters.
 
-Training and inference bundles include these definitions independently. They
-do not inherit from one another.
-
-Imports are rooted at `config/` through `SPINE_CONFIG_PATH`, for example:
+For example:
 
 ```yaml
-include: model/uresnet/default.yaml
+include: model/generic/graph_spice/model_240805.yaml
 ```
 
-Source `configure.sh` before loading or submitting configurations so that the
-repository configuration root is available to SPINE.
+Imports are rooted at `config/` through `SPINE_CONFIG_PATH`. Source
+`configure.sh` before loading or submitting configurations so that SPINE can
+resolve these paths.
 
-The generic full-chain configuration uses the default UResNet architecture, so
-there is intentionally no `model/generic/uresnet.yaml` override. A detector
-variant should be introduced only when it changes a model-owned parameter.
+Common structures are not mutable aliases. An incompatible SPINE model-schema
+change creates a new common version rather than changing `base_v1.yaml` in
+place. Detector revisions use the `YYMMDD` convention and derive directly from
+their common version instead of chaining through previous detector revisions.
 
-Composite models reuse their component definitions. For example,
-`model/uresnet_ppn/default.yaml` imports the UResNet network and loss from
-`model/uresnet/` and adds only the PPN network, loss, and model interface.
+Component versions evolve independently. For generic simulations, UResNet
+remains at revision `240718`, while UResNet-PPN and Graph-SPICE have `240805`
+revisions because their configurations changed. A future full-chain model will
+pin the required revision of each component explicitly.
+
+UResNet-PPN composes the common UResNet network and loss because UResNet is its
+segmentation component. Graph-SPICE instead owns a dedicated UResNet embedder
+configuration, following SPINE's canonical Graph-SPICE example; its input,
+kernel, and required spatial extent differ from standalone UResNet.

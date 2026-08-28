@@ -1,6 +1,6 @@
 __meta__:
   kind: fragment
-  description: Default point proposal loss
+  description: SPINE v1 point proposal loss
 
 mask_loss: CE
 resolution: 5.0

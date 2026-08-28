@@ -58,7 +58,7 @@ def test_detect_detector_returns_unknown_for_unrecognized_path(manager):
 def test_resolve_config_path_supports_spine_and_repository_relative_paths(
     manager, tmp_path, monkeypatch
 ):
-    config = tmp_path / "config" / "train" / "generic" / "uresnet.yaml"
+    config = tmp_path / "config" / "train" / "generic" / "uresnet" / "train_240718.yaml"
     config.parent.mkdir(parents=True)
     config.touch()
     outside = tmp_path / "outside"
@@ -66,8 +66,13 @@ def test_resolve_config_path_supports_spine_and_repository_relative_paths(
     monkeypatch.chdir(outside)
 
     assert manager.resolve_config_path(str(config)) == config
-    assert manager.resolve_config_path("train/generic/uresnet.yaml") == config
-    assert manager.resolve_config_path("config/train/generic/uresnet.yaml") == config
+    assert (
+        manager.resolve_config_path("train/generic/uresnet/train_240718.yaml") == config
+    )
+    assert (
+        manager.resolve_config_path("config/train/generic/uresnet/train_240718.yaml")
+        == config
+    )
 
 
 def test_resolve_config_path_uses_spine_config_path(manager, tmp_path, monkeypatch):

@@ -1,8 +1,6 @@
 __meta__:
-  kind: bundle
-  description: Generic UResNet semantic-segmentation training benchmark
-
-include: model/uresnet/default.yaml
+  kind: fragment
+  description: SPINE v1 generic Graph-SPICE training policy and data schema
 
 base:
   world_size: 1
@@ -14,7 +12,7 @@ base:
 
 io:
   loader:
-    minibatch_size: 256
+    minibatch_size: 64
     shuffle: false
     num_workers: 8
     collate_fn: all
@@ -31,6 +29,14 @@ io:
         seg_label:
           parser: sparse3d
           sparse_event: sparse3d_pcluster_semantics
+        clust_label:
+          parser: cluster3d
+          cluster_event: cluster3d_pcluster
+          sparse_semantics_event: sparse3d_pcluster_semantics
+          clean_data: true
+          break_clusters: true
+          particle_info:
+            particle_event: particle_pcluster
 
 train:
   weight_prefix: null

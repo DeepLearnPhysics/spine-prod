@@ -1465,7 +1465,7 @@ class TestBatchSpineOverride:
             patch.object(mock_submitter.batch_client, "submit", return_value="train"),
         ):
             assert mock_submitter.submit_job(
-                config="train/generic/uresnet.yaml",
+                config="train/generic/uresnet/train_240718.yaml",
                 files=[str(train_source)],
                 validation_files=[str(validation_source)],
                 stage="train",
@@ -1481,7 +1481,12 @@ class TestBatchSpineOverride:
         script = (submission / "submit.sbatch").read_text(encoding="utf-8")
         assert (
             str(
-                mock_submitter.basedir / "config" / "train" / "generic" / "uresnet.yaml"
+                mock_submitter.basedir
+                / "config"
+                / "train"
+                / "generic"
+                / "uresnet"
+                / "train_240718.yaml"
             )
             in script
         )

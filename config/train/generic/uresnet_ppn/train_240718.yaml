@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic UResNet-PPN training benchmark with endpoint classification
+
+include:
+  - model/generic/uresnet_ppn/model_240718.yaml
+  - train/generic/uresnet_ppn/base_v1.yaml

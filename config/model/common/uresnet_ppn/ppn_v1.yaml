@@ -1,5 +1,5 @@
 __meta__:
   kind: fragment
-  description: Default point proposal network
+  description: SPINE v1 point proposal network
 
 classify_endpoints: false

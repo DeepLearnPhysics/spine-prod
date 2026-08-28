@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic Graph-SPICE model revision with KNN graph construction
+
+include: model/common/graph_spice/base_v1.yaml
+
+override:
+  model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
+  model.modules.graph_spice.constructor.graph:
+    name: knn
+    k: 5

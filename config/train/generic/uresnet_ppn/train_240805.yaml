@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic UResNet-PPN training benchmark without endpoint classification
+
+include:
+  - model/generic/uresnet_ppn/model_240805.yaml
+  - train/generic/uresnet_ppn/base_v1.yaml

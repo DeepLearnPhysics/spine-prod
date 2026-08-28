@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 Graph-SPICE loss
+
+name: edge
+loss: binary_log_dice_ce

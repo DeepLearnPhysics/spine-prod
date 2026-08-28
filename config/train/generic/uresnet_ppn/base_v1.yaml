@@ -1,8 +1,6 @@
 __meta__:
-  kind: bundle
-  description: Generic UResNet-PPN training benchmark
-
-include: model/uresnet_ppn/default.yaml
+  kind: fragment
+  description: SPINE v1 generic UResNet-PPN training policy and data schema
 
 base:
   world_size: 1
