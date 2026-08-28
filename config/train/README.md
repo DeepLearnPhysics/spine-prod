@@ -48,9 +48,12 @@ setup used to produce its corresponding weights and link those weights to the
 appropriate configuration under `config/infer/`.
 
 Sister training bundles are added only when the component model actually
-changes between inference revisions. Generic UResNet has one bundle because
-its model did not change between the `240718` and `240805` full-chain releases;
-UResNet-PPN and Graph-SPICE have one for each revision.
+changes between inference revisions. Generic UResNet, shower GrapPA, and track
+GrapPA each have one bundle because their models did not change between the
+`240718` and `240805` full-chain releases. UResNet-PPN, Graph-SPICE, and
+interaction GrapPA have one for each revision. Each GrapPA stage also has a
+`260828` benchmark that tracks SPINE's current standalone example rather than
+a historical generic full-chain release.
 
 ## Usage
 

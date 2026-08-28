@@ -1,0 +1,19 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 standalone interaction GrapPA model structure
+
+model:
+  name: grappa
+  weight_path: null
+
+  network_input:
+    data: data
+    coord_label: coord_label
+
+  loss_input:
+    clust_label: data
+    coord_label: coord_label
+
+  modules:
+    grappa: !include model/common/grappa_inter/network_v1.yaml
+    grappa_loss: !include model/common/grappa_inter/loss_v1.yaml

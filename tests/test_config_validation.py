@@ -26,6 +26,7 @@ import os
 import re
 import warnings
 from contextlib import contextmanager
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
@@ -124,6 +125,9 @@ def test_generic_training_variants_follow_component_model_changes():
         "uresnet": {"240718"},
         "uresnet_ppn": {"240718", "240805"},
         "graph_spice": {"240718", "240805"},
+        "grappa_shower": {"240718", "260828"},
+        "grappa_track": {"240718", "260828"},
+        "grappa_inter": {"240718", "240805", "260828"},
     }
 
 
@@ -206,6 +210,50 @@ def test_generic_graph_spice_matches_generic_full_chain(version):
     full_chain_modules = full_chain["model"]["modules"]
     assert modules["graph_spice"] == full_chain_modules["graph_spice"]
     assert modules["graph_spice_loss"] == full_chain_modules["graph_spice_loss"]
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize(
+    ("component", "version"),
+    [
+        ("grappa_shower", "240718"),
+        ("grappa_track", "240718"),
+        ("grappa_inter", "240718"),
+        ("grappa_inter", "240805"),
+    ],
+)
+def test_generic_grappa_matches_generic_full_chain(component, version):
+    """Each generic GrapPA definition must match its full-chain component."""
+    grappa = load_config_with_includes(
+        CONFIG_ROOT / "model" / "generic" / component / f"model_{version}.yaml"
+    )
+    full_chain = load_config_with_includes(
+        CONFIG_INFER_ROOT / "generic" / "model" / f"model_{version}.yaml"
+    )
+
+    modules = deepcopy(grappa["model"]["modules"])
+    full_chain_modules = full_chain["model"]["modules"]
+
+    # The common definitions explicitly declare SPINE defaults so that the
+    # 260828 revisions reproduce its standalone examples. The historical full
+    # chain omitted these operationally equivalent defaults.
+    if component in {"grappa_shower", "grappa_track"}:
+        modules["grappa"]["nodes"].pop("min_size")
+    if component == "grappa_shower":
+        modules["grappa_loss"]["node_loss"].pop("use_closest")
+
+    assert modules["grappa"] == full_chain_modules[component]
+    assert modules["grappa_loss"] == full_chain_modules[f"{component}_loss"]
+
+
+def test_standalone_interaction_grappa_has_unambiguous_primary_targets():
+    """Particle-group nodes must not use fragment-level target disambiguation."""
+    loss_path = CONFIG_ROOT / "model" / "common" / "grappa_inter" / "loss_v1.yaml"
+    with open(loss_path, "r", encoding="utf-8") as config_file:
+        primary_loss = yaml.safe_load(config_file)["node_loss"]["primary"]
+
+    assert "use_closest" not in primary_loss
+    assert "secondary_label" not in primary_loss
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")

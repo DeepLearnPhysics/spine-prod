@@ -9,8 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added versioned common and generic model definitions for UResNet,
-  UResNet-PPN, and Graph-SPICE, together with dated generic training benchmarks
-  that pin explicit model revisions.
+  UResNet-PPN, Graph-SPICE, and the shower, track, and interaction GrapPA
+  stages, together with dated generic training benchmarks that pin explicit
+  model revisions. The `260828` GrapPA revisions follow SPINE's standalone
+  examples while preserving historical generic full-chain variants and omit
+  inapplicable closest-node relabeling from standalone interaction GrapPA.
 - Added first-class training and validation source forwarding through
   `--source`/`--source-list` and `--val-source`/`--val-source-list`.
 - Added first-class forwarding for SPINE runtime resource and duration options.

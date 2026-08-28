@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 track GrapPA loss
+
+edge_loss:
+  name: channel
+  target: group
