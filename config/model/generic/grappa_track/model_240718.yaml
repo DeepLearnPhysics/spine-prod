@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic track GrapPA model revision
+
+include: model/common/grappa_track/base_v1.yaml
+
+override:
+  model.modules.grappa.nodes.make_groups: true
+  model.modules.grappa.nodes.grouping_method: score
+  model.modules.grappa.node_encoder.dir_max_dist: -1
+  model.modules.grappa.node_encoder.dedx_max_dist: -1

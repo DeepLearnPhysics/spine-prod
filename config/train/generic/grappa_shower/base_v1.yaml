@@ -1,0 +1,54 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 generic shower GrapPA training policy and data schema
+
+base:
+  world_size: 1
+  epochs: 50.0
+  seed: 0
+  unwrap: false
+  log_dir: null
+  log_step: 1
+
+io:
+  loader:
+    minibatch_size: 64
+    shuffle: false
+    num_workers: 8
+    collate_fn: all
+    sampler:
+      name: random_sequence
+      seed: 0
+    dataset:
+      name: larcv
+      file_keys: null
+      schema:
+        data:
+          parser: cluster3d
+          cluster_event: cluster3d_pcluster
+          sparse_semantics_event: sparse3d_pcluster_semantics
+          clean_data: true
+          break_clusters: true
+          particle_info:
+            particle_event: particle_corrected
+        coord_label:
+          parser: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+
+train:
+  weight_prefix: null
+  save_epoch: 1.0
+  optimizer:
+    name: Adam
+    lr: 0.001
+
+validation:
+  file_keys: null
+  fraction: 1.0
+  early_stopping:
+    monitor: loss
+    mode: min
+    patience: 5
+    min_delta: 0.0
+  best_checkpoint: true

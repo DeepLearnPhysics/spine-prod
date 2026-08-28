@@ -27,12 +27,23 @@ change creates a new common version rather than changing `base_v1.yaml` in
 place. Detector revisions use the `YYMMDD` convention and derive directly from
 their common version instead of chaining through previous detector revisions.
 
-Component versions evolve independently. For generic simulations, UResNet
-remains at revision `240718`, while UResNet-PPN and Graph-SPICE have `240805`
-revisions because their configurations changed. A future full-chain model will
+Component versions evolve independently. The historical generic full-chain
+revisions use UResNet, shower GrapPA, and track GrapPA revision `240718`, while
+UResNet-PPN, Graph-SPICE, and interaction GrapPA also have `240805` revisions
+because their configurations changed. The three GrapPA stages additionally
+have `260828` revisions based on SPINE's current standalone examples. The
+interaction loss intentionally omits closest-node relabeling because its
+particle-group nodes have unambiguous targets. A future full-chain model will
 pin the required revision of each component explicitly.
 
 UResNet-PPN composes the common UResNet network and loss because UResNet is its
 segmentation component. Graph-SPICE instead owns a dedicated UResNet embedder
 configuration, following SPINE's canonical Graph-SPICE example; its input,
 kernel, and required spatial extent differ from standalone UResNet.
+
+The three GrapPA directories correspond to the independently trainable
+full-chain stages: shower-fragment aggregation and primary identification,
+track-fragment aggregation, and particle-interaction aggregation with particle
+classification. Their common structures follow SPINE's standalone GrapPA
+examples, while dated generic revisions preserve historical detector-specific
+radii, grouping behavior, losses, and layer widths.

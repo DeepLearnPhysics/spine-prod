@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260828"
+  date: "2026-08-28"
+  description: Generic standalone interaction GrapPA benchmark without fragment disambiguation
+
+include:
+  - model/generic/grappa_inter/model_260828.yaml
+  - train/generic/grappa_inter/base_v1.yaml

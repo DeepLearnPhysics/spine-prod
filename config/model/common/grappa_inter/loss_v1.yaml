@@ -1,0 +1,21 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 interaction GrapPA loss
+
+node_loss:
+  type:
+    name: class
+    target: pid
+    loss: ce
+    balance_loss: true
+  primary:
+    name: class
+    target: inter_primary
+    loss: ce
+    balance_loss: true
+  orient:
+    name: orient
+    loss: ce
+edge_loss:
+  name: channel
+  target: interaction
