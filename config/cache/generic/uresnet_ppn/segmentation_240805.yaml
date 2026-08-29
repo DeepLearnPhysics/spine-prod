@@ -61,6 +61,13 @@ model:
           config:
             mode: uresnet
             point_proposal: ppn
+            adapt_labels:
+              break_eps: 1.1
+              break_metric: chebyshev
+              break_p: 2.0
+              # shower, track, Michel and delta semantic IDs
+              break_classes: [0, 1, 2, 3]
+              weighted: true
 
     # model_name strips the full-chain module prefix while loading the
     # standalone UResNet-PPN checkpoint supplied by the workflow.
