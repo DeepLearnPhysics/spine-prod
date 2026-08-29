@@ -17,6 +17,7 @@ stages:
     depends_on: [train_uresnet_ppn]
     config: cache/generic/uresnet_ppn/segmentation_240805.yaml
     source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
+    run_dir: /path/to/workflow/cache/train
     output: /path/to/workflow/cache/train
     output_suffix: segmentation
     profile: s3df_ampere
@@ -30,6 +31,7 @@ stages:
     depends_on: [train_uresnet_ppn]
     config: cache/generic/uresnet_ppn/segmentation_240805.yaml
     source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
+    run_dir: /path/to/workflow/cache/validation
     output: /path/to/workflow/cache/validation
     output_suffix: segmentation
     profile: s3df_ampere
