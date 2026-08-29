@@ -443,6 +443,42 @@ class TestSubmitterHelpers:
         with pytest.raises(ValueError, match="managed from the GPU allocation"):
             mock_submitter._format_spine_set_overrides(["base.world_size=4"])
 
+    def test_format_spine_named_sources_and_module_weights(self, mock_submitter):
+        sources = {
+            "larcv": {"source_list": ["raw files.txt"]},
+            "hdf5": {"source": "/cache/*.h5"},
+        }
+        assert mock_submitter._format_spine_named_sources(sources) == (
+            "--source 'hdf5=/cache/*.h5' " "--source-list 'larcv=raw files.txt'"
+        )
+        assert mock_submitter._format_spine_named_sources(sources, validation=True) == (
+            "--val-source 'hdf5=/cache/*.h5' " "--val-source-list 'larcv=raw files.txt'"
+        )
+        assert (
+            mock_submitter._format_spine_module_weights(
+                {"uresnet_ppn": "/weights/best.ckpt"}
+            )
+            == "--module-weight uresnet_ppn=/weights/best.ckpt"
+        )
+
+        with pytest.raises(ValueError, match="exactly one"):
+            mock_submitter._format_spine_named_sources(
+                {"larcv": {"source": "raw.root", "source_list": "raw.txt"}}
+            )
+
+        assert mock_submitter._format_spine_named_sources(None) == ""
+        assert mock_submitter._format_spine_module_weights(None) == ""
+        with pytest.raises(TypeError, match="must be a mapping"):
+            mock_submitter._format_spine_named_sources({"larcv": "raw.root"})
+        with pytest.raises(ValueError, match="cannot be empty"):
+            mock_submitter._format_spine_named_sources({"larcv": {"source": []}})
+        with pytest.raises(ValueError, match="accepts exactly one"):
+            mock_submitter._format_spine_named_sources(
+                {"larcv": {"source_list": ["one.txt", "two.txt"]}}
+            )
+        with pytest.raises(ValueError, match="require a module and path"):
+            mock_submitter._format_spine_module_weights({"uresnet_ppn": ""})
+
     def test_align_world_size_with_scheduler_gpus(self, mock_submitter):
         assert mock_submitter._align_world_size({"site": "s3df", "gpus": 4}, None) == 4
         assert (
@@ -1414,6 +1450,26 @@ class TestBatchSpineOverride:
             ({"stage": "train"}, "--run-dir is required"),
             ({"resume": True}, "valid only for training"),
             ({"validation_name": "data"}, "valid only for validation"),
+            (
+                {"validation_named_sources": {"larcv": {"source": "val.root"}}},
+                "Named validation sources are valid only for training",
+            ),
+            (
+                {
+                    "files": ["train.root"],
+                    "named_sources": {"larcv": {"source": "train.root"}},
+                },
+                "Flat and named training sources cannot be combined",
+            ),
+            (
+                {
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "validation_files": ["val.root"],
+                    "validation_named_sources": {"larcv": {"source": "val.root"}},
+                },
+                "Flat and named validation sources cannot be combined",
+            ),
         ],
     )
     def test_submit_job_validates_lifecycle_options(
@@ -1498,6 +1554,51 @@ class TestBatchSpineOverride:
         metadata = json.loads((submission / "job_metadata.json").read_text())
         assert metadata["source_manifest"] == str(train_manifest)
         assert metadata["validation_source_manifest"] == str(validation_manifest)
+
+    def test_submit_job_forwards_named_sources_and_module_weights(
+        self, mock_submitter, tmp_path
+    ):
+        """Composite sources and module checkpoints use native SPINE flags."""
+        run_dir = tmp_path / "run"
+        named_sources = {
+            "larcv": {"source": "/raw/train.root"},
+            "hdf5": {"source": "/cache/train.h5"},
+        }
+        validation_sources = {
+            "larcv": {"source": "/raw/test.root"},
+            "hdf5": {"source": "/cache/test.h5"},
+        }
+
+        with (
+            patch.object(
+                mock_submitter,
+                "_get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            assert mock_submitter.submit_job(
+                config=(
+                    "train/generic/graph_spice/" "train_from_uresnet_ppn_240805.yaml"
+                ),
+                named_sources=named_sources,
+                validation_named_sources=validation_sources,
+                module_weights={"graph_spice": "/weights/seed.ckpt"},
+                stage="train",
+                run_dir=str(run_dir),
+            ) == ["train"]
+
+        submission = next(run_dir.glob("submissions/train/*"))
+        script = (submission / "submit.sbatch").read_text(encoding="utf-8")
+        assert "--source larcv=/raw/train.root hdf5=/cache/train.h5" in script
+        assert "--val-source larcv=/raw/test.root hdf5=/cache/test.h5" in script
+        assert "--module-weight graph_spice=/weights/seed.ckpt" in script
+        assert "--set io.loader.dataset" not in script
+
+        metadata = json.loads((submission / "job_metadata.json").read_text())
+        assert metadata["named_sources"] == named_sources
+        assert metadata["validation_named_sources"] == validation_sources
+        assert metadata["module_weights"] == {"graph_spice": "/weights/seed.ckpt"}
 
     def test_submit_job_rejects_validation_sources_outside_training(
         self, mock_submitter, tmp_path
@@ -2447,6 +2548,140 @@ class TestPreloadDownloads:
 
 class TestPipelineSubmission:
     """Tests for multi-stage dependencies and cleanup scheduling."""
+
+    def test_submit_pipeline_forwards_cli_source_and_override_fields(
+        self, mock_submitter, tmp_path
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "train",
+                            "config": "train.yaml",
+                            "stage": "train",
+                            "source_list": "train_files.txt",
+                            "val_source_list": "validation_files.txt",
+                            "run_dir": "/tmp/train",
+                            "set": "model.weight_path=/tmp/seed.ckpt",
+                        },
+                        {
+                            "name": "configured_inputs",
+                            "config": "mixed.yaml",
+                            "sources": {
+                                "larcv": {"source": "raw.root"},
+                                "hdf5": {"source": "cache.h5"},
+                            },
+                            "validation_sources": {
+                                "larcv": {"source": "validation.root"},
+                                "hdf5": {"source": "validation.h5"},
+                            },
+                            "module_weight": {"uresnet_ppn": "/tmp/snapshot-best.ckpt"},
+                        },
+                    ]
+                }
+            )
+        )
+
+        with patch.object(
+            mock_submitter, "submit_job", side_effect=[["10"], ["20"]]
+        ) as submit_job:
+            result = mock_submitter.submit_pipeline(str(pipeline_path))
+
+        assert result == {"train": ["10"], "configured_inputs": ["20"]}
+        train = submit_job.call_args_list[0].kwargs
+        assert train["files"] == ["train_files.txt"]
+        assert train["source_type"] == "source_list"
+        assert train["validation_files"] == ["validation_files.txt"]
+        assert train["validation_source_type"] == "source_list"
+        assert train["set_overrides"] == ["model.weight_path=/tmp/seed.ckpt"]
+
+        configured = submit_job.call_args_list[1].kwargs
+        assert configured["files"] is None
+        assert configured["named_sources"] == {
+            "larcv": {"source": "raw.root"},
+            "hdf5": {"source": "cache.h5"},
+        }
+        assert configured["validation_named_sources"] == {
+            "larcv": {"source": "validation.root"},
+            "hdf5": {"source": "validation.h5"},
+        }
+        assert configured["module_weights"] == {
+            "uresnet_ppn": "/tmp/snapshot-best.ckpt"
+        }
+
+    @pytest.mark.parametrize(
+        "conflicting_keys",
+        [
+            {"source": "input.root", "source_list": "inputs.txt"},
+            {
+                "val_source": "validation.root",
+                "val_source_list": "validation.txt",
+            },
+        ],
+    )
+    def test_submit_pipeline_rejects_conflicting_source_fields(
+        self, mock_submitter, tmp_path, conflicting_keys
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "ambiguous",
+                            "config": "config.yaml",
+                            **conflicting_keys,
+                        }
+                    ]
+                }
+            )
+        )
+
+        with pytest.raises(ValueError, match="must specify only one"):
+            mock_submitter.submit_pipeline(str(pipeline_path))
+
+    @pytest.mark.parametrize(
+        ("stage_fields", "message"),
+        [
+            (
+                {
+                    "source": "raw.root",
+                    "sources": {"larcv": {"source": "raw.root"}},
+                },
+                "cannot combine sources",
+            ),
+            (
+                {
+                    "val_source": "validation.root",
+                    "validation_sources": {"larcv": {"source": "validation.root"}},
+                },
+                "cannot combine validation_sources",
+            ),
+            ({"module_weight": ["bad"]}, "module_weight must be a mapping"),
+        ],
+    )
+    def test_submit_pipeline_rejects_invalid_structured_fields(
+        self, mock_submitter, tmp_path, stage_fields, message
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "invalid",
+                            "config": "config.yaml",
+                            **stage_fields,
+                        }
+                    ]
+                }
+            )
+        )
+
+        with pytest.raises((TypeError, ValueError), match=message):
+            mock_submitter.submit_pipeline(str(pipeline_path))
 
     def test_submit_pipeline_chains_stages_and_schedules_cleanup(
         self, mock_submitter, tmp_path, capsys
