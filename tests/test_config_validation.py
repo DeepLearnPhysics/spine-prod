@@ -154,6 +154,14 @@ def test_generic_segmentation_cache_reuses_uresnet_ppn_revision():
         "seg_label": "seg_label",
         "clust_label": "clust_label",
     }
+    stage_config = cache["model"]["modules"]["chain"]["stages"][0]["config"]
+    assert stage_config["adapt_labels"] == {
+        "break_eps": 1.1,
+        "break_metric": "chebyshev",
+        "break_p": 2.0,
+        "break_classes": [0, 1, 2, 3],
+        "weighted": True,
+    }
     cache_schema = cache["io"]["loader"]["dataset"]["schema"]
     assert set(cache_schema) == {"data", "seg_label", "clust_label"}
     assert cache_schema["clust_label"]["particle_event"] == "particle_corrected"
