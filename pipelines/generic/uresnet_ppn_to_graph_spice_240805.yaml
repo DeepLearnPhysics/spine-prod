@@ -10,6 +10,7 @@ stages:
     val_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
     run_dir: /path/to/workflow/train/uresnet_ppn
     profile: s3df_ampere
+    time: "08:00:00"
     tensorboard: true
 
   - name: cache_train_segmentation
@@ -19,6 +20,7 @@ stages:
     output: /path/to/workflow/cache/train
     output_suffix: segmentation
     profile: s3df_ampere
+    time: "08:00:00"
     files_per_task: 1
     ntasks: 50
     module_weight:
@@ -31,6 +33,7 @@ stages:
     output: /path/to/workflow/cache/validation
     output_suffix: segmentation
     profile: s3df_ampere
+    time: "08:00:00"
     files_per_task: 1
     ntasks: 50
     module_weight:
@@ -42,6 +45,7 @@ stages:
     stage: train
     run_dir: /path/to/workflow/train/graph_spice
     profile: s3df_ampere
+    time: "08:00:00"
     tensorboard: true
     sources:
       larcv:
