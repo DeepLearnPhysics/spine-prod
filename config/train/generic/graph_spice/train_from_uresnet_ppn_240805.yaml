@@ -2,7 +2,7 @@ __meta__:
   kind: bundle
   version: "240805"
   date: "2024-08-05"
-  description: Generic Graph-SPICE training from cached UResNet-PPN predictions
+  description: Generic Graph-SPICE training from cached UResNet-PPN stage products
 
 include:
   - model/generic/graph_spice/model_240805.yaml
@@ -13,4 +13,5 @@ override:
   # canonical prediction product emitted by the segmentation provider.
   model.network_input.seg_label: seg_pred
   model.loss_input.seg_label: seg_pred
+  model.loss_input.clust_label: clust_label_adapt
   model.modules.graph_spice.make_clusters: false

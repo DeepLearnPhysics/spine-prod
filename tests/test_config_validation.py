@@ -148,7 +148,16 @@ def test_generic_segmentation_cache_reuses_uresnet_ppn_revision():
     assert cache_module["model_name"] == ""
     assert cache_module["weight_path"] == ""
     assert cache["io"]["writer"]["stage"] == "segmentation"
-    assert cache["io"]["writer"]["keys"] == ["seg_pred"]
+    assert cache["io"]["writer"]["keys"] == ["seg_pred", "clust_label_adapt"]
+    assert cache["model"]["network_input"] == {
+        "data": "data",
+        "seg_label": "seg_label",
+        "clust_label": "clust_label",
+    }
+    cache_schema = cache["io"]["loader"]["dataset"]["schema"]
+    assert set(cache_schema) == {"data", "seg_label", "clust_label"}
+    assert cache_schema["clust_label"]["particle_event"] == "particle_corrected"
+    assert cache_schema["clust_label"]["shape_precedence"] == [2, 1, 0, 3, 4, 6]
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
@@ -164,13 +173,15 @@ def test_generic_graph_spice_can_train_from_segmentation_cache():
 
     dataset = config["io"]["loader"]["dataset"]
     assert dataset["name"] == "mixed"
-    assert "seg_label" not in dataset["larcv"]["schema"]
+    assert set(dataset["larcv"]["schema"]) == {"data"}
     assert dataset["hdf5"]["staged"] is True
     assert dataset["hdf5"]["stage"] == "segmentation"
-    assert dataset["hdf5"]["schema"]["seg_pred"]["parser"] == "feature_tensor"
+    assert dataset["hdf5"]["keys"] == ["seg_pred", "clust_label_adapt"]
+    assert "schema" not in dataset["hdf5"]
     assert set(config["validation"]["sources"]) == {"larcv", "hdf5"}
     assert config["model"]["network_input"]["seg_label"] == "seg_pred"
     assert config["model"]["loss_input"]["seg_label"] == "seg_pred"
+    assert config["model"]["loss_input"]["clust_label"] == "clust_label_adapt"
 
 
 def test_default_uresnet_matches_generic_full_chain():

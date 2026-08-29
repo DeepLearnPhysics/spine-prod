@@ -2,7 +2,7 @@ __meta__:
   kind: bundle
   version: "240805"
   date: "2024-08-05"
-  description: Materialize generic UResNet-PPN semantic predictions as a staged cache
+  description: Materialize generic UResNet-PPN predictions and adapted cluster truth
 
 base:
   world_size: 1
@@ -25,11 +25,22 @@ io:
         data:
           parser: sparse3d
           sparse_event: sparse3d_pcluster
+        seg_label:
+          parser: sparse3d
+          sparse_event: sparse3d_pcluster_semantics
+        clust_label:
+          parser: cluster3d
+          cluster_event: cluster3d_pcluster
+          particle_event: particle_corrected
+          sparse_semantics_event: sparse3d_pcluster_semantics
+          add_particle_info: true
+          clean_data: true
+          shape_precedence: [2, 1, 0, 3, 4, 6]
   writer:
     name: stage_hdf5
     file_name: null
     stage: segmentation
-    keys: [seg_pred]
+    keys: [seg_pred, clust_label_adapt]
     split: true
 
 model:
@@ -38,6 +49,8 @@ model:
 
   network_input:
     data: data
+    seg_label: seg_label
+    clust_label: clust_label
 
   modules:
     chain:

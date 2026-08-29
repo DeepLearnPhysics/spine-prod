@@ -40,8 +40,8 @@ See `icarus_production_example.yaml` for a complete example.
 transition:
 
 1. Train standalone UResNet-PPN and select `snapshot-best.ckpt`.
-2. Materialize its canonical `seg_pred` product into separate training and
-   validation staged caches.
+2. Materialize its canonical `seg_pred` and adapted `clust_label_adapt`
+   products into separate training and validation staged caches.
 3. Train standalone Graph-SPICE from raw LArCV truth plus the aligned cache.
 
 Replace the `/path/to/workflow` destination before submission. The prototype
