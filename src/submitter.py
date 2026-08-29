@@ -1552,6 +1552,26 @@ class Submitter:
                     f"Pipeline stage '{stage_name}' module_weight must be a mapping"
                 )
 
+            profile_overrides = {
+                key: stage[key]
+                for key in (
+                    "partition",
+                    "qos",
+                    "queue",
+                    "constraint",
+                    "gpus_per_node",
+                    "gpus",
+                    "cpus_per_task",
+                    "mem_per_cpu",
+                    "mem_per_node",
+                    "nodes",
+                    "time",
+                    "account",
+                    "bind_paths",
+                )
+                if key in stage
+            }
+
             # Build dependency string
             depends_on = stage.get("depends_on", [])
             dependency = None
@@ -1600,6 +1620,7 @@ class Submitter:
                 num_workers=stage.get("num_workers"),
                 epochs=stage.get("epochs"),
                 iterations=stage.get("iterations"),
+                **profile_overrides,
             )
 
             job_map[stage_name] = job_ids

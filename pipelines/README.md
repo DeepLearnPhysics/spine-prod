@@ -21,6 +21,7 @@ stages:
     # module_weight: {module: /path/to/checkpoint.ckpt}
     # set: [nested.config.key=value]
     profile: s3df_ampere    # optional (default: auto-detect)
+    time: "08:00:00"        # optional scheduler walltime override
     ntasks: 50              # optional, target number of tasks if files_per_task is omitted
     files_per_task: 5       # optional, overrides even splitting and uses ntasks as concurrency cap
     depends_on: []          # optional list of stage names

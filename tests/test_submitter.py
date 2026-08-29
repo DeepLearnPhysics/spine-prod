@@ -2564,6 +2564,7 @@ class TestPipelineSubmission:
                             "source_list": "train_files.txt",
                             "val_source_list": "validation_files.txt",
                             "run_dir": "/tmp/train",
+                            "time": "08:00:00",
                             "set": "model.weight_path=/tmp/seed.ckpt",
                         },
                         {
@@ -2596,6 +2597,7 @@ class TestPipelineSubmission:
         assert train["validation_files"] == ["validation_files.txt"]
         assert train["validation_source_type"] == "source_list"
         assert train["set_overrides"] == ["model.weight_path=/tmp/seed.ckpt"]
+        assert train["time"] == "08:00:00"
 
         configured = submit_job.call_args_list[1].kwargs
         assert configured["files"] is None

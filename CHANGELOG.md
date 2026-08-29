@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `val_source`, `val_source_list`, and `set` stage fields.
 - Added structured composite `sources` and `validation_sources` pipeline
   fields and module-specific checkpoint forwarding through `module_weight`.
+- Added per-stage scheduler resource overrides to pipeline definitions.
 - Added versioned common and generic model definitions for UResNet,
   UResNet-PPN, Graph-SPICE, and the shower, track, and interaction GrapPA
   stages, together with dated generic training benchmarks that pin explicit
