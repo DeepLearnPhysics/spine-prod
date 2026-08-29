@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added a generic staged-training prototype that trains UResNet-PPN,
-  materializes its canonical semantic predictions, and trains standalone
-  Graph-SPICE from aligned raw truth and cache inputs.
+  materializes its canonical semantic predictions and adapted cluster truth,
+  and trains standalone Graph-SPICE from aligned raw data and cache inputs.
 - Added pipeline support for CLI-equivalent `source`, `source_list`,
   `val_source`, `val_source_list`, and `set` stage fields.
 - Added structured composite `sources` and `validation_sources` pipeline

@@ -1,6 +1,6 @@
 __meta__:
   kind: fragment
-  description: Generic Graph-SPICE training policy backed by a staged segmentation cache
+  description: Generic Graph-SPICE training from cached semantics and adapted truth
 
 include: train/generic/graph_spice/base_v1.yaml
 
@@ -16,22 +16,11 @@ override:
         data:
           parser: sparse3d
           sparse_event: sparse3d_pcluster
-        clust_label:
-          parser: cluster3d
-          cluster_event: cluster3d_pcluster
-          sparse_semantics_event: sparse3d_pcluster_semantics
-          clean_data: true
-          break_clusters: true
-          particle_info:
-            particle_event: particle_pcluster
     hdf5:
       file_keys: null
       staged: true
       stage: segmentation
-      schema:
-        seg_pred:
-          parser: feature_tensor
-          tensor_event: seg_pred
+      keys: [seg_pred, clust_label_adapt]
 
   validation.sources:
     larcv:

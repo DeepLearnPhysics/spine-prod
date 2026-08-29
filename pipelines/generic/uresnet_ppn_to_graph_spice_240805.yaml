@@ -1,5 +1,5 @@
-# Prototype transition: train UResNet-PPN, cache its predictions, then train
-# standalone Graph-SPICE from aligned raw truth and staged predictions.
+# Prototype transition: train UResNet-PPN, cache its predictions and adapted
+# cluster truth, then train standalone Graph-SPICE from those stage products.
 # Replace the /path/to/workflow destination before submission.
 
 stages:
