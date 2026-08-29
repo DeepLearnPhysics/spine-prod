@@ -7,6 +7,10 @@ This directory contains example pipeline definitions for multi-stage SPINE proce
 Pipelines are defined in YAML format with the following structure:
 
 ```yaml
+defaults:
+  profile: s3df_ampere
+  time: "08:00:00"
+
 stages:
   - name: stage_name
     config: path/to/config.yaml
@@ -20,8 +24,7 @@ stages:
     # validation_sources: ...         # same shape for validation
     # module_weight: {module: /path/to/checkpoint.ckpt}
     # set: [nested.config.key=value]
-    profile: s3df_ampere    # optional (default: auto-detect)
-    time: "08:00:00"        # optional scheduler walltime override
+    profile: s3df_hopper    # optional stage override of the default
     ntasks: 50              # optional, target number of tasks if files_per_task is omitted
     files_per_task: 5       # optional, overrides even splitting and uses ntasks as concurrency cap
     depends_on: []          # optional list of stage names
@@ -32,6 +35,22 @@ stages:
 ```bash
 ./submit.py --pipeline pipelines/my_pipeline.yaml
 ```
+
+Pipeline settings resolve in this order: profile defaults, pipeline `defaults`,
+stage fields, then explicit CLI overrides. For example, this runs every stage
+with the same checkout and scheduler account while overriding any profiles in
+the YAML:
+
+```bash
+./submit.py --pipeline pipelines/my_pipeline.yaml \
+  --spine-path /path/to/spine --profile s3df_hopper --account my_account
+```
+
+Pipeline-wide CLI overrides are supported for software paths, profiles,
+scheduler resources, and first-class SPINE runtime options. Data sources,
+outputs, dependencies, run lifecycle settings, and model weights must remain on
+their individual stages. Unknown fields and unsupported pipeline CLI options
+are rejected rather than ignored.
 
 See `icarus_production_example.yaml` for a complete example.
 
@@ -51,6 +70,6 @@ dataset and `--module-weight` for the cached segmentation jobs; it requires no
 generic `--set` overrides. SPINE validates stored source provenance and fails
 rather than silently pairing the wrong events.
 
-Until these interfaces appear in a tagged SPINE release, run the prototype
-against a checkout containing commits `bc7c76fb`, `8e5e918b`, and `b432ae80`
-by setting `spine_path` on its stages.
+To run against an unreleased checkout, pass `--spine-path /path/to/spine` when
+submitting the pipeline. A stage-level `spine_path` remains available when only
+one stage needs a different checkout.

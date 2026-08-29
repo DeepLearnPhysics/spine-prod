@@ -2,6 +2,10 @@
 # cluster truth, then train standalone Graph-SPICE from those stage products.
 # Replace the /path/to/workflow destination before submission.
 
+defaults:
+  profile: s3df_ampere
+  time: "08:00:00"
+
 stages:
   - name: train_uresnet_ppn
     config: train/generic/uresnet_ppn/train_240805.yaml
@@ -9,8 +13,6 @@ stages:
     source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
     val_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
     run_dir: /path/to/workflow/train/uresnet_ppn
-    profile: s3df_ampere
-    time: "08:00:00"
     tensorboard: true
 
   - name: cache_train_segmentation
@@ -20,8 +22,6 @@ stages:
     run_dir: /path/to/workflow/cache/train
     output: /path/to/workflow/cache/train
     output_suffix: segmentation
-    profile: s3df_ampere
-    time: "08:00:00"
     files_per_task: 1
     ntasks: 50
     module_weight:
@@ -34,8 +34,6 @@ stages:
     run_dir: /path/to/workflow/cache/validation
     output: /path/to/workflow/cache/validation
     output_suffix: segmentation
-    profile: s3df_ampere
-    time: "08:00:00"
     files_per_task: 1
     ntasks: 50
     module_weight:
@@ -46,8 +44,6 @@ stages:
     config: train/generic/graph_spice/train_from_uresnet_ppn_240805.yaml
     stage: train
     run_dir: /path/to/workflow/train/graph_spice
-    profile: s3df_ampere
-    time: "08:00:00"
     tensorboard: true
     sources:
       larcv:

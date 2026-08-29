@@ -22,6 +22,76 @@ from .run_manager import RunManager
 class Submitter:
     """Orchestrates batch job submissions for SPINE production."""
 
+    _PIPELINE_GLOBAL_FIELDS = frozenset(
+        {
+            "profile",
+            "larcv_path",
+            "larcv_basedir",
+            "flashmatch_path",
+            "spine_path",
+            "flashmatch",
+            "cvmfs",
+            "world_size",
+            "batch_size",
+            "minibatch_size",
+            "num_workers",
+            "epochs",
+            "iterations",
+            "partition",
+            "qos",
+            "queue",
+            "constraint",
+            "gpus_per_node",
+            "gpus",
+            "cpus_per_task",
+            "mem_per_cpu",
+            "mem_per_node",
+            "nodes",
+            "time",
+            "account",
+            "bind_paths",
+        }
+    )
+    _PIPELINE_STAGE_FIELDS = _PIPELINE_GLOBAL_FIELDS | frozenset(
+        {
+            "name",
+            "config",
+            "files",
+            "source",
+            "source_list",
+            "val_source",
+            "val_source_list",
+            "sources",
+            "validation_sources",
+            "module_weight",
+            "job_name",
+            "output",
+            "output_suffix",
+            "no_writer",
+            "ntasks",
+            "files_per_task",
+            "depends_on",
+            "cleanup",
+            "larcv_basedir",
+            "apply_mods",
+            "set",
+            "stage",
+            "run_dir",
+            "resume",
+            "resume_from",
+            "validation_name",
+            "rerun_validation",
+            "tensorboard",
+        }
+    )
+    _PIPELINE_EXCLUSIVE_GROUPS = (
+        frozenset({"partition", "qos", "queue"}),
+        frozenset({"gpus", "gpus_per_node"}),
+        frozenset({"mem_per_cpu", "mem_per_node"}),
+        frozenset({"batch_size", "minibatch_size"}),
+        frozenset({"epochs", "iterations"}),
+    )
+
     def _classify_config_request(self, config: str) -> Tuple[bool, str]:
         """Classify whether a config request should resolve to detector latest.
 
@@ -1467,7 +1537,11 @@ class Submitter:
         return job_ids
 
     def submit_pipeline(
-        self, pipeline_path: str, dry_run: bool = False, preload: bool = False
+        self,
+        pipeline_path: str,
+        dry_run: bool = False,
+        preload: bool = False,
+        overrides: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, List[str]]:
         """Submit multi-stage pipeline with dependencies.
 
@@ -1479,6 +1553,9 @@ class Submitter:
             Show what would be submitted, by default False
         preload : bool, optional
             Preload !download assets before each stage submission, by default False
+        overrides : mapping, optional
+            Pipeline-wide command-line overrides. These take precedence over
+            stage values and pipeline defaults.
 
         Returns
         -------
@@ -1488,13 +1565,185 @@ class Submitter:
         with open(pipeline_path, "r", encoding="utf-8") as f:
             pipeline = yaml.safe_load(f)
 
+        if not isinstance(pipeline, Mapping):
+            raise TypeError("Pipeline YAML must contain a mapping")
+        unknown_top_level = set(pipeline) - {"defaults", "stages"}
+        if unknown_top_level:
+            raise ValueError(
+                "Unknown pipeline field(s): " + ", ".join(sorted(unknown_top_level))
+            )
+
+        defaults = pipeline.get("defaults", {})
+        if not isinstance(defaults, Mapping):
+            raise TypeError("Pipeline defaults must be a mapping")
+        unknown_defaults = set(defaults) - self._PIPELINE_GLOBAL_FIELDS
+        if unknown_defaults:
+            raise ValueError(
+                "Pipeline defaults contain stage-specific or unknown field(s): "
+                + ", ".join(sorted(unknown_defaults))
+            )
+
+        overrides = overrides or {}
+        if not isinstance(overrides, Mapping):
+            raise TypeError("Pipeline overrides must be a mapping")
+        unknown_overrides = set(overrides) - self._PIPELINE_GLOBAL_FIELDS
+        if unknown_overrides:
+            raise ValueError(
+                "Unknown pipeline override field(s): "
+                + ", ".join(sorted(unknown_overrides))
+            )
+
+        raw_stages = pipeline.get("stages")
+        if not isinstance(raw_stages, list) or not raw_stages:
+            raise ValueError("Pipeline must define a non-empty stages list")
+
+        def normalize_layer(layer: Mapping[str, Any], context: str) -> Dict[str, Any]:
+            """Normalize backward-compatible aliases within one precedence layer."""
+            normalized = dict(layer)
+            if "larcv_basedir" in normalized:
+                if "larcv_path" in normalized:
+                    raise ValueError(
+                        f"{context} cannot specify both larcv_path and larcv_basedir"
+                    )
+                normalized["larcv_path"] = normalized.pop("larcv_basedir")
+            return normalized
+
+        def merge_layers(*layers: Mapping[str, Any]) -> Dict[str, Any]:
+            """Merge settings while respecting mutually exclusive option groups."""
+            merged: Dict[str, Any] = {}
+            for layer in layers:
+                for group in self._PIPELINE_EXCLUSIVE_GROUPS:
+                    if group.intersection(layer):
+                        for key in group:
+                            merged.pop(key, None)
+                merged.update(layer)
+            return merged
+
+        default_layer = normalize_layer(defaults, "Pipeline defaults")
+        override_layer = normalize_layer(overrides, "Pipeline overrides")
+        stages = []
+        prior_stage_names = set()
+        for index, raw_stage in enumerate(raw_stages):
+            if not isinstance(raw_stage, Mapping):
+                raise TypeError(f"Pipeline stage {index + 1} must be a mapping")
+            unknown_fields = set(raw_stage) - self._PIPELINE_STAGE_FIELDS
+            if unknown_fields:
+                raise ValueError(
+                    f"Pipeline stage {index + 1} contains unknown field(s): "
+                    + ", ".join(sorted(unknown_fields))
+                )
+            if not raw_stage.get("name") or not raw_stage.get("config"):
+                raise ValueError(
+                    f"Pipeline stage {index + 1} must define name and config"
+                )
+
+            stage_name = raw_stage["name"]
+            if not isinstance(stage_name, str):
+                raise TypeError(f"Pipeline stage {index + 1} name must be a string")
+            if stage_name in prior_stage_names:
+                raise ValueError(f"Duplicate pipeline stage name: {stage_name}")
+
+            depends_on = raw_stage.get("depends_on", [])
+            if not isinstance(depends_on, list) or not all(
+                isinstance(name, str) for name in depends_on
+            ):
+                raise TypeError(
+                    f"Pipeline stage '{stage_name}' depends_on must be a list of names"
+                )
+            unavailable = set(depends_on) - prior_stage_names
+            if unavailable:
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' depends on unknown or later "
+                    "stage(s): " + ", ".join(sorted(unavailable))
+                )
+
+            stage_layer = normalize_layer(raw_stage, f"Pipeline stage '{stage_name}'")
+            merged_stage = merge_layers(default_layer, stage_layer, override_layer)
+
+            source_keys = [
+                key for key in ("files", "source", "source_list") if key in merged_stage
+            ]
+            validation_keys = [
+                key for key in ("val_source", "val_source_list") if key in merged_stage
+            ]
+            if len(source_keys) > 1:
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' must specify only one of: "
+                    "files, source, source_list"
+                )
+            if len(validation_keys) > 1:
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' must specify only one of: "
+                    "val_source, val_source_list"
+                )
+            if merged_stage.get("sources") and source_keys:
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' cannot combine sources with "
+                    "files/source/source_list"
+                )
+            if merged_stage.get("validation_sources") and validation_keys:
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' cannot combine "
+                    "validation_sources with val_source/val_source_list"
+                )
+            for field in ("sources", "validation_sources", "module_weight"):
+                value = merged_stage.get(field)
+                if value is not None and not isinstance(value, Mapping):
+                    raise TypeError(
+                        f"Pipeline stage '{stage_name}' {field} must be a mapping"
+                    )
+
+            lifecycle_stage = merged_stage.get("stage", "inference")
+            if lifecycle_stage not in ("inference", "train", "validation"):
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' has invalid lifecycle stage: "
+                    f"{lifecycle_stage}"
+                )
+            if lifecycle_stage != "inference" and not merged_stage.get("run_dir"):
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' requires run_dir for "
+                    f"{lifecycle_stage}"
+                )
+            if lifecycle_stage != "train" and (
+                merged_stage.get("resume") or merged_stage.get("resume_from")
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' can resume only when stage=train"
+                )
+            if lifecycle_stage != "validation" and (
+                merged_stage.get("validation_name")
+                or merged_stage.get("rerun_validation")
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' validation lifecycle options "
+                    "require stage=validation"
+                )
+            if lifecycle_stage != "train" and (
+                validation_keys or merged_stage.get("validation_sources")
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' validation inputs require "
+                    "stage=train"
+                )
+            if lifecycle_stage != "inference" and (
+                merged_stage.get("ntasks") is not None
+                or merged_stage.get("files_per_task") is not None
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' task splitting requires "
+                    "stage=inference"
+                )
+
+            stages.append(merged_stage)
+            prior_stage_names.add(stage_name)
+
         print(f"Loading pipeline: {pipeline_path}")
-        print(f"Stages: {len(pipeline['stages'])}\n")
+        print(f"Stages: {len(stages)}\n")
 
         job_map = {}
         cleanup_map = {}  # Track stages that need cleanup
 
-        for stage in pipeline["stages"]:
+        for stage in stages:
             stage_name = stage["name"]
             print(f"Stage: {stage_name}")
 
@@ -1533,6 +1782,10 @@ class Submitter:
             set_overrides = stage.get("set")
             if set_overrides is not None and not isinstance(set_overrides, list):
                 set_overrides = [set_overrides]
+
+            apply_mods = stage.get("apply_mods")
+            if apply_mods is not None and not isinstance(apply_mods, list):
+                apply_mods = [apply_mods]
 
             named_sources = stage.get("sources")
             validation_named_sources = stage.get("validation_sources")
@@ -1602,8 +1855,11 @@ class Submitter:
                 dependency=dependency,
                 larcv_path=stage.get("larcv_path", stage.get("larcv_basedir")),
                 flashmatch_path=stage.get("flashmatch_path"),
+                spine_path=stage.get("spine_path"),
                 flashmatch=stage.get("flashmatch", False),
                 cvmfs=stage.get("cvmfs", False),
+                apply_mods=apply_mods,
+                no_writer=stage.get("no_writer", False),
                 dry_run=dry_run,
                 preload=preload,
                 set_overrides=set_overrides,
@@ -1641,7 +1897,7 @@ class Submitter:
             for stage_name, cleanup_info in cleanup_map.items():
                 # Find all stages that depend on this one
                 dependent_stages = []
-                for stage in pipeline["stages"]:
+                for stage in stages:
                     if stage_name in stage.get("depends_on", []):
                         dependent_stages.append(stage["name"])
 

@@ -24,6 +24,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="SPINE Production Batch Submission System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        allow_abbrev=False,
         epilog="""
 Examples:
   # Detector shorthand resolves to the latest composite config
@@ -133,7 +134,6 @@ Examples:
     parser.add_argument(
         "--profile",
         "-p",
-        default="auto",
         help="Resource profile (default: auto-detect)",
     )
     parser.add_argument(
@@ -196,7 +196,6 @@ Examples:
     parser.add_argument(
         "--stage",
         choices=["inference", "train", "validation"],
-        default="inference",
         help="Run lifecycle stage (default: inference)",
     )
     parser.add_argument(
@@ -280,6 +279,8 @@ Examples:
     )
     parser.add_argument(
         "--spine-path",
+        "--spine",
+        dest="spine_path",
         help=(
             "Override the SPINE executable with a checkout directory or explicit "
             "executable path. Directories resolve to bin/spine or bin/run.py."
@@ -343,7 +344,6 @@ Examples:
     parser.add_argument(
         "--interactive-runtime",
         choices=["auto", "local", "container"],
-        default="auto",
         help=(
             "Runtime for --interactive: local uses spine on PATH, container uses "
             "SPINE_CONTAINER_PATH/SPINE_CONTAINER_TAG, auto falls back to "
@@ -354,7 +354,6 @@ Examples:
     parser.add_argument(
         "--task-id",
         type=int,
-        default=1,
         help="Task ID to run in interactive mode (default: 1)",
     )
     parser.add_argument(
@@ -426,21 +425,44 @@ Examples:
             args.validation_name,
             args.rerun_validation,
             args.tensorboard,
-            args.stage != "inference",
+            args.stage is not None,
         ]
     )
     if args.interactive and lifecycle_options:
         parser.error("run lifecycle options are currently supported in batch mode only")
-    if args.pipeline and lifecycle_options:
-        parser.error("run lifecycle options must be specified within a pipeline stage")
     if args.interactive and (args.val_source or args.val_source_list):
         parser.error(
             "validation source options are currently supported in batch mode only"
         )
-    if args.pipeline and (args.val_source or args.val_source_list):
-        parser.error(
-            "validation source options must be specified within a pipeline stage"
-        )
+
+    if args.pipeline:
+        stage_specific_options = [
+            ("--source/--source-list", args.source or args.source_list),
+            ("--val-source/--val-source-list", args.val_source or args.val_source_list),
+            ("--apply-mods", args.apply_mods),
+            ("--set", args.set_overrides),
+            ("--ntasks", args.ntasks is not None),
+            ("--files-per-task", args.files_per_task is not None),
+            ("--job-name", args.job_name),
+            ("--stage", args.stage is not None),
+            ("--run-dir", args.run_dir),
+            ("--resume/--resume-from", args.resume or args.resume_from),
+            ("--validation-name", args.validation_name),
+            ("--rerun-validation", args.rerun_validation),
+            ("--tensorboard", args.tensorboard),
+            ("--output", args.output),
+            ("--output-suffix", args.output_suffix),
+            ("--no-writer", args.no_writer),
+            ("--dependency", args.dependency),
+            ("--task-id", args.task_id is not None),
+            ("--interactive-runtime", args.interactive_runtime is not None),
+        ]
+        invalid_options = [option for option, value in stage_specific_options if value]
+        if invalid_options:
+            parser.error(
+                "pipeline stages must configure stage-specific options in YAML: "
+                + ", ".join(invalid_options)
+            )
 
     # Build profile overrides
     profile_overrides = {}
@@ -466,8 +488,32 @@ Examples:
     try:
         if args.pipeline:
             # Pipeline mode
+            pipeline_overrides = {
+                key: value
+                for key, value in {
+                    "profile": args.profile,
+                    "larcv_path": args.larcv_path,
+                    "flashmatch_path": args.flashmatch_path,
+                    "spine_path": args.spine_path,
+                    "world_size": args.world_size,
+                    "batch_size": args.batch_size,
+                    "minibatch_size": args.minibatch_size,
+                    "num_workers": args.num_workers,
+                    "epochs": args.epochs,
+                    "iterations": args.iterations,
+                }.items()
+                if value is not None
+            }
+            if args.flashmatch:
+                pipeline_overrides["flashmatch"] = True
+            if args.cvmfs:
+                pipeline_overrides["cvmfs"] = True
+            pipeline_overrides.update(profile_overrides)
             job_map = submitter.submit_pipeline(
-                args.pipeline, dry_run=args.dry_run, preload=args.preload
+                args.pipeline,
+                dry_run=args.dry_run,
+                preload=args.preload,
+                overrides=pipeline_overrides,
             )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():
@@ -486,7 +532,7 @@ Examples:
                 output_suffix=args.output_suffix,
                 no_writer=args.no_writer,
                 files_per_task=args.files_per_task,
-                task_id=args.task_id,
+                task_id=args.task_id or 1,
                 larcv_path=args.larcv_path,
                 flashmatch_path=args.flashmatch_path,
                 flashmatch=args.flashmatch,
@@ -500,7 +546,7 @@ Examples:
                 num_workers=args.num_workers,
                 epochs=args.epochs,
                 iterations=args.iterations,
-                interactive_runtime=args.interactive_runtime,
+                interactive_runtime=args.interactive_runtime or "auto",
                 bind_paths=args.bind_paths,
                 spine_path=args.spine_path,
             )
@@ -522,7 +568,7 @@ Examples:
                 source_type=source_type,
                 validation_files=validation_files,
                 validation_source_type=validation_source_type,
-                profile=args.profile,
+                profile=args.profile or "auto",
                 job_name=args.job_name,
                 output=args.output,
                 output_suffix=args.output_suffix,
@@ -545,7 +591,7 @@ Examples:
                 epochs=args.epochs,
                 iterations=args.iterations,
                 spine_path=args.spine_path,
-                stage=args.stage,
+                stage=args.stage or "inference",
                 run_dir=args.run_dir,
                 resume=args.resume,
                 resume_from=args.resume_from,
@@ -558,7 +604,7 @@ Examples:
             if job_ids and not args.dry_run:
                 print(f"\n=== Submitted job IDs: {', '.join(job_ids)} ===")
 
-    except (FileNotFoundError, ValueError, OSError, RuntimeError) as e:
+    except (FileNotFoundError, TypeError, ValueError, OSError, RuntimeError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
 

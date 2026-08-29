@@ -228,7 +228,7 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
 
     assert result == 0
     submitter.submit_pipeline.assert_called_once_with(
-        "pipeline.yaml", dry_run=False, preload=True
+        "pipeline.yaml", dry_run=False, preload=True, overrides={}
     )
     output = capsys.readouterr().out
     assert "reco: 42" in output
@@ -260,6 +260,62 @@ def test_local_output_warns_that_option_is_deprecated(capsys):
 def test_pipeline_rejects_interactive_mode():
     with pytest.raises(SystemExit, match="2"):
         run_main("--pipeline", "pipeline.yaml", "--interactive")
+
+
+def test_pipeline_mode_forwards_global_overrides():
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--spine",
+        "/software/spine-dev",
+        "--profile",
+        "s3df_hopper",
+        "--account",
+        "neutrino",
+        "--gpus",
+        "4",
+        "--time",
+        "12:00:00",
+        "--iterations",
+        "10",
+        "--cvmfs",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert submitter.submit_pipeline.call_args.kwargs["overrides"] == {
+        "spine_path": "/software/spine-dev",
+        "profile": "s3df_hopper",
+        "account": "neutrino",
+        "gpus": 4,
+        "time": "12:00:00",
+        "iterations": 10,
+        "cvmfs": True,
+    }
+
+
+def test_cli_rejects_undeclared_long_option_abbreviations():
+    with pytest.raises(SystemExit, match="2"):
+        run_main("--pipeline", "pipeline.yaml", "--spin", "/software/spine-dev")
+
+
+@pytest.mark.parametrize(
+    "stage_args",
+    [
+        ("--source", "input.root"),
+        ("--apply-mods", "data"),
+        ("--set", "base.seed=7"),
+        ("--ntasks", "4"),
+        ("--output", "/tmp/output.h5"),
+        ("--task-id", "2"),
+    ],
+)
+def test_pipeline_mode_rejects_stage_specific_cli_options(stage_args):
+    with pytest.raises(SystemExit, match="2"):
+        run_main("--pipeline", "pipeline.yaml", *stage_args)
 
 
 @pytest.mark.parametrize(

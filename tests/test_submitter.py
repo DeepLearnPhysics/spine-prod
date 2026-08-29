@@ -2570,6 +2570,8 @@ class TestPipelineSubmission:
                         {
                             "name": "configured_inputs",
                             "config": "mixed.yaml",
+                            "stage": "train",
+                            "run_dir": "/tmp/configured-inputs",
                             "sources": {
                                 "larcv": {"source": "raw.root"},
                                 "hdf5": {"source": "cache.h5"},
@@ -2612,6 +2614,113 @@ class TestPipelineSubmission:
         assert configured["module_weights"] == {
             "uresnet_ppn": "/tmp/snapshot-best.ckpt"
         }
+
+    def test_submit_pipeline_layers_defaults_stage_values_and_cli_overrides(
+        self, mock_submitter, tmp_path
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "defaults": {
+                        "profile": "s3df_ampere",
+                        "time": "04:00:00",
+                        "spine_path": "/software/default-spine",
+                        "gpus_per_node": 2,
+                    },
+                    "stages": [
+                        {
+                            "name": "first",
+                            "config": "first.yaml",
+                            "time": "08:00:00",
+                            "spine_path": "/software/stage-spine",
+                        },
+                        {
+                            "name": "second",
+                            "config": "second.yaml",
+                            "profile": "s3df_milano",
+                        },
+                    ],
+                }
+            )
+        )
+
+        with patch.object(
+            mock_submitter, "submit_job", side_effect=[["10"], ["20"]]
+        ) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                overrides={
+                    "profile": "s3df_hopper",
+                    "spine_path": "/software/cli-spine",
+                    "gpus": 4,
+                },
+            )
+
+        assert result == {"first": ["10"], "second": ["20"]}
+        for call in submit_job.call_args_list:
+            assert call.kwargs["profile"] == "s3df_hopper"
+            assert call.kwargs["spine_path"] == "/software/cli-spine"
+            assert call.kwargs["gpus"] == 4
+            assert "gpus_per_node" not in call.kwargs
+        assert submit_job.call_args_list[0].kwargs["time"] == "08:00:00"
+        assert submit_job.call_args_list[1].kwargs["time"] == "04:00:00"
+
+    @pytest.mark.parametrize(
+        ("pipeline", "message"),
+        [
+            (
+                {"unexpected": True, "stages": []},
+                "Unknown pipeline field",
+            ),
+            (
+                {
+                    "defaults": {"source": "input.root"},
+                    "stages": [{"name": "stage", "config": "config.yaml"}],
+                },
+                "defaults contain stage-specific",
+            ),
+            (
+                {
+                    "stages": [
+                        {
+                            "name": "stage",
+                            "config": "config.yaml",
+                            "typo_profile": "s3df_hopper",
+                        }
+                    ]
+                },
+                "unknown field",
+            ),
+        ],
+    )
+    def test_submit_pipeline_rejects_unknown_fields_before_submission(
+        self, mock_submitter, tmp_path, pipeline, message
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(yaml.safe_dump(pipeline))
+
+        with patch.object(mock_submitter, "submit_job") as submit_job:
+            with pytest.raises(ValueError, match=message):
+                mock_submitter.submit_pipeline(str(pipeline_path))
+
+        submit_job.assert_not_called()
+
+    def test_submit_pipeline_rejects_unknown_cli_override(
+        self, mock_submitter, tmp_path
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump({"stages": [{"name": "stage", "config": "config.yaml"}]})
+        )
+
+        with patch.object(mock_submitter, "submit_job") as submit_job:
+            with pytest.raises(ValueError, match="Unknown pipeline override"):
+                mock_submitter.submit_pipeline(
+                    str(pipeline_path), overrides={"source": "input.root"}
+                )
+
+        submit_job.assert_not_called()
 
     @pytest.mark.parametrize(
         "conflicting_keys",
@@ -2703,7 +2812,7 @@ class TestPipelineSubmission:
                             "name": "reconstruct",
                             "config": "reconstruct.yaml",
                             "files": ["intermediate.root"],
-                            "depends_on": ["prepare", "unknown"],
+                            "depends_on": ["prepare"],
                             "profile": "s3df_ampere",
                             "output_suffix": "reco",
                             "larcv_basedir": "/software/larcv",
@@ -2789,7 +2898,7 @@ class TestPipelineSubmission:
         assert result == {"prepare": ["10"], "consume": []}
         cleanup.assert_not_called()
 
-    def test_submit_pipeline_ignores_unknown_dependency_and_needs_no_cleanup(
+    def test_submit_pipeline_rejects_unknown_dependency_before_submission(
         self, mock_submitter, tmp_path
     ):
         pipeline_path = tmp_path / "pipeline.yaml"
@@ -2808,14 +2917,8 @@ class TestPipelineSubmission:
             )
         )
 
-        with (
-            patch.object(
-                mock_submitter, "submit_job", return_value=["10"]
-            ) as submit_job,
-            patch.object(mock_submitter.batch_client, "submit_cleanup_job") as cleanup,
-        ):
-            result = mock_submitter.submit_pipeline(str(pipeline_path))
+        with patch.object(mock_submitter, "submit_job") as submit_job:
+            with pytest.raises(ValueError, match="unknown or later stage"):
+                mock_submitter.submit_pipeline(str(pipeline_path))
 
-        assert result == {"standalone": ["10"]}
-        assert submit_job.call_args.kwargs["dependency"] is None
-        cleanup.assert_not_called()
+        submit_job.assert_not_called()
