@@ -5,7 +5,7 @@ stages:
   # Stage 1: Run SPINE reconstruction on raw data
   - name: reconstruction
     config: infer/icarus/latest
-    files: /sdf/data/neutrino/icarus/run2/data/*.root
+    source: /sdf/data/neutrino/icarus/run2/data/*.root
     profile: s3df_ampere
     ntasks: 100
     files_per_task: 1
@@ -20,7 +20,7 @@ stages:
   - name: analysis
     depends_on: [reconstruction]
     config: path/to/downstream_stage.yaml
-    files: output_reco/*.h5
+    source: output_reco/*.h5
     profile: s3df_milano
     ntasks: 20
     files_per_task: 5

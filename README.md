@@ -159,6 +159,7 @@ spine-prod/
 ├── README.md                # This file
 │
 ├── config/                  # All SPINE configs (inference & training)
+│   ├── cache/               # Stage-cache materialization configs
 │   ├── infer/               # Inference configs (referenced as infer/...)
 │   │   ├── 2x2/             # 2x2 detector configs
 │   │   ├── dune10kt-1x2x6/  # DUNE 10 kt module 1x2x6 configs
@@ -169,6 +170,7 @@ spine-prod/
 │   │   ├── protodune-vd/    # ProtoDUNE vertical-drift configs
 │   │   ├── sbnd/            # SBND detector configs
 │   │   └── common/          # Shared configs
+│   ├── model/               # Common structures and detector revisions
 │   └── train/               # Training configs (referenced as train/...)
 ├── templates/               # Job templates
 │   ├── profiles.yaml        # Resource profiles
@@ -177,6 +179,8 @@ spine-prod/
 │   └── job_template_anl.pbs
 │
 ├── pipelines/               # Multi-stage pipeline definitions
+│   ├── generic/              # Generic detector workflow revisions
+│   │   └── uresnet_ppn_to_graph_spice_240805.yaml
 │   └── icarus_production_example.yaml
 │
 ├── scripts/                 # Utility scripts
@@ -502,7 +506,7 @@ Create a YAML file in `pipelines/`:
 stages:
   - name: reconstruction
     config: infer/icarus/latest
-    files: /path/to/raw/*.root
+    source: /path/to/raw/*.root
     profile: s3df_ampere
     ntasks: 100
     # Replace with a concrete YAML config if you need specific modifiers
@@ -510,7 +514,7 @@ stages:
   - name: analysis
     depends_on: [reconstruction]  # Wait for reconstruction to complete
     config: path/to/downstream_stage.yaml
-    files: output_reco/*.h5
+    source: output_reco/*.h5
     profile: s3df_milano
     ntasks: 20
 ```
@@ -520,6 +524,13 @@ stages:
 ```bash
 ./submit.py --pipeline pipelines/my_pipeline.yaml
 ```
+
+Pipeline stages accept the CLI-equivalent `source`, `source_list`,
+`val_source`, and `val_source_list` fields. Composite datasets use structured
+`sources` and `validation_sources`, while `module_weight` forwards named model
+checkpoints through SPINE's native CLI. See
+`pipelines/generic/uresnet_ppn_to_graph_spice_240805.yaml` for the first
+staged-training prototype.
 
 ## Run Management
 

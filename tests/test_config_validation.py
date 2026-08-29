@@ -131,6 +131,48 @@ def test_generic_training_variants_follow_component_model_changes():
     }
 
 
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_generic_segmentation_cache_reuses_uresnet_ppn_revision():
+    """The cache producer must run the same network as standalone training."""
+    cache = load_config_with_includes(
+        CONFIG_ROOT / "cache" / "generic" / "uresnet_ppn" / "segmentation_240805.yaml"
+    )
+    standalone = load_config_with_includes(
+        CONFIG_ROOT / "model" / "generic" / "uresnet_ppn" / "model_240805.yaml"
+    )
+
+    cache_module = cache["model"]["modules"]["uresnet_ppn"]
+    standalone_modules = standalone["model"]["modules"]
+    assert cache_module["uresnet"] == standalone_modules["uresnet"]
+    assert cache_module["ppn"] == standalone_modules["ppn"]
+    assert cache_module["model_name"] == ""
+    assert cache_module["weight_path"] == ""
+    assert cache["io"]["writer"]["stage"] == "segmentation"
+    assert cache["io"]["writer"]["keys"] == ["seg_pred"]
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_generic_graph_spice_can_train_from_segmentation_cache():
+    """The cached recipe must merge truth with the canonical prediction product."""
+    config = load_config_with_includes(
+        CONFIG_ROOT
+        / "train"
+        / "generic"
+        / "graph_spice"
+        / "train_from_uresnet_ppn_240805.yaml"
+    )
+
+    dataset = config["io"]["loader"]["dataset"]
+    assert dataset["name"] == "mixed"
+    assert "seg_label" not in dataset["larcv"]["schema"]
+    assert dataset["hdf5"]["staged"] is True
+    assert dataset["hdf5"]["stage"] == "segmentation"
+    assert dataset["hdf5"]["schema"]["seg_pred"]["parser"] == "feature_tensor"
+    assert set(config["validation"]["sources"]) == {"larcv", "hdf5"}
+    assert config["model"]["network_input"]["seg_label"] == "seg_pred"
+    assert config["model"]["loss_input"]["seg_label"] == "seg_pred"
+
+
 def test_default_uresnet_matches_generic_full_chain():
     """The shared UResNet definition must match the generic full chain."""
     network_path = CONFIG_ROOT / "model" / "common" / "uresnet" / "network_v1.yaml"

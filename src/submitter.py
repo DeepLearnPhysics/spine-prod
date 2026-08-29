@@ -8,7 +8,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import yaml
 
@@ -197,6 +197,69 @@ class Submitter:
             formatted.append(f"--set {override}")
 
         return " ".join(formatted)
+
+    @staticmethod
+    def _format_spine_named_sources(
+        sources: Optional[Mapping[str, Mapping[str, Any]]],
+        validation: bool = False,
+    ) -> str:
+        """Format target-qualified composite dataset source overrides."""
+        if not sources:
+            return ""
+
+        direct_option = "--val-source" if validation else "--source"
+        list_option = "--val-source-list" if validation else "--source-list"
+        direct_values = []
+        list_values = []
+        for target, source_cfg in sources.items():
+            if not isinstance(source_cfg, Mapping):
+                raise TypeError(f"Named source '{target}' must be a mapping")
+            selectors = [key for key in ("source", "source_list") if key in source_cfg]
+            if len(selectors) != 1:
+                raise ValueError(
+                    f"Named source '{target}' must specify exactly one of: "
+                    "source, source_list"
+                )
+
+            selector = selectors[0]
+            values = source_cfg[selector]
+            if selector == "source":
+                if not isinstance(values, list):
+                    values = [values]
+                if not values:
+                    raise ValueError(f"Named source '{target}' cannot be empty")
+                direct_values.extend(
+                    shlex.quote(f"{target}={value}") for value in values
+                )
+            else:
+                if isinstance(values, list):
+                    if len(values) != 1:
+                        raise ValueError(
+                            f"Named source-list '{target}' accepts exactly one file"
+                        )
+                    values = values[0]
+                list_values.append(shlex.quote(f"{target}={values}"))
+
+        parts = []
+        if direct_values:
+            parts.append(f"{direct_option} {' '.join(direct_values)}")
+        if list_values:
+            parts.append(f"{list_option} {' '.join(list_values)}")
+        return " ".join(parts)
+
+    @staticmethod
+    def _format_spine_module_weights(
+        module_weights: Optional[Mapping[str, str]],
+    ) -> str:
+        """Format module-specific checkpoint overrides."""
+        if not module_weights:
+            return ""
+        values = []
+        for module, path in module_weights.items():
+            if not module or not path:
+                raise ValueError("Module weight assignments require a module and path")
+            values.append(shlex.quote(f"{module}={path}"))
+        return f"--module-weight {' '.join(values)}"
 
     @staticmethod
     def _format_spine_runtime_options(
@@ -792,6 +855,9 @@ class Submitter:
         source_type: str = "source",
         validation_files: Optional[List[str]] = None,
         validation_source_type: str = "source",
+        named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
+        validation_named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
+        module_weights: Optional[Mapping[str, str]] = None,
         profile: str = "auto",
         job_name: Optional[str] = None,
         output: Optional[str] = None,
@@ -840,6 +906,12 @@ class Submitter:
             Validation input files, globs, or one validation source-list path.
         validation_source_type : str, optional
             Either 'source' or 'source_list' for ``validation_files``.
+        named_sources : mapping, optional
+            Target-qualified source selectors for a composite dataset.
+        validation_named_sources : mapping, optional
+            Target-qualified validation selectors for a composite dataset.
+        module_weights : mapping, optional
+            Model module names mapped to checkpoint paths.
         profile : str, optional
             Resource profile name or 'auto', by default 'auto'
         job_name : str, optional
@@ -933,6 +1005,12 @@ class Submitter:
             raise ValueError(
                 "--val-source and --val-source-list are valid only for training"
             )
+        if validation_named_sources and stage != "train":
+            raise ValueError("Named validation sources are valid only for training")
+        if files and named_sources:
+            raise ValueError("Flat and named training sources cannot be combined")
+        if validation_files and validation_named_sources:
+            raise ValueError("Flat and named validation sources cannot be combined")
         if stage != "inference" and (ntasks is not None or files_per_task is not None):
             raise ValueError(
                 "--ntasks and --files-per-task are valid only for inference"
@@ -944,7 +1022,7 @@ class Submitter:
             if not file_list:
                 raise ValueError("No input files found")
             print(f"Found {len(file_list)} file(s) to process")
-        else:
+        elif not named_sources:
             if ntasks is not None or files_per_task is not None:
                 raise ValueError(
                     "Cannot use --ntasks/--files-per-task without "
@@ -956,6 +1034,8 @@ class Submitter:
                     "--source/--source-list"
                 )
             print("No input files provided; using inputs defined in the config")
+        else:
+            print(f"Using {len(named_sources)} named dataset source(s)")
 
         validation_file_list = []
         if validation_files:
@@ -1017,6 +1097,11 @@ class Submitter:
             self._preload_downloads(config)
 
         spine_cli_overrides = self._format_spine_set_overrides(set_overrides)
+        named_source_overrides = self._format_spine_named_sources(named_sources)
+        validation_named_source_overrides = self._format_spine_named_sources(
+            validation_named_sources, validation=True
+        )
+        module_weight_overrides = self._format_spine_module_weights(module_weights)
         spine_cmd, extra_bind_root = self._resolve_spine_command(spine_path)
         _, larcv_bind_root = self._resolve_setup_path(larcv_path, "--larcv-path")
         _, flashmatch_bind_root = self._resolve_setup_path(
@@ -1149,7 +1234,14 @@ class Submitter:
         extra_args = " ".join(lifecycle_args)
         spine_cli_overrides = " ".join(
             part
-            for part in [spine_runtime_options, spine_cli_overrides, extra_args]
+            for part in [
+                spine_runtime_options,
+                spine_cli_overrides,
+                named_source_overrides,
+                validation_named_source_overrides,
+                module_weight_overrides,
+                extra_args,
+            ]
             if part
         )
 
@@ -1305,6 +1397,9 @@ class Submitter:
             "original_config": original_config if apply_mods else config,
             "applied_modifiers": apply_mods or [],
             "set_overrides": set_overrides or [],
+            "named_sources": named_sources or {},
+            "validation_named_sources": validation_named_sources or {},
+            "module_weights": module_weights or {},
             "world_size": world_size,
             "batch_size": batch_size,
             "minibatch_size": minibatch_size,
@@ -1403,6 +1498,60 @@ class Submitter:
             stage_name = stage["name"]
             print(f"Stage: {stage_name}")
 
+            # Accept the same source vocabulary as the command-line interface.
+            # ``files`` remains as a backward-compatible spelling for ``source``.
+            source_keys = [
+                key for key in ("files", "source", "source_list") if key in stage
+            ]
+            if len(source_keys) > 1:
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' must specify only one of: "
+                    "files, source, source_list"
+                )
+            source_key = source_keys[0] if source_keys else None
+            files = stage.get(source_key) if source_key else None
+            if files is not None and not isinstance(files, list):
+                files = [files]
+            source_type = "source_list" if source_key == "source_list" else "source"
+
+            validation_keys = [
+                key for key in ("val_source", "val_source_list") if key in stage
+            ]
+            if len(validation_keys) > 1:
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' must specify only one of: "
+                    "val_source, val_source_list"
+                )
+            validation_key = validation_keys[0] if validation_keys else None
+            validation_files = stage.get(validation_key) if validation_key else None
+            if validation_files is not None and not isinstance(validation_files, list):
+                validation_files = [validation_files]
+            validation_source_type = (
+                "source_list" if validation_key == "val_source_list" else "source"
+            )
+
+            set_overrides = stage.get("set")
+            if set_overrides is not None and not isinstance(set_overrides, list):
+                set_overrides = [set_overrides]
+
+            named_sources = stage.get("sources")
+            validation_named_sources = stage.get("validation_sources")
+            module_weights = stage.get("module_weight")
+            if named_sources and source_key:
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' cannot combine sources with "
+                    "files/source/source_list"
+                )
+            if validation_named_sources and validation_key:
+                raise ValueError(
+                    f"Pipeline stage '{stage_name}' cannot combine "
+                    "validation_sources with val_source/val_source_list"
+                )
+            if module_weights is not None and not isinstance(module_weights, Mapping):
+                raise TypeError(
+                    f"Pipeline stage '{stage_name}' module_weight must be a mapping"
+                )
+
             # Build dependency string
             depends_on = stage.get("depends_on", [])
             dependency = None
@@ -1417,7 +1566,13 @@ class Submitter:
             # Submit stage
             job_ids = self.submit_job(
                 config=stage["config"],
-                files=stage["files"],
+                files=files,
+                source_type=source_type,
+                validation_files=validation_files,
+                validation_source_type=validation_source_type,
+                named_sources=named_sources,
+                validation_named_sources=validation_named_sources,
+                module_weights=module_weights,
                 profile=stage.get("profile", "auto"),
                 job_name=stage.get("job_name", stage_name),
                 output=stage.get("output"),
@@ -1431,6 +1586,7 @@ class Submitter:
                 cvmfs=stage.get("cvmfs", False),
                 dry_run=dry_run,
                 preload=preload,
+                set_overrides=set_overrides,
                 stage=stage.get("stage", "inference"),
                 run_dir=stage.get("run_dir"),
                 resume=stage.get("resume", False),

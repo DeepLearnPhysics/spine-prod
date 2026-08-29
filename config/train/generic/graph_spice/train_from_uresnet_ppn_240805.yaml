@@ -1,0 +1,16 @@
+__meta__:
+  kind: bundle
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic Graph-SPICE training from cached UResNet-PPN predictions
+
+include:
+  - model/generic/graph_spice/model_240805.yaml
+  - train/generic/graph_spice/from_segmentation_cache_v1.yaml
+
+override:
+  # Keep Graph-SPICE standalone while replacing truth semantics with the
+  # canonical prediction product emitted by the segmentation provider.
+  model.network_input.seg_label: seg_pred
+  model.loss_input.seg_label: seg_pred
+  model.modules.graph_spice.make_clusters: false
