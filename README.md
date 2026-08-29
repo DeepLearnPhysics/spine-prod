@@ -503,11 +503,14 @@ Pipelines allow you to chain multiple processing stages with automatic dependenc
 Create a YAML file in `pipelines/`:
 
 ```yaml
+defaults:
+  profile: s3df_ampere
+  time: "08:00:00"
+
 stages:
   - name: reconstruction
     config: infer/icarus/latest
     source: /path/to/raw/*.root
-    profile: s3df_ampere
     ntasks: 100
     # Replace with a concrete YAML config if you need specific modifiers
   
@@ -524,6 +527,25 @@ stages:
 ```bash
 ./submit.py --pipeline pipelines/my_pipeline.yaml
 ```
+
+Pipeline-wide CLI overrides take precedence over individual stage values, which
+in turn take precedence over `defaults`. This is useful for launch-specific
+software and scheduler settings:
+
+```bash
+./submit.py \
+  --pipeline pipelines/my_pipeline.yaml \
+  --spine-path /path/to/spine \
+  --profile s3df_hopper \
+  --account my_account
+```
+
+Software paths, profiles, scheduler resources, and first-class SPINE runtime
+options can be overridden pipeline-wide. Inputs, outputs, run directories,
+dependencies, model weights, and lifecycle options remain stage-specific and
+must be configured in YAML. Unsupported pipeline CLI options and unknown YAML
+fields fail before any jobs are submitted. `--spine` is an explicit alias for
+`--spine-path`.
 
 Pipeline stages accept the CLI-equivalent `source`, `source_list`,
 `val_source`, and `val_source_list` fields. Composite datasets use structured
