@@ -127,6 +127,7 @@ class BatchRunner(SubmissionComponent):
         named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
         validation_named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
         module_weights: Optional[Mapping[str, str]] = None,
+        export_weights: Optional[str] = None,
         profile: str = "auto",
         job_name: Optional[str] = None,
         output: Optional[str] = None,
@@ -181,6 +182,8 @@ class BatchRunner(SubmissionComponent):
             Target-qualified validation selectors for a composite dataset.
         module_weights : mapping, optional
             Model module names mapped to checkpoint paths.
+        export_weights : str, optional
+            Compose configured module checkpoints into this model artifact.
         profile : str, optional
             Resource profile name or 'auto', by default 'auto'
         job_name : str, optional
@@ -276,6 +279,17 @@ class BatchRunner(SubmissionComponent):
             )
         if validation_named_sources and stage != "train":
             raise ValueError("Named validation sources are valid only for training")
+        if export_weights:
+            if stage != "inference":
+                raise ValueError("--export-weights requires stage=inference")
+            if files or named_sources or validation_files or validation_named_sources:
+                raise ValueError(
+                    "--export-weights cannot be combined with data sources"
+                )
+            if output is not None or output_suffix is not None:
+                raise ValueError(
+                    "--export-weights cannot be combined with writer output options"
+                )
         if files and named_sources:
             raise ValueError("Flat and named training sources cannot be combined")
         if validation_files and validation_named_sources:
@@ -374,6 +388,9 @@ class BatchRunner(SubmissionComponent):
         )
         module_weight_overrides = self.context.spine_cli.format_module_weights(
             module_weights
+        )
+        export_weight_override = self.context.spine_cli.format_export_weights(
+            export_weights
         )
         spine_cmd, extra_bind_root = self.context.runtime.resolve_spine_command(
             spine_path
@@ -517,6 +534,7 @@ class BatchRunner(SubmissionComponent):
                 named_source_overrides,
                 validation_named_source_overrides,
                 module_weight_overrides,
+                export_weight_override,
                 extra_args,
             ]
             if part
@@ -681,6 +699,7 @@ class BatchRunner(SubmissionComponent):
             "named_sources": named_sources or {},
             "validation_named_sources": validation_named_sources or {},
             "module_weights": module_weights or {},
+            "export_weights": export_weights,
             "world_size": world_size,
             "batch_size": batch_size,
             "minibatch_size": minibatch_size,

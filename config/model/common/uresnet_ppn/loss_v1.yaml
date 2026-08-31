@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 composed UResNet-PPN loss structure
+
+uresnet_loss: !include model/common/uresnet/loss_v1.yaml
+ppn_loss: !include model/common/uresnet_ppn/ppn_loss_v1.yaml

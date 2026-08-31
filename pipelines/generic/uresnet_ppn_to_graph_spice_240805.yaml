@@ -1,9 +1,9 @@
 # Prototype transition: train UResNet-PPN, cache its predictions and adapted
 # cluster truth, then train standalone Graph-SPICE from those stage products.
-# Set the workflow destination once before submission.
+# Supply the workflow destination with CLI --workspace.
 # The cache naming matches the appendable full-chain workflow.
 
-workspace: /path/to/workflow
+workspace: null
 
 variables:
   train_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root

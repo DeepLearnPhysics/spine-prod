@@ -223,12 +223,21 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
     submitter.submit_pipeline.return_value = {"reco": ["42"], "post": ["43"]}
 
     result, _, _ = run_main(
-        "--pipeline", "pipeline.yaml", "--preload", submitter=submitter
+        "--pipeline",
+        "pipeline.yaml",
+        "--workspace",
+        "/runs/benchmark",
+        "--preload",
+        submitter=submitter,
     )
 
     assert result == 0
     submitter.submit_pipeline.assert_called_once_with(
-        "pipeline.yaml", dry_run=False, preload=True, overrides={}
+        "pipeline.yaml",
+        dry_run=False,
+        preload=True,
+        overrides={},
+        workspace="/runs/benchmark",
     )
     output = capsys.readouterr().out
     assert "reco: 42" in output
@@ -295,6 +304,13 @@ def test_pipeline_mode_forwards_global_overrides():
         "iterations": 10,
         "cvmfs": True,
     }
+    assert submitter.submit_pipeline.call_args.kwargs["workspace"] is None
+
+
+def test_workspace_is_rejected_outside_pipeline_mode():
+    """A pipeline workspace must not silently behave like a job run directory."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main("--config", "config.yaml", "--workspace", "/runs/benchmark")
 
 
 def test_cli_rejects_undeclared_long_option_abbreviations():

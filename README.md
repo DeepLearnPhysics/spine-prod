@@ -503,7 +503,7 @@ Pipelines allow you to chain multiple processing stages with automatic dependenc
 Create a YAML file in `pipelines/`:
 
 ```yaml
-workspace: /path/to/production
+workspace: null
 
 variables:
   raw_source: /path/to/raw/*.root
@@ -531,11 +531,17 @@ stages:
 ```
 
 `workspace` defines the pipeline's shared output root and is available as the
-reserved `${workspace}` variable. Additional string values under `variables`
-can reference the workspace or one another. Expansion applies recursively to
-stage fields, including structured sources and module weights. Undefined
-variables, dependency cycles, and invalid declarations fail before any job is
-submitted; environment variables are not expanded implicitly.
+reserved `${workspace}` variable. Declaring `workspace: null` keeps a checked-in
+pipeline independent of its launch location and requires an explicit
+`--workspace` at submission. A concrete YAML value remains a valid default and
+can also be overridden from the CLI. Pipelines that do not use a shared
+workspace may omit the field entirely.
+
+Additional string values under `variables` can reference the workspace or one
+another. Expansion applies recursively to stage fields, including structured
+sources and module weights. Undefined variables, dependency cycles, missing
+required workspaces, and invalid declarations fail before any job is submitted;
+environment variables are not expanded implicitly.
 
 Repeated stage variants can be declared as a flat string collection and
 expanded before validation:
@@ -564,7 +570,9 @@ and each expanded stage remains an independent scheduler job.
 ### Submit Pipeline
 
 ```bash
-./submit.py --pipeline pipelines/my_pipeline.yaml
+./submit.py \
+  --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/production
 ```
 
 Pipeline-wide CLI overrides take precedence over individual stage values, which
@@ -574,6 +582,7 @@ software and scheduler settings:
 ```bash
 ./submit.py \
   --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/production \
   --spine-path /path/to/spine \
   --profile s3df_hopper \
   --account my_account
@@ -589,10 +598,13 @@ fields fail before any jobs are submitted. `--spine` is an explicit alias for
 Pipeline stages accept the CLI-equivalent `source`, `source_list`,
 `val_source`, and `val_source_list` fields. Composite datasets use structured
 `sources` and `validation_sources`, while `module_weight` forwards named model
-checkpoints through SPINE's native CLI. See
+checkpoints through SPINE's native CLI. A model-only `export_weights` stage
+composes those checkpoints into one inference artifact without initializing
+data I/O. See
 `pipelines/generic/full_chain_240805.yaml` for a complete staged-training
 prototype with centralized paths. Its materialization jobs append successive
-stage groups to one source-derived HDF5 cache per training or validation file.
+stage groups to one source-derived HDF5 cache per training or validation file,
+then compose the independently trained modules into one full-chain checkpoint.
 
 ## Run Management
 

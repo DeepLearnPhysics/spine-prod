@@ -242,21 +242,23 @@ def test_generic_models_and_cache_producers_name_dated_component_fragments():
         "model/generic/grappa_inter/network_240805.yaml"
     )
 
-    # The final inference bundle selects the same component revisions.
-    inference_path = CONFIG_INFER_ROOT / "generic" / "model" / "model_240805.yaml"
-    inference = yaml.load(inference_path.read_text(), Loader=yaml.BaseLoader)
-    inference_overrides = inference["override"]
-    assert inference_overrides["model.modules.uresnet_ppn"] == (
+    # The authoritative full-chain model selects the same component revisions.
+    full_chain_path = (
+        CONFIG_ROOT / "model" / "generic" / "full_chain" / "model_240805.yaml"
+    )
+    full_chain = yaml.load(full_chain_path.read_text(), Loader=yaml.BaseLoader)
+    full_chain_overrides = full_chain["override"]
+    assert full_chain_overrides["model.modules.uresnet_ppn"] == (
         "model/generic/uresnet_ppn/network_240805.yaml"
     )
-    assert inference_overrides["model.modules.uresnet_ppn_loss"] == (
+    assert full_chain_overrides["model.modules.uresnet_ppn_loss"] == (
         "model/generic/uresnet_ppn/loss_240805.yaml"
     )
     selected_modules = dict(fragment_modules)
     selected_modules.update(particle_modules)
     for component in ("graph_spice", "grappa_shower", "grappa_track", "grappa_inter"):
         assert (
-            inference_overrides[f"model.modules.{component}"]
+            full_chain_overrides[f"model.modules.{component}"]
             == selected_modules[component]
         )
 
@@ -531,7 +533,9 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
     pipeline_path = (
         CONFIG_ROOT.parent / "pipelines" / "generic" / "full_chain_240805.yaml"
     )
-    pipeline = PipelineDefinition.load(str(pipeline_path))
+    pipeline = PipelineDefinition.load(
+        str(pipeline_path), workspace_override="/path/to/workflow"
+    )
     stages = {stage["name"]: stage for stage in pipeline.stages}
 
     fragment_dependencies = [
@@ -551,7 +555,11 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
         "cache_train_particle_graphs",
         "cache_validation_particle_graphs",
     ]
-    assert all(stage["time"] == "08:00:00" for stage in pipeline.stages)
+    assert all(
+        stage["time"] == "08:00:00"
+        for stage in pipeline.stages
+        if stage["name"] != "export_full_chain_weights"
+    )
 
     # Every materialization stage extends one source-derived cache per split.
     train_cache = "/path/to/workflow/cache/train/train_cache.h5"
@@ -595,49 +603,71 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
     for name, run_dir in expected_run_dirs.items():
         assert stages[name]["run_dir"] == run_dir
 
+    export = stages["export_full_chain_weights"]
+    assert export["depends_on"] == ["train_grappa_inter"]
+    assert export["config"] == "model/generic/full_chain/model_240805.yaml"
+    assert export["profile"] == "s3df_milano"
+    assert export["time"] == "00:30:00"
+    assert export["export_weights"] == (
+        "/path/to/workflow/weights/full_chain_240805.ckpt"
+    )
+    assert set(export["module_weight"]) == {
+        "uresnet_ppn",
+        "graph_spice",
+        "grappa_shower",
+        "grappa_track",
+        "grappa_inter",
+    }
 
-def test_default_uresnet_matches_generic_full_chain():
-    """The shared UResNet definition must match the generic full chain."""
-    network_path = CONFIG_ROOT / "model" / "common" / "uresnet" / "network_v1.yaml"
-    loss_path = CONFIG_ROOT / "model" / "common" / "uresnet" / "loss_v1.yaml"
-    full_chain_path = CONFIG_INFER_ROOT / "generic" / "model" / "model_common.yaml"
 
-    with open(network_path, "r", encoding="utf-8") as config_file:
-        network = yaml.safe_load(config_file)
-    with open(loss_path, "r", encoding="utf-8") as config_file:
-        loss = yaml.safe_load(config_file)
-    with open(full_chain_path, "r", encoding="utf-8") as config_file:
-        full_chain = yaml.safe_load(config_file)
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize("version", ["240718", "240805"])
+def test_generic_inference_wraps_authoritative_full_chain_model(version):
+    """Inference should add published weights without redefining the model."""
+    composed = load_config_with_includes(
+        CONFIG_ROOT / "model" / "generic" / "full_chain" / f"model_{version}.yaml"
+    )
+    inference = load_config_with_includes(
+        CONFIG_INFER_ROOT / "generic" / "model" / f"model_{version}.yaml"
+    )
 
-    network.pop("__meta__")
-    loss.pop("__meta__")
+    weight_path = inference["model"].pop("weight_path")
+    assert weight_path == "/fake/weights/checkpoint.ckpt"
+    assert inference == composed
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_default_uresnet_matches_common_full_chain():
+    """The common full chain must compose the shared UResNet leaves."""
+    network = load_config_with_includes(
+        CONFIG_ROOT / "model" / "common" / "uresnet" / "network_v1.yaml"
+    )
+    loss = load_config_with_includes(
+        CONFIG_ROOT / "model" / "common" / "uresnet" / "loss_v1.yaml"
+    )
+    full_chain = load_config_with_includes(
+        CONFIG_ROOT / "model" / "common" / "full_chain" / "base_v1.yaml"
+    )
+
     assert network == full_chain["model"]["modules"]["uresnet_ppn"]["uresnet"]
     assert loss == full_chain["model"]["modules"]["uresnet_ppn_loss"]["uresnet_loss"]
 
 
-def test_default_uresnet_ppn_matches_generic_full_chain():
-    """The shared UResNet-PPN definition must match the generic full chain."""
-    ppn_path = CONFIG_ROOT / "model" / "common" / "uresnet_ppn" / "ppn_v1.yaml"
-    ppn_loss_path = (
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_default_uresnet_ppn_matches_common_full_chain():
+    """The common full chain must compose the shared point-proposal leaves."""
+    ppn = load_config_with_includes(
+        CONFIG_ROOT / "model" / "common" / "uresnet_ppn" / "ppn_v1.yaml"
+    )
+    ppn_loss = load_config_with_includes(
         CONFIG_ROOT / "model" / "common" / "uresnet_ppn" / "ppn_loss_v1.yaml"
     )
-    full_chain_path = CONFIG_INFER_ROOT / "generic" / "model" / "model_common.yaml"
+    full_chain = load_config_with_includes(
+        CONFIG_ROOT / "model" / "common" / "full_chain" / "base_v1.yaml"
+    )
 
-    with open(ppn_path, "r", encoding="utf-8") as config_file:
-        ppn = yaml.safe_load(config_file)
-    with open(ppn_loss_path, "r", encoding="utf-8") as config_file:
-        ppn_loss = yaml.safe_load(config_file)
-    with open(full_chain_path, "r", encoding="utf-8") as config_file:
-        full_chain = yaml.safe_load(config_file)
-
-    ppn.pop("__meta__")
-    ppn_loss.pop("__meta__")
     assert ppn == full_chain["model"]["modules"]["uresnet_ppn"]["ppn"]
-    expected_ppn_loss = full_chain["model"]["modules"]["uresnet_ppn_loss"][
-        "ppn_loss"
-    ].copy()
-    expected_ppn_loss["restrict_to_clusters"] = True
-    assert ppn_loss == expected_ppn_loss
+    assert ppn_loss == full_chain["model"]["modules"]["uresnet_ppn_loss"]["ppn_loss"]
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")

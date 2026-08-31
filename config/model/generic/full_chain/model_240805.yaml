@@ -1,0 +1,19 @@
+__meta__:
+  kind: fragment
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic full-chain model composed from the August 2024 components
+
+include: model/common/full_chain/base_v1.yaml
+
+override:
+  model.modules.uresnet_ppn: !include model/generic/uresnet_ppn/network_240805.yaml
+  model.modules.uresnet_ppn_loss: !include model/generic/uresnet_ppn/loss_240805.yaml
+  model.modules.graph_spice: !include model/generic/graph_spice/network_240805.yaml
+  model.modules.graph_spice_loss: !include model/generic/graph_spice/loss_240805.yaml
+  model.modules.grappa_shower: !include model/generic/grappa_shower/network_240718.yaml
+  model.modules.grappa_shower_loss: !include model/generic/grappa_shower/loss_240718.yaml
+  model.modules.grappa_track: !include model/generic/grappa_track/network_240718.yaml
+  model.modules.grappa_track_loss: !include model/generic/grappa_track/loss_240718.yaml
+  model.modules.grappa_inter: !include model/generic/grappa_inter/network_240805.yaml
+  model.modules.grappa_inter_loss: !include model/generic/grappa_inter/loss_240805.yaml

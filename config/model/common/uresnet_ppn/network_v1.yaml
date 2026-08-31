@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 composed UResNet-PPN network structure
+
+uresnet: !include model/common/uresnet/network_v1.yaml
+ppn: !include model/common/uresnet_ppn/ppn_v1.yaml

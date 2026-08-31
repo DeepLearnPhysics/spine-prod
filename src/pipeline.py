@@ -51,6 +51,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "sources",
         "validation_sources",
         "module_weight",
+        "export_weights",
         "job_name",
         "output",
         "output_suffix",
@@ -110,18 +111,25 @@ class PipelineDefinition:
         Stages after defaults, stage values, and CLI overrides are resolved.
     """
 
-    __slots__ = ("stages",)
+    __slots__ = ("stages", "workspace")
     stages: Tuple[Mapping[str, Any], ...]
+    workspace: Optional[str]
 
-    def __init__(self, stages: Sequence[Mapping[str, Any]]):
-        """Store resolved stages in immutable submission order."""
+    def __init__(
+        self,
+        stages: Sequence[Mapping[str, Any]],
+        workspace: Optional[str] = None,
+    ):
+        """Store the resolved workspace and immutable submission order."""
         self.stages = tuple(stages)
+        self.workspace = workspace
 
     @classmethod
     def load(
         cls,
         pipeline_path: str,
         overrides: Optional[Mapping[str, Any]] = None,
+        workspace_override: Optional[str] = None,
     ) -> "PipelineDefinition":
         """Load and validate a pipeline without contacting a scheduler.
 
@@ -144,9 +152,8 @@ class PipelineDefinition:
         if unknown:
             raise ValueError("Unknown pipeline field(s): " + ", ".join(sorted(unknown)))
 
-        variables = cls._resolve_variables(
-            document.get("workspace"), document.get("variables", {})
-        )
+        workspace = cls._resolve_workspace(document, workspace_override)
+        variables = cls._resolve_variables(workspace, document.get("variables", {}))
         collections = cls._resolve_collections(
             document.get("collections", {}), variables
         )
@@ -194,7 +201,31 @@ class PipelineDefinition:
             stages.append(stage)
             prior_names.add(stage["name"])
 
-        return cls(tuple(stages))
+        return cls(tuple(stages), workspace)
+
+    @staticmethod
+    def _resolve_workspace(
+        document: Mapping[str, Any], workspace_override: Optional[str]
+    ) -> Optional[str]:
+        """Resolve the launch workspace before expanding pipeline variables.
+
+        An explicit ``workspace: null`` marks the pipeline as portable and
+        requires the submitter to choose its output root. Pipelines that omit
+        the field remain valid for workflows without a shared workspace.
+        """
+        if workspace_override is not None:
+            if not isinstance(workspace_override, str):
+                raise TypeError("Pipeline workspace override must be a string")
+            if not workspace_override:
+                raise ValueError("Pipeline workspace override must not be empty")
+            return workspace_override
+
+        workspace = document.get("workspace")
+        if "workspace" in document and workspace is None:
+            raise ValueError(
+                "Pipeline workspace is null; specify --workspace when submitting"
+            )
+        return workspace
 
     @classmethod
     def _resolve_variables(cls, workspace: Any, raw_variables: Any) -> Dict[str, str]:
@@ -505,6 +536,16 @@ class PipelineDefinition:
             value = stage.get(field)
             if value is not None and not isinstance(value, Mapping):
                 raise TypeError(f"Pipeline stage '{name}' {field} must be a mapping")
+        export_weights = stage.get("export_weights")
+        if export_weights is not None:
+            if not isinstance(export_weights, str):
+                raise TypeError(
+                    f"Pipeline stage '{name}' export_weights must be a string"
+                )
+            if not export_weights:
+                raise ValueError(
+                    f"Pipeline stage '{name}' export_weights must not be empty"
+                )
 
     @classmethod
     def _validate_lifecycle(cls, name: str, stage: Mapping[str, Any]) -> None:
@@ -544,6 +585,36 @@ class PipelineDefinition:
                 f"Pipeline stage '{name}' task splitting requires stage=inference"
             )
 
+        if stage.get("export_weights"):
+            if lifecycle != "inference":
+                raise ValueError(
+                    f"Pipeline stage '{name}' export_weights requires "
+                    "stage=inference"
+                )
+            source_inputs = cls._present(
+                stage,
+                "files",
+                "source",
+                "source_list",
+                "sources",
+                "val_source",
+                "val_source_list",
+                "validation_sources",
+            )
+            if source_inputs:
+                raise ValueError(
+                    f"Pipeline stage '{name}' export_weights cannot be combined "
+                    "with data sources"
+                )
+            if (
+                stage.get("output") is not None
+                or stage.get("output_suffix") is not None
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{name}' export_weights cannot be combined "
+                    "with writer output options"
+                )
+
     @staticmethod
     def _present(stage: Mapping[str, Any], *keys: str) -> List[str]:
         """Return configured keys while retaining their declared order."""
@@ -559,6 +630,7 @@ class PipelineRunner(SubmissionComponent):
         dry_run: bool = False,
         preload: bool = False,
         overrides: Optional[Mapping[str, Any]] = None,
+        workspace: Optional[str] = None,
     ) -> Dict[str, List[str]]:
         """Submit an ordered multi-stage production pipeline.
 
@@ -576,14 +648,25 @@ class PipelineRunner(SubmissionComponent):
             Materialize ``!download`` assets before each stage submission.
         overrides : mapping, optional
             Launch overrides with precedence over all YAML settings.
+        workspace : str, optional
+            Shared output root exposed to the pipeline as ``${workspace}``.
+            This overrides a concrete YAML value and satisfies a required
+            ``workspace: null`` declaration.
 
         Returns
         -------
         dict
             Mapping from stage names to scheduler job IDs.
         """
-        stages = PipelineDefinition.load(pipeline_path, overrides).stages
+        definition = PipelineDefinition.load(
+            pipeline_path,
+            overrides,
+            workspace_override=workspace,
+        )
+        stages = definition.stages
         print(f"Loading pipeline: {pipeline_path}")
+        if definition.workspace is not None:
+            print(f"Workspace: {definition.workspace}")
         print(f"Stages: {len(stages)}\n")
 
         job_map: Dict[str, List[str]] = {}
@@ -634,6 +717,7 @@ class PipelineRunner(SubmissionComponent):
                 "named_sources": stage.get("sources"),
                 "validation_named_sources": stage.get("validation_sources"),
                 "module_weights": stage.get("module_weight"),
+                "export_weights": stage.get("export_weights"),
                 "profile": stage.get("profile", "auto"),
                 "job_name": stage.get("job_name", stage["name"]),
                 "output": stage.get("output"),

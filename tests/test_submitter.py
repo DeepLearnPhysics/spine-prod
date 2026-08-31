@@ -474,6 +474,10 @@ class TestSubmitterHelpers:
             )
             == "--module-weight uresnet_ppn=/weights/best.ckpt"
         )
+        assert (
+            mock_submitter.spine_cli.format_export_weights("/weights/full chain.ckpt")
+            == "--export-weights '/weights/full chain.ckpt'"
+        )
 
         with pytest.raises(ValueError, match="exactly one"):
             mock_submitter.spine_cli.format_named_sources(
@@ -482,6 +486,7 @@ class TestSubmitterHelpers:
 
         assert mock_submitter.spine_cli.format_named_sources(None) == ""
         assert mock_submitter.spine_cli.format_module_weights(None) == ""
+        assert mock_submitter.spine_cli.format_export_weights(None) == ""
         with pytest.raises(TypeError, match="must be a mapping"):
             mock_submitter.spine_cli.format_named_sources({"larcv": "raw.root"})
         with pytest.raises(ValueError, match="cannot be empty"):
@@ -1661,6 +1666,60 @@ class TestBatchSpineOverride:
         assert "--output-suffix cache" in script
         assert output.is_dir()
 
+    def test_submit_job_exports_composed_module_weights(self, mock_submitter, tmp_path):
+        """A model-only batch job should forward composition options to SPINE."""
+        run_dir = tmp_path / "weights" / "export"
+        destination = tmp_path / "weights" / "full_chain.ckpt"
+        module_weights = {
+            "uresnet_ppn": "/weights/uresnet.ckpt",
+            "graph_spice": "/weights/graph_spice.ckpt",
+        }
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="export"),
+        ):
+            assert mock_submitter.submit_job(
+                config="model/generic/full_chain/model_240805.yaml",
+                module_weights=module_weights,
+                export_weights=str(destination),
+                profile="s3df_milano",
+                run_dir=str(run_dir),
+            ) == ["export"]
+
+        script = (run_dir / "scheduler" / "chunk_000" / "submit.sbatch").read_text(
+            encoding="utf-8"
+        )
+        assert "--module-weight uresnet_ppn=/weights/uresnet.ckpt" in script
+        assert "graph_spice=/weights/graph_spice.ckpt" in script
+        assert f"--export-weights {destination}" in script
+        assert " -S " not in script
+
+        metadata = json.loads((run_dir / "job_metadata.json").read_text())
+        assert metadata["export_weights"] == str(destination)
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"files": ["input.root"]},
+            {"named_sources": {"larcv": {"source": "input.root"}}},
+            {"output": "output.h5"},
+            {"stage": "train", "run_dir": "/tmp/train"},
+        ],
+    )
+    def test_submit_job_rejects_export_runtime_conflicts(self, mock_submitter, options):
+        """Model export must remain a terminal model-only operation."""
+        with pytest.raises(ValueError, match="export-weights"):
+            mock_submitter.submit_job(
+                config="model/generic/full_chain/model_240805.yaml",
+                export_weights="/weights/full_chain.ckpt",
+                **options,
+            )
+
     def test_submit_job_rejects_validation_sources_outside_training(
         self, mock_submitter, tmp_path
     ):
@@ -2645,17 +2704,29 @@ class TestPipelineSubmission:
                             },
                             "module_weight": {"uresnet_ppn": "/tmp/snapshot-best.ckpt"},
                         },
+                        {
+                            "name": "export",
+                            "config": "model.yaml",
+                            "depends_on": ["configured_inputs"],
+                            "run_dir": "/tmp/export",
+                            "export_weights": "/tmp/full-chain.ckpt",
+                            "module_weight": {"uresnet_ppn": "/tmp/snapshot-best.ckpt"},
+                        },
                     ]
                 }
             )
         )
 
         with patch.object(
-            mock_submitter, "submit_job", side_effect=[["10"], ["20"]]
+            mock_submitter, "submit_job", side_effect=[["10"], ["20"], ["30"]]
         ) as submit_job:
             result = mock_submitter.submit_pipeline(str(pipeline_path))
 
-        assert result == {"train": ["10"], "configured_inputs": ["20"]}
+        assert result == {
+            "train": ["10"],
+            "configured_inputs": ["20"],
+            "export": ["30"],
+        }
         train = submit_job.call_args_list[0].kwargs
         assert train["files"] == ["train_files.txt"]
         assert train["source_type"] == "source_list"
@@ -2677,6 +2748,11 @@ class TestPipelineSubmission:
         assert configured["module_weights"] == {
             "uresnet_ppn": "/tmp/snapshot-best.ckpt"
         }
+
+        export = submit_job.call_args_list[2].kwargs
+        assert export["dependency"] == "afterok:20"
+        assert export["export_weights"] == "/tmp/full-chain.ckpt"
+        assert export["module_weights"] == {"uresnet_ppn": "/tmp/snapshot-best.ckpt"}
 
     def test_submit_pipeline_layers_defaults_stage_values_and_cli_overrides(
         self, mock_submitter, tmp_path
@@ -2834,6 +2910,7 @@ class TestPipelineSubmission:
                 "cannot combine validation_sources",
             ),
             ({"module_weight": ["bad"]}, "module_weight must be a mapping"),
+            ({"export_weights": 4}, "export_weights must be a string"),
         ],
     )
     def test_submit_pipeline_rejects_invalid_structured_fields(

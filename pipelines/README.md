@@ -7,6 +7,8 @@ This directory contains example pipeline definitions for multi-stage SPINE proce
 Pipelines are defined in YAML format with the following structure:
 
 ```yaml
+workspace: null
+
 defaults:
   profile: s3df_ampere
   time: "08:00:00"
@@ -23,6 +25,7 @@ stages:
     #   hdf5: {source: /path/to/cache.h5}
     # validation_sources: ...         # same shape for validation
     # module_weight: {module: /path/to/checkpoint.ckpt}
+    # export_weights: /path/to/composed.ckpt  # terminal model-only stage
     # set: [nested.config.key=value]
     profile: s3df_hopper    # optional stage override of the default
     ntasks: 50              # optional, target number of tasks if files_per_task is omitted
@@ -33,7 +36,9 @@ stages:
 ## Usage
 
 ```bash
-./submit.py --pipeline pipelines/my_pipeline.yaml
+./submit.py \
+  --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/workflow
 ```
 
 Pipeline settings resolve in this order: profile defaults, pipeline `defaults`,
@@ -43,6 +48,7 @@ the YAML:
 
 ```bash
 ./submit.py --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/workflow \
   --spine-path /path/to/spine --profile s3df_hopper --account my_account
 ```
 
@@ -71,12 +77,16 @@ than producing a new physical file for every transition.
 The generic prototypes define their train and validation inputs once under
 `collections.splits`. A stage-level `for_each` expands cache templates into
 independent, concretely named jobs before dependency validation and submission.
+The full-chain workflow finishes with a CPU-only `export_weights` stage that
+loads every standalone `snapshot-best.ckpt` and writes one directly runnable
+full-chain checkpoint plus its SHA-256 sidecar.
 
-Replace the `/path/to/workflow` destination before submission. The prototype
-uses SPINE's target-qualified source overrides for the mixed Graph-SPICE
-dataset and `--module-weight` for the cached segmentation jobs; it requires no
-generic `--set` overrides. SPINE validates stored source provenance and fails
-rather than silently pairing the wrong events.
+The generic prototypes declare `workspace: null`; choose the shared output root
+at launch with `--workspace /path/to/workflow`. The prototype uses SPINE's
+target-qualified source overrides for the mixed Graph-SPICE dataset and
+`--module-weight` for the cached segmentation jobs; it requires no generic
+`--set` overrides. SPINE validates stored source provenance and fails rather
+than silently pairing the wrong events.
 
 To run against an unreleased checkout, pass `--spine-path /path/to/spine` when
 submitting the pipeline. A stage-level `spine_path` remains available when only

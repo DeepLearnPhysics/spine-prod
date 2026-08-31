@@ -100,6 +100,13 @@ class SpineCLI:
         return f"--module-weight {' '.join(values)}"
 
     @staticmethod
+    def format_export_weights(export_weights: Optional[str]) -> str:
+        """Format an optional terminal model-export destination."""
+        if not export_weights:
+            return ""
+        return f"--export-weights {shlex.quote(export_weights)}"
+
+    @staticmethod
     def format_runtime_options(
         world_size: Optional[int] = None,
         batch_size: Optional[int] = None,
