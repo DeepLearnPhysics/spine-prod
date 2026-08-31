@@ -9,7 +9,10 @@ class FileHandler:
     """Handles file parsing, validation, and chunking."""
 
     def parse_files(
-        self, file_input: List[str], source_type: str = "source"
+        self,
+        file_input: List[str],
+        source_type: str = "source",
+        allow_missing: bool = False,
     ) -> List[str]:
         """Parse file input (paths, globs, or txt file).
 
@@ -20,6 +23,10 @@ class FileHandler:
         source_type : str, optional
             Either 'source' (direct paths/globs) or 'source_list' (text file),
             by default 'source'
+        allow_missing : bool, optional
+            Preserve missing direct paths that an upstream pipeline stage will
+            create before this job starts. Globs and source lists must still
+            exist when the submission is prepared.
 
         Returns
         -------
@@ -43,7 +50,7 @@ class FileHandler:
                     files.extend(sorted(glob.glob(item)))
                 else:
                     # Direct file path
-                    if os.path.exists(item):
+                    if os.path.exists(item) or allow_missing:
                         files.append(item)
                     else:
                         print(f"WARNING: File not found: {item}")

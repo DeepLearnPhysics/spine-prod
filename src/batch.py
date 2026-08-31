@@ -158,6 +158,7 @@ class BatchRunner(SubmissionComponent):
         validation_name: Optional[str] = None,
         rerun_validation: bool = False,
         tensorboard: bool = False,
+        allow_missing_inputs: bool = False,
         **profile_overrides,
     ) -> List[str]:
         """Submit batch job for SPINE processing.
@@ -250,6 +251,10 @@ class BatchRunner(SubmissionComponent):
             Include checkpoints that already have complete validation logs.
         tensorboard : bool, optional
             Enable stage-specific TensorBoard event logging.
+        allow_missing_inputs : bool, optional
+            Preserve exact direct input paths expected from an upstream
+            pipeline stage. This internal pipeline option does not relax glob
+            or source-list resolution.
         **profile_overrides
             Override profile settings
 
@@ -301,7 +306,11 @@ class BatchRunner(SubmissionComponent):
 
         file_list = []
         if files:
-            file_list = self.file_handler.parse_files(files, source_type)
+            file_list = self.file_handler.parse_files(
+                files,
+                source_type,
+                allow_missing=allow_missing_inputs,
+            )
             if not file_list:
                 raise ValueError("No input files found")
             print(f"Found {len(file_list)} file(s) to process")
@@ -323,7 +332,9 @@ class BatchRunner(SubmissionComponent):
         validation_file_list = []
         if validation_files:
             validation_file_list = self.file_handler.parse_files(
-                validation_files, validation_source_type
+                validation_files,
+                validation_source_type,
+                allow_missing=allow_missing_inputs,
             )
             if not validation_file_list:
                 raise ValueError("No validation input files found")
@@ -667,7 +678,12 @@ class BatchRunner(SubmissionComponent):
             print(f"\nSubmitting chunk {chunk_idx + 1}/{len(file_chunks)}:")
             print(f"  Script: {script_path}")
             if file_list:
-                print(f"  Files: {sum(len(group) for group in chunk)}")
+                num_chunk_files = (
+                    sum(len(group) for group in chunk)
+                    if stage == "inference"
+                    else len(file_list)
+                )
+                print(f"  Files: {num_chunk_files}")
             else:
                 print("  Files: config-defined input list")
             print(f"  Profile: {profile} ({profile_config['description']})")

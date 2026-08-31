@@ -1589,6 +1589,41 @@ class TestBatchSpineOverride:
         assert metadata["source_manifest"] == str(train_manifest)
         assert metadata["validation_source_manifest"] == str(validation_manifest)
 
+    def test_submit_job_preserves_future_pipeline_training_sources(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        """Dependent jobs may reference exact files created by predecessors."""
+        train_source = tmp_path / "cache" / "train.h5"
+        validation_source = tmp_path / "cache" / "validation.h5"
+        run_dir = tmp_path / "run"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            assert mock_submitter.submit_job(
+                config="train/generic/uresnet/train_240718.yaml",
+                files=[str(train_source)],
+                validation_files=[str(validation_source)],
+                stage="train",
+                run_dir=str(run_dir),
+                dependency="afterok:123",
+                allow_missing_inputs=True,
+            ) == ["train"]
+
+        submission = next(run_dir.glob("submissions/train/*"))
+        assert (submission / "inputs.txt").read_text().splitlines() == [
+            str(train_source)
+        ]
+        assert (submission / "validation_inputs.txt").read_text().splitlines() == [
+            str(validation_source)
+        ]
+        assert "Files: 1" in capsys.readouterr().out
+
     def test_submit_job_forwards_named_sources_and_module_weights(
         self, mock_submitter, tmp_path
     ):
@@ -2992,10 +3027,12 @@ class TestPipelineSubmission:
         assert submit_job.call_count == 3
         reconstruct = submit_job.call_args_list[1].kwargs
         assert reconstruct["dependency"] == "afterok:10"
+        assert reconstruct["allow_missing_inputs"] is True
         assert reconstruct["larcv_path"] == "/software/larcv"
         assert reconstruct["flashmatch"] is True
         assert reconstruct["cvmfs"] is True
         assert reconstruct["preload"] is True
+        assert submit_job.call_args_list[0].kwargs["allow_missing_inputs"] is False
         cleanup.assert_called_once_with(
             paths_to_clean=["intermediate.root"],
             job_name="cleanup_prepare",

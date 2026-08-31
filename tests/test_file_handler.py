@@ -55,6 +55,20 @@ def test_parse_direct_sources_sorts_each_glob(handler, monkeypatch):
     ]
 
 
+def test_parse_direct_sources_preserves_expected_pipeline_output(handler, tmp_path):
+    """An exact future path can be written into a dependent job manifest."""
+    future = tmp_path / "upstream_cache.h5"
+
+    assert handler.parse_files([str(future)], allow_missing=True) == [str(future)]
+
+
+def test_allow_missing_does_not_preserve_unresolved_glob(handler, tmp_path):
+    """Future inputs must be exact because an unmatched glob is indeterminate."""
+    pattern = str(tmp_path / "*.h5")
+
+    assert handler.parse_files([pattern], allow_missing=True) == []
+
+
 @pytest.mark.parametrize(
     ("files", "max_array_size", "files_per_task", "expected"),
     [
