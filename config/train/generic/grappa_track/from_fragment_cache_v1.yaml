@@ -1,0 +1,38 @@
+__meta__:
+  kind: fragment
+  description: Generic track GrapPA training from cached fragment graphs
+
+include: train/generic/grappa_track/base_v1.yaml
+
+override:
+  io.loader.dataset:
+    name: hdf5
+    file_keys: null
+    staged: true
+    stage: fragmentation
+    keys:
+      - data
+      - track_fragment_clusts
+      - track_fragment_edge_index
+      - track_fragment_node_features
+      - track_fragment_edge_features
+      - particle_aggregation_track_edge_target
+      - particle_aggregation_track_edge_valid
+
+  model.network_input:
+    data: data
+    clusts: track_fragment_clusts
+    edge_index: track_fragment_edge_index
+    node_features: track_fragment_node_features
+    edge_features: track_fragment_edge_features
+
+  model.loss_input:
+    edge_target: particle_aggregation_track_edge_target
+    edge_valid: particle_aggregation_track_edge_valid
+
+remove:
+  - model.network_input.coord_label
+  - model.loss_input.clust_label
+  - model.modules.grappa.graph
+  - model.modules.grappa.node_encoder
+  - model.modules.grappa.edge_encoder

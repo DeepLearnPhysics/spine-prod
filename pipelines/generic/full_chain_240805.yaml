@@ -1,0 +1,156 @@
+# Prototype staged training of every learned component used by the generic
+# 240805 full chain. Set the workflow destination once before submission.
+# Each split owns one cache file; materialization stages append named groups.
+
+workspace: /path/to/workflow
+
+variables:
+  train_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
+  validation_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
+
+defaults:
+  profile: s3df_ampere
+  time: "08:00:00"
+
+stages:
+  - name: train_uresnet_ppn
+    config: train/generic/uresnet_ppn/train_240805.yaml
+    stage: train
+    source: ${train_source}
+    val_source: ${validation_source}
+    run_dir: ${workspace}/train/uresnet_ppn
+    tensorboard: true
+
+  - name: cache_train_segmentation
+    depends_on: [train_uresnet_ppn]
+    config: cache/generic/uresnet_ppn/segmentation_240805.yaml
+    source: ${train_source}
+    run_dir: ${workspace}/cache/train/segmentation
+    output: ${workspace}/cache/train
+    output_suffix: cache
+    files_per_task: 1
+    ntasks: 50
+    module_weight:
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
+
+  - name: cache_validation_segmentation
+    depends_on: [train_uresnet_ppn]
+    config: cache/generic/uresnet_ppn/segmentation_240805.yaml
+    source: ${validation_source}
+    run_dir: ${workspace}/cache/validation/segmentation
+    output: ${workspace}/cache/validation
+    output_suffix: cache
+    files_per_task: 1
+    ntasks: 50
+    module_weight:
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
+
+  - name: train_graph_spice
+    depends_on: [cache_train_segmentation, cache_validation_segmentation]
+    config: train/generic/graph_spice/train_from_uresnet_ppn_240805.yaml
+    stage: train
+    run_dir: ${workspace}/train/graph_spice
+    tensorboard: true
+    sources:
+      larcv:
+        source: ${train_source}
+      hdf5:
+        source: ${workspace}/cache/train/train_cache.h5
+    validation_sources:
+      larcv:
+        source: ${validation_source}
+      hdf5:
+        source: ${workspace}/cache/validation/test_cache.h5
+
+  # Produce both shower and track graphs in one pass over each split.
+  - name: cache_train_fragment_graphs
+    depends_on: [train_graph_spice]
+    config: cache/generic/graph_spice/fragment_graphs_240805.yaml
+    run_dir: ${workspace}/cache/train/fragmentation
+    output: ${workspace}/cache/train
+    output_suffix: cache
+    files_per_task: 1
+    ntasks: 50
+    sources:
+      larcv:
+        source: ${train_source}
+      hdf5:
+        source: ${workspace}/cache/train/train_cache.h5
+    module_weight:
+      graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
+
+  - name: cache_validation_fragment_graphs
+    depends_on: [train_graph_spice]
+    config: cache/generic/graph_spice/fragment_graphs_240805.yaml
+    run_dir: ${workspace}/cache/validation/fragmentation
+    output: ${workspace}/cache/validation
+    output_suffix: cache
+    files_per_task: 1
+    ntasks: 50
+    sources:
+      larcv:
+        source: ${validation_source}
+      hdf5:
+        source: ${workspace}/cache/validation/test_cache.h5
+    module_weight:
+      graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
+
+  # These jobs read the completed fragmentation stage and run together.
+  - name: train_grappa_shower
+    depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
+    config: train/generic/grappa_shower/train_from_fragment_cache_240718.yaml
+    stage: train
+    source: ${workspace}/cache/train/train_cache.h5
+    val_source: ${workspace}/cache/validation/test_cache.h5
+    run_dir: ${workspace}/train/grappa_shower
+    tensorboard: true
+
+  - name: train_grappa_track
+    depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
+    config: train/generic/grappa_track/train_from_fragment_cache_240718.yaml
+    stage: train
+    source: ${workspace}/cache/train/train_cache.h5
+    val_source: ${workspace}/cache/validation/test_cache.h5
+    run_dir: ${workspace}/train/grappa_track
+    tensorboard: true
+
+  # Run both trained particle aggregators together, then cache the interaction
+  # graph and its targets for the final standalone training job.
+  - name: cache_train_particle_graphs
+    depends_on: [train_grappa_shower, train_grappa_track]
+    config: cache/generic/grappa_shower_track/particle_graphs_240805.yaml
+    source: ${workspace}/cache/train/train_cache.h5
+    run_dir: ${workspace}/cache/train/particle_aggregation
+    output: ${workspace}/cache/train
+    output_suffix: cache
+    files_per_task: 1
+    ntasks: 50
+    module_weight:
+      grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
+      grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
+
+  - name: cache_validation_particle_graphs
+    depends_on: [train_grappa_shower, train_grappa_track]
+    config: cache/generic/grappa_shower_track/particle_graphs_240805.yaml
+    source: ${workspace}/cache/validation/test_cache.h5
+    run_dir: ${workspace}/cache/validation/particle_aggregation
+    output: ${workspace}/cache/validation
+    output_suffix: cache
+    files_per_task: 1
+    ntasks: 50
+    module_weight:
+      grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
+      grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
+
+  - name: train_grappa_inter
+    depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
+    config: train/generic/grappa_inter/train_from_particle_cache_240805.yaml
+    stage: train
+    source: ${workspace}/cache/train/train_cache.h5
+    val_source: ${workspace}/cache/validation/test_cache.h5
+    run_dir: ${workspace}/train/grappa_inter
+    tensorboard: true
+
+# The four standalone snapshot-best checkpoints are the authoritative outputs
+# for now. A final packaging stage belongs here once SPINE can export one full-
+# chain checkpoint after loading these files through module-weight overrides.

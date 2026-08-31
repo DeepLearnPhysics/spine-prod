@@ -1,6 +1,13 @@
 # Prototype transition: train UResNet-PPN, cache its predictions and adapted
 # cluster truth, then train standalone Graph-SPICE from those stage products.
-# Replace the /path/to/workflow destination before submission.
+# Set the workflow destination once before submission.
+# The cache naming matches the appendable full-chain workflow.
+
+workspace: /path/to/workflow
+
+variables:
+  train_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
+  validation_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
 
 defaults:
   profile: s3df_ampere
@@ -10,48 +17,48 @@ stages:
   - name: train_uresnet_ppn
     config: train/generic/uresnet_ppn/train_240805.yaml
     stage: train
-    source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
-    val_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
-    run_dir: /path/to/workflow/train/uresnet_ppn
+    source: ${train_source}
+    val_source: ${validation_source}
+    run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
 
   - name: cache_train_segmentation
     depends_on: [train_uresnet_ppn]
     config: cache/generic/uresnet_ppn/segmentation_240805.yaml
-    source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
-    run_dir: /path/to/workflow/cache/train
-    output: /path/to/workflow/cache/train
-    output_suffix: segmentation
+    source: ${train_source}
+    run_dir: ${workspace}/cache/train/segmentation
+    output: ${workspace}/cache/train
+    output_suffix: cache
     files_per_task: 1
     ntasks: 50
     module_weight:
-      uresnet_ppn: /path/to/workflow/train/uresnet_ppn/weights/snapshot-best.ckpt
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
   - name: cache_validation_segmentation
     depends_on: [train_uresnet_ppn]
     config: cache/generic/uresnet_ppn/segmentation_240805.yaml
-    source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
-    run_dir: /path/to/workflow/cache/validation
-    output: /path/to/workflow/cache/validation
-    output_suffix: segmentation
+    source: ${validation_source}
+    run_dir: ${workspace}/cache/validation/segmentation
+    output: ${workspace}/cache/validation
+    output_suffix: cache
     files_per_task: 1
     ntasks: 50
     module_weight:
-      uresnet_ppn: /path/to/workflow/train/uresnet_ppn/weights/snapshot-best.ckpt
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
   - name: train_graph_spice
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/generic/graph_spice/train_from_uresnet_ppn_240805.yaml
     stage: train
-    run_dir: /path/to/workflow/train/graph_spice
+    run_dir: ${workspace}/train/graph_spice
     tensorboard: true
     sources:
       larcv:
-        source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
+        source: ${train_source}
       hdf5:
-        source: /path/to/workflow/cache/train/train_segmentation.h5
+        source: ${workspace}/cache/train/train_cache.h5
     validation_sources:
       larcv:
-        source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
+        source: ${validation_source}
       hdf5:
-        source: /path/to/workflow/cache/validation/test_segmentation.h5
+        source: ${workspace}/cache/validation/test_cache.h5

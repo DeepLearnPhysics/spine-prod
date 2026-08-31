@@ -70,11 +70,8 @@ model:
 
     # model_name strips the full-chain module prefix while loading the
     # standalone UResNet-PPN checkpoint supplied by the workflow.
-    uresnet_ppn:
-      model_name: ""
-      weight_path: ""
-      uresnet: !include model/common/uresnet/network_v1.yaml
-      ppn: !include model/common/uresnet_ppn/ppn_v1.yaml
+    uresnet_ppn: !include model/generic/uresnet_ppn/network_240805.yaml
 
 override:
-  model.modules.uresnet_ppn.ppn.classify_endpoints: false
+  model.modules.uresnet_ppn.model_name: ""
+  model.modules.uresnet_ppn.weight_path: ""

@@ -1629,6 +1629,38 @@ class TestBatchSpineOverride:
         assert metadata["validation_named_sources"] == validation_sources
         assert metadata["module_weights"] == {"graph_spice": "/weights/seed.ckpt"}
 
+    def test_submit_job_forwards_output_for_named_sources(
+        self, mock_submitter, tmp_path
+    ):
+        """Composite cache jobs can append into an explicit output directory."""
+        output = tmp_path / "cache" / "train"
+        named_sources = {
+            "larcv": {"source": "/raw/train.root"},
+            "hdf5": {"source": "/cache/train_cache.h5"},
+        }
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="cache"),
+        ):
+            assert mock_submitter.submit_job(
+                config="cache/generic/graph_spice/fragment_graphs_240805.yaml",
+                named_sources=named_sources,
+                output=str(output),
+                output_suffix="cache",
+            ) == ["cache"]
+
+        script = next(
+            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+        ).read_text(encoding="utf-8")
+        assert f"--output-dir {output}" in script
+        assert "--output-suffix cache" in script
+        assert output.is_dir()
+
     def test_submit_job_rejects_validation_sources_outside_training(
         self, mock_submitter, tmp_path
     ):

@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic 240805 composed UResNet-PPN network
+
+# The backbone did not change in 240805; only the PPN revision changed.
+uresnet: !include model/generic/uresnet/network_240718.yaml
+ppn: !include model/generic/uresnet_ppn/ppn_240805.yaml

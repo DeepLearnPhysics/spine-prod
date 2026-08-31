@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "260828"
+  date: "2026-08-28"
+  description: Generic 260828 track GrapPA loss matching the SPINE example
+
+include: model/common/grappa_track/loss_v1.yaml

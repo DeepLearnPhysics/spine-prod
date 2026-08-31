@@ -7,5 +7,7 @@ __meta__:
 include: model/common/uresnet_ppn/base_v1.yaml
 
 override:
-  model.modules.ppn.classify_endpoints: false
-  model.modules.ppn_loss.restrict_to_clusters: true
+  model.modules.uresnet: !include model/generic/uresnet/network_240718.yaml
+  model.modules.ppn: !include model/generic/uresnet_ppn/ppn_240805.yaml
+  model.modules.uresnet_loss: !include model/generic/uresnet/loss_240718.yaml
+  model.modules.ppn_loss: !include model/generic/uresnet_ppn/ppn_loss_240805.yaml

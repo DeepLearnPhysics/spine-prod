@@ -1,0 +1,51 @@
+__meta__:
+  kind: fragment
+  description: Generic interaction GrapPA training from cached particle graphs
+
+include: train/generic/grappa_inter/base_v1.yaml
+
+override:
+  io.loader.dataset:
+    name: hdf5
+    file_keys: null
+    staged: true
+    stage: particle_aggregation
+    keys:
+      - data
+      - particle_clusts
+      - particle_edge_index
+      - particle_node_features
+      - particle_edge_features
+      - interaction_aggregation_node_type_target
+      - interaction_aggregation_node_type_valid
+      - interaction_aggregation_node_primary_target
+      - interaction_aggregation_node_primary_valid
+      - interaction_aggregation_node_orient_target
+      - interaction_aggregation_node_orient_valid
+      - interaction_aggregation_edge_target
+      - interaction_aggregation_edge_valid
+
+  model.network_input:
+    data: data
+    clusts: particle_clusts
+    edge_index: particle_edge_index
+    node_features: particle_node_features
+    edge_features: particle_edge_features
+
+  model.loss_input:
+    node_type_target: interaction_aggregation_node_type_target
+    node_type_valid: interaction_aggregation_node_type_valid
+    node_primary_target: interaction_aggregation_node_primary_target
+    node_primary_valid: interaction_aggregation_node_primary_valid
+    node_orient_target: interaction_aggregation_node_orient_target
+    node_orient_valid: interaction_aggregation_node_orient_valid
+    edge_target: interaction_aggregation_edge_target
+    edge_valid: interaction_aggregation_edge_valid
+
+remove:
+  - model.network_input.coord_label
+  - model.loss_input.clust_label
+  - model.loss_input.coord_label
+  - model.modules.grappa.graph
+  - model.modules.grappa.node_encoder
+  - model.modules.grappa.edge_encoder

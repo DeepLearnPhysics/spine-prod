@@ -5,3 +5,7 @@ __meta__:
   description: Generic shower GrapPA model matching the SPINE standalone example
 
 include: model/common/grappa_shower/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/generic/grappa_shower/network_260828.yaml
+  model.modules.grappa_loss: !include model/generic/grappa_shower/loss_260828.yaml

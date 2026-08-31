@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic 240718 shower GrapPA network
+
+include: model/common/grappa_shower/network_v1.yaml
+
+override:
+  node_encoder.dir_max_dist: -1
+  node_encoder.dedx_max_dist: -1

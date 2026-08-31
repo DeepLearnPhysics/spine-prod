@@ -20,29 +20,16 @@ override:
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/generic/generic_snapshot_240805.ckpt
     hash: 212be7374716ad23962be9b1cd5556f0556a4ec06760946b263521ad4bfdd044
 
-  # PPN endpoint classification enabled
-  model.modules.uresnet_ppn.ppn.classify_endpoints: false
+  # Reuse the exact dated segmentation and point-proposal components.
+  model.modules.uresnet_ppn: !include model/generic/uresnet_ppn/network_240805.yaml
+  model.modules.uresnet_ppn_loss: !include model/generic/uresnet_ppn/loss_240805.yaml
 
-  # PPN loss - restrict to clusters
-  model.modules.ppn_loss.restrict_to_clusters: true
-
-  # GraphSPICE spatial size (smaller than 240718)
-  model.modules.graph_spice.embedder.uresnet.spatial_size: 768
-
-  # GraphSPICE constructor graph settings (radius-based)
-  model.modules.graph_spice.constructor.graph:
-    name: radius
-    r: 1.9
-
-  # GraPPA inter-aggregation layer widths (wider than 240718)
-  model.modules.grappa_inter.gnn_model.edge_layer.mlp.width: 128
-  model.modules.grappa_inter.gnn_model.node_layer.message_mlp.width: 128
-  model.modules.grappa_inter.gnn_model.node_layer.aggr_mlp.width: 128
-
-  # Direction and dE/dx radii settings for GrapPA modules
-  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
-  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_track.node_encoder.dir_max_dist: -1
-  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1
+  # Reuse the exact dated components trained by the standalone recipes.
+  model.modules.graph_spice: !include model/generic/graph_spice/network_240805.yaml
+  model.modules.graph_spice_loss: !include model/generic/graph_spice/loss_240805.yaml
+  model.modules.grappa_shower: !include model/generic/grappa_shower/network_240718.yaml
+  model.modules.grappa_shower_loss: !include model/generic/grappa_shower/loss_240718.yaml
+  model.modules.grappa_track: !include model/generic/grappa_track/network_240718.yaml
+  model.modules.grappa_track_loss: !include model/generic/grappa_track/loss_240718.yaml
+  model.modules.grappa_inter: !include model/generic/grappa_inter/network_240805.yaml
+  model.modules.grappa_inter_loss: !include model/generic/grappa_inter/loss_240805.yaml

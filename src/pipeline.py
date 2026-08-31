@@ -1,5 +1,6 @@
 """Loading, validation, and execution of multi-stage production pipelines."""
 
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -94,6 +95,9 @@ PROFILE_FIELDS = (
     "bind_paths",
 )
 
+VARIABLE_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+VARIABLE_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
 
 class PipelineDefinition:
     """A fully validated pipeline, ready for ordered submission.
@@ -128,12 +132,18 @@ class PipelineDefinition:
 
         if not isinstance(document, Mapping):
             raise TypeError("Pipeline YAML must contain a mapping")
-        unknown = set(document) - {"defaults", "stages"}
+        unknown = set(document) - {"workspace", "variables", "defaults", "stages"}
         if unknown:
             raise ValueError("Unknown pipeline field(s): " + ", ".join(sorted(unknown)))
 
+        variables = cls._resolve_variables(
+            document.get("workspace"), document.get("variables", {})
+        )
         defaults = cls._require_mapping(
-            document.get("defaults", {}), "Pipeline defaults"
+            cls._expand_variables(
+                document.get("defaults", {}), variables, "Pipeline defaults"
+            ),
+            "Pipeline defaults",
         )
         unknown = set(defaults) - GLOBAL_FIELDS
         if unknown:
@@ -142,14 +152,19 @@ class PipelineDefinition:
                 + ", ".join(sorted(unknown))
             )
 
-        override_values = cls._require_mapping(overrides or {}, "Pipeline overrides")
+        override_values = cls._require_mapping(
+            cls._expand_variables(overrides or {}, variables, "Pipeline overrides"),
+            "Pipeline overrides",
+        )
         unknown = set(override_values) - GLOBAL_FIELDS
         if unknown:
             raise ValueError(
                 "Unknown pipeline override field(s): " + ", ".join(sorted(unknown))
             )
 
-        raw_stages = document.get("stages")
+        raw_stages = cls._expand_variables(
+            document.get("stages"), variables, "Pipeline stages"
+        )
         if not isinstance(raw_stages, list) or not raw_stages:
             raise ValueError("Pipeline must define a non-empty stages list")
 
@@ -169,6 +184,89 @@ class PipelineDefinition:
             prior_names.add(stage["name"])
 
         return cls(tuple(stages))
+
+    @classmethod
+    def _resolve_variables(cls, workspace: Any, raw_variables: Any) -> Dict[str, str]:
+        """Validate and resolve pipeline-local string substitutions.
+
+        ``workspace`` is exposed as the reserved ``${workspace}`` variable.
+        User variables may reference the workspace or one another, regardless
+        of declaration order. Cycles and missing references are rejected before
+        stage validation or scheduler interaction.
+        """
+        if workspace is not None:
+            if not isinstance(workspace, str):
+                raise TypeError("Pipeline workspace must be a string")
+            if not workspace:
+                raise ValueError("Pipeline workspace must not be empty")
+
+        variables = cls._require_mapping(raw_variables, "Pipeline variables")
+        if "workspace" in variables:
+            raise ValueError(
+                "Pipeline variable 'workspace' is reserved for the top-level "
+                "workspace field"
+            )
+
+        unresolved = dict(variables)
+        if workspace is not None:
+            unresolved["workspace"] = workspace
+        for name, value in unresolved.items():
+            if not isinstance(name, str) or not VARIABLE_NAME_PATTERN.match(name):
+                raise ValueError(
+                    "Pipeline variable names must be valid identifiers: " + repr(name)
+                )
+            if not isinstance(value, str):
+                raise TypeError(f"Pipeline variable '{name}' must be a string")
+
+        resolved: Dict[str, str] = {}
+
+        def resolve(name: str, stack: Tuple[str, ...]) -> str:
+            """Resolve one variable while retaining its dependency stack."""
+            if name in resolved:
+                return resolved[name]
+            if name not in unresolved:
+                raise ValueError(f"Undefined pipeline variable: {name}")
+            if name in stack:
+                cycle = " -> ".join(stack + (name,))
+                raise ValueError(f"Cyclic pipeline variable reference: {cycle}")
+
+            value = unresolved[name]
+            next_stack = stack + (name,)
+            resolved[name] = VARIABLE_PATTERN.sub(
+                lambda match: resolve(match.group(1), next_stack), value
+            )
+            return resolved[name]
+
+        for name in unresolved:
+            resolve(name, ())
+        return resolved
+
+    @classmethod
+    def _expand_variables(cls, value: Any, variables: Mapping[str, str], context: str):
+        """Recursively expand pipeline variables in strings and containers."""
+        if isinstance(value, str):
+
+            def replace(match):
+                name = match.group(1)
+                if name not in variables:
+                    raise ValueError(
+                        f"Undefined pipeline variable '{name}' in {context}"
+                    )
+                return variables[name]
+
+            return VARIABLE_PATTERN.sub(replace, value)
+        if isinstance(value, Mapping):
+            return {
+                key: cls._expand_variables(item, variables, context)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._expand_variables(item, variables, context) for item in value]
+        if isinstance(value, tuple):
+            return tuple(
+                cls._expand_variables(item, variables, context) for item in value
+            )
+        return value
 
     @staticmethod
     def _require_mapping(value: Any, context: str) -> Mapping[str, Any]:
