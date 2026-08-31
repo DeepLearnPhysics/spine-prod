@@ -368,6 +368,7 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
     assert loader["dataset"]["hdf5"]["keep_open"] is False
     assert config["io"]["writer"]["keep_open"] is False
     assert config["io"]["writer"]["overwrite_stage"] is True
+    assert "ppn_points" not in config["io"]["writer"]["keys"]
 
     chain = config["model"]["modules"]["chain"]
     assert chain["inputs"] == ["seg_pred", "ppn_points"]
@@ -490,6 +491,7 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     loader = cache["io"]["loader"]
     assert loader["num_workers"] == 0
     assert loader["dataset"]["keep_open"] is False
+    assert loader["dataset"]["stage_map"] == {"ppn_points": "segmentation"}
     assert cache["io"]["writer"]["keep_open"] is False
     assert cache["io"]["writer"]["overwrite_stage"] is True
 
