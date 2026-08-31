@@ -740,6 +740,9 @@ class PipelineRunner(SubmissionComponent):
                 "validation_name": stage.get("validation_name"),
                 "rerun_validation": stage.get("rerun_validation", False),
                 "tensorboard": stage.get("tensorboard", False),
+                # Exact files produced by declared predecessors do not exist
+                # yet; scheduler dependencies make them available at runtime.
+                "allow_missing_inputs": bool(stage.get("depends_on")),
                 "world_size": stage.get("world_size"),
                 "batch_size": stage.get("batch_size"),
                 "minibatch_size": stage.get("minibatch_size"),
