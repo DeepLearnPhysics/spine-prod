@@ -95,7 +95,9 @@ PROFILE_FIELDS = (
     "bind_paths",
 )
 
-VARIABLE_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+VARIABLE_PATTERN = re.compile(
+    r"\$\{([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\}"
+)
 VARIABLE_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -132,12 +134,21 @@ class PipelineDefinition:
 
         if not isinstance(document, Mapping):
             raise TypeError("Pipeline YAML must contain a mapping")
-        unknown = set(document) - {"workspace", "variables", "defaults", "stages"}
+        unknown = set(document) - {
+            "workspace",
+            "variables",
+            "collections",
+            "defaults",
+            "stages",
+        }
         if unknown:
             raise ValueError("Unknown pipeline field(s): " + ", ".join(sorted(unknown)))
 
         variables = cls._resolve_variables(
             document.get("workspace"), document.get("variables", {})
+        )
+        collections = cls._resolve_collections(
+            document.get("collections", {}), variables
         )
         defaults = cls._require_mapping(
             cls._expand_variables(
@@ -162,8 +173,8 @@ class PipelineDefinition:
                 "Unknown pipeline override field(s): " + ", ".join(sorted(unknown))
             )
 
-        raw_stages = cls._expand_variables(
-            document.get("stages"), variables, "Pipeline stages"
+        raw_stages = cls._expand_stage_templates(
+            document.get("stages"), variables, collections
         )
         if not isinstance(raw_stages, list) or not raw_stages:
             raise ValueError("Pipeline must define a non-empty stages list")
@@ -240,6 +251,110 @@ class PipelineDefinition:
         for name in unresolved:
             resolve(name, ())
         return resolved
+
+    @classmethod
+    def _resolve_collections(
+        cls, raw_collections: Any, variables: Mapping[str, str]
+    ) -> Dict[str, Tuple[Mapping[str, str], ...]]:
+        """Validate reusable collections used by stage ``for_each`` blocks.
+
+        Collections are deliberately small data tables: each is a non-empty
+        list of flat string mappings. Global pipeline variables are expanded
+        in their values before the entries become iteration-local variables.
+        """
+        collections = cls._require_mapping(raw_collections, "Pipeline collections")
+        resolved: Dict[str, Tuple[Mapping[str, str], ...]] = {}
+        for name, raw_items in collections.items():
+            if not isinstance(name, str) or not VARIABLE_NAME_PATTERN.match(name):
+                raise ValueError(
+                    "Pipeline collection names must be valid identifiers: " + repr(name)
+                )
+            if not isinstance(raw_items, list) or not raw_items:
+                raise ValueError(
+                    f"Pipeline collection '{name}' must be a non-empty list"
+                )
+
+            items = []
+            for index, raw_item in enumerate(raw_items, start=1):
+                context = f"Pipeline collection '{name}' item {index}"
+                item = cls._require_mapping(raw_item, context)
+                if not item:
+                    raise ValueError(f"{context} must not be empty")
+                for key, value in item.items():
+                    if not isinstance(key, str) or not VARIABLE_NAME_PATTERN.match(key):
+                        raise ValueError(
+                            f"{context} keys must be valid identifiers: {key!r}"
+                        )
+                    if not isinstance(value, str):
+                        raise TypeError(f"{context} value '{key}' must be a string")
+                items.append(cls._expand_variables(item, variables, context))
+            resolved[name] = tuple(items)
+        return resolved
+
+    @classmethod
+    def _expand_stage_templates(
+        cls,
+        raw_stages: Any,
+        variables: Mapping[str, str],
+        collections: Mapping[str, Sequence[Mapping[str, str]]],
+    ) -> List[Any]:
+        """Expand ``for_each`` templates into ordinary concrete stages."""
+        if not isinstance(raw_stages, list) or not raw_stages:
+            raise ValueError("Pipeline must define a non-empty stages list")
+
+        expanded = []
+        for index, raw_stage in enumerate(raw_stages, start=1):
+            if not isinstance(raw_stage, Mapping):
+                raise TypeError(f"Pipeline stage {index} must be a mapping")
+
+            for_each = raw_stage.get("for_each")
+            if for_each is None:
+                expanded.append(
+                    cls._expand_variables(
+                        raw_stage, variables, f"Pipeline stage {index}"
+                    )
+                )
+                continue
+
+            context = f"Pipeline stage {index} for_each"
+            loop = cls._require_mapping(for_each, context)
+            unknown = set(loop) - {"collection", "as"}
+            if unknown:
+                raise ValueError(
+                    f"{context} contains unknown field(s): "
+                    + ", ".join(sorted(unknown))
+                )
+            collection_name = loop.get("collection")
+            alias = loop.get("as")
+            if not isinstance(collection_name, str) or not collection_name:
+                raise TypeError(f"{context} collection must be a non-empty string")
+            if collection_name not in collections:
+                raise ValueError(
+                    f"{context} references unknown collection: {collection_name}"
+                )
+            if not isinstance(alias, str) or not VARIABLE_NAME_PATTERN.match(alias):
+                raise ValueError(f"{context} as must be a valid identifier")
+            if alias in variables:
+                raise ValueError(
+                    f"{context} alias '{alias}' conflicts with a pipeline variable"
+                )
+
+            template = {
+                key: value for key, value in raw_stage.items() if key != "for_each"
+            }
+            for item_index, item in enumerate(collections[collection_name], start=1):
+                local_variables = dict(variables)
+                local_variables.update(
+                    {f"{alias}.{key}": value for key, value in item.items()}
+                )
+                expanded.append(
+                    cls._expand_variables(
+                        template,
+                        local_variables,
+                        f"Pipeline stage {index} iteration {item_index}",
+                    )
+                )
+        return expanded
 
     @classmethod
     def _expand_variables(cls, value: Any, variables: Mapping[str, str], context: str):

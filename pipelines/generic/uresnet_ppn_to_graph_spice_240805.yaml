@@ -9,6 +9,17 @@ variables:
   train_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
   validation_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
 
+collections:
+  splits:
+    - name: train
+      source: ${train_source}
+      cache_dir: ${workspace}/cache/train
+      cache_file: ${workspace}/cache/train/train_cache.h5
+    - name: validation
+      source: ${validation_source}
+      cache_dir: ${workspace}/cache/validation
+      cache_file: ${workspace}/cache/validation/test_cache.h5
+
 defaults:
   profile: s3df_ampere
   time: "08:00:00"
@@ -22,24 +33,15 @@ stages:
     run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
 
-  - name: cache_train_segmentation
+  - name: cache_${split.name}_segmentation
+    for_each:
+      collection: splits
+      as: split
     depends_on: [train_uresnet_ppn]
     config: cache/generic/uresnet_ppn/segmentation_240805.yaml
-    source: ${train_source}
-    run_dir: ${workspace}/cache/train/segmentation
-    output: ${workspace}/cache/train
-    output_suffix: cache
-    files_per_task: 1
-    ntasks: 50
-    module_weight:
-      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
-
-  - name: cache_validation_segmentation
-    depends_on: [train_uresnet_ppn]
-    config: cache/generic/uresnet_ppn/segmentation_240805.yaml
-    source: ${validation_source}
-    run_dir: ${workspace}/cache/validation/segmentation
-    output: ${workspace}/cache/validation
+    source: ${split.source}
+    run_dir: ${split.cache_dir}/segmentation
+    output: ${split.cache_dir}
     output_suffix: cache
     files_per_task: 1
     ntasks: 50

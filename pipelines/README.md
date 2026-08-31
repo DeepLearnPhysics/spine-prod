@@ -68,6 +68,10 @@ Each original source file has one staged cache. Later materialization jobs in
 the full-chain prototype append named groups to that same HDF5 file rather
 than producing a new physical file for every transition.
 
+The generic prototypes define their train and validation inputs once under
+`collections.splits`. A stage-level `for_each` expands cache templates into
+independent, concretely named jobs before dependency validation and submission.
+
 Replace the `/path/to/workflow` destination before submission. The prototype
 uses SPINE's target-qualified source overrides for the mixed Graph-SPICE
 dataset and `--module-weight` for the cached segmentation jobs; it requires no

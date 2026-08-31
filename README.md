@@ -537,6 +537,30 @@ stage fields, including structured sources and module weights. Undefined
 variables, dependency cycles, and invalid declarations fail before any job is
 submitted; environment variables are not expanded implicitly.
 
+Repeated stage variants can be declared as a flat string collection and
+expanded before validation:
+
+```yaml
+collections:
+  splits:
+    - name: train
+      source: /data/train.root
+    - name: validation
+      source: /data/test.root
+
+stages:
+  - name: cache_${split.name}
+    for_each:
+      collection: splits
+      as: split
+    config: cache/example.yaml
+    source: ${split.source}
+```
+
+This produces the concrete `cache_train` and `cache_validation` stages. It is
+load-time shorthand only: dependencies still name concrete stages explicitly,
+and each expanded stage remains an independent scheduler job.
+
 ### Submit Pipeline
 
 ```bash
