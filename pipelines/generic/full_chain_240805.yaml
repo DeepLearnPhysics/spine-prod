@@ -1,8 +1,8 @@
 # Prototype staged training of every learned component used by the generic
-# 240805 full chain. Set the workflow destination once before submission.
+# 240805 full chain. Supply its destination with CLI --workspace.
 # Each split owns one cache file; materialization stages append named groups.
 
-workspace: /path/to/workflow
+workspace: null
 
 variables:
   train_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
@@ -24,6 +24,7 @@ defaults:
   time: "08:00:00"
 
 stages:
+  # Train semantic segmentation and point proposal directly from LArCV truth.
   - name: train_uresnet_ppn
     config: train/generic/uresnet_ppn/train_240805.yaml
     stage: train
@@ -32,6 +33,7 @@ stages:
     run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
 
+  # Append segmentation predictions and adapted cluster labels to each cache.
   - name: cache_${split.name}_segmentation
     for_each:
       collection: splits
@@ -47,6 +49,7 @@ stages:
     module_weight:
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
+  # Train Graph-SPICE from raw detector data and cached segmentation products.
   - name: train_graph_spice
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/generic/graph_spice/train_from_uresnet_ppn_240805.yaml
@@ -64,7 +67,7 @@ stages:
       hdf5:
         source: ${workspace}/cache/validation/test_cache.h5
 
-  # Produce both shower and track graphs in one pass over each split.
+  # Append fragment graphs and GrapPA supervision for both particle branches.
   - name: cache_${split.name}_fragment_graphs
     for_each:
       collection: splits
@@ -84,7 +87,7 @@ stages:
     module_weight:
       graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
 
-  # These jobs read the completed fragmentation stage and run together.
+  # Train shower aggregation and primary identification from cached graphs.
   - name: train_grappa_shower
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/generic/grappa_shower/train_from_fragment_cache_240718.yaml
@@ -94,6 +97,7 @@ stages:
     run_dir: ${workspace}/train/grappa_shower
     tensorboard: true
 
+  # Train track aggregation concurrently from the same fragment cache.
   - name: train_grappa_track
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/generic/grappa_track/train_from_fragment_cache_240718.yaml
@@ -103,8 +107,7 @@ stages:
     run_dir: ${workspace}/train/grappa_track
     tensorboard: true
 
-  # Run both trained particle aggregators together, then cache the interaction
-  # graph and its targets for the final standalone training job.
+  # Append interaction graphs and supervision using both particle aggregators.
   - name: cache_${split.name}_particle_graphs
     for_each:
       collection: splits
@@ -121,6 +124,7 @@ stages:
       grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
       grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
 
+  # Train interaction aggregation and particle classifiers from cached graphs.
   - name: train_grappa_inter
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
     config: train/generic/grappa_inter/train_from_particle_cache_240805.yaml
@@ -130,6 +134,17 @@ stages:
     run_dir: ${workspace}/train/grappa_inter
     tensorboard: true
 
-# The four standalone snapshot-best checkpoints are the authoritative outputs
-# for now. A final packaging stage belongs here once SPINE can export one full-
-# chain checkpoint after loading these files through module-weight overrides.
+  # Export one inference checkpoint with its component manifest and checksum.
+  - name: export_full_chain_weights
+    depends_on: [train_grappa_inter]
+    config: model/generic/full_chain/model_240805.yaml
+    profile: s3df_milano
+    time: "00:30:00"
+    run_dir: ${workspace}/weights/export
+    export_weights: ${workspace}/weights/full_chain_240805.ckpt
+    module_weight:
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
+      graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
+      grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
+      grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
+      grappa_inter: ${workspace}/train/grappa_inter/weights/snapshot-best.ckpt

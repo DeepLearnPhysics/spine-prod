@@ -1,0 +1,42 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 full-chain model structure
+
+model:
+  name: full_chain
+  to_numpy: true
+
+  network_input:
+    data: data
+    seg_label: seg_label
+
+  modules:
+    # Stable orchestration shared by detector-specific compositions.
+    chain:
+      deghosting: null
+      charge_rescaling: null
+      segmentation: uresnet
+      point_proposal: ppn
+      fragmentation: graph_spice
+      shower_aggregation: grappa
+      shower_primary: grappa
+      track_aggregation: grappa
+      particle_aggregation: null
+      inter_aggregation: grappa
+      particle_identification: grappa
+      primary_identification: grappa
+      orientation_identification: grappa
+      calibration: null
+
+    # Common leaves define the structural default. Dated detector models
+    # replace these pointers explicitly to record their exact composition.
+    uresnet_ppn: !include model/common/uresnet_ppn/network_v1.yaml
+    uresnet_ppn_loss: !include model/common/uresnet_ppn/loss_v1.yaml
+    graph_spice: !include model/common/graph_spice/network_v1.yaml
+    graph_spice_loss: !include model/common/graph_spice/loss_v1.yaml
+    grappa_shower: !include model/common/grappa_shower/network_v1.yaml
+    grappa_shower_loss: !include model/common/grappa_shower/loss_v1.yaml
+    grappa_track: !include model/common/grappa_track/network_v1.yaml
+    grappa_track_loss: !include model/common/grappa_track/loss_v1.yaml
+    grappa_inter: !include model/common/grappa_inter/network_v1.yaml
+    grappa_inter_loss: !include model/common/grappa_inter/loss_v1.yaml

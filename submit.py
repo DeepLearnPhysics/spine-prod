@@ -8,7 +8,7 @@ Usage:
     ./submit.py --config infer/icarus --source test.root
     ./submit.py --config infer/icarus/latest --source-list file_list.txt
     ./submit.py --config infer/icarus/latest --apply-mods data --source data/*.root --profile s3df_ampere
-    ./submit.py --pipeline pipelines/icarus_production.yaml
+    ./submit.py --pipeline pipelines/icarus_production.yaml --workspace /path/to/run
     ./submit.py --config ... --source ... --central-dir
 """
 
@@ -67,7 +67,7 @@ Examples:
   %(prog)s --config /path/to/deghost_val.yaml --stage validation --run-dir /path/to/experiments/deghost/default
 
   # Pipeline mode
-  %(prog)s --pipeline pipelines/icarus_production.yaml
+  %(prog)s --pipeline pipelines/icarus_production.yaml --workspace /path/to/run
 
   # Dry run (does not submit jobs, but shows what would be done)
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source test.root --dry-run
@@ -203,6 +203,13 @@ Examples:
         help=(
             "Persistent run directory. Required for train and validation; "
             "optional for inference."
+        ),
+    )
+    parser.add_argument(
+        "--workspace",
+        help=(
+            "Pipeline-wide output root exposed as ${workspace}. Required when "
+            "the pipeline declares workspace: null."
         ),
     )
     resume_group = parser.add_mutually_exclusive_group()
@@ -364,6 +371,9 @@ Examples:
 
     args = parser.parse_args()
 
+    if args.workspace is not None and not args.pipeline:
+        parser.error("--workspace is only supported with --pipeline")
+
     # Handle deprecated --local-output flag
     if getattr(args, "local_output", False):
         print(
@@ -514,6 +524,7 @@ Examples:
                 dry_run=args.dry_run,
                 preload=args.preload,
                 overrides=pipeline_overrides,
+                workspace=args.workspace,
             )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():

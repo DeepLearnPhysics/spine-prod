@@ -12,24 +12,10 @@ __meta__:
   tags: []
   training_set: "v1"
 
-include: model_common.yaml
+include: model/generic/full_chain/model_240805.yaml
 
 override:
   # First full chain weights for generic simulations
   model.weight_path: !download
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/generic/generic_snapshot_240805.ckpt
     hash: 212be7374716ad23962be9b1cd5556f0556a4ec06760946b263521ad4bfdd044
-
-  # Reuse the exact dated segmentation and point-proposal components.
-  model.modules.uresnet_ppn: !include model/generic/uresnet_ppn/network_240805.yaml
-  model.modules.uresnet_ppn_loss: !include model/generic/uresnet_ppn/loss_240805.yaml
-
-  # Reuse the exact dated components trained by the standalone recipes.
-  model.modules.graph_spice: !include model/generic/graph_spice/network_240805.yaml
-  model.modules.graph_spice_loss: !include model/generic/graph_spice/loss_240805.yaml
-  model.modules.grappa_shower: !include model/generic/grappa_shower/network_240718.yaml
-  model.modules.grappa_shower_loss: !include model/generic/grappa_shower/loss_240718.yaml
-  model.modules.grappa_track: !include model/generic/grappa_track/network_240718.yaml
-  model.modules.grappa_track_loss: !include model/generic/grappa_track/loss_240718.yaml
-  model.modules.grappa_inter: !include model/generic/grappa_inter/network_240805.yaml
-  model.modules.grappa_inter_loss: !include model/generic/grappa_inter/loss_240805.yaml

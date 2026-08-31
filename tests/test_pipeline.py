@@ -50,6 +50,89 @@ def test_pipeline_expands_workspace_and_variables_recursively(tmp_path):
     assert stage["spine_path"] == "/workflow/software/spine"
 
 
+def test_null_workspace_requires_launch_override(tmp_path):
+    """Portable pipelines should fail before expansion without a workspace."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "workspace": None,
+            "stages": [
+                {
+                    "name": "train",
+                    "config": "train.yaml",
+                    "run_dir": "${workspace}/train",
+                }
+            ],
+        },
+    )
+
+    with pytest.raises(ValueError, match="workspace is null.*--workspace"):
+        PipelineDefinition.load(str(path))
+
+
+def test_workspace_override_resolves_portable_pipeline(tmp_path):
+    """A launch workspace should resolve variables in stages and collections."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "workspace": None,
+            "collections": {
+                "splits": [{"name": "train", "output": "${workspace}/cache/train"}]
+            },
+            "stages": [
+                {
+                    "name": "cache_${split.name}",
+                    "for_each": {"collection": "splits", "as": "split"},
+                    "config": "cache.yaml",
+                    "output": "${split.output}",
+                }
+            ],
+        },
+    )
+
+    definition = PipelineDefinition.load(
+        str(path), workspace_override="/runs/benchmark"
+    )
+
+    assert definition.workspace == "/runs/benchmark"
+    assert definition.stages[0]["output"] == "/runs/benchmark/cache/train"
+
+
+def test_workspace_override_replaces_yaml_default(tmp_path):
+    """The launch value should take precedence over a concrete YAML workspace."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "workspace": "/yaml/default",
+            "stages": [
+                {
+                    "name": "job",
+                    "config": "job.yaml",
+                    "run_dir": "${workspace}/job",
+                }
+            ],
+        },
+    )
+
+    definition = PipelineDefinition.load(str(path), workspace_override="/cli/override")
+
+    assert definition.workspace == "/cli/override"
+    assert definition.stages[0]["run_dir"] == "/cli/override/job"
+
+
+def test_pipeline_may_omit_unused_workspace(tmp_path):
+    """Legacy pipelines need no workspace when they do not reference one."""
+    path = write_pipeline(
+        tmp_path,
+        {"stages": [{"name": "job", "config": "job.yaml"}]},
+    )
+
+    definition = PipelineDefinition.load(str(path))
+
+    assert definition.workspace is None
+    assert definition.stages[0]["name"] == "job"
+
+
 def test_pipeline_expands_collection_stage_templates(tmp_path):
     """Each collection item should become an ordinary validated stage."""
     path = write_pipeline(
@@ -230,4 +313,32 @@ def test_pipeline_rejects_invalid_variable_declarations(
     path = write_pipeline(tmp_path, document)
 
     with pytest.raises(error, match=message):
+        PipelineDefinition.load(str(path))
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        ({"source": "input.root"}, "cannot be combined with data sources"),
+        ({"output": "output.h5"}, "cannot be combined with writer output"),
+        ({"stage": "train", "run_dir": "/tmp/train"}, "requires stage=inference"),
+    ],
+)
+def test_pipeline_rejects_export_runtime_conflicts(tmp_path, extra, message):
+    """Weight composition must remain a terminal model-only stage."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "export",
+                    "config": "model.yaml",
+                    "export_weights": "/weights/full-chain.ckpt",
+                    **extra,
+                }
+            ]
+        },
+    )
+
+    with pytest.raises(ValueError, match=message):
         PipelineDefinition.load(str(path))
