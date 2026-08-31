@@ -238,6 +238,8 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         preload=True,
         overrides={},
         workspace="/runs/benchmark",
+        from_stage=None,
+        to_stage=None,
     )
     output = capsys.readouterr().out
     assert "reco: 42" in output
@@ -307,10 +309,42 @@ def test_pipeline_mode_forwards_global_overrides():
     assert submitter.submit_pipeline.call_args.kwargs["workspace"] is None
 
 
+def test_pipeline_mode_forwards_restart_stage():
+    """Pipeline restart selection should remain separate from job lifecycle."""
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--workspace",
+        "/runs/benchmark",
+        "--from-stage",
+        "cache_train",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert submitter.submit_pipeline.call_args.kwargs["from_stage"] == "cache_train"
+    assert submitter.submit_pipeline.call_args.kwargs["to_stage"] is None
+
+
 def test_workspace_is_rejected_outside_pipeline_mode():
     """A pipeline workspace must not silently behave like a job run directory."""
     with pytest.raises(SystemExit, match="2"):
         run_main("--config", "config.yaml", "--workspace", "/runs/benchmark")
+
+
+def test_from_stage_is_rejected_outside_pipeline_mode():
+    """A restart stage has no meaning for a single job submission."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main("--config", "config.yaml", "--from-stage", "train")
+
+
+def test_to_stage_is_rejected_outside_pipeline_mode():
+    """A pipeline stop boundary has no meaning for a single job."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main("--config", "config.yaml", "--to-stage", "train")
 
 
 def test_cli_rejects_undeclared_long_option_abbreviations():

@@ -631,6 +631,8 @@ class PipelineRunner(SubmissionComponent):
         preload: bool = False,
         overrides: Optional[Mapping[str, Any]] = None,
         workspace: Optional[str] = None,
+        from_stage: Optional[str] = None,
+        to_stage: Optional[str] = None,
     ) -> Dict[str, List[str]]:
         """Submit an ordered multi-stage production pipeline.
 
@@ -652,6 +654,13 @@ class PipelineRunner(SubmissionComponent):
             Shared output root exposed to the pipeline as ``${workspace}``.
             This overrides a concrete YAML value and satisfies a required
             ``workspace: null`` declaration.
+        from_stage : str, optional
+            Restart at this stage in pipeline order. Earlier stages are
+            treated as completed, and selected stage directories are retried
+            without discarding prior submission records.
+        to_stage : str, optional
+            Stop after this stage in pipeline order. This can bound a restart
+            to the stages that must be regenerated.
 
         Returns
         -------
@@ -663,11 +672,21 @@ class PipelineRunner(SubmissionComponent):
             overrides,
             workspace_override=workspace,
         )
-        stages = definition.stages
+        all_stages = definition.stages
+        stages, skipped, deferred = self._select_stages(
+            all_stages,
+            from_stage,
+            to_stage,
+        )
         print(f"Loading pipeline: {pipeline_path}")
         if definition.workspace is not None:
             print(f"Workspace: {definition.workspace}")
-        print(f"Stages: {len(stages)}\n")
+        print(f"Stages: {len(stages)}")
+        if skipped:
+            print(f"Skipped as completed: {', '.join(skipped)}")
+        if deferred:
+            print(f"Not selected after stop: {', '.join(deferred)}")
+        print()
 
         job_map: Dict[str, List[str]] = {}
         cleanup_map: Dict[str, List[str]] = {}
@@ -676,7 +695,21 @@ class PipelineRunner(SubmissionComponent):
             print(f"Stage: {name}")
 
             dependency = self._dependency(stage.get("depends_on", []), job_map)
-            options = self._submission_options(stage, dependency)
+            skipped_dependencies = [
+                dependency_name
+                for dependency_name in stage.get("depends_on", [])
+                if dependency_name in skipped
+            ]
+            if skipped_dependencies:
+                print(
+                    "  Reusing completed dependencies: "
+                    + ", ".join(skipped_dependencies)
+                )
+            options = self._submission_options(
+                stage,
+                dependency,
+                retry=from_stage is not None,
+            )
             job_map[name] = self.context.submit_job(
                 dry_run=dry_run,
                 preload=preload,
@@ -692,9 +725,38 @@ class PipelineRunner(SubmissionComponent):
         self._schedule_cleanup(stages, job_map, cleanup_map, dry_run)
         return job_map
 
+    @staticmethod
+    def _select_stages(
+        stages: Sequence[Mapping[str, Any]],
+        from_stage: Optional[str],
+        to_stage: Optional[str],
+    ) -> Tuple[Sequence[Mapping[str, Any]], List[str], List[str]]:
+        """Select an inclusive ordered range and describe omitted stages."""
+        names = [stage["name"] for stage in stages]
+        start = 0
+        stop = len(stages)
+        if from_stage is not None:
+            if not isinstance(from_stage, str) or not from_stage:
+                raise ValueError("Pipeline from_stage must be a non-empty string")
+            if from_stage not in names:
+                raise ValueError(f"Unknown pipeline restart stage: {from_stage}")
+            start = names.index(from_stage)
+        if to_stage is not None:
+            if not isinstance(to_stage, str) or not to_stage:
+                raise ValueError("Pipeline to_stage must be a non-empty string")
+            if to_stage not in names:
+                raise ValueError(f"Unknown pipeline stop stage: {to_stage}")
+            stop = names.index(to_stage) + 1
+        if stop <= start:
+            raise ValueError("Pipeline --to-stage must not precede --from-stage")
+        return stages[start:stop], names[:start], names[stop:]
+
     @classmethod
     def _submission_options(
-        cls, stage: Mapping[str, Any], dependency: Optional[str]
+        cls,
+        stage: Mapping[str, Any],
+        dependency: Optional[str],
+        retry: bool = False,
     ) -> Dict[str, Any]:
         """Translate one stage to ``BatchRunner.submit_job`` options."""
         source_key, files = cls._source(stage, "files", "source", "source_list")
@@ -743,6 +805,7 @@ class PipelineRunner(SubmissionComponent):
                 # Exact files produced by declared predecessors do not exist
                 # yet; scheduler dependencies make them available at runtime.
                 "allow_missing_inputs": bool(stage.get("depends_on")),
+                "retry": retry,
                 "world_size": stage.get("world_size"),
                 "batch_size": stage.get("batch_size"),
                 "minibatch_size": stage.get("minibatch_size"),

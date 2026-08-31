@@ -98,6 +98,29 @@ def test_resume_requires_matching_run_config_and_checkpoint(tmp_path):
     with pytest.raises(ValueError, match="different training configuration"):
         RunManager.prepare_training_run(run_dir, config, resume=True)
 
+
+def test_retry_reuses_unstarted_run_or_latest_checkpoint(tmp_path):
+    """Pipeline retries should handle canceled and interrupted training jobs."""
+    run_dir, config = initialize_run(tmp_path)
+    RunManager.record_training_jobs(run_dir, ["123"])
+
+    assert RunManager.prepare_training_run(run_dir, config, retry=True) is None
+
+    latest = checkpoint(run_dir, 100)
+    assert RunManager.prepare_training_run(run_dir, config, retry=True) == latest
+
+
+def test_retry_rejects_ambiguous_or_changed_training_run(tmp_path):
+    """Retry must not restart an unverifiable partial run from scratch."""
+    run_dir, config = initialize_run(tmp_path)
+    (run_dir / "train_log-0000001.csv").write_text("iter,loss\n0,1\n")
+    with pytest.raises(ValueError, match="logs but no checkpoint"):
+        RunManager.prepare_training_run(run_dir, config, retry=True)
+
+    changed = write_config(tmp_path / "changed.yaml", "base:\n  epochs: 2\n")
+    with pytest.raises(ValueError, match="different configuration"):
+        RunManager.prepare_training_run(run_dir, changed, retry=True)
+
     metadata = json.loads((run_dir / "run_metadata.json").read_text())
     metadata["training_config_sha256"] = RunManager.config_digest(config)
     (run_dir / "run_metadata.json").write_text(json.dumps(metadata))

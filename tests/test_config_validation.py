@@ -282,7 +282,12 @@ def test_generic_segmentation_cache_reuses_uresnet_ppn_revision():
     assert cache["base"]["split_output"] is True
     assert "split" not in cache["io"]["writer"]
     assert cache["io"]["writer"]["stage"] == "segmentation"
-    assert cache["io"]["writer"]["keys"] == ["seg_pred", "clust_label_adapt"]
+    assert cache["io"]["writer"]["overwrite_stage"] is True
+    assert cache["io"]["writer"]["keys"] == [
+        "seg_pred",
+        "ppn_points",
+        "clust_label_adapt",
+    ]
     assert cache["model"]["network_input"] == {
         "data": "data",
         "seg_label": "seg_label",
@@ -362,9 +367,11 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
     assert loader["num_workers"] == 0
     assert loader["dataset"]["hdf5"]["keep_open"] is False
     assert config["io"]["writer"]["keep_open"] is False
+    assert config["io"]["writer"]["overwrite_stage"] is True
 
     chain = config["model"]["modules"]["chain"]
-    assert chain["inputs"] == ["seg_pred"]
+    assert chain["inputs"] == ["seg_pred", "ppn_points"]
+    assert config["model"]["network_input"]["ppn_points"] == "ppn_points"
     assert [stage["name"] for stage in chain["stages"]] == [
         "fragmentation",
         "particle_aggregation",
@@ -484,9 +491,15 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     assert loader["num_workers"] == 0
     assert loader["dataset"]["keep_open"] is False
     assert cache["io"]["writer"]["keep_open"] is False
+    assert cache["io"]["writer"]["overwrite_stage"] is True
 
     chain = cache["model"]["modules"]["chain"]
-    assert chain["inputs"] == ["fragment_clusts", "fragment_shapes"]
+    assert chain["inputs"] == [
+        "ppn_points",
+        "fragment_clusts",
+        "fragment_shapes",
+    ]
+    assert cache["model"]["network_input"]["ppn_points"] == "ppn_points"
     assert [stage["name"] for stage in chain["stages"]] == [
         "particle_aggregation",
         "interaction_aggregation",

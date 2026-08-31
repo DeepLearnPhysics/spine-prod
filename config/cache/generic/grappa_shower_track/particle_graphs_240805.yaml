@@ -28,6 +28,7 @@ io:
       keep_open: false
       keys:
         - data
+        - ppn_points
         - coord_label
         - clust_label_adapt
         - fragment_clusts
@@ -37,6 +38,7 @@ io:
     file_name: null
     stage: particle_aggregation
     keep_open: false
+    overwrite_stage: true
     keys:
       - data
       - particle_clusts
@@ -58,6 +60,7 @@ model:
 
   network_input:
     data: data
+    ppn_points: ppn_points
     clust_label: clust_label_adapt
     coord_label: coord_label
     fragment_clusts: fragment_clusts
@@ -69,7 +72,7 @@ model:
 
   modules:
     chain:
-      inputs: [fragment_clusts, fragment_shapes]
+      inputs: [ppn_points, fragment_clusts, fragment_shapes]
       stages:
         - name: particle_aggregation
           provider: particle_aggregation

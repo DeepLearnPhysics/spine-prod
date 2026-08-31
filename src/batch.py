@@ -159,6 +159,7 @@ class BatchRunner(SubmissionComponent):
         rerun_validation: bool = False,
         tensorboard: bool = False,
         allow_missing_inputs: bool = False,
+        retry: bool = False,
         **profile_overrides,
     ) -> List[str]:
         """Submit batch job for SPINE processing.
@@ -255,6 +256,9 @@ class BatchRunner(SubmissionComponent):
             Preserve exact direct input paths expected from an upstream
             pipeline stage. This internal pipeline option does not relax glob
             or source-list resolution.
+        retry : bool, optional
+            Reuse an existing pipeline stage directory while preserving prior
+            submissions. Training resumes its latest checkpoint when present.
         **profile_overrides
             Override profile settings
 
@@ -359,7 +363,7 @@ class BatchRunner(SubmissionComponent):
         if run_dir:
             job_dir = Path(run_dir).expanduser().resolve()
             if stage == "inference":
-                if job_dir.exists() and any(job_dir.iterdir()):
+                if job_dir.exists() and any(job_dir.iterdir()) and not retry:
                     raise ValueError(f"Inference run directory is not empty: {job_dir}")
                 job_dir.mkdir(parents=True, exist_ok=True)
         else:
@@ -461,7 +465,11 @@ class BatchRunner(SubmissionComponent):
         validation_input_manifest = None
         if stage == "train":
             resume_checkpoint = RunManager.prepare_training_run(
-                job_dir, config, resume=resume, resume_from=resume_from
+                job_dir,
+                config,
+                resume=resume,
+                resume_from=resume_from,
+                retry=retry,
             )
             submission_dir = RunManager.create_submission_dir(job_dir, "train")
             spine_log_dir = str(job_dir)
@@ -481,6 +489,11 @@ class BatchRunner(SubmissionComponent):
                         shlex.quote(str(job_dir / "tensorboard" / "train")),
                     ]
                 )
+        elif stage == "inference" and retry:
+            # A retry gets an immutable attempt directory so scripts, scheduler
+            # logs, and metadata from the failed submission remain available.
+            submission_dir = RunManager.create_submission_dir(job_dir, "inference")
+            spine_log_dir = str(submission_dir / "logs")
         elif stage == "validation":
             spine_log_path, selected_checkpoints = RunManager.prepare_validation(
                 job_dir,
@@ -573,6 +586,7 @@ class BatchRunner(SubmissionComponent):
         file_list_pattern = None
         file_chunks = [[]]
         concurrent_task_limit = None
+        attempt_dir = submission_dir or job_dir
         if stage == "inference" and file_list:
             max_array_size = self.profiles["defaults"]["max_array_size"]
             effective_files_per_task = self.resolve_files_per_task(
@@ -594,7 +608,7 @@ class BatchRunner(SubmissionComponent):
             chunk_output_args = output_args
             chunk_spine_log_dir = spine_log_dir
             if stage == "inference":
-                scheduler_dir = job_dir / "scheduler" / chunk_name
+                scheduler_dir = attempt_dir / "scheduler" / chunk_name
             else:
                 assert submission_dir is not None
                 scheduler_dir = submission_dir
@@ -611,7 +625,7 @@ class BatchRunner(SubmissionComponent):
                     array_spec += f"%{concurrent_task_limit}"
 
             if stage == "inference" and file_list:
-                task_chunk_dir = job_dir / "tasks" / chunk_name
+                task_chunk_dir = attempt_dir / "tasks" / chunk_name
                 task_dir_pattern = str(task_chunk_dir / "task_*")
                 file_list_pattern = f"{task_dir_pattern}/inputs.txt"
                 for task_idx, file_group in enumerate(chunk, start=1):
@@ -752,12 +766,16 @@ class BatchRunner(SubmissionComponent):
             "ntasks": ntasks,
             "job_ids": job_ids,
             "output": output
-            or (str(job_dir / "tasks") if stage == "inference" and file_list else None),
+            or (
+                str(attempt_dir / "tasks")
+                if stage == "inference" and file_list
+                else None
+            ),
             "output_dir": (
                 output_dir
                 if output
                 else (
-                    str(job_dir / "tasks")
+                    str(attempt_dir / "tasks")
                     if stage == "inference" and file_list
                     else None
                 )

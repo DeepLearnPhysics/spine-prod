@@ -37,15 +37,19 @@ io:
         staged: true
         stage: segmentation
         keep_open: false
-        keys: [seg_pred, clust_label_adapt]
+        keys: [seg_pred, ppn_points, clust_label_adapt]
   writer:
     name: stage_hdf5
     file_name: null
     stage: fragmentation
     keep_open: false
+    overwrite_stage: true
     keys:
       # Inputs needed to build particles after the standalone GrapPAs train.
       - data
+      # Retain reconstructed point proposals; truth coordinates are not
+      # defined for every predicted fragment.
+      - ppn_points
       - coord_label
       - clust_label_adapt
       - fragment_clusts
@@ -76,6 +80,7 @@ model:
   network_input:
     data: data
     seg_pred: seg_pred
+    ppn_points: ppn_points
     clust_label: clust_label_adapt
     coord_label: coord_label
 
@@ -85,7 +90,7 @@ model:
 
   modules:
     chain:
-      inputs: [seg_pred]
+      inputs: [seg_pred, ppn_points]
       stages:
         - name: fragmentation
           provider: fragmentation

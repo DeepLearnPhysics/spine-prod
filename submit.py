@@ -212,6 +212,17 @@ Examples:
             "the pipeline declares workspace: null."
         ),
     )
+    parser.add_argument(
+        "--from-stage",
+        help=(
+            "Restart a pipeline at this stage, treating earlier stages as "
+            "completed and safely reusing existing stage directories."
+        ),
+    )
+    parser.add_argument(
+        "--to-stage",
+        help="Stop a pipeline submission after this stage (inclusive).",
+    )
     resume_group = parser.add_mutually_exclusive_group()
     resume_group.add_argument(
         "--resume",
@@ -373,6 +384,10 @@ Examples:
 
     if args.workspace is not None and not args.pipeline:
         parser.error("--workspace is only supported with --pipeline")
+    if args.from_stage is not None and not args.pipeline:
+        parser.error("--from-stage is only supported with --pipeline")
+    if args.to_stage is not None and not args.pipeline:
+        parser.error("--to-stage is only supported with --pipeline")
 
     # Handle deprecated --local-output flag
     if getattr(args, "local_output", False):
@@ -525,6 +540,8 @@ Examples:
                 preload=args.preload,
                 overrides=pipeline_overrides,
                 workspace=args.workspace,
+                from_stage=args.from_stage,
+                to_stage=args.to_stage,
             )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():

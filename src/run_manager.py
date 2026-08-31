@@ -74,8 +74,15 @@ class RunManager:
         config: str,
         resume: bool = False,
         resume_from: Optional[str] = None,
+        retry: bool = False,
     ) -> Optional[Path]:
-        """Create a training run or resolve the checkpoint used to resume it."""
+        """Create, resume, or safely retry a persistent training run.
+
+        A retry resumes the latest checkpoint when one exists. If a scheduler
+        job was submitted but never began training, it may instead reuse the
+        unchanged run with no checkpoint. Existing training logs without a
+        checkpoint are ambiguous and remain an error.
+        """
         metadata_path = run_dir / cls.METADATA_NAME
         wants_resume = resume or resume_from is not None
 
@@ -102,8 +109,27 @@ class RunManager:
 
         if metadata_path.exists():
             metadata = cls._read_json(metadata_path)
+            digest_matches = metadata.get("training_config_sha256") == (
+                cls.config_digest(config)
+            )
+            if retry:
+                if not digest_matches:
+                    raise ValueError(
+                        f"Cannot retry training with a different configuration: "
+                        f"{run_dir}"
+                    )
+                checkpoint = cls.latest_checkpoint(run_dir)
+                if checkpoint is not None:
+                    cls.checkpoint_digest(checkpoint)
+                    return checkpoint
+                if any(run_dir.glob("train*_log-*.csv")):
+                    raise ValueError(
+                        "Cannot retry training that produced logs but no checkpoint: "
+                        f"{run_dir}"
+                    )
+                return None
             if (
-                metadata.get("training_config_sha256") == cls.config_digest(config)
+                digest_matches
                 and not metadata.get("job_ids")
                 and cls.latest_checkpoint(run_dir) is None
                 and not any(run_dir.glob("train*_log-*.csv"))
