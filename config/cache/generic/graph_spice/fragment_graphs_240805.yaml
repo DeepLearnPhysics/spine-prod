@@ -47,9 +47,6 @@ io:
     keys:
       # Inputs needed to build particles after the standalone GrapPAs train.
       - data
-      # Retain reconstructed point proposals; truth coordinates are not
-      # defined for every predicted fragment.
-      - ppn_points
       - coord_label
       - clust_label_adapt
       - fragment_clusts

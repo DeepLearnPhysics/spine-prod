@@ -25,6 +25,10 @@ io:
       file_keys: null
       staged: true
       stage: fragmentation
+      # PPN remains owned by segmentation; avoid copying its voxel-aligned
+      # tensor into every downstream stage.
+      stage_map:
+        ppn_points: segmentation
       keep_open: false
       keys:
         - data
