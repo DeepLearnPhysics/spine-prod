@@ -1,6 +1,5 @@
 """Loading, validation, and execution of multi-stage production pipelines."""
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -96,7 +95,6 @@ PROFILE_FIELDS = (
 )
 
 
-@dataclass(frozen=True)
 class PipelineDefinition:
     """A fully validated pipeline, ready for ordered submission.
 
@@ -106,7 +104,12 @@ class PipelineDefinition:
         Stages after defaults, stage values, and CLI overrides are resolved.
     """
 
-    stages: Tuple[Dict[str, Any], ...]
+    __slots__ = ("stages",)
+    stages: Tuple[Mapping[str, Any], ...]
+
+    def __init__(self, stages: Sequence[Mapping[str, Any]]):
+        """Store resolved stages in immutable submission order."""
+        self.stages = tuple(stages)
 
     @classmethod
     def load(
