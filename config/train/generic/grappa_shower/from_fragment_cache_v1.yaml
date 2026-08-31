@@ -1,0 +1,43 @@
+__meta__:
+  kind: fragment
+  description: Generic shower GrapPA training from cached fragment graphs
+
+include: train/generic/grappa_shower/base_v1.yaml
+
+override:
+  io.loader.dataset:
+    name: hdf5
+    file_keys: null
+    staged: true
+    stage: fragmentation
+    keys:
+      - data
+      - shower_fragment_clusts
+      - shower_fragment_edge_index
+      - shower_fragment_node_features
+      - shower_fragment_edge_features
+      - particle_aggregation_shower_node_target
+      - particle_aggregation_shower_node_valid
+      - particle_aggregation_shower_edge_target
+      - particle_aggregation_shower_edge_valid
+
+  model.network_input:
+    data: data
+    clusts: shower_fragment_clusts
+    edge_index: shower_fragment_edge_index
+    node_features: shower_fragment_node_features
+    edge_features: shower_fragment_edge_features
+
+  model.loss_input:
+    node_target: particle_aggregation_shower_node_target
+    node_valid: particle_aggregation_shower_node_valid
+    edge_target: particle_aggregation_shower_edge_target
+    edge_valid: particle_aggregation_shower_edge_valid
+
+remove:
+  - model.network_input.coord_label
+  - model.loss_input.clust_label
+  - model.loss_input.coord_label
+  - model.modules.grappa.graph
+  - model.modules.grappa.node_encoder
+  - model.modules.grappa.edge_encoder

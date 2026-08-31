@@ -1,0 +1,124 @@
+__meta__:
+  kind: bundle
+  version: "240805"
+  date: "2024-08-05"
+  description: Materialize generic fragment graphs and static GrapPA supervision
+
+base:
+  world_size: 1
+  iterations: -1
+  seed: 0
+  unwrap: true
+  split_output: true
+  log_step: 1
+
+io:
+  loader:
+    minibatch_size: 64
+    shuffle: false
+    # This job reads the segmentation stage and appends fragmentation to the
+    # same HDF5 file. Synchronous, short-lived reads avoid competing handles.
+    num_workers: 0
+    collate_fn: all
+    dataset:
+      name: mixed
+      larcv:
+        file_keys: null
+        schema:
+          data:
+            parser: sparse3d
+            sparse_event: sparse3d_pcluster
+          coord_label:
+            parser: particle_coords
+            particle_event: particle_corrected
+            cluster_event: cluster3d_pcluster
+      hdf5:
+        file_keys: null
+        staged: true
+        stage: segmentation
+        keep_open: false
+        keys: [seg_pred, clust_label_adapt]
+  writer:
+    name: stage_hdf5
+    file_name: null
+    stage: fragmentation
+    keep_open: false
+    keys:
+      # Inputs needed to build particles after the standalone GrapPAs train.
+      - data
+      - coord_label
+      - clust_label_adapt
+      - fragment_clusts
+      - fragment_shapes
+
+      # Precomputed graph inputs consumed by the concurrent training jobs.
+      - shower_fragment_clusts
+      - shower_fragment_edge_index
+      - shower_fragment_node_features
+      - shower_fragment_edge_features
+      - track_fragment_clusts
+      - track_fragment_edge_index
+      - track_fragment_node_features
+      - track_fragment_edge_features
+
+      # SPINE reapplies prediction-dependent masking to the cached static mask.
+      - particle_aggregation_shower_node_target
+      - particle_aggregation_shower_node_valid
+      - particle_aggregation_shower_edge_target
+      - particle_aggregation_shower_edge_valid
+      - particle_aggregation_track_edge_target
+      - particle_aggregation_track_edge_valid
+
+model:
+  name: full_chain
+  to_numpy: true
+
+  network_input:
+    data: data
+    seg_pred: seg_pred
+    clust_label: clust_label_adapt
+    coord_label: coord_label
+
+  loss_input:
+    clust_label: clust_label_adapt
+    coord_label: coord_label
+
+  modules:
+    chain:
+      inputs: [seg_pred]
+      stages:
+        - name: fragmentation
+          provider: fragmentation
+          uses: graph_spice
+          config:
+            mode: graph_spice
+
+        - name: particle_aggregation
+          provider: particle_aggregation
+          uses: [grappa_shower, grappa_track]
+          loss:
+            shower: grappa_shower_loss
+            track: grappa_track_loss
+          config:
+            shower_aggregation: grappa
+            shower_primary: grappa
+            track_aggregation: grappa
+            particle_aggregation: null
+
+    # Load the standalone Graph-SPICE checkpoint supplied by the pipeline.
+    graph_spice: !include model/generic/graph_spice/network_240805.yaml
+    grappa_shower: !include model/generic/grappa_shower/network_240718.yaml
+    grappa_shower_loss: !include model/generic/grappa_shower/loss_240718.yaml
+    grappa_track: !include model/generic/grappa_track/network_240718.yaml
+    grappa_track_loss: !include model/generic/grappa_track/loss_240718.yaml
+
+override:
+  model.modules.graph_spice.model_name: ""
+  model.modules.graph_spice.weight_path: ""
+
+  # Emit encoder products once instead of rebuilding them during training.
+  model.modules.grappa_shower.return_features: true
+  model.modules.grappa_track.return_features: true
+
+  model.modules.grappa_shower_loss.return_targets: true
+  model.modules.grappa_track_loss.return_targets: true

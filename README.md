@@ -503,6 +503,11 @@ Pipelines allow you to chain multiple processing stages with automatic dependenc
 Create a YAML file in `pipelines/`:
 
 ```yaml
+workspace: /path/to/production
+
+variables:
+  raw_source: /path/to/raw/*.root
+
 defaults:
   profile: s3df_ampere
   time: "08:00:00"
@@ -510,17 +515,27 @@ defaults:
 stages:
   - name: reconstruction
     config: infer/icarus/latest
-    source: /path/to/raw/*.root
+    source: ${raw_source}
+    run_dir: ${workspace}/reconstruction
+    output: ${workspace}/reconstruction/output
     ntasks: 100
     # Replace with a concrete YAML config if you need specific modifiers
-  
+
   - name: analysis
     depends_on: [reconstruction]  # Wait for reconstruction to complete
     config: path/to/downstream_stage.yaml
-    source: output_reco/*.h5
+    source: ${workspace}/reconstruction/output/*.h5
+    run_dir: ${workspace}/analysis
     profile: s3df_milano
     ntasks: 20
 ```
+
+`workspace` defines the pipeline's shared output root and is available as the
+reserved `${workspace}` variable. Additional string values under `variables`
+can reference the workspace or one another. Expansion applies recursively to
+stage fields, including structured sources and module weights. Undefined
+variables, dependency cycles, and invalid declarations fail before any job is
+submitted; environment variables are not expanded implicitly.
 
 ### Submit Pipeline
 
@@ -551,8 +566,9 @@ Pipeline stages accept the CLI-equivalent `source`, `source_list`,
 `val_source`, and `val_source_list` fields. Composite datasets use structured
 `sources` and `validation_sources`, while `module_weight` forwards named model
 checkpoints through SPINE's native CLI. See
-`pipelines/generic/uresnet_ppn_to_graph_spice_240805.yaml` for the first
-staged-training prototype.
+`pipelines/generic/full_chain_240805.yaml` for a complete staged-training
+prototype with centralized paths. Its materialization jobs append successive
+stage groups to one source-derived HDF5 cache per training or validation file.
 
 ## Run Management
 

@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic interaction GrapPA training from cached 240805 particles
+
+include:
+  - model/generic/grappa_inter/model_240805.yaml
+  - train/generic/grappa_inter/from_particle_cache_v1.yaml

@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic 240718 composed UResNet-PPN network
+
+uresnet: !include model/generic/uresnet/network_240718.yaml
+ppn: !include model/generic/uresnet_ppn/ppn_240718.yaml

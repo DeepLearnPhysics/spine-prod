@@ -64,6 +64,10 @@ transition:
    products into separate training and validation staged caches.
 3. Train standalone Graph-SPICE from raw LArCV truth plus the aligned cache.
 
+Each original source file has one staged cache. Later materialization jobs in
+the full-chain prototype append named groups to that same HDF5 file rather
+than producing a new physical file for every transition.
+
 Replace the `/path/to/workflow` destination before submission. The prototype
 uses SPINE's target-qualified source overrides for the mixed Graph-SPICE
 dataset and `--module-weight` for the cached segmentation jobs; it requires no

@@ -1,0 +1,108 @@
+__meta__:
+  kind: bundle
+  version: "240805"
+  date: "2024-08-05"
+  description: Materialize generic particle graphs and interaction supervision
+
+base:
+  world_size: 1
+  iterations: -1
+  seed: 0
+  unwrap: true
+  split_output: true
+  log_step: 1
+
+io:
+  loader:
+    minibatch_size: 64
+    shuffle: false
+    # This job reads fragmentation and appends particle aggregation to the
+    # same HDF5 file. Synchronous, short-lived reads avoid competing handles.
+    num_workers: 0
+    collate_fn: all
+    dataset:
+      name: hdf5
+      file_keys: null
+      staged: true
+      stage: fragmentation
+      keep_open: false
+      keys:
+        - data
+        - coord_label
+        - clust_label_adapt
+        - fragment_clusts
+        - fragment_shapes
+  writer:
+    name: stage_hdf5
+    file_name: null
+    stage: particle_aggregation
+    keep_open: false
+    keys:
+      - data
+      - particle_clusts
+      - particle_edge_index
+      - particle_node_features
+      - particle_edge_features
+      - interaction_aggregation_node_type_target
+      - interaction_aggregation_node_type_valid
+      - interaction_aggregation_node_primary_target
+      - interaction_aggregation_node_primary_valid
+      - interaction_aggregation_node_orient_target
+      - interaction_aggregation_node_orient_valid
+      - interaction_aggregation_edge_target
+      - interaction_aggregation_edge_valid
+
+model:
+  name: full_chain
+  to_numpy: true
+
+  network_input:
+    data: data
+    clust_label: clust_label_adapt
+    coord_label: coord_label
+    fragment_clusts: fragment_clusts
+    fragment_shapes: fragment_shapes
+
+  loss_input:
+    clust_label: clust_label_adapt
+    coord_label: coord_label
+
+  modules:
+    chain:
+      inputs: [fragment_clusts, fragment_shapes]
+      stages:
+        - name: particle_aggregation
+          provider: particle_aggregation
+          uses: [grappa_shower, grappa_track]
+          config:
+            shower_aggregation: grappa
+            shower_primary: grappa
+            track_aggregation: grappa
+            particle_aggregation: null
+
+        - name: interaction_aggregation
+          provider: interaction_aggregation
+          uses: grappa_inter
+          loss: grappa_inter_loss
+          config:
+            mode: grappa
+            task_modes:
+              type: grappa
+              primary: grappa
+              orient: grappa
+
+    # Load both standalone checkpoints supplied by the pipeline.
+    grappa_shower: !include model/generic/grappa_shower/network_240718.yaml
+    grappa_track: !include model/generic/grappa_track/network_240718.yaml
+    grappa_inter: !include model/generic/grappa_inter/network_240805.yaml
+    grappa_inter_loss: !include model/generic/grappa_inter/loss_240805.yaml
+
+override:
+  model.modules.grappa_shower.model_name: ""
+  model.modules.grappa_shower.weight_path: ""
+  model.modules.grappa_track.model_name: ""
+  model.modules.grappa_track.weight_path: ""
+
+  # Cache the generic 240805 interaction graph once for standalone training.
+  model.modules.grappa_inter.return_features: true
+  model.modules.grappa_inter_loss.return_targets: true

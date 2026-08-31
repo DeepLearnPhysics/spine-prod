@@ -120,7 +120,6 @@ def test_generic_training_variants_follow_component_model_changes():
         for model_dir in (CONFIG_ROOT / "train" / "generic").iterdir()
         if model_dir.is_dir() and list(model_dir.glob("train_*.yaml"))
     }
-
     assert variants == {
         "uresnet": {"240718"},
         "uresnet_ppn": {"240718", "240805"},
@@ -129,6 +128,135 @@ def test_generic_training_variants_follow_component_model_changes():
         "grappa_track": {"240718", "260828"},
         "grappa_inter": {"240718", "240805", "260828"},
     }
+
+
+def test_generic_models_and_cache_producers_name_dated_component_fragments():
+    """Composition sites must expose their exact network and loss revisions."""
+    components = {
+        "uresnet": ("240718",),
+        "graph_spice": ("240718", "240805"),
+        "grappa_shower": ("240718", "260828"),
+        "grappa_track": ("240718", "260828"),
+        "grappa_inter": ("240718", "240805", "260828"),
+    }
+    for component, versions in components.items():
+        for version in versions:
+            model_path = (
+                CONFIG_ROOT / "model" / "generic" / component / f"model_{version}.yaml"
+            )
+            model = yaml.load(model_path.read_text(), Loader=yaml.BaseLoader)
+            module_name = {
+                "uresnet": "uresnet",
+                "graph_spice": "graph_spice",
+            }.get(component, "grappa")
+            assert model["override"][f"model.modules.{module_name}"] == (
+                f"model/generic/{component}/network_{version}.yaml"
+            )
+            loss_name = {
+                "uresnet": "uresnet_loss",
+                "graph_spice": "graph_spice_loss",
+            }.get(component, "grappa_loss")
+            assert model["override"][f"model.modules.{loss_name}"] == (
+                f"model/generic/{component}/loss_{version}.yaml"
+            )
+
+    # UResNet-PPN shares leaf modules with standalone UResNet while also
+    # providing one nested fragment for full-chain composition.
+    for version in ("240718", "240805"):
+        model_path = (
+            CONFIG_ROOT / "model" / "generic" / "uresnet_ppn" / f"model_{version}.yaml"
+        )
+        model = yaml.load(model_path.read_text(), Loader=yaml.BaseLoader)
+        overrides = model["override"]
+        assert overrides["model.modules.uresnet"] == (
+            "model/generic/uresnet/network_240718.yaml"
+        )
+        assert overrides["model.modules.uresnet_loss"] == (
+            "model/generic/uresnet/loss_240718.yaml"
+        )
+        assert overrides["model.modules.ppn"] == (
+            f"model/generic/uresnet_ppn/ppn_{version}.yaml"
+        )
+        assert overrides["model.modules.ppn_loss"] == (
+            f"model/generic/uresnet_ppn/ppn_loss_{version}.yaml"
+        )
+
+        network_path = (
+            CONFIG_ROOT
+            / "model"
+            / "generic"
+            / "uresnet_ppn"
+            / f"network_{version}.yaml"
+        )
+        network = yaml.load(network_path.read_text(), Loader=yaml.BaseLoader)
+        assert network["uresnet"] == "model/generic/uresnet/network_240718.yaml"
+        assert network["ppn"] == (f"model/generic/uresnet_ppn/ppn_{version}.yaml")
+
+    segmentation_cache_path = (
+        CONFIG_ROOT / "cache" / "generic" / "uresnet_ppn" / "segmentation_240805.yaml"
+    )
+    segmentation_cache = yaml.load(
+        segmentation_cache_path.read_text(), Loader=yaml.BaseLoader
+    )
+    assert segmentation_cache["model"]["modules"]["uresnet_ppn"] == (
+        "model/generic/uresnet_ppn/network_240805.yaml"
+    )
+
+    fragment_cache_path = (
+        CONFIG_ROOT
+        / "cache"
+        / "generic"
+        / "graph_spice"
+        / "fragment_graphs_240805.yaml"
+    )
+    fragment_cache = yaml.load(fragment_cache_path.read_text(), Loader=yaml.BaseLoader)
+    fragment_modules = fragment_cache["model"]["modules"]
+    assert fragment_modules["graph_spice"] == (
+        "model/generic/graph_spice/network_240805.yaml"
+    )
+    assert fragment_modules["grappa_shower"] == (
+        "model/generic/grappa_shower/network_240718.yaml"
+    )
+    assert fragment_modules["grappa_track"] == (
+        "model/generic/grappa_track/network_240718.yaml"
+    )
+
+    particle_cache_path = (
+        CONFIG_ROOT
+        / "cache"
+        / "generic"
+        / "grappa_shower_track"
+        / "particle_graphs_240805.yaml"
+    )
+    particle_cache = yaml.load(particle_cache_path.read_text(), Loader=yaml.BaseLoader)
+    particle_modules = particle_cache["model"]["modules"]
+    assert particle_modules["grappa_shower"] == (
+        "model/generic/grappa_shower/network_240718.yaml"
+    )
+    assert particle_modules["grappa_track"] == (
+        "model/generic/grappa_track/network_240718.yaml"
+    )
+    assert particle_modules["grappa_inter"] == (
+        "model/generic/grappa_inter/network_240805.yaml"
+    )
+
+    # The final inference bundle selects the same component revisions.
+    inference_path = CONFIG_INFER_ROOT / "generic" / "model" / "model_240805.yaml"
+    inference = yaml.load(inference_path.read_text(), Loader=yaml.BaseLoader)
+    inference_overrides = inference["override"]
+    assert inference_overrides["model.modules.uresnet_ppn"] == (
+        "model/generic/uresnet_ppn/network_240805.yaml"
+    )
+    assert inference_overrides["model.modules.uresnet_ppn_loss"] == (
+        "model/generic/uresnet_ppn/loss_240805.yaml"
+    )
+    selected_modules = dict(fragment_modules)
+    selected_modules.update(particle_modules)
+    for component in ("graph_spice", "grappa_shower", "grappa_track", "grappa_inter"):
+        assert (
+            inference_overrides[f"model.modules.{component}"]
+            == selected_modules[component]
+        )
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
@@ -171,6 +299,27 @@ def test_generic_segmentation_cache_reuses_uresnet_ppn_revision():
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize("version", ["240718", "240805"])
+def test_generic_uresnet_ppn_matches_generic_full_chain(version):
+    """Standalone and full-chain UResNet-PPN must share dated leaf modules."""
+    standalone = load_config_with_includes(
+        CONFIG_ROOT / "model" / "generic" / "uresnet_ppn" / f"model_{version}.yaml"
+    )["model"]["modules"]
+    full_chain = load_config_with_includes(
+        CONFIG_INFER_ROOT / "generic" / "model" / f"model_{version}.yaml"
+    )["model"]["modules"]
+
+    assert full_chain["uresnet_ppn"] == {
+        "uresnet": standalone["uresnet"],
+        "ppn": standalone["ppn"],
+    }
+    assert full_chain["uresnet_ppn_loss"] == {
+        "uresnet_loss": standalone["uresnet_loss"],
+        "ppn_loss": standalone["ppn_loss"],
+    }
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 def test_generic_graph_spice_can_train_from_segmentation_cache():
     """The cached recipe must merge truth with the canonical prediction product."""
     config = load_config_with_includes(
@@ -192,6 +341,255 @@ def test_generic_graph_spice_can_train_from_segmentation_cache():
     assert config["model"]["network_input"]["seg_label"] == "seg_pred"
     assert config["model"]["loss_input"]["seg_label"] == "seg_pred"
     assert config["model"]["loss_input"]["clust_label"] == "clust_label_adapt"
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
+    """One Graph-SPICE pass must feed independent shower and track jobs."""
+    config = load_config_with_includes(
+        CONFIG_ROOT
+        / "cache"
+        / "generic"
+        / "graph_spice"
+        / "fragment_graphs_240805.yaml"
+    )
+
+    loader = config["io"]["loader"]
+    assert loader["num_workers"] == 0
+    assert loader["dataset"]["hdf5"]["keep_open"] is False
+    assert config["io"]["writer"]["keep_open"] is False
+
+    chain = config["model"]["modules"]["chain"]
+    assert chain["inputs"] == ["seg_pred"]
+    assert [stage["name"] for stage in chain["stages"]] == [
+        "fragmentation",
+        "particle_aggregation",
+    ]
+    assert config["model"]["network_input"]["seg_pred"] == "seg_pred"
+
+    modules = config["model"]["modules"]
+    assert modules["graph_spice"]["model_name"] == ""
+    assert modules["graph_spice"]["weight_path"] == ""
+    assert modules["grappa_shower"]["return_features"] is True
+    assert modules["grappa_track"]["return_features"] is True
+    assert modules["grappa_shower_loss"]["return_targets"] is True
+    assert modules["grappa_track_loss"]["return_targets"] is True
+
+    # Cache-only controls aside, these are the authoritative standalone modules.
+    revisions = {
+        "graph_spice": ("240805", "graph_spice", None),
+        "grappa_shower": ("240718", "grappa", "grappa_loss"),
+        "grappa_track": ("240718", "grappa", "grappa_loss"),
+    }
+    for component, (version, network_key, loss_key) in revisions.items():
+        standalone = load_config_with_includes(
+            CONFIG_ROOT / "model" / "generic" / component / f"model_{version}.yaml"
+        )["model"]["modules"]
+        cache_network = deepcopy(modules[component])
+        for key in ("model_name", "weight_path", "return_features"):
+            cache_network.pop(key, None)
+        assert cache_network == standalone[network_key]
+        if loss_key is not None:
+            cache_loss = deepcopy(modules[f"{component}_loss"])
+            cache_loss.pop("return_targets")
+            assert cache_loss == standalone[loss_key]
+
+    keys = set(config["io"]["writer"]["keys"])
+    for path in ("shower", "track"):
+        prefix = f"{path}_fragment"
+        assert {
+            f"{prefix}_clusts",
+            f"{prefix}_edge_index",
+            f"{prefix}_node_features",
+            f"{prefix}_edge_features",
+        }.issubset(keys)
+    assert {
+        "particle_aggregation_shower_node_target",
+        "particle_aggregation_shower_node_valid",
+        "particle_aggregation_shower_edge_target",
+        "particle_aggregation_shower_edge_valid",
+        "particle_aggregation_track_edge_target",
+        "particle_aggregation_track_edge_valid",
+    }.issubset(keys)
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize(
+    ("component", "bundle", "prefix", "objectives"),
+    [
+        (
+            "grappa_shower",
+            "train_from_fragment_cache_240718.yaml",
+            "shower_fragment",
+            ("node", "edge"),
+        ),
+        (
+            "grappa_track",
+            "train_from_fragment_cache_240718.yaml",
+            "track_fragment",
+            ("edge",),
+        ),
+    ],
+)
+def test_generic_particle_grappas_train_only_from_cached_graphs(
+    component, bundle, prefix, objectives
+):
+    """Cached GrapPA recipes must bypass graph construction and encoding."""
+    config = load_config_with_includes(
+        CONFIG_ROOT / "train" / "generic" / component / bundle
+    )
+
+    dataset = config["io"]["loader"]["dataset"]
+    assert dataset["name"] == "hdf5"
+    assert dataset["staged"] is True
+    assert dataset["stage"] == "fragmentation"
+    assert config["model"]["network_input"] == {
+        "data": "data",
+        "clusts": f"{prefix}_clusts",
+        "edge_index": f"{prefix}_edge_index",
+        "node_features": f"{prefix}_node_features",
+        "edge_features": f"{prefix}_edge_features",
+    }
+    assert set(config["model"]["modules"]["grappa"]) == {"nodes", "gnn_model"}
+    assert set(config["model"]["loss_input"]) == {
+        key
+        for objective in objectives
+        for key in (f"{objective}_target", f"{objective}_valid")
+    }
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
+    """The second cache must provide every input and target used by inter."""
+    cache = load_config_with_includes(
+        CONFIG_ROOT
+        / "cache"
+        / "generic"
+        / "grappa_shower_track"
+        / "particle_graphs_240805.yaml"
+    )
+    training = load_config_with_includes(
+        CONFIG_ROOT
+        / "train"
+        / "generic"
+        / "grappa_inter"
+        / "train_from_particle_cache_240805.yaml"
+    )
+
+    loader = cache["io"]["loader"]
+    assert loader["num_workers"] == 0
+    assert loader["dataset"]["keep_open"] is False
+    assert cache["io"]["writer"]["keep_open"] is False
+
+    chain = cache["model"]["modules"]["chain"]
+    assert chain["inputs"] == ["fragment_clusts", "fragment_shapes"]
+    assert [stage["name"] for stage in chain["stages"]] == [
+        "particle_aggregation",
+        "interaction_aggregation",
+    ]
+    assert cache["model"]["modules"]["grappa_shower"]["model_name"] == ""
+    assert cache["model"]["modules"]["grappa_track"]["model_name"] == ""
+    assert cache["model"]["modules"]["grappa_inter"]["return_features"] is True
+    assert cache["model"]["modules"]["grappa_inter_loss"]["return_targets"] is True
+
+    cache_modules = cache["model"]["modules"]
+    revisions = {
+        "grappa_shower": "240718",
+        "grappa_track": "240718",
+        "grappa_inter": "240805",
+    }
+    for component, version in revisions.items():
+        standalone = load_config_with_includes(
+            CONFIG_ROOT / "model" / "generic" / component / f"model_{version}.yaml"
+        )["model"]["modules"]
+        cache_network = deepcopy(cache_modules[component])
+        for key in ("model_name", "weight_path", "return_features"):
+            cache_network.pop(key, None)
+        assert cache_network == standalone["grappa"]
+        if component == "grappa_inter":
+            cache_loss = deepcopy(cache_modules["grappa_inter_loss"])
+            cache_loss.pop("return_targets")
+            assert cache_loss == standalone["grappa_loss"]
+
+    writer_keys = set(cache["io"]["writer"]["keys"])
+    reader_keys = set(training["io"]["loader"]["dataset"]["keys"])
+    assert reader_keys.issubset(writer_keys)
+    assert training["model"]["network_input"] == {
+        "data": "data",
+        "clusts": "particle_clusts",
+        "edge_index": "particle_edge_index",
+        "node_features": "particle_node_features",
+        "edge_features": "particle_edge_features",
+    }
+    assert set(training["model"]["modules"]["grappa"]) == {"nodes", "gnn_model"}
+
+
+def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
+    """Shower and track training fan out, then jointly gate the inter cache."""
+    pipeline_path = (
+        CONFIG_ROOT.parent / "pipelines" / "generic" / "full_chain_240805.yaml"
+    )
+    pipeline = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
+    stages = {stage["name"]: stage for stage in pipeline["stages"]}
+
+    fragment_dependencies = [
+        "cache_train_fragment_graphs",
+        "cache_validation_fragment_graphs",
+    ]
+    assert stages["train_grappa_shower"]["depends_on"] == fragment_dependencies
+    assert stages["train_grappa_track"]["depends_on"] == fragment_dependencies
+
+    particle_dependencies = ["train_grappa_shower", "train_grappa_track"]
+    assert stages["cache_train_particle_graphs"]["depends_on"] == particle_dependencies
+    assert (
+        stages["cache_validation_particle_graphs"]["depends_on"]
+        == particle_dependencies
+    )
+    assert stages["train_grappa_inter"]["depends_on"] == [
+        "cache_train_particle_graphs",
+        "cache_validation_particle_graphs",
+    ]
+    assert pipeline["defaults"]["time"] == "08:00:00"
+
+    # Every materialization stage extends one source-derived cache per split.
+    train_cache = "${workspace}/cache/train/train_cache.h5"
+    validation_cache = "${workspace}/cache/validation/test_cache.h5"
+    for name in ("cache_train_segmentation", "cache_train_fragment_graphs"):
+        assert stages[name]["output"] == "${workspace}/cache/train"
+        assert stages[name]["output_suffix"] == "cache"
+    for name in (
+        "cache_validation_segmentation",
+        "cache_validation_fragment_graphs",
+    ):
+        assert stages[name]["output"] == "${workspace}/cache/validation"
+        assert stages[name]["output_suffix"] == "cache"
+    assert stages["cache_train_particle_graphs"]["source"] == train_cache
+    assert stages["cache_train_particle_graphs"]["output"] == (
+        "${workspace}/cache/train"
+    )
+    assert stages["cache_validation_particle_graphs"]["source"] == validation_cache
+    assert stages["cache_validation_particle_graphs"]["output"] == (
+        "${workspace}/cache/validation"
+    )
+    assert stages["train_grappa_inter"]["source"] == train_cache
+    assert stages["train_grappa_inter"]["val_source"] == validation_cache
+
+    expected_run_dirs = {
+        "cache_train_segmentation": "${workspace}/cache/train/segmentation",
+        "cache_validation_segmentation": ("${workspace}/cache/validation/segmentation"),
+        "cache_train_fragment_graphs": "${workspace}/cache/train/fragmentation",
+        "cache_validation_fragment_graphs": (
+            "${workspace}/cache/validation/fragmentation"
+        ),
+        "cache_train_particle_graphs": (
+            "${workspace}/cache/train/particle_aggregation"
+        ),
+        "cache_validation_particle_graphs": (
+            "${workspace}/cache/validation/particle_aggregation"
+        ),
+    }
+    for name, run_dir in expected_run_dirs.items():
+        assert stages[name]["run_dir"] == run_dir
 
 
 def test_default_uresnet_matches_generic_full_chain():
@@ -294,16 +692,8 @@ def test_generic_grappa_matches_generic_full_chain(component, version):
         CONFIG_INFER_ROOT / "generic" / "model" / f"model_{version}.yaml"
     )
 
-    modules = deepcopy(grappa["model"]["modules"])
+    modules = grappa["model"]["modules"]
     full_chain_modules = full_chain["model"]["modules"]
-
-    # The common definitions explicitly declare SPINE defaults so that the
-    # 260828 revisions reproduce its standalone examples. The historical full
-    # chain omitted these operationally equivalent defaults.
-    if component in {"grappa_shower", "grappa_track"}:
-        modules["grappa"]["nodes"].pop("min_size")
-    if component == "grappa_shower":
-        modules["grappa_loss"]["node_loss"].pop("use_closest")
 
     assert modules["grappa"] == full_chain_modules[component]
     assert modules["grappa_loss"] == full_chain_modules[f"{component}_loss"]

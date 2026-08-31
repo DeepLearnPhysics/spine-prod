@@ -5,3 +5,7 @@ __meta__:
   description: Generic UResNet model revision
 
 include: model/common/uresnet/base_v1.yaml
+
+override:
+  model.modules.uresnet: !include model/generic/uresnet/network_240718.yaml
+  model.modules.uresnet_loss: !include model/generic/uresnet/loss_240718.yaml

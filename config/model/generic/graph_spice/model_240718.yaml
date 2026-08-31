@@ -7,7 +7,5 @@ __meta__:
 include: model/common/graph_spice/base_v1.yaml
 
 override:
-  model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
-  model.modules.graph_spice.constructor.graph:
-    name: knn
-    k: 5
+  model.modules.graph_spice: !include model/generic/graph_spice/network_240718.yaml
+  model.modules.graph_spice_loss: !include model/generic/graph_spice/loss_240718.yaml

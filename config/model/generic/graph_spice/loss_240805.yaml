@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic 240805 Graph-SPICE loss
+
+include: model/common/graph_spice/loss_v1.yaml

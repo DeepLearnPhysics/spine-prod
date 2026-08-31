@@ -527,7 +527,9 @@ class BatchRunner(SubmissionComponent):
                 job_dir, config, output_suffix
             )
         )
-        if file_list and output:
+        # Composite datasets have no flat file list, but their writer output
+        # is still a first-class CLI override.
+        if (file_list or named_sources) and output:
             output_path = Path(output)
             if output_path.suffix:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -535,7 +537,7 @@ class BatchRunner(SubmissionComponent):
                 output_path.mkdir(parents=True, exist_ok=True)
         output_args = (
             self.context.spine_cli.format_output_args(output, output_dir, output_suffix)
-            if file_list and output
+            if (file_list or named_sources) and output
             else ""
         )
 

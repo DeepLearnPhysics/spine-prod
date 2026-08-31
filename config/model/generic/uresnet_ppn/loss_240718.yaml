@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic 240718 composed UResNet-PPN loss
+
+uresnet_loss: !include model/generic/uresnet/loss_240718.yaml
+ppn_loss: !include model/generic/uresnet_ppn/ppn_loss_240718.yaml

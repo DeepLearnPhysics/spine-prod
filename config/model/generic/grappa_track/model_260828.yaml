@@ -5,3 +5,7 @@ __meta__:
   description: Generic track GrapPA model matching the SPINE standalone example
 
 include: model/common/grappa_track/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/generic/grappa_track/network_260828.yaml
+  model.modules.grappa_loss: !include model/generic/grappa_track/loss_260828.yaml
