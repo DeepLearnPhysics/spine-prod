@@ -147,6 +147,8 @@ def test_generic_segmentation_cache_reuses_uresnet_ppn_revision():
     assert cache_module["ppn"] == standalone_modules["ppn"]
     assert cache_module["model_name"] == ""
     assert cache_module["weight_path"] == ""
+    assert cache["base"]["split_output"] is True
+    assert "split" not in cache["io"]["writer"]
     assert cache["io"]["writer"]["stage"] == "segmentation"
     assert cache["io"]["writer"]["keys"] == ["seg_pred", "clust_label_adapt"]
     assert cache["model"]["network_input"] == {
