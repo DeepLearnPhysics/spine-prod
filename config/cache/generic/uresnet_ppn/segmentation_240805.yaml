@@ -41,7 +41,6 @@ io:
     file_name: null
     stage: segmentation
     keys: [seg_pred, clust_label_adapt]
-    split: true
 
 model:
   name: full_chain
