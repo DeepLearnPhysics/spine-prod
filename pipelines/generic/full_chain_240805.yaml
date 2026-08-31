@@ -8,6 +8,17 @@ variables:
   train_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
   validation_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
 
+collections:
+  splits:
+    - name: train
+      source: ${train_source}
+      cache_dir: ${workspace}/cache/train
+      cache_file: ${workspace}/cache/train/train_cache.h5
+    - name: validation
+      source: ${validation_source}
+      cache_dir: ${workspace}/cache/validation
+      cache_file: ${workspace}/cache/validation/test_cache.h5
+
 defaults:
   profile: s3df_ampere
   time: "08:00:00"
@@ -21,24 +32,15 @@ stages:
     run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
 
-  - name: cache_train_segmentation
+  - name: cache_${split.name}_segmentation
+    for_each:
+      collection: splits
+      as: split
     depends_on: [train_uresnet_ppn]
     config: cache/generic/uresnet_ppn/segmentation_240805.yaml
-    source: ${train_source}
-    run_dir: ${workspace}/cache/train/segmentation
-    output: ${workspace}/cache/train
-    output_suffix: cache
-    files_per_task: 1
-    ntasks: 50
-    module_weight:
-      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
-
-  - name: cache_validation_segmentation
-    depends_on: [train_uresnet_ppn]
-    config: cache/generic/uresnet_ppn/segmentation_240805.yaml
-    source: ${validation_source}
-    run_dir: ${workspace}/cache/validation/segmentation
-    output: ${workspace}/cache/validation
+    source: ${split.source}
+    run_dir: ${split.cache_dir}/segmentation
+    output: ${split.cache_dir}
     output_suffix: cache
     files_per_task: 1
     ntasks: 50
@@ -63,35 +65,22 @@ stages:
         source: ${workspace}/cache/validation/test_cache.h5
 
   # Produce both shower and track graphs in one pass over each split.
-  - name: cache_train_fragment_graphs
+  - name: cache_${split.name}_fragment_graphs
+    for_each:
+      collection: splits
+      as: split
     depends_on: [train_graph_spice]
     config: cache/generic/graph_spice/fragment_graphs_240805.yaml
-    run_dir: ${workspace}/cache/train/fragmentation
-    output: ${workspace}/cache/train
+    run_dir: ${split.cache_dir}/fragmentation
+    output: ${split.cache_dir}
     output_suffix: cache
     files_per_task: 1
     ntasks: 50
     sources:
       larcv:
-        source: ${train_source}
+        source: ${split.source}
       hdf5:
-        source: ${workspace}/cache/train/train_cache.h5
-    module_weight:
-      graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
-
-  - name: cache_validation_fragment_graphs
-    depends_on: [train_graph_spice]
-    config: cache/generic/graph_spice/fragment_graphs_240805.yaml
-    run_dir: ${workspace}/cache/validation/fragmentation
-    output: ${workspace}/cache/validation
-    output_suffix: cache
-    files_per_task: 1
-    ntasks: 50
-    sources:
-      larcv:
-        source: ${validation_source}
-      hdf5:
-        source: ${workspace}/cache/validation/test_cache.h5
+        source: ${split.cache_file}
     module_weight:
       graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
 
@@ -116,25 +105,15 @@ stages:
 
   # Run both trained particle aggregators together, then cache the interaction
   # graph and its targets for the final standalone training job.
-  - name: cache_train_particle_graphs
+  - name: cache_${split.name}_particle_graphs
+    for_each:
+      collection: splits
+      as: split
     depends_on: [train_grappa_shower, train_grappa_track]
     config: cache/generic/grappa_shower_track/particle_graphs_240805.yaml
-    source: ${workspace}/cache/train/train_cache.h5
-    run_dir: ${workspace}/cache/train/particle_aggregation
-    output: ${workspace}/cache/train
-    output_suffix: cache
-    files_per_task: 1
-    ntasks: 50
-    module_weight:
-      grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
-      grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
-
-  - name: cache_validation_particle_graphs
-    depends_on: [train_grappa_shower, train_grappa_track]
-    config: cache/generic/grappa_shower_track/particle_graphs_240805.yaml
-    source: ${workspace}/cache/validation/test_cache.h5
-    run_dir: ${workspace}/cache/validation/particle_aggregation
-    output: ${workspace}/cache/validation
+    source: ${split.cache_file}
+    run_dir: ${split.cache_dir}/particle_aggregation
+    output: ${split.cache_dir}
     output_suffix: cache
     files_per_task: 1
     ntasks: 50

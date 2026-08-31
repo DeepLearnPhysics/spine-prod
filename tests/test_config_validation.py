@@ -33,6 +33,8 @@ from unittest.mock import patch
 import pytest
 import yaml
 
+from src.pipeline import PipelineDefinition
+
 CONFIG_INFER_ROOT = Path(__file__).parent.parent / "config" / "infer"
 CONFIG_ROOT = CONFIG_INFER_ROOT.parent
 ACTIVE_CONFIGS = sorted(
@@ -529,8 +531,8 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
     pipeline_path = (
         CONFIG_ROOT.parent / "pipelines" / "generic" / "full_chain_240805.yaml"
     )
-    pipeline = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
-    stages = {stage["name"]: stage for stage in pipeline["stages"]}
+    pipeline = PipelineDefinition.load(str(pipeline_path))
+    stages = {stage["name"]: stage for stage in pipeline.stages}
 
     fragment_dependencies = [
         "cache_train_fragment_graphs",
@@ -549,43 +551,45 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
         "cache_train_particle_graphs",
         "cache_validation_particle_graphs",
     ]
-    assert pipeline["defaults"]["time"] == "08:00:00"
+    assert all(stage["time"] == "08:00:00" for stage in pipeline.stages)
 
     # Every materialization stage extends one source-derived cache per split.
-    train_cache = "${workspace}/cache/train/train_cache.h5"
-    validation_cache = "${workspace}/cache/validation/test_cache.h5"
+    train_cache = "/path/to/workflow/cache/train/train_cache.h5"
+    validation_cache = "/path/to/workflow/cache/validation/test_cache.h5"
     for name in ("cache_train_segmentation", "cache_train_fragment_graphs"):
-        assert stages[name]["output"] == "${workspace}/cache/train"
+        assert stages[name]["output"] == "/path/to/workflow/cache/train"
         assert stages[name]["output_suffix"] == "cache"
     for name in (
         "cache_validation_segmentation",
         "cache_validation_fragment_graphs",
     ):
-        assert stages[name]["output"] == "${workspace}/cache/validation"
+        assert stages[name]["output"] == "/path/to/workflow/cache/validation"
         assert stages[name]["output_suffix"] == "cache"
     assert stages["cache_train_particle_graphs"]["source"] == train_cache
     assert stages["cache_train_particle_graphs"]["output"] == (
-        "${workspace}/cache/train"
+        "/path/to/workflow/cache/train"
     )
     assert stages["cache_validation_particle_graphs"]["source"] == validation_cache
     assert stages["cache_validation_particle_graphs"]["output"] == (
-        "${workspace}/cache/validation"
+        "/path/to/workflow/cache/validation"
     )
     assert stages["train_grappa_inter"]["source"] == train_cache
     assert stages["train_grappa_inter"]["val_source"] == validation_cache
 
     expected_run_dirs = {
-        "cache_train_segmentation": "${workspace}/cache/train/segmentation",
-        "cache_validation_segmentation": ("${workspace}/cache/validation/segmentation"),
-        "cache_train_fragment_graphs": "${workspace}/cache/train/fragmentation",
+        "cache_train_segmentation": "/path/to/workflow/cache/train/segmentation",
+        "cache_validation_segmentation": (
+            "/path/to/workflow/cache/validation/segmentation"
+        ),
+        "cache_train_fragment_graphs": "/path/to/workflow/cache/train/fragmentation",
         "cache_validation_fragment_graphs": (
-            "${workspace}/cache/validation/fragmentation"
+            "/path/to/workflow/cache/validation/fragmentation"
         ),
         "cache_train_particle_graphs": (
-            "${workspace}/cache/train/particle_aggregation"
+            "/path/to/workflow/cache/train/particle_aggregation"
         ),
         "cache_validation_particle_graphs": (
-            "${workspace}/cache/validation/particle_aggregation"
+            "/path/to/workflow/cache/validation/particle_aggregation"
         ),
     }
     for name, run_dir in expected_run_dirs.items():
