@@ -15,11 +15,17 @@ spine-prod/
 │   │   ├── base.py         # Shared template/job metadata helpers
 │   │   ├── slurm.py        # SLURM sbatch client
 │   │   └── pbs.py          # PBS qsub client
+│   ├── batch.py            # Single-job planning and scheduler submission
+│   ├── component.py        # Shared component-to-façade contract
 │   ├── config_manager.py   # Configuration and profile management
 │   ├── file_handler.py     # File parsing and chunking
+│   ├── interactive.py      # Direct local/container execution workflow
+│   ├── pipeline.py         # Pipeline loading, validation, and execution
 │   ├── preload.py          # SPINE download preloading
+│   ├── runtime.py          # Executable, setup, container, and bind resolution
 │   ├── run_manager.py      # Persistent training and validation lifecycle
-│   └── submitter.py        # Main orchestration class
+│   ├── spine_cli.py        # Pure SPINE CLI argument formatting
+│   └── submitter.py        # Thin public façade and component wiring
 ├── templates/              # Batch job templates
 ├── config/                 # SPINE configurations
 └── runs/                   # Automatic inference run directories
@@ -53,11 +59,31 @@ spine-prod/
 - Cleanup job management for SLURM
 
 ### `src/submitter.py`
-- Main `Submitter` class
-- Orchestrates all components
-- Handles job submission workflow
-- Pipeline management
-- Interactive execution mode
+- Stable public `Submitter` API
+- Shared manager and scheduler-client construction
+- Focused component wiring and compatibility forwarding
+
+### `src/batch.py`
+- Single-job input and lifecycle validation
+- Scheduler profile and array-job planning
+- Template rendering, submission, and metadata recording
+
+### `src/interactive.py`
+- Interactive input preparation
+- Direct local or container-backed SPINE execution
+
+### `src/pipeline.py`
+- Whole-document loading and validation before scheduler interaction
+- Default/stage/CLI precedence resolution
+- Dependency-ordered stage and cleanup submission
+
+### `src/spine_cli.py`
+- Pure formatting and validation of SPINE command-line options
+- GPU allocation and world-size alignment
+
+### `src/runtime.py`
+- Software setup and executable discovery
+- Container selection and bind-path construction
 
 ### `src/run_manager.py`
 - Create and validate persistent training runs
