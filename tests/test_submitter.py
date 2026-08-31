@@ -37,7 +37,7 @@ class TestModifierDiscovery:
             pytest.skip("No ICARUS configs found for testing")
 
         config_path = str(icarus_configs[0])
-        modifiers = mock_submitter._discover_modifiers(config_path)
+        modifiers = mock_submitter.config_mgr.discover_modifiers(config_path)
 
         # Should be a dict with modifier names as keys
         assert isinstance(modifiers, dict)
@@ -87,7 +87,7 @@ class TestVersionResolution:
         ]
 
         # Resolve with explicit version
-        result = mock_submitter._resolve_modifier_version(
+        result = mock_submitter.config_mgr.resolve_modifier_version(
             mod_name="data",
             available_versions=versions,
             base_version="250625",
@@ -104,7 +104,7 @@ class TestVersionResolution:
             Path("/fake/mod_data_250625.yaml"),
         ]
 
-        result = mock_submitter._resolve_modifier_version(
+        result = mock_submitter.config_mgr.resolve_modifier_version(
             mod_name="data",
             available_versions=versions,
             base_version="250625",
@@ -121,7 +121,7 @@ class TestVersionResolution:
             Path("/fake/mod_data_250115.yaml"),
         ]
 
-        result = mock_submitter._resolve_modifier_version(
+        result = mock_submitter.config_mgr.resolve_modifier_version(
             mod_name="data",
             available_versions=versions,
             base_version="250625",  # Not available
@@ -142,7 +142,7 @@ class TestLatestConfigGeneration:
             pytest.skip("ICARUS configs not found")
 
         # Test with icarus detector
-        config_path = mock_submitter._create_latest_config(
+        config_path = mock_submitter.config_mgr.create_latest_config(
             detector="icarus", job_dir=mock_submitter.jobs_dir
         )
 
@@ -164,7 +164,7 @@ class TestLatestConfigGeneration:
         if not icarus_dir.exists():
             pytest.skip("ICARUS configs not found")
 
-        config_path = mock_submitter._create_latest_config(
+        config_path = mock_submitter.config_mgr.create_latest_config(
             detector="icarus", job_dir=mock_submitter.jobs_dir
         )
 
@@ -239,7 +239,7 @@ class TestConfigPathHandling:
         ]
 
         for config_path in test_cases:
-            is_latest, config_name = mock_submitter._classify_config_request(
+            is_latest, config_name = mock_submitter.batch.classify_config_request(
                 config_path
             )
             assert is_latest is True
@@ -261,27 +261,29 @@ class TestDetectorDetection:
 
     def test_detect_detector_icarus(self, mock_submitter):
         """Test auto-detecting ICARUS from config path."""
-        result = mock_submitter._detect_detector("infer/icarus/latest.yaml")
+        result = mock_submitter.config_mgr.detect_detector("infer/icarus/latest.yaml")
         assert result == "icarus"
 
     def test_detect_detector_sbnd(self, mock_submitter):
         """Test auto-detecting SBND from config path."""
-        result = mock_submitter._detect_detector("infer/sbnd/full_chain_240720.yaml")
+        result = mock_submitter.config_mgr.detect_detector(
+            "infer/sbnd/full_chain_240720.yaml"
+        )
         assert result == "sbnd"
 
     def test_detect_detector_2x2(self, mock_submitter):
         """Test auto-detecting 2x2 from config path."""
-        result = mock_submitter._detect_detector("infer/2x2/latest")
+        result = mock_submitter.config_mgr.detect_detector("infer/2x2/latest")
         assert result == "2x2"
 
     def test_detect_detector_generic(self, mock_submitter):
         """Test fallback for unknown detectors."""
-        result = mock_submitter._detect_detector("some/random/config.yaml")
+        result = mock_submitter.config_mgr.detect_detector("some/random/config.yaml")
         assert result == "unknown_detector"
 
     def test_detect_detector_dune10kt_1x2x6(self, mock_submitter):
         """Test auto-detecting DUNE10kt-1x2x6 from config path."""
-        result = mock_submitter._detect_detector("infer/dune10kt-1x2x6")
+        result = mock_submitter.config_mgr.detect_detector("infer/dune10kt-1x2x6")
         assert result == "dune10kt-1x2x6"
 
 
@@ -291,25 +293,25 @@ class TestVersionExtraction:
     def test_extract_version_yymmdd(self, mock_submitter):
         """Test extracting YYMMDD version format."""
         config_path = Path("full_chain_co_250625.yaml")
-        version = mock_submitter._extract_version(config_path)
+        version = mock_submitter.config_mgr.extract_version(config_path)
         assert version == "250625"
 
     def test_extract_version_data_modifier(self, mock_submitter):
         """Test extracting version from data modifier."""
         config_path = Path("mod_data_250115.yaml")
-        version = mock_submitter._extract_version(config_path)
+        version = mock_submitter.config_mgr.extract_version(config_path)
         assert version == "250115"
 
     def test_extract_version_no_version(self, mock_submitter):
         """Test handling files without version."""
         config_path = Path("base_common.yaml")
-        version = mock_submitter._extract_version(config_path)
+        version = mock_submitter.config_mgr.extract_version(config_path)
         assert version is None
 
     def test_extract_version_legacy_format(self, mock_submitter):
         """Test extracting version from legacy format."""
         config_path = Path("full_chain_240719.yaml")
-        version = mock_submitter._extract_version(config_path)
+        version = mock_submitter.config_mgr.extract_version(config_path)
         assert version == "240719"
 
 
@@ -321,7 +323,7 @@ class TestFileHandling:
         test_file = tmp_path / "test.root"
         test_file.touch()
 
-        files = mock_submitter._parse_files([str(test_file)])
+        files = mock_submitter.file_handler.parse_files([str(test_file)])
         assert len(files) == 1
         assert files[0] == str(test_file)
 
@@ -332,7 +334,7 @@ class TestFileHandling:
             (tmp_path / f"data_{i}.root").touch()
 
         pattern = str(tmp_path / "data_*.root")
-        files = mock_submitter._parse_files([pattern])
+        files = mock_submitter.file_handler.parse_files([pattern])
         assert len(files) == 3
         assert all(f.endswith(".root") for f in files)
 
@@ -349,7 +351,9 @@ class TestFileHandling:
         file_list = tmp_path / "files.txt"
         file_list.write_text("\n".join(test_files))
 
-        files = mock_submitter._parse_files([str(file_list)], source_type="source_list")
+        files = mock_submitter.file_handler.parse_files(
+            [str(file_list)], source_type="source_list"
+        )
         assert len(files) == 3
         assert all(f.endswith(".root") for f in files)
 
@@ -362,7 +366,9 @@ class TestFileHandling:
             f.touch()
             files_to_create.append(str(f))
 
-        files = mock_submitter._parse_files(files_to_create, source_type="source")
+        files = mock_submitter.file_handler.parse_files(
+            files_to_create, source_type="source"
+        )
         assert len(files) == 3
         assert all(f.endswith(".root") for f in files)
 
@@ -374,7 +380,9 @@ class TestFileChunking:
         """Test basic file chunking."""
         files = [f"file_{i}.root" for i in range(10)]
 
-        chunks = mock_submitter._chunk_files(files, max_array_size=99, files_per_task=2)
+        chunks = mock_submitter.file_handler.chunk_files(
+            files, max_array_size=99, files_per_task=2
+        )
         # 10 files / 2 per task = 5 groups, all fit in one chunk
         assert len(chunks) == 1
         assert len(chunks[0]) == 5  # 5 groups
@@ -384,7 +392,9 @@ class TestFileChunking:
         # Create enough files to exceed max_array_size
         files = [f"file_{i}.root" for i in range(50)]
 
-        chunks = mock_submitter._chunk_files(files, max_array_size=10, files_per_task=1)
+        chunks = mock_submitter.file_handler.chunk_files(
+            files, max_array_size=10, files_per_task=1
+        )
         # 50 files / 1 per task = 50 groups, split into chunks of 10
         assert len(chunks) == 5
         assert all(len(chunk) <= 10 for chunk in chunks)
@@ -393,7 +403,9 @@ class TestFileChunking:
         """Test multiple files per task."""
         files = [f"file_{i}.root" for i in range(9)]
 
-        chunks = mock_submitter._chunk_files(files, max_array_size=99, files_per_task=3)
+        chunks = mock_submitter.file_handler.chunk_files(
+            files, max_array_size=99, files_per_task=3
+        )
         # 9 files / 3 per task = 3 groups
         assert len(chunks) == 1
         assert len(chunks[0]) == 3
@@ -403,11 +415,11 @@ class TestFileChunking:
 
     def test_resolve_files_per_task_defaults_to_all_files(self, mock_submitter):
         """Test omitted splitting flags collapse explicit inputs into one task."""
-        assert mock_submitter._resolve_files_per_task(9) == 9
+        assert mock_submitter.batch.resolve_files_per_task(9) == 9
 
     def test_resolve_files_per_task_uses_ntasks_for_even_split(self, mock_submitter):
         """Test ntasks alone distributes files roughly evenly across tasks."""
-        assert mock_submitter._resolve_files_per_task(10, ntasks=3) == 4
+        assert mock_submitter.batch.resolve_files_per_task(10, ntasks=3) == 4
 
     @pytest.mark.parametrize(
         ("kwargs", "message"),
@@ -420,14 +432,14 @@ class TestFileChunking:
         self, mock_submitter, kwargs, message
     ):
         with pytest.raises(ValueError, match=message):
-            mock_submitter._resolve_files_per_task(10, **kwargs)
+            mock_submitter.batch.resolve_files_per_task(10, **kwargs)
 
 
 class TestSubmitterHelpers:
     """Tests for scheduler, path, and template selection helpers."""
 
     def test_format_spine_runtime_options(self, mock_submitter):
-        assert mock_submitter._format_spine_runtime_options(
+        assert mock_submitter.spine_cli.format_runtime_options(
             world_size=4,
             batch_size=16,
             minibatch_size=2,
@@ -438,87 +450,95 @@ class TestSubmitterHelpers:
             "--world-size 4 --batch-size 16 --minibatch-size 2 "
             "--num-workers 8 --epochs 25.0 --iterations 100"
         )
-        assert mock_submitter._format_spine_runtime_options() == ""
+        assert mock_submitter.spine_cli.format_runtime_options() == ""
 
         with pytest.raises(ValueError, match="managed from the GPU allocation"):
-            mock_submitter._format_spine_set_overrides(["base.world_size=4"])
+            mock_submitter.spine_cli.format_set_overrides(["base.world_size=4"])
 
     def test_format_spine_named_sources_and_module_weights(self, mock_submitter):
         sources = {
             "larcv": {"source_list": ["raw files.txt"]},
             "hdf5": {"source": "/cache/*.h5"},
         }
-        assert mock_submitter._format_spine_named_sources(sources) == (
+        assert mock_submitter.spine_cli.format_named_sources(sources) == (
             "--source 'hdf5=/cache/*.h5' " "--source-list 'larcv=raw files.txt'"
         )
-        assert mock_submitter._format_spine_named_sources(sources, validation=True) == (
+        assert mock_submitter.spine_cli.format_named_sources(
+            sources, validation=True
+        ) == (
             "--val-source 'hdf5=/cache/*.h5' " "--val-source-list 'larcv=raw files.txt'"
         )
         assert (
-            mock_submitter._format_spine_module_weights(
+            mock_submitter.spine_cli.format_module_weights(
                 {"uresnet_ppn": "/weights/best.ckpt"}
             )
             == "--module-weight uresnet_ppn=/weights/best.ckpt"
         )
 
         with pytest.raises(ValueError, match="exactly one"):
-            mock_submitter._format_spine_named_sources(
+            mock_submitter.spine_cli.format_named_sources(
                 {"larcv": {"source": "raw.root", "source_list": "raw.txt"}}
             )
 
-        assert mock_submitter._format_spine_named_sources(None) == ""
-        assert mock_submitter._format_spine_module_weights(None) == ""
+        assert mock_submitter.spine_cli.format_named_sources(None) == ""
+        assert mock_submitter.spine_cli.format_module_weights(None) == ""
         with pytest.raises(TypeError, match="must be a mapping"):
-            mock_submitter._format_spine_named_sources({"larcv": "raw.root"})
+            mock_submitter.spine_cli.format_named_sources({"larcv": "raw.root"})
         with pytest.raises(ValueError, match="cannot be empty"):
-            mock_submitter._format_spine_named_sources({"larcv": {"source": []}})
+            mock_submitter.spine_cli.format_named_sources({"larcv": {"source": []}})
         with pytest.raises(ValueError, match="accepts exactly one"):
-            mock_submitter._format_spine_named_sources(
+            mock_submitter.spine_cli.format_named_sources(
                 {"larcv": {"source_list": ["one.txt", "two.txt"]}}
             )
         with pytest.raises(ValueError, match="require a module and path"):
-            mock_submitter._format_spine_module_weights({"uresnet_ppn": ""})
+            mock_submitter.spine_cli.format_module_weights({"uresnet_ppn": ""})
 
     def test_align_world_size_with_scheduler_gpus(self, mock_submitter):
-        assert mock_submitter._align_world_size({"site": "s3df", "gpus": 4}, None) == 4
         assert (
-            mock_submitter._align_world_size(
+            mock_submitter.spine_cli.align_world_size({"site": "s3df", "gpus": 4}, None)
+            == 4
+        )
+        assert (
+            mock_submitter.spine_cli.align_world_size(
                 {"site": "nersc", "gpus_per_node": 4}, None
             )
             == 4
         )
-        assert mock_submitter._align_world_size({"site": "s3df", "gpus": 0}, None) == 0
-        assert mock_submitter._align_world_size({"site": "custom"}, 2) == 2
+        assert (
+            mock_submitter.spine_cli.align_world_size({"site": "s3df", "gpus": 0}, None)
+            == 0
+        )
+        assert mock_submitter.spine_cli.align_world_size({"site": "custom"}, 2) == 2
 
         with pytest.raises(ValueError, match="conflicts with the scheduler"):
-            mock_submitter._align_world_size(
+            mock_submitter.spine_cli.align_world_size(
                 {"site": "s3df", "gpus": 2}, requested_world_size=4
             )
         with pytest.raises(ValueError, match="Multi-node"):
-            mock_submitter._align_world_size(
+            mock_submitter.spine_cli.align_world_size(
                 {"site": "anl", "gpus_per_node": 4, "nodes": 2}, None
             )
 
     def test_classify_config_request_covers_shorthand_and_absolute_paths(
         self, mock_submitter, workspace_root
     ):
-        assert mock_submitter._classify_config_request("infer/icarus") == (
+        assert mock_submitter.batch.classify_config_request("infer/icarus") == (
             True,
             "latest",
         )
-        assert mock_submitter._classify_config_request(
+        assert mock_submitter.batch.classify_config_request(
             str(workspace_root / "config" / "infer" / "icarus")
         ) == (True, "latest")
-        assert mock_submitter._classify_config_request("infer/icarus/latest") == (
+        assert mock_submitter.batch.classify_config_request("infer/icarus/latest") == (
             True,
             "latest",
         )
-        assert mock_submitter._classify_config_request("custom.yaml") == (
+        assert mock_submitter.batch.classify_config_request("custom.yaml") == (
             False,
             "custom",
         )
         mock_submitter.config_mgr.profiles["detectors"]["without_configs"] = {}
-        assert mock_submitter._classify_config_request("still_custom.yaml") == (
+        assert mock_submitter.batch.classify_config_request("still_custom.yaml") == (
             False,
             "still_custom",
         )
@@ -526,53 +546,56 @@ class TestSubmitterHelpers:
     def test_resolve_setup_path_requires_configure_script(
         self, mock_submitter, tmp_path
     ):
-        assert mock_submitter._resolve_setup_path(None, "--tool") == (None, None)
+        assert mock_submitter.runtime.resolve_setup_path(None, "--tool") == (None, None)
         with pytest.raises(RuntimeError, match="configure.sh"):
-            mock_submitter._resolve_setup_path(str(tmp_path), "--tool")
+            mock_submitter.runtime.resolve_setup_path(str(tmp_path), "--tool")
 
     def test_batch_client_and_template_selection(self, mock_submitter):
         assert isinstance(
-            mock_submitter._get_batch_client({"site": "s3df"}), SlurmClient
+            mock_submitter.batch.get_batch_client({"site": "s3df"}), SlurmClient
         )
         assert isinstance(
-            mock_submitter._get_batch_client({"site": "polaris"}), PBSClient
+            mock_submitter.batch.get_batch_client({"site": "polaris"}), PBSClient
         )
         assert (
-            mock_submitter._get_template_name({"template": "custom.j2"}) == "custom.j2"
+            mock_submitter.batch.get_template_name({"template": "custom.j2"})
+            == "custom.j2"
         )
         assert (
-            mock_submitter._get_template_name({"site": "nersc"})
+            mock_submitter.batch.get_template_name({"site": "nersc"})
             == "job_template_nersc.sbatch"
         )
         assert (
-            mock_submitter._get_template_name({"site": "s3df"})
+            mock_submitter.batch.get_template_name({"site": "s3df"})
             == "job_template_s3df.sbatch"
         )
 
         with pytest.raises(ValueError, match="Unknown scheduler"):
-            mock_submitter._get_batch_client({"scheduler": "other"})
+            mock_submitter.batch.get_batch_client({"scheduler": "other"})
         with pytest.raises(ValueError, match="Unknown site"):
-            mock_submitter._get_template_name({"site": "other"})
+            mock_submitter.batch.get_template_name({"site": "other"})
 
     def test_output_and_bind_path_helpers(self, mock_submitter, tmp_path):
         output = tmp_path / "result.h5"
         assert (
-            mock_submitter._format_spine_output_args(str(output), "unused", "unused")
+            mock_submitter.spine_cli.format_output_args(str(output), "unused", "unused")
             == f"--output {output}"
         )
         assert (
-            mock_submitter._format_spine_output_args(
+            mock_submitter.spine_cli.format_output_args(
                 None, "/tmp/job output", "reco output"
             )
             == "--output-dir '/tmp/job output' --output-suffix 'reco output'"
         )
         assert (
-            mock_submitter._merge_bind_paths(" /data, /scratch, /data ", ["/extra", ""])
+            mock_submitter.runtime.merge_bind_paths(
+                " /data, /scratch, /data ", ["/extra", ""]
+            )
             == "/data,/scratch,/extra"
         )
-        assert mock_submitter._merge_bind_paths(None) is None
-        assert mock_submitter._default_bind_paths_for_site("nersc") is None
-        assert mock_submitter._resolve_files_per_task(10, files_per_task=3) == 3
+        assert mock_submitter.runtime.merge_bind_paths(None) is None
+        assert mock_submitter.runtime.default_bind_paths_for_site("nersc") is None
+        assert mock_submitter.batch.resolve_files_per_task(10, files_per_task=3) == 3
 
     def test_resolve_spine_command_accepts_explicit_binary(
         self, mock_submitter, tmp_path
@@ -582,7 +605,7 @@ class TestSubmitterHelpers:
         binary.parent.mkdir(parents=True)
         binary.touch()
 
-        command, bind_root = mock_submitter._resolve_spine_command(str(binary))
+        command, bind_root = mock_submitter.runtime.resolve_spine_command(str(binary))
 
         assert command == str(binary)
         assert bind_root == str(checkout)
@@ -594,17 +617,19 @@ class TestSubmitterHelpers:
             clear=True,
         ):
             assert (
-                mock_submitter._container_version()
-                == mock_submitter._default_container_version()
+                mock_submitter.runtime.container_version()
+                == mock_submitter.runtime.default_container_version()
             )
 
         def find_apptainer(command):
             return "/usr/bin/apptainer" if command == "apptainer" else None
 
         with patch.dict(os.environ, {}, clear=True), patch(
-            "src.submitter.shutil.which", side_effect=find_apptainer
+            "src.runtime.shutil.which", side_effect=find_apptainer
         ):
-            assert mock_submitter._sif_runtime_executable() == "/usr/bin/apptainer"
+            assert (
+                mock_submitter.runtime.sif_runtime_executable() == "/usr/bin/apptainer"
+            )
 
     def test_init_uses_central_jobs_directory_and_warns_without_environment(
         self, workspace_root, tmp_path, capsys
@@ -641,10 +666,10 @@ class TestSubmitterHelpers:
                 {"SPINE_CONTAINER_RUNTIME_BIN": "missing-runtime"},
                 clear=False,
             ),
-            patch("src.submitter.shutil.which", return_value=None),
+            patch("src.runtime.shutil.which", return_value=None),
             pytest.raises(RuntimeError, match="no executable was found"),
         ):
-            mock_submitter._sif_runtime_executable()
+            mock_submitter.runtime.sif_runtime_executable()
 
         with (
             patch.dict(
@@ -652,10 +677,10 @@ class TestSubmitterHelpers:
                 {"SPINE_CONTAINER_PATH": str(tmp_path / "missing.sif")},
                 clear=False,
             ),
-            patch("src.submitter.shutil.which", return_value=None),
+            patch("src.runtime.shutil.which", return_value=None),
             pytest.raises(RuntimeError, match="no usable runtime"),
         ):
-            mock_submitter._build_interactive_container_command("spine", False)
+            mock_submitter.runtime.build_interactive_container_command("spine", False)
 
     def test_sif_container_command_adds_cvmfs_bind(self, mock_submitter, tmp_path):
         container = tmp_path / "spine.sif"
@@ -667,12 +692,12 @@ class TestSubmitterHelpers:
                 clear=False,
             ),
             patch.object(
-                mock_submitter,
-                "_sif_runtime_executable",
+                mock_submitter.runtime,
+                "sif_runtime_executable",
                 return_value="/usr/bin/apptainer",
             ),
         ):
-            command = mock_submitter._build_interactive_container_command(
+            command = mock_submitter.runtime.build_interactive_container_command(
                 "spine -c config.yaml", True
             )
 
@@ -703,10 +728,10 @@ class TestSubmitterHelpers:
                 },
                 clear=False,
             ),
-            patch("src.submitter.Path.exists", report_cvmfs_exists),
-            patch("src.submitter.shutil.which", side_effect=find_docker),
+            patch("src.runtime.Path.exists", report_cvmfs_exists),
+            patch("src.runtime.shutil.which", side_effect=find_docker),
         ):
-            command = mock_submitter._build_interactive_container_command(
+            command = mock_submitter.runtime.build_interactive_container_command(
                 "spine -c config.yaml", True
             )
 
@@ -730,10 +755,12 @@ class TestSubmitterHelpers:
                 {"SPINE_CONTAINER_PATH": str(container)},
                 clear=False,
             ),
-            patch.object(mock_submitter, "_sif_runtime_executable", return_value=None),
-            patch("src.submitter.shutil.which", side_effect=find_docker),
+            patch.object(
+                mock_submitter.runtime, "sif_runtime_executable", return_value=None
+            ),
+            patch("src.runtime.shutil.which", side_effect=find_docker),
         ):
-            command = mock_submitter._build_interactive_container_command(
+            command = mock_submitter.runtime.build_interactive_container_command(
                 "spine -c config.yaml", False
             )
 
@@ -780,8 +807,8 @@ class TestInteractiveExecution:
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed),
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed),
         ):
             assert (
                 mock_submitter.run_interactive(
@@ -817,9 +844,9 @@ class TestInteractiveExecution:
                 "create_composite_config",
                 return_value=str(composite),
             ) as create_composite,
-            patch.object(mock_submitter, "_preload_downloads") as preload,
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed),
+            patch.object(mock_submitter, "preload_downloads") as preload,
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed),
         ):
             assert (
                 mock_submitter.run_interactive(
@@ -844,8 +871,8 @@ class TestInteractiveExecution:
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -883,8 +910,8 @@ class TestInteractiveExecution:
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/train/icarus/deghost/deghost.yaml",
@@ -906,8 +933,8 @@ class TestInteractiveExecution:
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -944,8 +971,8 @@ class TestInteractiveExecution:
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -975,8 +1002,8 @@ class TestInteractiveExecution:
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -999,8 +1026,8 @@ class TestInteractiveExecution:
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed),
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed),
             patch("sys.stderr", new_callable=io.StringIO) as stderr,
         ):
             exit_code = mock_submitter.run_interactive(
@@ -1063,8 +1090,8 @@ class TestInteractiveExecution:
                 },
                 clear=False,
             ),
-            patch("src.submitter.shutil.which", side_effect=fake_which),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", side_effect=fake_which),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -1093,13 +1120,15 @@ class TestInteractiveExecution:
         )
 
         with patch.dict(os.environ, {}, clear=True):
-            assert mock_submitter._default_container_version() == expected
-            assert mock_submitter._container_version() == expected
-            assert mock_submitter._container_tag_for_cli().endswith(f":{expected}")
+            assert mock_submitter.runtime.default_container_version() == expected
+            assert mock_submitter.runtime.container_version() == expected
+            assert mock_submitter.runtime.container_tag_for_cli().endswith(
+                f":{expected}"
+            )
             expected_path_version = (
                 expected[1:] if expected.startswith("v") else expected
             )
-            assert mock_submitter._default_container_path().endswith(
+            assert mock_submitter.runtime.default_container_path().endswith(
                 f"spine_v{expected_path_version.replace('.', '-')}.sif"
             )
 
@@ -1107,17 +1136,17 @@ class TestInteractiveExecution:
         self, mock_submitter
     ):
         """Test direct version env overrides are ignored without configure.sh."""
-        expected = mock_submitter._default_container_version()
+        expected = mock_submitter.runtime.default_container_version()
 
         with patch.dict(os.environ, {"SPINE_CONTAINER_VERSION": "9.8.7"}, clear=True):
-            assert mock_submitter._container_version() == expected
+            assert mock_submitter.runtime.container_version() == expected
 
         with patch.dict(
             os.environ,
             {"SPINE_PROD_CONFIGURED": "1", "SPINE_CONTAINER_VERSION": "9.8.7"},
             clear=True,
         ):
-            assert mock_submitter._container_version() == "9.8.7"
+            assert mock_submitter.runtime.container_version() == "9.8.7"
 
     def test_container_tag_strips_release_prefix(self, mock_submitter):
         """Test Git-style release versions map to unprefixed GHCR tags."""
@@ -1127,7 +1156,7 @@ class TestInteractiveExecution:
             clear=True,
         ):
             assert (
-                mock_submitter._container_tag_for_cli()
+                mock_submitter.runtime.container_tag_for_cli()
                 == "ghcr.io/deeplearnphysics/spine:9.8.7"
             )
 
@@ -1157,8 +1186,8 @@ class TestInteractiveExecution:
                 },
                 clear=False,
             ),
-            patch("src.submitter.shutil.which", side_effect=fake_which),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", side_effect=fake_which),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -1198,8 +1227,8 @@ class TestInteractiveExecution:
                 },
                 clear=False,
             ),
-            patch("src.submitter.shutil.which", side_effect=fake_which),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", side_effect=fake_which),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -1242,8 +1271,8 @@ class TestInteractiveExecution:
                 },
                 clear=False,
             ),
-            patch("src.submitter.shutil.which", side_effect=fake_which),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", side_effect=fake_which),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -1271,8 +1300,8 @@ class TestInteractiveExecution:
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch("src.submitter.shutil.which", return_value=None),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", return_value=None),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -1294,8 +1323,8 @@ class TestInteractiveExecution:
         completed = type("Completed", (), {"returncode": 0})()
 
         with (
-            patch("src.submitter.shutil.which", return_value="/usr/bin/spine"),
-            patch("src.submitter.subprocess.run", return_value=completed) as run,
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
@@ -1331,7 +1360,7 @@ class TestInteractiveExecution:
         input_file.touch()
 
         with (
-            patch("src.submitter.shutil.which", return_value=None),
+            patch("src.runtime.shutil.which", return_value=None),
             pytest.raises(
                 RuntimeError, match="SPINE.*PATH|--spine-path|SPINE_LOCAL_PATH"
             ),
@@ -1349,7 +1378,7 @@ class TestJobDirectory:
     def test_create_job_dir(self, mock_submitter):
         """Test creating timestamped job directory."""
         job_name = "test_job"
-        job_dir = mock_submitter._create_job_dir(job_name)
+        job_dir = mock_submitter.batch_client.create_job_dir(job_name)
 
         assert job_dir.exists()
         assert job_dir.is_dir()
@@ -1359,7 +1388,7 @@ class TestJobDirectory:
 
     def test_job_dir_under_jobs(self, mock_submitter):
         """Test that job dir is created under jobs/."""
-        job_dir = mock_submitter._create_job_dir("test")
+        job_dir = mock_submitter.batch_client.create_job_dir("test")
         assert mock_submitter.jobs_dir in job_dir.parents
 
 
@@ -1410,9 +1439,9 @@ class TestBatchSpineOverride:
                 "get_profile",
                 return_value=profile_config,
             ),
-            patch.object(mock_submitter, "_preload_downloads") as preload,
+            patch.object(mock_submitter, "preload_downloads") as preload,
             patch.object(SlurmClient, "submit", side_effect=["10", "20", "30"]),
-            patch("src.submitter.shutil.which", return_value=None),
+            patch("src.runtime.shutil.which", return_value=None),
         ):
             job_ids = mock_submitter.submit_job(
                 config="infer/icarus",
@@ -1514,8 +1543,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="train"),
@@ -1571,8 +1600,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="train"),
@@ -1658,8 +1687,8 @@ class TestBatchSpineOverride:
         run_dir = tmp_path / "chosen-run"
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value=None),
@@ -1684,8 +1713,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="train-1"),
@@ -1712,8 +1741,8 @@ class TestBatchSpineOverride:
         saved.touch()
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="train-2"),
@@ -1753,8 +1782,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(
@@ -1811,8 +1840,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="val"),
@@ -1861,8 +1890,8 @@ class TestBatchSpineOverride:
                 return_value=profile_config,
             ),
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value=None),
@@ -1914,8 +1943,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
@@ -1954,14 +1983,14 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
             patch.object(
-                Submitter,
-                "_resolve_spine_command",
+                mock_submitter.runtime,
+                "resolve_spine_command",
                 return_value=(
                     f"python3 {spine_checkout / 'bin' / 'run.py'}",
                     str(spine_checkout),
@@ -1992,8 +2021,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
@@ -2027,8 +2056,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
@@ -2071,8 +2100,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
@@ -2107,8 +2136,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
@@ -2132,8 +2161,8 @@ class TestBatchSpineOverride:
         """Test batch submission can defer input discovery to the config."""
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
@@ -2192,8 +2221,8 @@ class TestBatchSpineOverride:
 
         with (
             patch.object(
-                mock_submitter,
-                "_get_batch_client",
+                mock_submitter.batch,
+                "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
             patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
@@ -2234,7 +2263,7 @@ class TestBatchSpineOverride:
             "timestamp": "2026-01-05T10:00:00",
         }
 
-        mock_submitter._save_job_metadata(tmp_path, metadata)
+        mock_submitter.batch_client.save_job_metadata(tmp_path, metadata)
 
         metadata_file = tmp_path / "job_metadata.json"
         assert metadata_file.exists()
@@ -2258,7 +2287,7 @@ class TestCompositeConfig:
             pytest.skip("No ICARUS configs found")
 
         base_config = str(icarus_configs[0])
-        composite_path = mock_submitter._create_composite_config(
+        composite_path = mock_submitter.config_mgr.create_composite_config(
             base_config=base_config,
             modifiers=[],
             job_dir=tmp_path,
@@ -2291,7 +2320,7 @@ class TestCompositeConfig:
             "nd-lar", tmp_path
         )
 
-        composite_path = mock_submitter._create_composite_config(
+        composite_path = mock_submitter.config_mgr.create_composite_config(
             base_config=latest_config,
             modifiers=["single"],
             job_dir=tmp_path,
@@ -2313,19 +2342,19 @@ class TestProfileSelection:
 
     def test_get_profile_explicit(self, mock_submitter):
         """Test getting an explicit profile."""
-        profile = mock_submitter._get_profile("s3df_ampere")
+        profile = mock_submitter.config_mgr.get_profile("s3df_ampere")
         assert profile is not None
         assert "partition" in profile or "nodes" in profile
 
     def test_get_profile_with_detector(self, mock_submitter):
         """Test getting profile with detector defaults."""
-        profile = mock_submitter._get_profile("auto", detector="icarus")
+        profile = mock_submitter.config_mgr.get_profile("auto", detector="icarus")
         assert profile is not None
 
     def test_get_profile_auto_fallback(self, mock_submitter):
         """Test auto profile selection with fallback."""
         # Should fall back to default if available
-        profile = mock_submitter._get_profile("auto", detector="generic")
+        profile = mock_submitter.config_mgr.get_profile("auto", detector="generic")
         assert profile is not None
 
 
@@ -2519,10 +2548,12 @@ class TestBatchClientSelection:
 
     def test_submitter_selects_pbs_client_for_anl(self, mock_submitter):
         """Test ANL profiles select the PBS client."""
-        client = mock_submitter._get_batch_client({"site": "anl", "scheduler": "pbs"})
+        client = mock_submitter.batch.get_batch_client(
+            {"site": "anl", "scheduler": "pbs"}
+        )
 
         assert isinstance(client, PBSClient)
-        assert mock_submitter._get_template_name({"site": "anl"}) == (
+        assert mock_submitter.batch.get_template_name({"site": "anl"}) == (
             "job_template_anl.pbs"
         )
 
@@ -2533,7 +2564,7 @@ class TestPreloadDownloads:
     def test_preload_downloads_invokes_helper(self, mock_submitter, workspace_root):
         """Test submitter invokes the preload helper with the requested config."""
         with patch("src.submitter.preload_downloads") as preload:
-            mock_submitter._preload_downloads("infer/2x2/full_chain_240819.yaml")
+            mock_submitter.preload_downloads("infer/2x2/full_chain_240819.yaml")
 
         preload.assert_called_once_with(
             "infer/2x2/full_chain_240819.yaml", workspace_root
@@ -2543,7 +2574,7 @@ class TestPreloadDownloads:
         """Test preload failures stop submission before jobs are queued."""
         with patch("src.submitter.preload_downloads", side_effect=RuntimeError("boom")):
             with pytest.raises(RuntimeError, match="boom"):
-                mock_submitter._preload_downloads("infer/2x2/full_chain_240819.yaml")
+                mock_submitter.preload_downloads("infer/2x2/full_chain_240819.yaml")
 
 
 class TestPipelineSubmission:
