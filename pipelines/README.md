@@ -58,6 +58,20 @@ outputs, dependencies, run lifecycle settings, and model weights must remain on
 their individual stages. Unknown fields and unsupported pipeline CLI options
 are rejected rather than ignored.
 
+To continue an interrupted workflow in the same workspace, cancel or confirm
+termination of its old jobs and restart at the first failed stage:
+
+```bash
+./submit.py --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/workflow \
+  --from-stage cache_train_fragment_graphs
+```
+
+Earlier stages are treated as completed. Retry attempts preserve previous
+scheduler artifacts, and training resumes the latest checkpoint when one is
+available. An optional `--to-stage NAME` bounds the submitted range
+inclusively.
+
 See `icarus_production_example.yaml` for a complete example.
 
 ## Generic staged-training prototype
@@ -67,7 +81,8 @@ transition:
 
 1. Train standalone UResNet-PPN and select `snapshot-best.ckpt`.
 2. Materialize its canonical `seg_pred` and adapted `clust_label_adapt`
-   products into separate training and validation staged caches.
+   products, together with `ppn_points`, into separate training and validation
+   staged caches.
 3. Train standalone Graph-SPICE from raw LArCV truth plus the aligned cache.
 
 Each original source file has one staged cache. Later materialization jobs in
@@ -91,3 +106,27 @@ than silently pairing the wrong events.
 To run against an unreleased checkout, pass `--spine-path /path/to/spine` when
 submitting the pipeline. A stage-level `spine_path` remains available when only
 one stage needs a different checkout.
+
+### Recovering the PPN cache transition
+
+Caches produced before `ppn_points` was retained need only their segmentation
+stage rebuilt. Preserve the trained UResNet-PPN and Graph-SPICE weights by
+submitting the bounded cache pair first:
+
+```bash
+./submit.py --pipeline pipelines/generic/full_chain_240805.yaml \
+  --workspace /path/to/workflow \
+  --from-stage cache_train_segmentation \
+  --to-stage cache_validation_segmentation \
+  --spine-path /path/to/fixed/spine
+```
+
+After both jobs complete, continue from the failed transition without
+resubmitting Graph-SPICE training:
+
+```bash
+./submit.py --pipeline pipelines/generic/full_chain_240805.yaml \
+  --workspace /path/to/workflow \
+  --from-stage cache_train_fragment_graphs \
+  --spine-path /path/to/fixed/spine
+```

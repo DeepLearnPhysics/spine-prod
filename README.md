@@ -595,6 +595,32 @@ must be configured in YAML. Unsupported pipeline CLI options and unknown YAML
 fields fail before any jobs are submitted. `--spine` is an explicit alias for
 `--spine-path`.
 
+### Restart a Pipeline
+
+After canceling or confirming termination of a failed pipeline submission,
+restart it at the first failed stage while retaining its workspace:
+
+```bash
+./submit.py \
+  --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/production \
+  --from-stage cache_train_fragment_graphs
+```
+
+Stages earlier in pipeline order are treated as completed. Dependencies among
+the selected stages are rebuilt with the new scheduler IDs, while dependencies
+on skipped stages are considered satisfied by their existing artifacts.
+Use `--to-stage NAME` to stop at an inclusive boundary when only a bounded
+range should be regenerated.
+
+Every retried inference/cache stage receives a new timestamped submission
+directory, preserving the failed scripts, logs, and metadata. A retried
+training stage resumes its latest valid checkpoint automatically. If its
+previous scheduler job never started, the unchanged empty training run is
+reused. A run containing training logs but no checkpoint is rejected because
+there is no unambiguous state from which to resume. Do not use `--from-stage`
+while jobs from the previous submission are still active.
+
 Pipeline stages accept the CLI-equivalent `source`, `source_list`,
 `val_source`, and `val_source_list` fields. Composite datasets use structured
 `sources` and `validation_sources`, while `module_weight` forwards named model

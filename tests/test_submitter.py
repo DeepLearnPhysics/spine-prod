@@ -1830,6 +1830,42 @@ class TestBatchSpineOverride:
         assert run_dir.is_dir()
         assert (run_dir / "job_metadata.json").is_file()
 
+    def test_submit_job_retry_preserves_prior_inference_attempt(
+        self, mock_submitter, tmp_path
+    ):
+        """A pipeline retry should write new scheduler artifacts beside the old."""
+        run_dir = tmp_path / "cache-stage"
+        config = "config/train/icarus/deghost/deghost.yaml"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(
+                mock_submitter.batch_client,
+                "submit",
+                side_effect=["first", "retry"],
+            ),
+        ):
+            assert mock_submitter.submit_job(config=config, run_dir=str(run_dir)) == [
+                "first"
+            ]
+            original_script = run_dir / "scheduler" / "chunk_000" / "submit.sbatch"
+            original_text = original_script.read_text(encoding="utf-8")
+
+            assert mock_submitter.submit_job(
+                config=config,
+                run_dir=str(run_dir),
+                retry=True,
+            ) == ["retry"]
+
+        attempts = list(run_dir.glob("submissions/inference/*"))
+        assert len(attempts) == 1
+        assert (attempts[0] / "scheduler" / "chunk_000" / "submit.sbatch").is_file()
+        assert (attempts[0] / "job_metadata.json").is_file()
+        assert original_script.read_text(encoding="utf-8") == original_text
+
     def test_submit_training_and_resume_share_run_artifacts(
         self, mock_submitter, tmp_path
     ):
@@ -2839,6 +2875,99 @@ class TestPipelineSubmission:
             assert "gpus_per_node" not in call.kwargs
         assert submit_job.call_args_list[0].kwargs["time"] == "08:00:00"
         assert submit_job.call_args_list[1].kwargs["time"] == "04:00:00"
+
+    def test_submit_pipeline_restarts_ordered_suffix(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        """Restart should skip completed stages and rebuild new dependencies."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {"name": "prepare", "config": "prepare.yaml"},
+                        {
+                            "name": "cache_train",
+                            "config": "cache.yaml",
+                            "depends_on": ["prepare"],
+                        },
+                        {
+                            "name": "cache_validation",
+                            "config": "cache.yaml",
+                            "depends_on": ["prepare"],
+                        },
+                        {
+                            "name": "train",
+                            "config": "train.yaml",
+                            "stage": "train",
+                            "run_dir": "/tmp/train",
+                            "depends_on": ["cache_train", "cache_validation"],
+                        },
+                    ]
+                }
+            )
+        )
+
+        with patch.object(
+            mock_submitter,
+            "submit_job",
+            side_effect=[["20"], ["21"], ["30"]],
+        ) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                from_stage="cache_train",
+                to_stage="cache_validation",
+            )
+
+        assert result == {
+            "cache_train": ["20"],
+            "cache_validation": ["21"],
+        }
+        assert submit_job.call_args_list[0].kwargs["dependency"] is None
+        assert submit_job.call_args_list[1].kwargs["dependency"] is None
+        assert all(call.kwargs["retry"] for call in submit_job.call_args_list)
+        output = capsys.readouterr().out
+        assert "Skipped as completed: prepare" in output
+        assert "Reusing completed dependencies: prepare" in output
+        assert "Not selected after stop: train" in output
+
+    def test_submit_pipeline_rejects_unknown_restart_before_submission(
+        self, mock_submitter, tmp_path
+    ):
+        """A typo in the restart boundary must not submit any jobs."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump({"stages": [{"name": "prepare", "config": "prepare.yaml"}]})
+        )
+
+        with patch.object(mock_submitter, "submit_job") as submit_job:
+            with pytest.raises(ValueError, match="Unknown pipeline restart stage"):
+                mock_submitter.submit_pipeline(str(pipeline_path), from_stage="missing")
+
+        submit_job.assert_not_called()
+
+    def test_submit_pipeline_rejects_reversed_stage_range(
+        self, mock_submitter, tmp_path
+    ):
+        """A bounded restart must retain forward pipeline order."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {"name": "first", "config": "first.yaml"},
+                        {"name": "second", "config": "second.yaml"},
+                    ]
+                }
+            )
+        )
+
+        with pytest.raises(ValueError, match="must not precede"):
+            mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                from_stage="second",
+                to_stage="first",
+            )
 
     @pytest.mark.parametrize(
         ("pipeline", "message"),

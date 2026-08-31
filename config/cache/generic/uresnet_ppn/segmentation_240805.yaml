@@ -40,7 +40,9 @@ io:
     name: stage_hdf5
     file_name: null
     stage: segmentation
-    keys: [seg_pred, clust_label_adapt]
+    overwrite_stage: true
+    # PPN points are canonical GrapPA inputs for reconstructed fragments.
+    keys: [seg_pred, ppn_points, clust_label_adapt]
 
 model:
   name: full_chain
