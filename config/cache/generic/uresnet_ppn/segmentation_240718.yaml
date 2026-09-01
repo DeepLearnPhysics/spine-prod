@@ -1,0 +1,11 @@
+__meta__:
+  kind: bundle
+  version: "240718"
+  date: "2024-07-18"
+  description: Materialize generic 240718 UResNet-PPN stage products
+
+include: cache/generic/uresnet_ppn/base_v1.yaml
+
+model:
+  modules:
+    uresnet_ppn: !include model/generic/uresnet_ppn/network_240718.yaml

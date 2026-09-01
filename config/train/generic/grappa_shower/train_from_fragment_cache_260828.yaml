@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260828"
+  date: "2026-08-28"
+  description: Generic 260828 shower GrapPA training from cached fragment graphs
+
+include:
+  - model/generic/grappa_shower/model_260828.yaml
+  - train/generic/grappa_shower/from_fragment_cache_v1.yaml

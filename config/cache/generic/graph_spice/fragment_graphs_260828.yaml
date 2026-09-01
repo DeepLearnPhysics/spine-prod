@@ -1,0 +1,15 @@
+__meta__:
+  kind: bundle
+  version: "260828"
+  date: "2026-08-28"
+  description: Materialize generic 260828 fragment graphs and supervision
+
+include: cache/generic/graph_spice/base_v1.yaml
+
+model:
+  modules:
+    graph_spice: !include model/generic/graph_spice/network_240805.yaml
+    grappa_shower: !include model/generic/grappa_shower/network_260828.yaml
+    grappa_shower_loss: !include model/generic/grappa_shower/loss_260828.yaml
+    grappa_track: !include model/generic/grappa_track/network_260828.yaml
+    grappa_track_loss: !include model/generic/grappa_track/loss_260828.yaml

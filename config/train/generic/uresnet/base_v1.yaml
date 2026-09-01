@@ -14,7 +14,7 @@ io:
   loader:
     minibatch_size: 256
     shuffle: false
-    num_workers: 8
+    num_workers: 16
     collate_fn: all
     sampler:
       name: random_sequence

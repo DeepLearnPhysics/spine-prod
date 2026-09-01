@@ -2,78 +2,10 @@ __meta__:
   kind: bundle
   version: "240805"
   date: "2024-08-05"
-  description: Materialize generic UResNet-PPN predictions and adapted cluster truth
+  description: Materialize generic 240805 UResNet-PPN stage products
 
-base:
-  world_size: 1
-  iterations: -1
-  seed: 0
-  unwrap: true
-  split_output: true
-  log_step: 1
-
-io:
-  loader:
-    minibatch_size: 64
-    shuffle: false
-    num_workers: 8
-    collate_fn: all
-    dataset:
-      name: larcv
-      file_keys: null
-      schema:
-        data:
-          parser: sparse3d
-          sparse_event: sparse3d_pcluster
-        seg_label:
-          parser: sparse3d
-          sparse_event: sparse3d_pcluster_semantics
-        clust_label:
-          parser: cluster3d
-          cluster_event: cluster3d_pcluster
-          particle_event: particle_corrected
-          sparse_semantics_event: sparse3d_pcluster_semantics
-          add_particle_info: true
-          clean_data: true
-          shape_precedence: [2, 1, 0, 3, 4, 6]
-  writer:
-    name: stage_hdf5
-    file_name: null
-    stage: segmentation
-    overwrite_stage: true
-    # PPN points are canonical GrapPA inputs for reconstructed fragments.
-    keys: [seg_pred, ppn_points, clust_label_adapt]
+include: cache/generic/uresnet_ppn/base_v1.yaml
 
 model:
-  name: full_chain
-  to_numpy: true
-
-  network_input:
-    data: data
-    seg_label: seg_label
-    clust_label: clust_label
-
   modules:
-    chain:
-      stages:
-        - name: segmentation
-          provider: segmentation
-          uses: uresnet_ppn
-          config:
-            mode: uresnet
-            point_proposal: ppn
-            adapt_labels:
-              break_eps: 1.1
-              break_metric: chebyshev
-              break_p: 2.0
-              # shower, track, Michel and delta semantic IDs
-              break_classes: [0, 1, 2, 3]
-              weighted: true
-
-    # model_name strips the full-chain module prefix while loading the
-    # standalone UResNet-PPN checkpoint supplied by the workflow.
     uresnet_ppn: !include model/generic/uresnet_ppn/network_240805.yaml
-
-override:
-  model.modules.uresnet_ppn.model_name: ""
-  model.modules.uresnet_ppn.weight_path: ""
