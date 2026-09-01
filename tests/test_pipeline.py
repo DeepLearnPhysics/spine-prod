@@ -342,3 +342,14 @@ def test_pipeline_rejects_export_runtime_conflicts(tmp_path, extra, message):
 
     with pytest.raises(ValueError, match=message):
         PipelineDefinition.load(str(path))
+
+
+def test_pipeline_rejects_stage_names_that_are_not_safe_paths(tmp_path):
+    """Stage names also serve as workspace log-link names."""
+    path = write_pipeline(
+        tmp_path,
+        {"stages": [{"name": "../escape", "config": "model.yaml"}]},
+    )
+
+    with pytest.raises(ValueError, match="name may contain only"):
+        PipelineDefinition.load(str(path))

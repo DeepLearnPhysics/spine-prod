@@ -89,7 +89,7 @@ spine-prod/
 - Create and validate persistent training runs
 - Resolve numeric resume checkpoints
 - Plan incremental and named validation suites
-- Create stage-specific scheduler submission directories
+- Create immutable attempt directories and stable latest/log links
 
 ## Benefits
 

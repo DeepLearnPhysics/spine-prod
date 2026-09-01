@@ -387,13 +387,22 @@ experiments/deghost/default/
 ├── tensorboard/
 │   ├── train/
 │   └── validation/
-└── submissions/
-    └── train/
-        └── TIMESTAMP/
-            ├── job_metadata.json
-            ├── submit.sbatch
-            └── logs/
+├── latest -> attempts/TIMESTAMP
+├── stdout.log -> latest/stdout.log
+├── stderr.log -> latest/stderr.log
+└── attempts/
+    └── TIMESTAMP/
+        ├── inputs.txt
+        ├── validation_inputs.txt
+        ├── job_metadata.json
+        ├── submit.sbatch
+        ├── stdout.log
+        └── stderr.log
 ```
+
+`tensorboard/` is created only when TensorBoard is requested. The timestamped
+attempt preserves an exact submission record, while the stable links make the
+current scheduler logs available directly from the run root.
 
 Use sibling run directories such as `default`, `augment`, and `ablate` for
 comparable variants of one experiment.
@@ -613,8 +622,9 @@ on skipped stages are considered satisfied by their existing artifacts.
 Use `--to-stage NAME` to stop at an inclusive boundary when only a bounded
 range should be regenerated.
 
-Every retried inference/cache stage receives a new timestamped submission
-directory, preserving the failed scripts, logs, and metadata. A retried
+Every submission, including the first, receives a new `attempts/TIMESTAMP`
+directory, preserving earlier scripts, logs, and metadata. Each stage root has
+a `latest` link to its current attempt. A retried
 training stage resumes its latest valid checkpoint automatically. If its
 previous scheduler job never started, the unchanged empty training run is
 reused. A run containing training logs but no checkpoint is rejected because
@@ -636,33 +646,58 @@ then compose the independently trained modules into one full-chain checkpoint.
 
 ### Job Artifacts
 
-Inference creates a timestamped directory in `runs/` automatically. Explicit
-inputs are divided into scheduler chunks and each array task receives its own
-input list, SPINE logs, and output directory:
+Inference creates a timestamped run directory automatically. Every submission
+uses the same attempt layout. The common single-task case is deliberately
+flat:
 
 ```
 runs/20260810_143022_spine_icarus_latest/
-├── job_metadata.json
-├── scheduler/
-│   └── chunk_000/
-│       ├── submit.sbatch
-│       └── logs/                 # Scheduler stdout/stderr
-└── tasks/
-    └── chunk_000/
-        ├── task_1/
-        │   ├── inputs.txt
-        │   ├── logs/             # SPINE CSV logs
-        │   └── output/           # Outputs for this task only
-        └── task_2/
-            ├── inputs.txt
-            ├── logs/
-            └── output/
+├── latest -> attempts/TIMESTAMP
+├── stdout.log -> latest/stdout.log
+├── stderr.log -> latest/stderr.log
+└── attempts/
+    └── TIMESTAMP/
+        ├── inputs.txt
+        ├── job_metadata.json
+        ├── submit.sbatch
+        ├── stdout.log
+        ├── stderr.log
+        ├── inference_log-*.csv
+        └── output/
 ```
 
-Chunk directories also bound the number of entries in each task directory.
+`output/` is created only when spine-prod supplies the default writer output;
+it is omitted when `--output` selects an external destination. There are no
+empty scheduler, task, or log directories.
+
+Only a real scheduler array creates task directories. Scheduler chunking is
+represented by numbered submit scripts instead of another directory layer:
+
+```
+attempts/TIMESTAMP/
+├── job_metadata.json
+├── submit_000.sbatch
+├── submit_001.sbatch
+├── JOB_*.out                   # Scheduler array logs
+├── JOB_*.err
+└── tasks/
+    ├── 000_1/
+    │   ├── inputs.txt
+    │   ├── inference_log-*.csv
+    │   └── output/
+    └── 000_2/
+        └── ...
+```
+
 Use an explicit `--output` only when a deliberately shared or externally
 managed output location is required. An optional `--run-dir` can select a
-specific new inference directory; it must be empty.
+specific new inference directory; it must be empty. Existing run trees are not
+migrated or modified; the new layout applies to new attempts.
+
+Pipeline workspaces also expose `logs/<stage>`, a symlink to each stage's
+latest attempt. Thus the current scheduler log for a scalar stage is available
+as `WORKSPACE/logs/STAGE/stdout.log` or `stderr.log` without traversing the
+stage's durable artifact hierarchy.
 
 ### Monitoring Jobs
 
@@ -679,8 +714,11 @@ qstat -u $USER
 # View job details on PBS
 qstat -fx <job_id>
 
-# View logs
-tail -f runs/<run_dir>/scheduler/chunk_*/logs/*.out
+# View the latest scalar-job log
+tail -f runs/<run_dir>/stdout.log
+
+# View one pipeline stage's latest log
+tail -f <workspace>/logs/<stage>/stdout.log
 
 # Cancel job on SLURM
 scancel <job_id>
@@ -847,7 +885,8 @@ pip install jinja2 pyyaml
 
 ### Job Failures
 
-1. Check batch logs in `runs/<run_dir>/scheduler/chunk_*/logs/`
+1. Check the latest batch log at `runs/<run_dir>/stdout.log` and
+   `runs/<run_dir>/stderr.log` (or inspect `latest/` for an array)
 2. Review run metadata in `runs/<run_dir>/job_metadata.json`
 3. Test configuration on a single file with `--dry-run`
 4. Verify input files exist and are accessible
