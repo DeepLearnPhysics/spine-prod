@@ -48,7 +48,6 @@ io:
       # Inputs needed to build particles after the standalone GrapPAs train.
       - data
       - coord_label
-      - clust_label_adapt
       - fragment_clusts
       - fragment_shapes
 
