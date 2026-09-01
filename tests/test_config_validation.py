@@ -364,7 +364,7 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
     )
 
     loader = config["io"]["loader"]
-    assert loader["num_workers"] == 4
+    assert loader["num_workers"] == 16
     assert loader["dataset"]["hdf5"]["keep_open"] is True
     assert config["io"]["writer"]["keep_open"] is True
     assert config["io"]["writer"]["overwrite_stage"] is True
@@ -490,7 +490,7 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     )
 
     loader = cache["io"]["loader"]
-    assert loader["num_workers"] == 4
+    assert loader["num_workers"] == 16
     assert loader["dataset"]["keep_open"] is True
     assert loader["dataset"]["stage_map"] == {
         "ppn_points": "segmentation",
@@ -535,8 +535,12 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
             assert cache_loss == standalone["grappa_loss"]
 
     writer_keys = set(cache["io"]["writer"]["keys"])
-    reader_keys = set(training["io"]["loader"]["dataset"]["keys"])
-    assert reader_keys.issubset(writer_keys)
+    training_dataset = training["io"]["loader"]["dataset"]
+    reader_keys = set(training_dataset["keys"])
+    inherited_keys = set(training_dataset["stage_map"])
+    assert training_dataset["stage_map"] == {"data": "fragmentation"}
+    assert reader_keys - inherited_keys <= writer_keys
+    assert inherited_keys.isdisjoint(writer_keys)
     assert training["model"]["network_input"] == {
         "data": "data",
         "clusts": "particle_clusts",
@@ -545,6 +549,39 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
         "edge_features": "particle_edge_features",
     }
     assert set(training["model"]["modules"]["grappa"]) == {"nodes", "gnn_model"}
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_generic_cache_stages_have_disjoint_product_ownership():
+    """Each staged writer must append new products rather than copy siblings."""
+    paths = (
+        CONFIG_ROOT / "cache" / "generic" / "uresnet_ppn" / "segmentation_240805.yaml",
+        CONFIG_ROOT
+        / "cache"
+        / "generic"
+        / "graph_spice"
+        / "fragment_graphs_240805.yaml",
+        CONFIG_ROOT
+        / "cache"
+        / "generic"
+        / "grappa_shower_track"
+        / "particle_graphs_240805.yaml",
+    )
+    stage_keys = {
+        config["io"]["writer"]["stage"]: set(config["io"]["writer"]["keys"])
+        for config in map(load_config_with_includes, paths)
+    }
+
+    owners = {}
+    for stage, keys in stage_keys.items():
+        for key in keys:
+            assert key not in owners, (
+                f"Cache product '{key}' is owned by both '{owners.get(key)}' "
+                f"and '{stage}'."
+            )
+            owners[key] = stage
+
+    assert owners["data"] == "fragmentation"
 
 
 def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
@@ -637,6 +674,68 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
         "grappa_track",
         "grappa_inter",
     }
+
+
+@pytest.mark.parametrize(
+    ("version", "stage_versions"),
+    (
+        (
+            "240718",
+            {
+                "train_uresnet_ppn": "240718",
+                "cache_train_segmentation": "240718",
+                "train_graph_spice": "240718",
+                "cache_train_fragment_graphs": "240718",
+                "train_grappa_shower": "240718",
+                "train_grappa_track": "240718",
+                "cache_train_particle_graphs": "240718",
+                "train_grappa_inter": "240718",
+            },
+        ),
+        (
+            "240805",
+            {
+                "train_uresnet_ppn": "240805",
+                "cache_train_segmentation": "240805",
+                "train_graph_spice": "240805",
+                "cache_train_fragment_graphs": "240805",
+                "train_grappa_shower": "240718",
+                "train_grappa_track": "240718",
+                "cache_train_particle_graphs": "240805",
+                "train_grappa_inter": "240805",
+            },
+        ),
+        (
+            "260828",
+            {
+                "train_uresnet_ppn": "240805",
+                "cache_train_segmentation": "240805",
+                "train_graph_spice": "240805",
+                "cache_train_fragment_graphs": "260828",
+                "train_grappa_shower": "260828",
+                "train_grappa_track": "260828",
+                "cache_train_particle_graphs": "260828",
+                "train_grappa_inter": "260828",
+            },
+        ),
+    ),
+)
+def test_generic_full_chain_pipelines_pin_component_revisions(version, stage_versions):
+    """Each historical pipeline must make its mixed revision matrix explicit."""
+    pipeline_path = (
+        CONFIG_ROOT.parent / "pipelines" / "generic" / f"full_chain_{version}.yaml"
+    )
+    pipeline = PipelineDefinition.load(
+        str(pipeline_path), workspace_override="/path/to/workflow"
+    )
+    stages = {stage["name"]: stage for stage in pipeline.stages}
+
+    for stage_name, stage_version in stage_versions.items():
+        assert stages[stage_name]["config"].endswith(f"_{stage_version}.yaml")
+
+    export = stages["export_full_chain_weights"]
+    assert export["config"] == f"model/generic/full_chain/model_{version}.yaml"
+    assert export["export_weights"].endswith(f"full_chain_{version}.ckpt")
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")

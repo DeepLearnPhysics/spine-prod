@@ -10,6 +10,8 @@ override:
     file_keys: null
     staged: true
     stage: particle_aggregation
+    stage_map:
+      data: fragmentation
     keys:
       - data
       - particle_clusts

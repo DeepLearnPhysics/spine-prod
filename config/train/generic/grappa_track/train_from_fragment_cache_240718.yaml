@@ -2,7 +2,7 @@ __meta__:
   kind: bundle
   version: "240718"
   date: "2024-07-18"
-  description: Generic track GrapPA training from cached 240805 fragments
+  description: Generic 240718 track GrapPA training from cached fragment graphs
 
 include:
   - model/generic/grappa_track/model_240718.yaml

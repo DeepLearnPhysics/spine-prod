@@ -1,0 +1,15 @@
+__meta__:
+  kind: bundle
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic 240718 Graph-SPICE training from cached UResNet-PPN products
+
+include:
+  - model/generic/graph_spice/model_240718.yaml
+  - train/generic/graph_spice/from_segmentation_cache_v1.yaml
+
+override:
+  model.network_input.seg_label: seg_pred
+  model.loss_input.seg_label: seg_pred
+  model.loss_input.clust_label: clust_label_adapt
+  model.modules.graph_spice.make_clusters: false
