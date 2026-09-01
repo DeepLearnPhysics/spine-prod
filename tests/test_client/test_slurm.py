@@ -61,6 +61,7 @@ def test_cleanup_writes_executable_script_and_submits_it(client):
     content = script.read_text()
     assert script.stat().st_mode & 0o111
     assert "#SBATCH --dependency=afterok:42" in content
+    assert "#SBATCH --kill-on-invalid-dep=yes" in content
     assert 'rm -rf "/tmp/intermediate.root"' in content
     submit.assert_called_once_with(script, False)
 

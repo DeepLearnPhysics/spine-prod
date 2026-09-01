@@ -622,6 +622,12 @@ on skipped stages are considered satisfied by their existing artifacts.
 Use `--to-stage NAME` to stop at an inclusive boundary when only a bounded
 range should be regenerated.
 
+On Slurm, dependent stages are submitted with
+`--kill-on-invalid-dep=yes`, so a stage is canceled automatically when an
+upstream `afterok` dependency can no longer succeed. PBS Professional provides
+the corresponding deletion behavior as part of its native dependency
+semantics and requires no additional directive.
+
 Every submission, including the first, receives a new `attempts/TIMESTAMP`
 directory, preserving earlier scripts, logs, and metadata. Each stage root has
 a `latest` link to its current attempt. A retried

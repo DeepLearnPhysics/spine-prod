@@ -61,6 +61,7 @@ class SlurmClient(BatchClient):
 #SBATCH --time=0:10:00
 #SBATCH --job-name={job_name}
 #SBATCH --dependency={dependency}
+#SBATCH --kill-on-invalid-dep=yes
 
 echo "Cleanup job started: $(date)"
 echo "Removing intermediate files..."

@@ -1472,6 +1472,7 @@ class TestBatchSpineOverride:
         assert len(scripts) == 3
         assert "#SBATCH --array=1-2%1" in scripts[0].read_text()
         assert "#SBATCH --dependency=afterok:5" in scripts[0].read_text()
+        assert "#SBATCH --kill-on-invalid-dep=yes" in scripts[0].read_text()
         assert "#SBATCH --dependency=afterok:10" in scripts[1].read_text()
         assert "tasks/002_1/inputs.txt" in scripts[2].read_text()
         assert "tasks/002_*/inputs.txt" not in scripts[2].read_text()
@@ -2595,6 +2596,35 @@ class TestCVMFSOption:
 
         assert 'SHIFTER_MODULES+=("--module=cvmfs")' in script
 
+    @pytest.mark.parametrize(
+        "template_name",
+        ["job_template_s3df.sbatch", "job_template_nersc.sbatch"],
+    )
+    def test_slurm_dependencies_cancel_when_they_become_invalid(
+        self, mock_submitter, template_name
+    ):
+        """Slurm descendants should not remain pending after upstream failure."""
+        script = self._render_template(
+            mock_submitter,
+            template_name,
+            dependency="afterok:123",
+        )
+
+        assert "#SBATCH --dependency=afterok:123" in script
+        assert "#SBATCH --kill-on-invalid-dep=yes" in script
+
+    @pytest.mark.parametrize(
+        "template_name",
+        ["job_template_s3df.sbatch", "job_template_nersc.sbatch"],
+    )
+    def test_slurm_jobs_without_dependencies_need_no_invalid_dependency_policy(
+        self, mock_submitter, template_name
+    ):
+        """Independent jobs should not receive an irrelevant Slurm directive."""
+        script = self._render_template(mock_submitter, template_name)
+
+        assert "--kill-on-invalid-dep" not in script
+
     def test_anl_template_uses_pbs_and_array_index(self, mock_submitter):
         """Test ANL template uses PBS directives and PBS array variables."""
         script = self._render_template(
@@ -2611,6 +2641,17 @@ class TestCVMFSOption:
         assert "${PBS_ARRAY_INDEX}" in script
         assert "apptainer exec" in script
         assert "spine -S" in script
+
+    def test_anl_uses_native_pbs_dependency_deletion_semantics(self, mock_submitter):
+        """PBS needs only afterok; it has no Slurm-style opt-in directive."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_anl.pbs",
+            dependency="afterok:123.server",
+        )
+
+        assert "#PBS -W depend=afterok:123.server" in script
+        assert "kill-on-invalid-dep" not in script
 
     def test_templates_allow_config_defined_inputs(self, mock_submitter):
         """Test batch templates can omit submit-time source lists entirely."""

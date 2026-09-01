@@ -29,6 +29,7 @@
 
 {% if dependency %}
 #SBATCH --dependency={{ dependency }}
+#SBATCH --kill-on-invalid-dep=yes
 {% endif %}
 
 # Job metadata
