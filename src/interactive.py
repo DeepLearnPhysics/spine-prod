@@ -17,6 +17,7 @@ class InteractiveRunner(SubmissionComponent):
         source_type: str = "source",
         output: Optional[str] = None,
         output_suffix: Optional[str] = None,
+        in_place: bool = False,
         no_writer: bool = False,
         files_per_task: Optional[int] = None,
         task_id: int = 1,
@@ -56,6 +57,9 @@ class InteractiveRunner(SubmissionComponent):
             Output file path
         output_suffix : str, optional
             Output HDF5 suffix when output names are derived from input files
+        in_place : bool, optional
+            Leave the writer destination config-defined and suppress automatic
+            ``--output*`` arguments.
         no_writer : bool, optional
             Deprecated and ignored. SPINE v0.15.3+ safely ignores output options
             when the configuration has no writer.
@@ -110,6 +114,10 @@ class InteractiveRunner(SubmissionComponent):
             self.context.batch.warn_flashmatch_noop()
         if no_writer:
             self.context.spine_cli.warn_no_writer_deprecated()
+        if in_place and (output is not None or output_suffix is not None):
+            raise ValueError(
+                "--in-place cannot be combined with --output or --output-suffix"
+            )
 
         if interactive_runtime not in ("auto", "local", "container"):
             raise ValueError(
@@ -213,22 +221,24 @@ class InteractiveRunner(SubmissionComponent):
         # Build SPINE command
         log_dir = job_dir / "logs"
         log_dir.mkdir(exist_ok=True)
-        output_dir, output_suffix = (
-            self.context.spine_cli.default_writer_output_settings(
-                job_dir, config, output_suffix
+        output_dir = None
+        if not in_place:
+            output_dir, output_suffix = (
+                self.context.spine_cli.default_writer_output_settings(
+                    job_dir, config, output_suffix
+                )
             )
-        )
-        if file_list and output:
+        if file_list and output and not in_place:
             output_path = Path(output)
             if output_path.suffix:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
-        elif file_list:
+        elif file_list and not in_place:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
         output_args = (
             self.context.spine_cli.format_output_args(output, output_dir, output_suffix)
-            if file_list
+            if file_list and not in_place
             else ""
         )
         spine_cli_overrides = self.context.spine_cli.format_set_overrides(set_overrides)
