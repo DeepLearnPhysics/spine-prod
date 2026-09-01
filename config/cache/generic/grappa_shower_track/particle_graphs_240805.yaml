@@ -25,10 +25,11 @@ io:
       file_keys: null
       staged: true
       stage: fragmentation
-      # PPN remains owned by segmentation; avoid copying its voxel-aligned
-      # tensor into every downstream stage.
+      # Canonical segmentation products remain owned by that stage; avoid
+      # copying voxel-aligned tensors into every downstream stage.
       stage_map:
         ppn_points: segmentation
+        clust_label_adapt: segmentation
       keep_open: false
       keys:
         - data
