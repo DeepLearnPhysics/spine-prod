@@ -593,13 +593,11 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
         assert stages[name]["output"] == "/path/to/workflow/cache/validation"
         assert stages[name]["output_suffix"] == "cache"
     assert stages["cache_train_particle_graphs"]["source"] == train_cache
-    assert stages["cache_train_particle_graphs"]["output"] == (
-        "/path/to/workflow/cache/train"
-    )
+    assert stages["cache_train_particle_graphs"]["output"] == train_cache
+    assert "output_suffix" not in stages["cache_train_particle_graphs"]
     assert stages["cache_validation_particle_graphs"]["source"] == validation_cache
-    assert stages["cache_validation_particle_graphs"]["output"] == (
-        "/path/to/workflow/cache/validation"
-    )
+    assert stages["cache_validation_particle_graphs"]["output"] == validation_cache
+    assert "output_suffix" not in stages["cache_validation_particle_graphs"]
     assert stages["train_grappa_inter"]["source"] == train_cache
     assert stages["train_grappa_inter"]["val_source"] == validation_cache
 

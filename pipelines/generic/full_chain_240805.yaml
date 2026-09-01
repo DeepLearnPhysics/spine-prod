@@ -116,8 +116,7 @@ stages:
     config: cache/generic/grappa_shower_track/particle_graphs_240805.yaml
     source: ${split.cache_file}
     run_dir: ${split.cache_dir}/particle_aggregation
-    output: ${split.cache_dir}
-    output_suffix: cache
+    output: ${split.cache_file}
     files_per_task: 1
     ntasks: 50
     module_weight:
