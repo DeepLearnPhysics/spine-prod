@@ -14,8 +14,13 @@
 #PBS -l filesystems={{ filesystems|default("home:grand:eagle") }}
 #PBS -k doe
 #PBS -N {{ job_name }}
+{% if array_spec %}
 #PBS -o {{ log_dir }}/{{ job_name }}.out
 #PBS -e {{ log_dir }}/{{ job_name }}.err
+{% else %}
+#PBS -o {{ stdout_path }}
+#PBS -e {{ stderr_path }}
+{% endif %}
 {% if array_spec %}
 #PBS -J {{ array_spec }}
 {% endif %}
@@ -57,8 +62,12 @@ TASK_DIR="{{ task_dir_pattern | replace('*', '${PBS_ARRAY_INDEX}') }}"
 TASK_FILE_LIST="{{ file_list_pattern | replace('*', '${PBS_ARRAY_INDEX}') }}"
 {% elif file_list_pattern %}
 # Single job: use the single file list
+{% if task_dir_pattern %}
 TASK_DIR="{{ task_dir_pattern | replace('*', '1') }}"
 TASK_FILE_LIST="{{ file_list_pattern | replace('*', '1') }}"
+{% else %}
+TASK_FILE_LIST="{{ file_list_pattern }}"
+{% endif %}
 {% endif %}
 
 {% if file_list_pattern %}

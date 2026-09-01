@@ -151,8 +151,6 @@ class RunManager:
 
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "weights").mkdir(exist_ok=True)
-        (run_dir / "tensorboard" / "train").mkdir(parents=True, exist_ok=True)
-        (run_dir / "tensorboard" / "validation").mkdir(parents=True, exist_ok=True)
         cls._write_json(
             metadata_path,
             {
@@ -285,14 +283,40 @@ class RunManager:
         return log_dir, selected
 
     @staticmethod
-    def create_submission_dir(
-        run_dir: Path, stage: str, name: Optional[str] = None
-    ) -> Path:
-        """Create a timestamped scheduler-artifact directory for a run stage."""
+    def create_attempt_dir(run_dir: Path) -> Path:
+        """Create one immutable, timestamped submission attempt.
+
+        Durable run products remain at the run root. Scripts, manifests,
+        scheduler logs, and submission metadata live together under this
+        attempt so retries never overwrite their predecessors.
+        """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        parts = [run_dir, "submissions", stage]
-        if name:
-            parts.append(name)
-        submission_dir = Path(*parts) / timestamp
-        (submission_dir / "logs").mkdir(parents=True)
-        return submission_dir
+        attempt_dir = run_dir / "attempts" / timestamp
+        attempt_dir.mkdir(parents=True)
+        RunManager.replace_symlink(run_dir / "latest", Path("attempts") / timestamp)
+        return attempt_dir
+
+    @staticmethod
+    def replace_symlink(link: Path, target: Path) -> None:
+        """Create or replace a managed symbolic link without deleting files."""
+        link.parent.mkdir(parents=True, exist_ok=True)
+        if link.is_symlink():
+            link.unlink()
+        elif link.exists():
+            raise ValueError(f"Cannot replace non-symlink path: {link}")
+        link.symlink_to(target)
+
+    @classmethod
+    def expose_attempt_logs(cls, run_dir: Path, has_array: bool) -> None:
+        """Expose stable scheduler-log links for a single-job attempt.
+
+        Array attempts have several stdout/stderr files and are reached through
+        ``latest``. Remove stale scalar links when the latest attempt is an
+        array to avoid pointing at logs from an older submission.
+        """
+        for name in ("stdout.log", "stderr.log"):
+            link = run_dir / name
+            if link.is_symlink():
+                link.unlink()
+            if not has_array:
+                cls.replace_symlink(link, Path("latest") / name)

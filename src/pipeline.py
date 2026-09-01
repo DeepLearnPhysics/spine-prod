@@ -1,5 +1,6 @@
 """Loading, validation, and execution of multi-stage production pipelines."""
 
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -7,6 +8,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 import yaml
 
 from .component import SubmissionComponent
+from .run_manager import RunManager
 
 GLOBAL_FIELDS = frozenset(
     {
@@ -100,6 +102,7 @@ VARIABLE_PATTERN = re.compile(
     r"\$\{([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\}"
 )
 VARIABLE_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+STAGE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 class PipelineDefinition:
@@ -474,6 +477,11 @@ class PipelineDefinition:
         name = raw_stage["name"]
         if not isinstance(name, str):
             raise TypeError(f"Pipeline stage {index} name must be a string")
+        if not STAGE_NAME_PATTERN.match(name):
+            raise ValueError(
+                f"Pipeline stage {index} name may contain only letters, "
+                "numbers, '.', '_', and '-'"
+            )
         if name in prior_names:
             raise ValueError(f"Duplicate pipeline stage name: {name}")
 
@@ -688,6 +696,9 @@ class PipelineRunner(SubmissionComponent):
             print(f"Not selected after stop: {', '.join(deferred)}")
         print()
 
+        if definition.workspace is not None:
+            self._prepare_log_index(definition.workspace, stages)
+
         job_map: Dict[str, List[str]] = {}
         cleanup_map: Dict[str, List[str]] = {}
         for stage in stages:
@@ -715,6 +726,12 @@ class PipelineRunner(SubmissionComponent):
                 preload=preload,
                 **options,
             )
+            if definition.workspace is not None and stage.get("run_dir"):
+                self._link_stage_attempt(
+                    definition.workspace,
+                    name,
+                    stage["run_dir"],
+                )
 
             cleanup = self._as_list(stage.get("cleanup"))
             if cleanup:
@@ -724,6 +741,24 @@ class PipelineRunner(SubmissionComponent):
 
         self._schedule_cleanup(stages, job_map, cleanup_map, dry_run)
         return job_map
+
+    @staticmethod
+    def _prepare_log_index(workspace: str, stages: Sequence[Mapping[str, Any]]) -> None:
+        """Validate the workspace's shallow stage-attempt index up front."""
+        log_dir = Path(workspace).expanduser().resolve() / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        for stage in stages:
+            link = log_dir / stage["name"]
+            if link.exists() and not link.is_symlink():
+                raise ValueError(f"Pipeline log index path is not a symlink: {link}")
+
+    @staticmethod
+    def _link_stage_attempt(workspace: str, name: str, run_dir: str) -> None:
+        """Link ``workspace/logs/<stage>`` to that stage's latest attempt."""
+        link = Path(workspace).expanduser().resolve() / "logs" / name
+        latest = Path(run_dir).expanduser().resolve() / "latest"
+        target = Path(os.path.relpath(str(latest), str(link.parent)))
+        RunManager.replace_symlink(link, target)
 
     @staticmethod
     def _select_stages(

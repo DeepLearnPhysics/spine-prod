@@ -1468,11 +1468,17 @@ class TestBatchSpineOverride:
             str(latest), ["data"], job_dir, detector="icarus"
         )
         preload.assert_called_once_with(str(composite))
-        scripts = sorted(job_dir.glob("scheduler/chunk_*/submit.sbatch"))
+        scripts = sorted(job_dir.glob("attempts/*/submit_*.sbatch"))
         assert len(scripts) == 3
         assert "#SBATCH --array=1-2%1" in scripts[0].read_text()
         assert "#SBATCH --dependency=afterok:5" in scripts[0].read_text()
         assert "#SBATCH --dependency=afterok:10" in scripts[1].read_text()
+        assert "tasks/002_1/inputs.txt" in scripts[2].read_text()
+        assert "tasks/002_*/inputs.txt" not in scripts[2].read_text()
+        attempt = scripts[0].parent
+        assert not list(attempt.glob("tasks/*/logs"))
+        assert not list(attempt.glob("tasks/*/output"))
+        assert not (attempt / "scheduler").exists()
         assert profile_config["bind_paths"].startswith("/sdf/")
         assert profile_config["account"]
         assert "--flashmatch is deprecated" in capsys.readouterr().err
@@ -1562,7 +1568,7 @@ class TestBatchSpineOverride:
                 run_dir=str(run_dir),
             ) == ["train"]
 
-        submission = next(run_dir.glob("submissions/train/*"))
+        submission = run_dir / "latest"
         train_manifest = submission / "inputs.txt"
         validation_manifest = submission / "validation_inputs.txt"
         assert train_manifest.read_text().splitlines() == [str(train_source)]
@@ -1580,14 +1586,16 @@ class TestBatchSpineOverride:
             )
             in script
         )
-        assert f"--source-list {train_manifest}" in script
-        assert f"--val-source-list {validation_manifest}" in script
+        assert f"--source-list {train_manifest.resolve()}" in script
+        assert f"--val-source-list {validation_manifest.resolve()}" in script
         assert "#SBATCH --array=" not in script
         assert not (run_dir / "tasks").exists()
 
         metadata = json.loads((submission / "job_metadata.json").read_text())
-        assert metadata["source_manifest"] == str(train_manifest)
-        assert metadata["validation_source_manifest"] == str(validation_manifest)
+        assert metadata["source_manifest"] == str(train_manifest.resolve())
+        assert metadata["validation_source_manifest"] == str(
+            validation_manifest.resolve()
+        )
 
     def test_submit_job_preserves_future_pipeline_training_sources(
         self, mock_submitter, tmp_path, capsys
@@ -1615,7 +1623,7 @@ class TestBatchSpineOverride:
                 allow_missing_inputs=True,
             ) == ["train"]
 
-        submission = next(run_dir.glob("submissions/train/*"))
+        submission = run_dir / "latest"
         assert (submission / "inputs.txt").read_text().splitlines() == [
             str(train_source)
         ]
@@ -1657,7 +1665,7 @@ class TestBatchSpineOverride:
                 run_dir=str(run_dir),
             ) == ["train"]
 
-        submission = next(run_dir.glob("submissions/train/*"))
+        submission = run_dir / "latest"
         script = (submission / "submit.sbatch").read_text(encoding="utf-8")
         assert "--source larcv=/raw/train.root hdf5=/cache/train.h5" in script
         assert "--val-source larcv=/raw/test.root hdf5=/cache/test.h5" in script
@@ -1695,7 +1703,7 @@ class TestBatchSpineOverride:
             ) == ["cache"]
 
         script = next(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+            mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch")
         ).read_text(encoding="utf-8")
         assert f"--output-dir {output}" in script
         assert "--output-suffix cache" in script
@@ -1726,15 +1734,13 @@ class TestBatchSpineOverride:
                 run_dir=str(run_dir),
             ) == ["export"]
 
-        script = (run_dir / "scheduler" / "chunk_000" / "submit.sbatch").read_text(
-            encoding="utf-8"
-        )
+        script = (run_dir / "latest" / "submit.sbatch").read_text(encoding="utf-8")
         assert "--module-weight uresnet_ppn=/weights/uresnet.ckpt" in script
         assert "graph_spice=/weights/graph_spice.ckpt" in script
         assert f"--export-weights {destination}" in script
         assert " -S " not in script
 
-        metadata = json.loads((run_dir / "job_metadata.json").read_text())
+        metadata = json.loads((run_dir / "latest" / "job_metadata.json").read_text())
         assert metadata["export_weights"] == str(destination)
 
     @pytest.mark.parametrize(
@@ -1828,7 +1834,7 @@ class TestBatchSpineOverride:
             )
 
         assert run_dir.is_dir()
-        assert (run_dir / "job_metadata.json").is_file()
+        assert (run_dir / "latest" / "job_metadata.json").is_file()
 
     def test_submit_job_retry_preserves_prior_inference_attempt(
         self, mock_submitter, tmp_path
@@ -1851,7 +1857,9 @@ class TestBatchSpineOverride:
             assert mock_submitter.submit_job(config=config, run_dir=str(run_dir)) == [
                 "first"
             ]
-            original_script = run_dir / "scheduler" / "chunk_000" / "submit.sbatch"
+            original_script = run_dir / "latest" / "submit.sbatch"
+            original_attempt = original_script.resolve().parent
+            original_script = original_attempt / "submit.sbatch"
             original_text = original_script.read_text(encoding="utf-8")
 
             assert mock_submitter.submit_job(
@@ -1860,10 +1868,11 @@ class TestBatchSpineOverride:
                 retry=True,
             ) == ["retry"]
 
-        attempts = list(run_dir.glob("submissions/inference/*"))
-        assert len(attempts) == 1
-        assert (attempts[0] / "scheduler" / "chunk_000" / "submit.sbatch").is_file()
-        assert (attempts[0] / "job_metadata.json").is_file()
+        attempts = list(run_dir.glob("attempts/*"))
+        assert len(attempts) == 2
+        assert all((attempt / "submit.sbatch").is_file() for attempt in attempts)
+        assert all((attempt / "job_metadata.json").is_file() for attempt in attempts)
+        assert (run_dir / "latest").resolve() != original_attempt
         assert original_script.read_text(encoding="utf-8") == original_text
 
     def test_submit_training_and_resume_share_run_artifacts(
@@ -1889,7 +1898,7 @@ class TestBatchSpineOverride:
                 tensorboard=True,
             ) == ["train-1"]
 
-        first_script = next(run_dir.glob("submissions/train/*/submit.sbatch"))
+        first_script = run_dir / "latest" / "submit.sbatch"
         first_text = first_script.read_text(encoding="utf-8")
         assert f"--log-dir {run_dir}" in first_text
         assert f"--weight-prefix {run_dir}/weights/snapshot" in first_text
@@ -1917,7 +1926,7 @@ class TestBatchSpineOverride:
                 resume=True,
             ) == ["train-2"]
 
-        scripts = sorted(run_dir.glob("submissions/train/*/submit.sbatch"))
+        scripts = sorted(run_dir.glob("attempts/*/submit.sbatch"))
         resumed_text = scripts[-1].read_text(encoding="utf-8")
         assert f"--weight-path {saved}" in resumed_text
         assert "--resume" in resumed_text
@@ -1961,12 +1970,12 @@ class TestBatchSpineOverride:
             ) == ["val-1"]
             submit.assert_called_once()
 
-        submission = next(run_dir.glob("submissions/validation/*"))
+        submission = run_dir / "latest"
         assert submission.is_dir()
         assert (submission / "weights.txt").read_text().splitlines() == [str(second)]
         script = (submission / "submit.sbatch").read_text(encoding="utf-8")
         assert f"--log-dir {run_dir}" in script
-        assert f"--weight-list {submission}/weights.txt" in script
+        assert f"--weight-list {(submission / 'weights.txt').resolve()}" in script
         assert "model.weight_path=null" in script
         assert (
             f"--tensorboard --tensorboard-dir {run_dir}/tensorboard/validation"
@@ -2018,7 +2027,7 @@ class TestBatchSpineOverride:
                 tensorboard=True,
             ) == ["val"]
 
-        submission = next(run_dir.glob("submissions/validation/data/*"))
+        submission = run_dir / "latest"
         script = (submission / "submit.sbatch").read_text(encoding="utf-8")
         assert f"--log-dir {run_dir}/validation/data" in script
         assert "base.overwrite_log=true" in script
@@ -2077,7 +2086,7 @@ class TestBatchSpineOverride:
         assert output.parent.is_dir()
         assert profile_config["bind_paths"] == f"/existing,{larcv_root}"
         script = next(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
+            mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch")
         ).read_text(encoding="utf-8")
         assert "#SBATCH --gpus=4" in script
         assert "--world-size 4 --batch-size 8 --num-workers 4 --epochs 2.5" in script
@@ -2122,9 +2131,7 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
-        )
+        scripts = list(mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch"))
         assert len(scripts) == 1
 
         script = scripts[0].read_text(encoding="utf-8")
@@ -2168,9 +2175,7 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
-        )
+        scripts = list(mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch"))
         assert len(scripts) == 1
 
         script = scripts[0].read_text(encoding="utf-8")
@@ -2198,9 +2203,7 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
-        )
+        scripts = list(mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch"))
         assert len(scripts) == 1
 
         script = scripts[0].read_text(encoding="utf-8")
@@ -2232,26 +2235,19 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
-        )
+        scripts = list(mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch"))
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert "#SBATCH --array=" not in script
-        assert 'TASK_DIR="' in script
-        assert "--output-dir $TASK_DIR/output" in script
-        assert "--log-dir $TASK_DIR/logs" in script
+        assert 'TASK_DIR="' not in script
+        assert f"--output-dir {scripts[0].parent}/output" in script
+        assert f"--log-dir {scripts[0].parent}" in script
 
-        task_lists = list(
-            mock_submitter.jobs_dir.glob("**/tasks/chunk_000/task_1/inputs.txt")
-        )
-        assert len(task_lists) == 1
-        assert (
-            task_lists[0].read_text(encoding="utf-8").strip().splitlines()
-            == input_files
-        )
-        assert (task_lists[0].parent / "output").is_dir()
-        assert (task_lists[0].parent / "logs").is_dir()
+        manifest = scripts[0].parent / "inputs.txt"
+        assert manifest.read_text(encoding="utf-8").strip().splitlines() == input_files
+        assert (scripts[0].parent / "output").is_dir()
+        assert not (scripts[0].parent / "logs").exists()
+        assert not (scripts[0].parent / "tasks").exists()
 
     def test_submit_job_no_writer_is_deprecated_and_ignored(
         self, mock_submitter, tmp_path, capsys
@@ -2277,9 +2273,7 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
-        )
+        scripts = list(mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch"))
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert " -S $TASK_FILE_LIST" in script
@@ -2313,9 +2307,7 @@ class TestBatchSpineOverride:
             )
 
         assert job_ids == ["12345"]
-        scripts = list(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
-        )
+        scripts = list(mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch"))
         assert len(scripts) == 1
         assert "--output-suffix custom_reco" in scripts[0].read_text(encoding="utf-8")
 
@@ -2336,9 +2328,7 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
-        )
+        scripts = list(mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch"))
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert "Using input files defined in the config" in script
@@ -2398,16 +2388,14 @@ class TestBatchSpineOverride:
 
         assert job_ids == ["12345"]
 
-        scripts = list(
-            mock_submitter.jobs_dir.glob("**/scheduler/chunk_000/submit.sbatch")
-        )
+        scripts = list(mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch"))
         assert len(scripts) == 1
         script = scripts[0].read_text(encoding="utf-8")
         assert "#SBATCH --array=1-3" in script
         assert "%3" not in script
 
         task_lists = sorted(
-            mock_submitter.jobs_dir.glob("**/tasks/chunk_000/task_*/inputs.txt")
+            mock_submitter.jobs_dir.glob("**/attempts/*/tasks/000_*/inputs.txt")
         )
         assert len(task_lists) == 3
         task_sizes = [
@@ -2741,6 +2729,40 @@ class TestPreloadDownloads:
 
 class TestPipelineSubmission:
     """Tests for multi-stage dependencies and cleanup scheduling."""
+
+    def test_submit_pipeline_indexes_each_latest_attempt(
+        self, mock_submitter, tmp_path
+    ):
+        """A workspace should expose one shallow link per submitted stage."""
+        workspace = tmp_path / "workspace"
+        run_dir = workspace / "cache" / "train" / "segmentation"
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "workspace": str(workspace),
+                    "stages": [
+                        {
+                            "name": "cache_train_segmentation",
+                            "config": "cache.yaml",
+                            "run_dir": str(run_dir),
+                        }
+                    ],
+                }
+            )
+        )
+
+        def submit_attempt(**options):
+            RunManager.create_attempt_dir(Path(options["run_dir"]))
+            return ["10"]
+
+        with patch.object(mock_submitter, "submit_job", side_effect=submit_attempt):
+            result = mock_submitter.submit_pipeline(str(pipeline_path))
+
+        assert result == {"cache_train_segmentation": ["10"]}
+        link = workspace / "logs" / "cache_train_segmentation"
+        assert link.is_symlink()
+        assert link.resolve() == (run_dir / "latest").resolve()
 
     def test_submit_pipeline_forwards_cli_source_and_override_fields(
         self, mock_submitter, tmp_path

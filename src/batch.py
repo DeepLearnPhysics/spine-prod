@@ -456,8 +456,6 @@ class BatchRunner(SubmissionComponent):
                 "account", self.profiles["defaults"]["account"]
             )
 
-        submission_dir = None
-        spine_log_dir = str(job_dir / "logs")
         lifecycle_args = []
         selected_checkpoints = []
         resume_checkpoint = None
@@ -471,8 +469,6 @@ class BatchRunner(SubmissionComponent):
                 resume_from=resume_from,
                 retry=retry,
             )
-            submission_dir = RunManager.create_submission_dir(job_dir, "train")
-            spine_log_dir = str(job_dir)
             lifecycle_args.extend(
                 ["--weight-prefix", shlex.quote(str(job_dir / "weights" / "snapshot"))]
             )
@@ -489,11 +485,6 @@ class BatchRunner(SubmissionComponent):
                         shlex.quote(str(job_dir / "tensorboard" / "train")),
                     ]
                 )
-        elif stage == "inference" and retry:
-            # A retry gets an immutable attempt directory so scripts, scheduler
-            # logs, and metadata from the failed submission remain available.
-            submission_dir = RunManager.create_submission_dir(job_dir, "inference")
-            spine_log_dir = str(submission_dir / "logs")
         elif stage == "validation":
             spine_log_path, selected_checkpoints = RunManager.prepare_validation(
                 job_dir,
@@ -505,10 +496,21 @@ class BatchRunner(SubmissionComponent):
             if not selected_checkpoints:
                 print("Validation is up to date; no scheduler job submitted")
                 return []
-            submission_dir = RunManager.create_submission_dir(
-                job_dir, "validation", validation_name
-            )
-            weight_list = submission_dir / "weights.txt"
+
+        # Every scheduler submission gets the same immutable attempt layout,
+        # including the first inference attempt. This keeps retries uniform.
+        attempt_dir = RunManager.create_attempt_dir(job_dir)
+        if stage == "inference":
+            spine_log_dir = str(attempt_dir)
+        elif stage == "validation":
+            spine_log_dir = str(spine_log_path)
+        else:
+            spine_log_dir = str(job_dir)
+
+        if stage == "train" and tensorboard:
+            (job_dir / "tensorboard" / "train").mkdir(parents=True, exist_ok=True)
+        elif stage == "validation":
+            weight_list = attempt_dir / "weights.txt"
             with open(weight_list, "w", encoding="utf-8") as stream:
                 for checkpoint in selected_checkpoints:
                     stream.write(f"{checkpoint}\n")
@@ -520,6 +522,7 @@ class BatchRunner(SubmissionComponent):
                 tensorboard_dir = job_dir / "tensorboard" / "validation"
                 if validation_name:
                     tensorboard_dir /= validation_name
+                tensorboard_dir.mkdir(parents=True, exist_ok=True)
                 lifecycle_args.extend(
                     [
                         "--tensorboard",
@@ -529,16 +532,14 @@ class BatchRunner(SubmissionComponent):
                 )
 
         if stage != "inference" and file_list:
-            assert submission_dir is not None
-            input_manifest = submission_dir / "inputs.txt"
+            input_manifest = attempt_dir / "inputs.txt"
             with open(input_manifest, "w", encoding="utf-8") as stream:
                 for file_path in file_list:
                     stream.write(f"{file_path}\n")
             lifecycle_args.extend(["--source-list", shlex.quote(str(input_manifest))])
 
         if validation_file_list:
-            assert submission_dir is not None
-            validation_input_manifest = submission_dir / "validation_inputs.txt"
+            validation_input_manifest = attempt_dir / "validation_inputs.txt"
             with open(validation_input_manifest, "w", encoding="utf-8") as stream:
                 for file_path in validation_file_list:
                     stream.write(f"{file_path}\n")
@@ -583,10 +584,8 @@ class BatchRunner(SubmissionComponent):
             else ""
         )
 
-        file_list_pattern = None
         file_chunks = [[]]
         concurrent_task_limit = None
-        attempt_dir = submission_dir or job_dir
         if stage == "inference" and file_list:
             max_array_size = self.profiles["defaults"]["max_array_size"]
             effective_files_per_task = self.resolve_files_per_task(
@@ -598,24 +597,20 @@ class BatchRunner(SubmissionComponent):
             if files_per_task is not None and ntasks is not None:
                 concurrent_task_limit = ntasks
 
-        print(f"Splitting into {len(file_chunks)} array job(s)")
+        task_count = sum(len(chunk) for chunk in file_chunks)
+        has_array = stage == "inference" and bool(file_list) and task_count > 1
+        RunManager.expose_attempt_logs(job_dir, has_array)
+        print(f"Splitting into {len(file_chunks)} scheduler job(s)")
 
         job_ids = []
         chunk_dependency = dependency  # Track dependency for chunk chaining
+        default_output_location = None
         for chunk_idx, chunk in enumerate(file_chunks):
-            chunk_name = f"chunk_{chunk_idx:03d}"
             task_dir_pattern = None
+            file_list_pattern = None
             chunk_output_args = output_args
             chunk_spine_log_dir = spine_log_dir
-            if stage == "inference":
-                scheduler_dir = attempt_dir / "scheduler" / chunk_name
-            else:
-                assert submission_dir is not None
-                scheduler_dir = submission_dir
-            scheduler_log_dir = scheduler_dir / "logs"
-            scheduler_log_dir.mkdir(parents=True, exist_ok=True)
 
-            # Render SBATCH script
             array_spec = None
             if len(chunk) > 1:
                 array_spec = f"1-{len(chunk)}"
@@ -625,27 +620,45 @@ class BatchRunner(SubmissionComponent):
                     array_spec += f"%{concurrent_task_limit}"
 
             if stage == "inference" and file_list:
-                task_chunk_dir = attempt_dir / "tasks" / chunk_name
-                task_dir_pattern = str(task_chunk_dir / "task_*")
-                file_list_pattern = f"{task_dir_pattern}/inputs.txt"
-                for task_idx, file_group in enumerate(chunk, start=1):
-                    task_dir = task_chunk_dir / f"task_{task_idx}"
-                    (task_dir / "logs").mkdir(parents=True, exist_ok=True)
-                    (task_dir / "output").mkdir(exist_ok=True)
-                    task_file_list = task_dir / "inputs.txt"
-                    with open(task_file_list, "w", encoding="utf-8") as f:
-                        for file_path in file_group:
-                            f.write(f"{file_path}\n")
-                chunk_spine_log_dir = "$TASK_DIR/logs"
-                if not output:
-                    chunk_output_args = " ".join(
-                        [
-                            "--output-dir $TASK_DIR/output",
-                            f"--output-suffix {shlex.quote(output_suffix)}",
-                        ]
-                    )
-            else:
-                file_list_pattern = None
+                if has_array:
+                    task_dir_pattern = str(attempt_dir / "tasks" / f"{chunk_idx:03d}_*")
+                    file_list_pattern = f"{task_dir_pattern}/inputs.txt"
+                    for task_idx, file_group in enumerate(chunk, start=1):
+                        task_dir = (
+                            attempt_dir / "tasks" / (f"{chunk_idx:03d}_{task_idx}")
+                        )
+                        task_dir.mkdir(parents=True, exist_ok=True)
+                        task_file_list = task_dir / "inputs.txt"
+                        with open(task_file_list, "w", encoding="utf-8") as stream:
+                            for file_path in file_group:
+                                stream.write(f"{file_path}\n")
+                        if not output:
+                            (task_dir / "output").mkdir()
+                    chunk_spine_log_dir = "$TASK_DIR"
+                    if not output:
+                        chunk_output_args = " ".join(
+                            [
+                                "--output-dir $TASK_DIR/output",
+                                f"--output-suffix {shlex.quote(output_suffix)}",
+                            ]
+                        )
+                        default_output_location = str(attempt_dir / "tasks")
+                else:
+                    input_manifest = attempt_dir / "inputs.txt"
+                    with open(input_manifest, "w", encoding="utf-8") as stream:
+                        for file_path in chunk[0]:
+                            stream.write(f"{file_path}\n")
+                    file_list_pattern = str(input_manifest)
+                    if not output:
+                        scalar_output = attempt_dir / "output"
+                        scalar_output.mkdir()
+                        chunk_output_args = " ".join(
+                            [
+                                f"--output-dir {shlex.quote(str(scalar_output))}",
+                                f"--output-suffix {shlex.quote(output_suffix)}",
+                            ]
+                        )
+                        default_output_location = str(scalar_output)
 
             batch_client = self.get_batch_client(profile_config)
             template = batch_client.load_template(
@@ -657,7 +670,23 @@ class BatchRunner(SubmissionComponent):
                 job_name=(
                     f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
                 ),
-                log_dir=str(scheduler_log_dir),
+                log_dir=str(attempt_dir),
+                stdout_path=(
+                    None
+                    if array_spec
+                    else str(
+                        attempt_dir
+                        / (f"stdout_{chunk_idx:03d}.log" if has_array else "stdout.log")
+                    )
+                ),
+                stderr_path=(
+                    None
+                    if array_spec
+                    else str(
+                        attempt_dir
+                        / (f"stderr_{chunk_idx:03d}.log" if has_array else "stderr.log")
+                    )
+                ),
                 dependency=chunk_dependency,
                 basedir=str(self.basedir),
                 file_list_pattern=file_list_pattern,
@@ -682,8 +711,10 @@ class BatchRunner(SubmissionComponent):
                 **profile_config,
             )
 
-            # Write script
-            script_path = scheduler_dir / f"submit{batch_client.script_suffix}"
+            script_name = "submit"
+            if len(file_chunks) > 1:
+                script_name += f"_{chunk_idx:03d}"
+            script_path = attempt_dir / f"{script_name}{batch_client.script_suffix}"
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(script_content)
             script_path.chmod(0o755)
@@ -765,21 +796,8 @@ class BatchRunner(SubmissionComponent):
             ),
             "ntasks": ntasks,
             "job_ids": job_ids,
-            "output": output
-            or (
-                str(attempt_dir / "tasks")
-                if stage == "inference" and file_list
-                else None
-            ),
-            "output_dir": (
-                output_dir
-                if output
-                else (
-                    str(attempt_dir / "tasks")
-                    if stage == "inference" and file_list
-                    else None
-                )
-            ),
+            "output": output or default_output_location,
+            "output_dir": output_dir if output else default_output_location,
             "output_suffix": output_suffix,
             "resume_checkpoint": (
                 str(resume_checkpoint) if resume_checkpoint is not None else None
@@ -790,12 +808,12 @@ class BatchRunner(SubmissionComponent):
             "submitted": datetime.now().isoformat(),
             "command": " ".join(sys.argv),
         }
-        metadata_dir = submission_dir or job_dir
-        self.batch_client.save_job_metadata(metadata_dir, metadata)
+        self.batch_client.save_job_metadata(attempt_dir, metadata)
         if stage == "train":
             RunManager.record_training_jobs(job_dir, job_ids)
 
         print(f"\nRun directory: {job_dir}")
-        print(f"Submission metadata: {metadata_dir}/job_metadata.json")
+        print(f"Latest attempt: {job_dir}/latest")
+        print(f"Submission metadata: {attempt_dir}/job_metadata.json")
 
         return job_ids

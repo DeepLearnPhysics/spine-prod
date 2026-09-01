@@ -23,8 +23,8 @@
 #SBATCH --output={{ log_dir }}/{{ job_name }}_%A_%a.out
 #SBATCH --error={{ log_dir }}/{{ job_name }}_%A_%a.err
 {% else %}
-#SBATCH --output={{ log_dir }}/{{ job_name }}_%j.out
-#SBATCH --error={{ log_dir }}/{{ job_name }}_%j.err
+#SBATCH --output={{ stdout_path }}
+#SBATCH --error={{ stderr_path }}
 {% endif %}
 
 {% if dependency %}
@@ -76,8 +76,12 @@ cat "$TASK_FILE_LIST"
 echo
 {% elif file_list_pattern %}
 # Single job: use the single file list
+{% if task_dir_pattern %}
 TASK_DIR="{{ task_dir_pattern | replace('*', '1') }}"
 TASK_FILE_LIST="{{ file_list_pattern | replace('*', '1') }}"
+{% else %}
+TASK_FILE_LIST="{{ file_list_pattern }}"
+{% endif %}
 FIRST_FILE=$(head -n 1 "$TASK_FILE_LIST")
 if [[ ! -f "$FIRST_FILE" ]]; then
     echo "ERROR: Input file not found: $FIRST_FILE"
