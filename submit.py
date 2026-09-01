@@ -263,6 +263,14 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--in-place",
+        action="store_true",
+        help=(
+            "Leave the writer destination config-defined. This suppresses all "
+            "automatic SPINE output overrides for staged-cache extension."
+        ),
+    )
+    parser.add_argument(
         "--no-writer",
         action="store_true",
         help=(
@@ -477,6 +485,7 @@ Examples:
             ("--tensorboard", args.tensorboard),
             ("--output", args.output),
             ("--output-suffix", args.output_suffix),
+            ("--in-place", args.in_place),
             ("--no-writer", args.no_writer),
             ("--dependency", args.dependency),
             ("--task-id", args.task_id is not None),
@@ -558,6 +567,7 @@ Examples:
                 source_type=source_type,
                 output=args.output,
                 output_suffix=args.output_suffix,
+                in_place=args.in_place,
                 no_writer=args.no_writer,
                 files_per_task=args.files_per_task,
                 task_id=args.task_id or 1,
@@ -600,6 +610,7 @@ Examples:
                 job_name=args.job_name,
                 output=args.output,
                 output_suffix=args.output_suffix,
+                in_place=args.in_place,
                 no_writer=args.no_writer,
                 ntasks=args.ntasks,
                 files_per_task=args.files_per_task,

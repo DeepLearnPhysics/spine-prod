@@ -642,7 +642,11 @@ Pipeline stages accept the CLI-equivalent `source`, `source_list`,
 `sources` and `validation_sources`, while `module_weight` forwards named model
 checkpoints through SPINE's native CLI. A model-only `export_weights` stage
 composes those checkpoints into one inference artifact without initializing
-data I/O. See
+data I/O. An inference stage with `in_place: true` passes no `--output`,
+`--output-dir`, or `--output-suffix` override, leaving writer routing entirely
+to SPINE. This is the intended mode for extending a staged HDF5 cache through
+SPINE's transactional sidecar mechanism; it cannot be combined with explicit
+writer output fields. See
 `pipelines/generic/full_chain_240805.yaml` for a complete staged-training
 prototype with centralized paths. Its materialization jobs append successive
 stage groups to one source-derived HDF5 cache per training or validation file,
@@ -673,8 +677,9 @@ runs/20260810_143022_spine_icarus_latest/
 ```
 
 `output/` is created only when spine-prod supplies the default writer output;
-it is omitted when `--output` selects an external destination. There are no
-empty scheduler, task, or log directories.
+it is omitted when `--output` selects an external destination or `--in-place`
+leaves the writer destination config-defined. There are no empty scheduler,
+task, or log directories.
 
 Only a real scheduler array creates task directories. Scheduler chunking is
 represented by numbered submit scripts instead of another directory layer:

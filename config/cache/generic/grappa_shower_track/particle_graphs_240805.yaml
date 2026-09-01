@@ -16,9 +16,9 @@ io:
   loader:
     minibatch_size: 64
     shuffle: false
-    # This job reads fragmentation and appends particle aggregation to the
-    # same HDF5 file. Synchronous, short-lived reads avoid competing handles.
-    num_workers: 0
+    # SPINE writes the new stage to a transactional sidecar, so workers may
+    # retain fast, process-local read handles to the immutable canonical cache.
+    num_workers: 4
     collate_fn: all
     dataset:
       name: hdf5
@@ -30,7 +30,7 @@ io:
       stage_map:
         ppn_points: segmentation
         clust_label_adapt: segmentation
-      keep_open: false
+      keep_open: true
       keys:
         - data
         - ppn_points
@@ -42,7 +42,7 @@ io:
     name: stage_hdf5
     file_name: null
     stage: particle_aggregation
-    keep_open: false
+    keep_open: true
     overwrite_stage: true
     keys:
       - data

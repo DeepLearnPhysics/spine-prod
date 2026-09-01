@@ -1342,6 +1342,31 @@ class TestInteractiveExecution:
         command = run.call_args.args[0]
         assert "--output-suffix custom_reco" in command
 
+    def test_run_interactive_in_place_omits_output_overrides(
+        self, mock_submitter, tmp_path
+    ):
+        """Interactive cache extension should preserve config-owned routing."""
+        input_file = tmp_path / "cache.h5"
+        input_file.touch()
+        completed = type("Completed", (), {"returncode": 0})()
+
+        with (
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed) as run,
+        ):
+            exit_code = mock_submitter.run_interactive(
+                config="config/cache/generic/grappa_shower_track/particle_graphs_240805.yaml",
+                files=[str(input_file)],
+                in_place=True,
+                interactive_runtime="local",
+            )
+
+        assert exit_code == 0
+        command = run.call_args.args[0]
+        assert "--output " not in command
+        assert "--output-dir" not in command
+        assert "--output-suffix" not in command
+
     def test_run_interactive_local_rejects_invalid_spine_path(
         self, mock_submitter, tmp_path
     ):
@@ -2250,6 +2275,54 @@ class TestBatchSpineOverride:
         assert not (scripts[0].parent / "logs").exists()
         assert not (scripts[0].parent / "tasks").exists()
 
+    def test_submit_job_in_place_leaves_writer_destination_config_defined(
+        self, mock_submitter, tmp_path
+    ):
+        """In-place jobs must not create or pass a default writer destination."""
+        input_file = tmp_path / "cache.h5"
+        input_file.touch()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
+        ):
+            job_ids = mock_submitter.submit_job(
+                config="config/cache/generic/grappa_shower_track/particle_graphs_240805.yaml",
+                files=[str(input_file)],
+                profile="s3df_ampere",
+                in_place=True,
+            )
+
+        assert job_ids == ["12345"]
+        scripts = list(mock_submitter.jobs_dir.glob("**/attempts/*/submit.sbatch"))
+        assert len(scripts) == 1
+        script = scripts[0].read_text(encoding="utf-8")
+        assert "--output " not in script
+        assert "--output-dir" not in script
+        assert "--output-suffix" not in script
+        assert not (scripts[0].parent / "output").exists()
+
+        metadata = json.loads(
+            (scripts[0].parent / "job_metadata.json").read_text(encoding="utf-8")
+        )
+        assert metadata["in_place"] is True
+        assert metadata["output"] is None
+        assert metadata["output_dir"] is None
+
+    def test_submit_job_rejects_in_place_with_output(self, mock_submitter):
+        """Config-owned and explicit writer destinations are mutually exclusive."""
+        with pytest.raises(ValueError, match="--in-place cannot be combined"):
+            mock_submitter.submit_job(
+                config="config/infer/sbnd/full_chain_co_260316.yaml",
+                files=["input.root"],
+                in_place=True,
+                output="output.h5",
+            )
+
     def test_submit_job_no_writer_is_deprecated_and_ignored(
         self, mock_submitter, tmp_path, capsys
     ):
@@ -2887,6 +2960,65 @@ class TestPipelineSubmission:
         assert export["dependency"] == "afterok:20"
         assert export["export_weights"] == "/tmp/full-chain.ckpt"
         assert export["module_weights"] == {"uresnet_ppn": "/tmp/snapshot-best.ckpt"}
+
+    def test_submit_pipeline_forwards_in_place_cache_extension(
+        self, mock_submitter, tmp_path
+    ):
+        """Pipeline cache stages should expose config-owned writer routing."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "append",
+                            "config": "cache.yaml",
+                            "source": "cache.h5",
+                            "in_place": True,
+                        }
+                    ]
+                }
+            )
+        )
+
+        with patch.object(mock_submitter, "submit_job", return_value=["10"]) as submit:
+            result = mock_submitter.submit_pipeline(str(pipeline_path))
+
+        assert result == {"append": ["10"]}
+        assert submit.call_args.kwargs["in_place"] is True
+
+    @pytest.mark.parametrize(
+        ("stage_fields", "message"),
+        [
+            ({"in_place": True, "output": "cache.h5"}, "cannot be combined"),
+            ({"in_place": "yes"}, "in_place must be a boolean"),
+            (
+                {"in_place": True, "stage": "train", "run_dir": "/tmp/train"},
+                "in_place requires stage=inference",
+            ),
+        ],
+    )
+    def test_submit_pipeline_rejects_invalid_in_place_usage(
+        self, mock_submitter, tmp_path, stage_fields, message
+    ):
+        """In-place routing must be explicit, boolean, and inference-only."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "invalid",
+                            "config": "cache.yaml",
+                            **stage_fields,
+                        }
+                    ]
+                }
+            )
+        )
+
+        with pytest.raises((TypeError, ValueError), match=message):
+            mock_submitter.submit_pipeline(str(pipeline_path))
 
     def test_submit_pipeline_layers_defaults_stage_values_and_cli_overrides(
         self, mock_submitter, tmp_path

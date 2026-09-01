@@ -132,6 +132,7 @@ class BatchRunner(SubmissionComponent):
         job_name: Optional[str] = None,
         output: Optional[str] = None,
         output_suffix: Optional[str] = None,
+        in_place: bool = False,
         no_writer: bool = False,
         ntasks: Optional[int] = None,
         files_per_task: Optional[int] = None,
@@ -195,6 +196,10 @@ class BatchRunner(SubmissionComponent):
         output_suffix : str, optional
             Output HDF5 suffix when output names are derived from input files,
             by default None
+        in_place : bool, optional
+            Leave the writer destination entirely config-defined. This suppresses
+            all automatic ``--output*`` arguments so SPINE can extend staged
+            caches through its transactional sidecar mechanism.
         no_writer : bool, optional
             Deprecated and ignored. SPINE v0.15.3+ safely ignores output options
             when the configuration has no writer.
@@ -272,6 +277,11 @@ class BatchRunner(SubmissionComponent):
         if no_writer:
             self.context.spine_cli.warn_no_writer_deprecated()
 
+        if in_place and (output is not None or output_suffix is not None):
+            raise ValueError(
+                "--in-place cannot be combined with --output or --output-suffix"
+            )
+
         if stage not in ("inference", "train", "validation"):
             raise ValueError("stage must be one of: inference, train, validation")
         if stage != "inference" and not run_dir:
@@ -307,6 +317,8 @@ class BatchRunner(SubmissionComponent):
             raise ValueError(
                 "--ntasks and --files-per-task are valid only for inference"
             )
+        if in_place and stage != "inference":
+            raise ValueError("--in-place is valid only for inference")
 
         file_list = []
         if files:
@@ -565,14 +577,16 @@ class BatchRunner(SubmissionComponent):
             if part
         )
 
-        output_dir, output_suffix = (
-            self.context.spine_cli.default_writer_output_settings(
-                job_dir, config, output_suffix
+        output_dir = None
+        if not in_place:
+            output_dir, output_suffix = (
+                self.context.spine_cli.default_writer_output_settings(
+                    job_dir, config, output_suffix
+                )
             )
-        )
         # Composite datasets have no flat file list, but their writer output
         # is still a first-class CLI override.
-        if (file_list or named_sources) and output:
+        if not in_place and (file_list or named_sources) and output:
             output_path = Path(output)
             if output_path.suffix:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -580,7 +594,7 @@ class BatchRunner(SubmissionComponent):
                 output_path.mkdir(parents=True, exist_ok=True)
         output_args = (
             self.context.spine_cli.format_output_args(output, output_dir, output_suffix)
-            if (file_list or named_sources) and output
+            if not in_place and (file_list or named_sources) and output
             else ""
         )
 
@@ -632,10 +646,10 @@ class BatchRunner(SubmissionComponent):
                         with open(task_file_list, "w", encoding="utf-8") as stream:
                             for file_path in file_group:
                                 stream.write(f"{file_path}\n")
-                        if not output:
+                        if not output and not in_place:
                             (task_dir / "output").mkdir()
                     chunk_spine_log_dir = "$TASK_DIR"
-                    if not output:
+                    if not output and not in_place:
                         chunk_output_args = " ".join(
                             [
                                 "--output-dir $TASK_DIR/output",
@@ -649,7 +663,7 @@ class BatchRunner(SubmissionComponent):
                         for file_path in chunk[0]:
                             stream.write(f"{file_path}\n")
                     file_list_pattern = str(input_manifest)
-                    if not output:
+                    if not output and not in_place:
                         scalar_output = attempt_dir / "output"
                         scalar_output.mkdir()
                         chunk_output_args = " ".join(
@@ -697,7 +711,7 @@ class BatchRunner(SubmissionComponent):
                 output=output,
                 output_dir=(
                     f"{task_dir_pattern}/output"
-                    if task_dir_pattern and not output
+                    if task_dir_pattern and not output and not in_place
                     else output_dir
                 ),
                 output_suffix=output_suffix,
@@ -782,6 +796,7 @@ class BatchRunner(SubmissionComponent):
             "spine_path": spine_path,
             "cvmfs": cvmfs,
             "no_writer": no_writer,
+            "in_place": in_place,
             "profile": profile,
             "profile_config": profile_config,
             "num_files": len(file_list) if file_list else None,
@@ -796,8 +811,10 @@ class BatchRunner(SubmissionComponent):
             ),
             "ntasks": ntasks,
             "job_ids": job_ids,
-            "output": output or default_output_location,
-            "output_dir": output_dir if output else default_output_location,
+            "output": None if in_place else output or default_output_location,
+            "output_dir": (
+                None if in_place else output_dir if output else default_output_location
+            ),
             "output_suffix": output_suffix,
             "resume_checkpoint": (
                 str(resume_checkpoint) if resume_checkpoint is not None else None

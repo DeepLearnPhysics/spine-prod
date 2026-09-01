@@ -364,9 +364,9 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
     )
 
     loader = config["io"]["loader"]
-    assert loader["num_workers"] == 0
-    assert loader["dataset"]["hdf5"]["keep_open"] is False
-    assert config["io"]["writer"]["keep_open"] is False
+    assert loader["num_workers"] == 4
+    assert loader["dataset"]["hdf5"]["keep_open"] is True
+    assert config["io"]["writer"]["keep_open"] is True
     assert config["io"]["writer"]["overwrite_stage"] is True
     assert "ppn_points" not in config["io"]["writer"]["keys"]
     assert "clust_label_adapt" not in config["io"]["writer"]["keys"]
@@ -490,13 +490,13 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     )
 
     loader = cache["io"]["loader"]
-    assert loader["num_workers"] == 0
-    assert loader["dataset"]["keep_open"] is False
+    assert loader["num_workers"] == 4
+    assert loader["dataset"]["keep_open"] is True
     assert loader["dataset"]["stage_map"] == {
         "ppn_points": "segmentation",
         "clust_label_adapt": "segmentation",
     }
-    assert cache["io"]["writer"]["keep_open"] is False
+    assert cache["io"]["writer"]["keep_open"] is True
     assert cache["io"]["writer"]["overwrite_stage"] is True
 
     chain = cache["model"]["modules"]["chain"]
@@ -583,21 +583,23 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
     # Every materialization stage extends one source-derived cache per split.
     train_cache = "/path/to/workflow/cache/train/train_cache.h5"
     validation_cache = "/path/to/workflow/cache/validation/test_cache.h5"
-    for name in ("cache_train_segmentation", "cache_train_fragment_graphs"):
+    for name in ("cache_train_segmentation",):
         assert stages[name]["output"] == "/path/to/workflow/cache/train"
         assert stages[name]["output_suffix"] == "cache"
-    for name in (
-        "cache_validation_segmentation",
-        "cache_validation_fragment_graphs",
-    ):
+    for name in ("cache_validation_segmentation",):
         assert stages[name]["output"] == "/path/to/workflow/cache/validation"
         assert stages[name]["output_suffix"] == "cache"
+    for name in (
+        "cache_train_fragment_graphs",
+        "cache_validation_fragment_graphs",
+        "cache_train_particle_graphs",
+        "cache_validation_particle_graphs",
+    ):
+        assert stages[name]["in_place"] is True
+        assert "output" not in stages[name]
+        assert "output_suffix" not in stages[name]
     assert stages["cache_train_particle_graphs"]["source"] == train_cache
-    assert stages["cache_train_particle_graphs"]["output"] == train_cache
-    assert "output_suffix" not in stages["cache_train_particle_graphs"]
     assert stages["cache_validation_particle_graphs"]["source"] == validation_cache
-    assert stages["cache_validation_particle_graphs"]["output"] == validation_cache
-    assert "output_suffix" not in stages["cache_validation_particle_graphs"]
     assert stages["train_grappa_inter"]["source"] == train_cache
     assert stages["train_grappa_inter"]["val_source"] == validation_cache
 

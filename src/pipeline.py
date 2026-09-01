@@ -57,6 +57,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "job_name",
         "output",
         "output_suffix",
+        "in_place",
         "no_writer",
         "ntasks",
         "files_per_task",
@@ -554,6 +555,9 @@ class PipelineDefinition:
                 raise ValueError(
                     f"Pipeline stage '{name}' export_weights must not be empty"
                 )
+        in_place = stage.get("in_place")
+        if in_place is not None and not isinstance(in_place, bool):
+            raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
 
     @classmethod
     def _validate_lifecycle(cls, name: str, stage: Mapping[str, Any]) -> None:
@@ -592,6 +596,19 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' task splitting requires stage=inference"
             )
+        if stage.get("in_place"):
+            if lifecycle != "inference":
+                raise ValueError(
+                    f"Pipeline stage '{name}' in_place requires stage=inference"
+                )
+            if (
+                stage.get("output") is not None
+                or stage.get("output_suffix") is not None
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{name}' in_place cannot be combined with "
+                    "writer output options"
+                )
 
         if stage.get("export_weights"):
             if lifecycle != "inference":
@@ -819,6 +836,7 @@ class PipelineRunner(SubmissionComponent):
                 "job_name": stage.get("job_name", stage["name"]),
                 "output": stage.get("output"),
                 "output_suffix": stage.get("output_suffix"),
+                "in_place": stage.get("in_place", False),
                 "ntasks": stage.get("ntasks"),
                 "files_per_task": stage.get("files_per_task"),
                 "dependency": dependency,
