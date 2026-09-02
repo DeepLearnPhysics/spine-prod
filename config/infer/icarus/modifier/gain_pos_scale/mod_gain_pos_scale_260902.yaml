@@ -1,0 +1,19 @@
+# ICARUS gain +2% detector variation modifier
+# Revision date: September 2, 2026
+
+__meta__:
+  kind: mod
+  name: "gain_pos_scale"
+  version: "260902"
+  date: "2026-09-02"
+  description: "Gain +2% detector variation"
+  applies_to: [mc]
+  compatible_with:
+    model: ">=250303"
+  conflicts_with: [gain_neg_scale]
+
+override:
+  # Apply the gain before charge calibrations.
+  model.modules.calibration.gain:
+    priority: 10
+    gain: 1.02
