@@ -218,7 +218,7 @@ class ConfigManager:
             metadata["version"] = version
             metadata["date"] = datetime.strptime(version, "%y%m%d").date().isoformat()
         metadata["description"] = description
-        return yaml.safe_dump({"__meta__": metadata}, sort_keys=False) + "\n"
+        return yaml.safe_dump({"__meta__": metadata}) + "\n"
 
     def resolve_modifier_version(
         self,

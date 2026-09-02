@@ -180,7 +180,7 @@ class ReportRunner(SubmissionComponent):
 
         destination = attempt_dir / "report.yaml"
         destination.write_text(
-            yaml.safe_dump(document, sort_keys=False),
+            yaml.safe_dump(document),
             encoding="utf-8",
         )
         return destination
