@@ -44,6 +44,7 @@ GLOBAL_FIELDS = frozenset(
 STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
     {
         "name",
+        "kind",
         "config",
         "files",
         "source",
@@ -53,7 +54,12 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "sources",
         "validation_sources",
         "module_weight",
+        "weight_path",
         "export_weights",
+        "input_dir",
+        "output_dir",
+        "checkpoint",
+        "dataset",
         "job_name",
         "output",
         "output_suffix",
@@ -555,6 +561,18 @@ class PipelineDefinition:
                 raise ValueError(
                     f"Pipeline stage '{name}' export_weights must not be empty"
                 )
+        for field in (
+            "weight_path",
+            "input_dir",
+            "output_dir",
+            "checkpoint",
+            "dataset",
+        ):
+            value = stage.get(field)
+            if value is not None and (not isinstance(value, str) or not value):
+                raise ValueError(
+                    f"Pipeline stage '{name}' {field} must be a non-empty string"
+                )
         in_place = stage.get("in_place")
         if in_place is not None and not isinstance(in_place, bool):
             raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
@@ -562,6 +580,13 @@ class PipelineDefinition:
     @classmethod
     def _validate_lifecycle(cls, name: str, stage: Mapping[str, Any]) -> None:
         """Validate train, validation, and inference-only controls."""
+        kind = stage.get("kind", "spine")
+        if kind == "report":
+            cls._validate_report(name, stage)
+            return
+        if kind != "spine":
+            raise ValueError(f"Pipeline stage '{name}' has invalid kind: {kind}")
+
         lifecycle = stage.get("stage", "inference")
         if lifecycle not in ("inference", "train", "validation"):
             raise ValueError(
@@ -639,6 +664,47 @@ class PipelineDefinition:
                     f"Pipeline stage '{name}' export_weights cannot be combined "
                     "with writer output options"
                 )
+
+    @classmethod
+    def _validate_report(cls, name: str, stage: Mapping[str, Any]) -> None:
+        """Require a standalone report contract without SPINE runtime fields."""
+        required = ("run_dir", "input_dir", "output_dir")
+        missing = [field for field in required if not stage.get(field)]
+        if missing:
+            raise ValueError(
+                f"Pipeline report stage '{name}' requires: " + ", ".join(missing)
+            )
+
+        forbidden = cls._present(
+            stage,
+            "files",
+            "source",
+            "source_list",
+            "val_source",
+            "val_source_list",
+            "sources",
+            "validation_sources",
+            "module_weight",
+            "weight_path",
+            "export_weights",
+            "output",
+            "output_suffix",
+            "in_place",
+            "ntasks",
+            "files_per_task",
+            "set",
+            "stage",
+            "resume",
+            "resume_from",
+            "validation_name",
+            "rerun_validation",
+            "tensorboard",
+        )
+        if forbidden:
+            raise ValueError(
+                f"Pipeline report stage '{name}' cannot use SPINE field(s): "
+                + ", ".join(forbidden)
+            )
 
     @staticmethod
     def _present(stage: Mapping[str, Any], *keys: str) -> List[str]:
@@ -738,11 +804,17 @@ class PipelineRunner(SubmissionComponent):
                 dependency,
                 retry=from_stage is not None,
             )
-            job_map[name] = self.context.submit_job(
-                dry_run=dry_run,
-                preload=preload,
-                **options,
-            )
+            if stage.get("kind", "spine") == "report":
+                job_map[name] = self.context.submit_report(
+                    dry_run=dry_run,
+                    **options,
+                )
+            else:
+                job_map[name] = self.context.submit_job(
+                    dry_run=dry_run,
+                    preload=preload,
+                    **options,
+                )
             if definition.workspace is not None and stage.get("run_dir"):
                 self._link_stage_attempt(
                     definition.workspace,
@@ -811,6 +883,26 @@ class PipelineRunner(SubmissionComponent):
         retry: bool = False,
     ) -> Dict[str, Any]:
         """Translate one stage to ``BatchRunner.submit_job`` options."""
+        if stage.get("kind", "spine") == "report":
+            options = {key: stage[key] for key in PROFILE_FIELDS if key in stage}
+            options.update(
+                {
+                    "config": stage["config"],
+                    "input_dir": stage["input_dir"],
+                    "output_dir": stage["output_dir"],
+                    "run_dir": stage["run_dir"],
+                    "checkpoint": stage.get("checkpoint"),
+                    "dataset": stage.get("dataset"),
+                    "profile": stage.get("profile", "s3df_milano"),
+                    "job_name": stage.get("job_name", stage["name"]),
+                    "dependency": dependency,
+                    "spine_path": stage.get("spine_path"),
+                    "cvmfs": stage.get("cvmfs", False),
+                    "retry": retry,
+                }
+            )
+            return options
+
         source_key, files = cls._source(stage, "files", "source", "source_list")
         val_key, val_files = cls._source(stage, "val_source", "val_source_list")
 
@@ -831,6 +923,7 @@ class PipelineRunner(SubmissionComponent):
                 "named_sources": stage.get("sources"),
                 "validation_named_sources": stage.get("validation_sources"),
                 "module_weights": stage.get("module_weight"),
+                "weight_path": stage.get("weight_path"),
                 "export_weights": stage.get("export_weights"),
                 "profile": stage.get("profile", "auto"),
                 "job_name": stage.get("job_name", stage["name"]),

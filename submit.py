@@ -248,6 +248,10 @@ Examples:
         help="Enable TensorBoard logging in the stage-specific run directory",
     )
     parser.add_argument(
+        "--weight-path",
+        help="Complete-model checkpoint override forwarded to SPINE",
+    )
+    parser.add_argument(
         "--output",
         "-o",
         help=(
@@ -396,6 +400,8 @@ Examples:
         parser.error("--from-stage is only supported with --pipeline")
     if args.to_stage is not None and not args.pipeline:
         parser.error("--to-stage is only supported with --pipeline")
+    if args.weight_path is not None and args.pipeline:
+        parser.error("--weight-path is stage-specific and cannot override a pipeline")
 
     # Handle deprecated --local-output flag
     if getattr(args, "local_output", False):
@@ -587,6 +593,7 @@ Examples:
                 interactive_runtime=args.interactive_runtime or "auto",
                 bind_paths=args.bind_paths,
                 spine_path=args.spine_path,
+                weight_path=args.weight_path,
             )
             return exit_code
 
@@ -606,6 +613,7 @@ Examples:
                 source_type=source_type,
                 validation_files=validation_files,
                 validation_source_type=validation_source_type,
+                weight_path=args.weight_path,
                 profile=args.profile or "auto",
                 job_name=args.job_name,
                 output=args.output,

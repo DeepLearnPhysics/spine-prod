@@ -25,6 +25,7 @@ stages:
     #   hdf5: {source: /path/to/cache.h5}
     # validation_sources: ...         # same shape for validation
     # module_weight: {module: /path/to/checkpoint.ckpt}
+    # weight_path: /path/to/composed.ckpt  # complete-model checkpoint
     # export_weights: /path/to/composed.ckpt  # terminal model-only stage
     # set: [nested.config.key=value]
     profile: s3df_hopper    # optional stage override of the default
@@ -94,7 +95,25 @@ The generic prototypes define their train and validation inputs once under
 independent, concretely named jobs before dependency validation and submission.
 The full-chain workflow finishes with a CPU-only `export_weights` stage that
 loads every standalone `snapshot-best.ckpt` and writes one directly runnable
-full-chain checkpoint plus its SHA-256 sidecar.
+full-chain checkpoint plus its SHA-256 sidecar. It then evaluates that exact
+checkpoint on the held-out dataset and runs a dependent CPU-only report stage:
+
+```yaml
+- name: report_full_chain
+  kind: report
+  depends_on: [evaluate_full_chain]
+  config: test/generic/full_chain/report_v1.yaml
+  input_dir: ${workspace}/metrics/full_chain/raw/latest
+  output_dir: ${workspace}/metrics/full_chain/report/artifacts
+  run_dir: ${workspace}/metrics/full_chain/report
+  checkpoint: ${workspace}/weights/full_chain_240805.ckpt
+  dataset: ${validation_source}
+  profile: s3df_milano
+```
+
+`spine-report` recursively consumes every completed analyzer CSV shard. The
+resolved report recipe records the dataset and hashes the composed checkpoint;
+`summary.json` and plots are written beneath the stable artifact directory.
 
 The generic prototypes declare `workspace: null`; choose the shared output root
 at launch with `--workspace /path/to/workflow`. The prototype uses SPINE's

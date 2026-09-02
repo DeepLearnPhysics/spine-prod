@@ -96,6 +96,44 @@ class RuntimeResolver(SubmissionComponent):
         return None, None
 
     @staticmethod
+    def resolve_spine_report_command(
+        spine_path: Optional[str] = None,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Resolve ``spine-report`` against an install or source checkout.
+
+        A source checkout does not need to install its console entry point.
+        Running the report module with that checkout's ``src`` directory on
+        ``PYTHONPATH`` exercises the same code selected by ``--spine-path``.
+        """
+        configured = spine_path or os.environ.get("SPINE_LOCAL_PATH")
+        if configured:
+            configured_path = Path(configured).expanduser()
+            if configured_path.is_dir():
+                root = configured_path
+            elif configured_path.parent.name == "bin":
+                root = configured_path.parent.parent
+            else:
+                root = configured_path.parent
+
+            report_module = root / "src" / "spine" / "bin" / "report.py"
+            if not report_module.is_file():
+                option_name = "--spine-path" if spine_path else "SPINE_LOCAL_PATH"
+                raise RuntimeError(
+                    f"{option_name} does not provide spine.bin.report: {root}"
+                )
+            src_dir = shlex.quote(str(root / "src"))
+            command = f"PYTHONPATH={src_dir}:$PYTHONPATH python3 -m spine.bin.report"
+            return command, str(root)
+
+        local_report = shutil.which("spine-report")
+        if local_report:
+            return shlex.quote(local_report), None
+
+        # Batch execution occurs inside the configured SPINE container, where
+        # the release entry point is expected even if it is absent on the host.
+        return None, None
+
+    @staticmethod
     def merge_bind_paths(
         bind_paths: Optional[str], extra_paths: Optional[List[str]] = None
     ) -> Optional[str]:

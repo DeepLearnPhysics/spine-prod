@@ -1,0 +1,46 @@
+__meta__:
+  kind: fragment
+  description: Full-chain analyzer records consumed by the generic metric report
+
+# Fragment construction and adapted-space matching are required to evaluate
+# the fragment-level aggregation outputs of the trained chain.
+build:
+  fragments: true
+
+post:
+  ppn: {}
+  match:
+    truth_point_mode: points_adapt
+    fragment: true
+
+ana:
+  prefix_output: true
+  overwrite: true
+
+  segment_eval:
+    summary: true
+    ghost: false
+
+  point_eval: {}
+
+  cluster_eval:
+    obj_type: [fragment, particle, interaction]
+    use_objects: true
+    truth_index_mode: index_adapt
+    metrics: [pur, eff, ari]
+
+  save:
+    obj_type: [fragment, particle]
+    run_mode: both
+    match_mode: both
+    fragment: [shape, size, size_adapt, is_primary, group_primary, start_dir]
+    particle:
+      - shape
+      - size
+      - pid
+      - is_primary
+      - start_dir
+      - ke
+      - pdg_code
+      - parent_pdg_code
+      - nu_id

@@ -6,6 +6,7 @@ nodes:
   source: cluster
   shapes: [track]
   min_size: -1
+  make_groups: false
 graph:
   name: complete
   max_length: 100

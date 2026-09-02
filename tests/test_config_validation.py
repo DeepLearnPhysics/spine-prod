@@ -220,7 +220,7 @@ def test_generic_models_and_cache_producers_name_dated_component_fragments():
         "model/generic/grappa_shower/network_240718.yaml"
     )
     assert fragment_modules["grappa_track"] == (
-        "model/generic/grappa_track/network_240718.yaml"
+        "model/generic/grappa_track/network_full_chain_240718.yaml"
     )
 
     particle_cache_path = (
@@ -236,7 +236,7 @@ def test_generic_models_and_cache_producers_name_dated_component_fragments():
         "model/generic/grappa_shower/network_240718.yaml"
     )
     assert particle_modules["grappa_track"] == (
-        "model/generic/grappa_track/network_240718.yaml"
+        "model/generic/grappa_track/network_full_chain_240718.yaml"
     )
     assert particle_modules["grappa_inter"] == (
         "model/generic/grappa_inter/network_240805.yaml"
@@ -401,7 +401,12 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
         cache_network = deepcopy(modules[component])
         for key in ("model_name", "weight_path", "return_features"):
             cache_network.pop(key, None)
-        assert cache_network == standalone[network_key]
+        standalone_network = deepcopy(standalone[network_key])
+        if component == "grappa_track":
+            assert cache_network["nodes"].pop("make_groups") is True
+            assert cache_network["nodes"].pop("grouping_method") == "score"
+            assert standalone_network["nodes"].pop("make_groups") is False
+        assert cache_network == standalone_network
         if loss_key is not None:
             cache_loss = deepcopy(modules[f"{component}_loss"])
             cache_loss.pop("return_targets")
@@ -528,7 +533,12 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
         cache_network = deepcopy(cache_modules[component])
         for key in ("model_name", "weight_path", "return_features"):
             cache_network.pop(key, None)
-        assert cache_network == standalone["grappa"]
+        standalone_network = deepcopy(standalone["grappa"])
+        if component == "grappa_track":
+            assert cache_network["nodes"].pop("make_groups") is True
+            assert cache_network["nodes"].pop("grouping_method") == "score"
+            assert standalone_network["nodes"].pop("make_groups") is False
+        assert cache_network == standalone_network
         if component == "grappa_inter":
             cache_loss = deepcopy(cache_modules["grappa_inter_loss"])
             cache_loss.pop("return_targets")
@@ -614,7 +624,7 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
     assert all(
         stage["time"] == "08:00:00"
         for stage in pipeline.stages
-        if stage["name"] != "export_full_chain_weights"
+        if stage["name"] not in {"export_full_chain_weights", "report_full_chain"}
     )
 
     # Every materialization stage extends one source-derived cache per split.
@@ -674,6 +684,26 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
         "grappa_track",
         "grappa_inter",
     }
+
+    evaluation = stages["evaluate_full_chain"]
+    checkpoint = "/path/to/workflow/weights/full_chain_240805.ckpt"
+    assert evaluation["depends_on"] == ["export_full_chain_weights"]
+    assert evaluation["config"] == "test/generic/full_chain/evaluate_240805.yaml"
+    assert evaluation["source"].endswith("/test.root")
+    assert evaluation["weight_path"] == checkpoint
+    assert evaluation["in_place"] is True
+    assert evaluation["run_dir"] == "/path/to/workflow/metrics/full_chain/raw"
+
+    report = stages["report_full_chain"]
+    assert report["kind"] == "report"
+    assert report["depends_on"] == ["evaluate_full_chain"]
+    assert report["config"] == "test/generic/full_chain/report_v1.yaml"
+    assert report["input_dir"] == "/path/to/workflow/metrics/full_chain/raw/latest"
+    assert report["output_dir"] == (
+        "/path/to/workflow/metrics/full_chain/report/artifacts"
+    )
+    assert report["checkpoint"] == checkpoint
+    assert report["profile"] == "s3df_milano"
 
 
 @pytest.mark.parametrize(
@@ -736,6 +766,30 @@ def test_generic_full_chain_pipelines_pin_component_revisions(version, stage_ver
     export = stages["export_full_chain_weights"]
     assert export["config"] == f"model/generic/full_chain/model_{version}.yaml"
     assert export["export_weights"].endswith(f"full_chain_{version}.ckpt")
+
+    evaluation = stages["evaluate_full_chain"]
+    assert evaluation["config"].endswith(f"evaluate_{version}.yaml")
+    assert evaluation["weight_path"].endswith(f"full_chain_{version}.ckpt")
+    assert stages["report_full_chain"]["checkpoint"] == evaluation["weight_path"]
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize("version", ["240718", "240805", "260828"])
+def test_generic_full_chain_evaluation_uses_metric_analyzers_without_hdf5(version):
+    """Production evaluation should emit metric CSVs for the composed model."""
+    config = load_config_with_includes(
+        CONFIG_ROOT / "test" / "generic" / "full_chain" / f"evaluate_{version}.yaml"
+    )
+
+    assert config["io"]["writer"] is None
+    assert config["build"]["fragments"] is True
+    assert set(config["ana"]) >= {
+        "segment_eval",
+        "point_eval",
+        "cluster_eval",
+        "save",
+    }
+    assert "weight_path" not in config["model"]
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
@@ -830,7 +884,6 @@ def test_generic_graph_spice_matches_generic_full_chain(version):
     ("component", "version"),
     [
         ("grappa_shower", "240718"),
-        ("grappa_track", "240718"),
         ("grappa_inter", "240718"),
         ("grappa_inter", "240805"),
     ],
@@ -859,6 +912,61 @@ def test_standalone_interaction_grappa_has_unambiguous_primary_targets():
 
     assert "use_closest" not in primary_loss
     assert "secondary_label" not in primary_loss
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize("version", ["240718", "260828"])
+def test_track_grappa_only_builds_groups_in_full_chain_contexts(version):
+    """Standalone track models must not perform full-chain reconstruction."""
+    standalone = load_config_with_includes(
+        CONFIG_ROOT / "model" / "generic" / "grappa_track" / f"network_{version}.yaml"
+    )
+    chain_network = load_config_with_includes(
+        CONFIG_ROOT
+        / "model"
+        / "generic"
+        / "grappa_track"
+        / f"network_full_chain_{version}.yaml"
+    )
+
+    assert standalone["nodes"]["make_groups"] is False
+    assert "grouping_method" not in standalone["nodes"]
+    assert chain_network["nodes"]["make_groups"] is True
+    assert chain_network["nodes"]["grouping_method"] == "score"
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize(
+    "config_path",
+    [
+        *(
+            CONFIG_ROOT / "model" / "generic" / "full_chain" / f"model_{version}.yaml"
+            for version in ("240718", "240805", "260828")
+        ),
+        *(
+            CONFIG_ROOT
+            / "cache"
+            / "generic"
+            / "graph_spice"
+            / f"fragment_graphs_{version}.yaml"
+            for version in ("240718", "240805", "260828")
+        ),
+        *(
+            CONFIG_ROOT
+            / "cache"
+            / "generic"
+            / "grappa_shower_track"
+            / f"particle_graphs_{version}.yaml"
+            for version in ("240718", "240805", "260828")
+        ),
+    ],
+)
+def test_full_chain_contexts_use_group_producing_track_grappa(config_path):
+    """Every aggregation provider must receive a group-producing track model."""
+    config = load_config_with_includes(config_path)
+    track = config["model"]["modules"]["grappa_track"]
+    assert track["nodes"]["make_groups"] is True
+    assert track["nodes"]["grouping_method"] == "score"
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
