@@ -394,6 +394,34 @@ class TestConfigValidation:
             config["post"]["apply_calibrations"]["depositions_source"] == "depositions"
         )
 
+    def test_sbnd_smearing_25_percent_composes_with_supported_model(
+        self, config_infer_root, tmp_path
+    ):
+        """The 25% SBND smearing variation must resolve into the full chain."""
+        sbnd_root = config_infer_root / "sbnd"
+        modifier = sbnd_root / "modifier" / "smearing" / "mod_smearing_260902.yaml"
+        composite = tmp_path / "composite.yaml"
+        composite.write_text(
+            yaml.safe_dump(
+                {
+                    "include": [
+                        str(sbnd_root / "full_chain_co_260316.yaml"),
+                        str(modifier),
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        config = load_config_with_includes(composite)
+        calibration = config["model"]["modules"]["calibration"]
+        assert calibration["smearing"]["scale"] == 0.25
+        assert calibration["smearing"]["mode"] == "multiplicative"
+        assert "response_func" in calibration["response"]
+        assert (
+            config["post"]["apply_calibrations"]["depositions_source"] == "depositions"
+        )
+
     def test_icarus_charge_scale_only_adds_response_and_smearing(
         self, config_infer_root, tmp_path
     ):
@@ -454,3 +482,40 @@ class TestConfigValidation:
 
         config = load_config_with_includes(composite)
         assert "response" in config["model"]["modules"]["calibration"]
+
+    @pytest.mark.parametrize(
+        ("direction", "scale"),
+        [("neg", 0.98), ("pos", 1.02)],
+    )
+    def test_icarus_gain_scale_preserves_nominal_gain(
+        self, config_infer_root, tmp_path, direction, scale
+    ):
+        """ICARUS gain variations must not replace the nominal ADC conversion."""
+        icarus_root = config_infer_root / "icarus"
+        modifier = (
+            icarus_root
+            / "modifier"
+            / f"gain_{direction}_scale"
+            / f"mod_gain_{direction}_scale_260902.yaml"
+        )
+        composite = tmp_path / "composite.yaml"
+        composite.write_text(
+            yaml.safe_dump(
+                {
+                    "include": [
+                        str(icarus_root / "full_chain_co_260501.yaml"),
+                        str(modifier),
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        config = load_config_with_includes(composite)
+        calibration = config["model"]["modules"]["calibration"]
+        assert calibration["gain"]["gain"] == 79.9169
+        assert calibration["gain_scale"] == {
+            "name": "gain",
+            "priority": 10,
+            "gain": scale,
+        }

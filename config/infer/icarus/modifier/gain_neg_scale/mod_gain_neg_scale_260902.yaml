@@ -13,7 +13,8 @@ __meta__:
   conflicts_with: [gain_pos_scale]
 
 override:
-  # Apply the gain before charge calibrations.
-  model.modules.calibration.gain:
+  # Apply the scale before the nominal gain and remaining charge calibrations.
+  model.modules.calibration.gain_scale:
+    name: gain
     priority: 10
     gain: 0.98
