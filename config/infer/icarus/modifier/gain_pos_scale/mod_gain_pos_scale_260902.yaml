@@ -15,6 +15,6 @@ __meta__:
 override:
   # Apply the scale before the nominal gain and remaining charge calibrations.
   model.modules.calibration.gain_scale:
-    name: gain
+    name: response
     priority: 10
-    gain: 1.02
+    response_func: 1.02*x

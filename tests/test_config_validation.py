@@ -487,10 +487,10 @@ class TestConfigValidation:
         ("direction", "scale"),
         [("neg", 0.98), ("pos", 1.02)],
     )
-    def test_icarus_gain_scale_preserves_nominal_gain(
+    def test_icarus_gain_scale_uses_response_and_preserves_nominal_gain(
         self, config_infer_root, tmp_path, direction, scale
     ):
-        """ICARUS gain variations must not replace the nominal ADC conversion."""
+        """ICARUS gain variations use response without replacing nominal gain."""
         icarus_root = config_infer_root / "icarus"
         modifier = (
             icarus_root
@@ -515,7 +515,7 @@ class TestConfigValidation:
         calibration = config["model"]["modules"]["calibration"]
         assert calibration["gain"]["gain"] == 79.9169
         assert calibration["gain_scale"] == {
-            "name": "gain",
+            "name": "response",
             "priority": 10,
-            "gain": scale,
+            "response_func": f"{scale}*x",
         }
