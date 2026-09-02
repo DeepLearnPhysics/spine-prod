@@ -127,6 +127,7 @@ class BatchRunner(SubmissionComponent):
         named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
         validation_named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
         module_weights: Optional[Mapping[str, str]] = None,
+        weight_path: Optional[str] = None,
         export_weights: Optional[str] = None,
         profile: str = "auto",
         job_name: Optional[str] = None,
@@ -185,6 +186,8 @@ class BatchRunner(SubmissionComponent):
             Target-qualified validation selectors for a composite dataset.
         module_weights : mapping, optional
             Model module names mapped to checkpoint paths.
+        weight_path : str, optional
+            Complete-model checkpoint override forwarded to SPINE.
         export_weights : str, optional
             Compose configured module checkpoints into this model artifact.
         profile : str, optional
@@ -288,6 +291,8 @@ class BatchRunner(SubmissionComponent):
             raise ValueError(f"--run-dir is required for the {stage} stage")
         if stage != "train" and (resume or resume_from):
             raise ValueError("--resume and --resume-from are valid only for training")
+        if weight_path and (resume or resume_from):
+            raise ValueError("--weight-path cannot be combined with training resume")
         if stage != "validation" and (validation_name or rerun_validation):
             raise ValueError(
                 "--validation-name and --rerun-validation are valid only for validation"
@@ -416,6 +421,7 @@ class BatchRunner(SubmissionComponent):
         module_weight_overrides = self.context.spine_cli.format_module_weights(
             module_weights
         )
+        weight_path_override = self.context.spine_cli.format_weight_path(weight_path)
         export_weight_override = self.context.spine_cli.format_export_weights(
             export_weights
         )
@@ -571,6 +577,7 @@ class BatchRunner(SubmissionComponent):
                 named_source_overrides,
                 validation_named_source_overrides,
                 module_weight_overrides,
+                weight_path_override,
                 export_weight_override,
                 extra_args,
             ]
@@ -774,6 +781,7 @@ class BatchRunner(SubmissionComponent):
             "named_sources": named_sources or {},
             "validation_named_sources": validation_named_sources or {},
             "module_weights": module_weights or {},
+            "weight_path": weight_path,
             "export_weights": export_weights,
             "world_size": world_size,
             "batch_size": batch_size,

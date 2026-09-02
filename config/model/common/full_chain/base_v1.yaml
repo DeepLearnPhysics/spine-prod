@@ -36,7 +36,7 @@ model:
     graph_spice_loss: !include model/common/graph_spice/loss_v1.yaml
     grappa_shower: !include model/common/grappa_shower/network_v1.yaml
     grappa_shower_loss: !include model/common/grappa_shower/loss_v1.yaml
-    grappa_track: !include model/common/grappa_track/network_v1.yaml
+    grappa_track: !include model/common/grappa_track/network_full_chain_v1.yaml
     grappa_track_loss: !include model/common/grappa_track/loss_v1.yaml
     grappa_inter: !include model/common/grappa_inter/network_v1.yaml
     grappa_inter_loss: !include model/common/grappa_inter/loss_v1.yaml

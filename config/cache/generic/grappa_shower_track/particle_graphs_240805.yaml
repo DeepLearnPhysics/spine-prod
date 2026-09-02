@@ -9,6 +9,6 @@ include: cache/generic/grappa_shower_track/base_v1.yaml
 model:
   modules:
     grappa_shower: !include model/generic/grappa_shower/network_240718.yaml
-    grappa_track: !include model/generic/grappa_track/network_240718.yaml
+    grappa_track: !include model/generic/grappa_track/network_full_chain_240718.yaml
     grappa_inter: !include model/generic/grappa_inter/network_240805.yaml
     grappa_inter_loss: !include model/generic/grappa_inter/loss_240805.yaml

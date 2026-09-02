@@ -109,6 +109,8 @@ def test_interactive_mode_forwards_runtime_options():
         "8",
         "--epochs",
         "25",
+        "--weight-path",
+        "/weights/full.ckpt",
         "--set",
         "model.detect_anomaly=true",
         submitter=submitter,
@@ -125,6 +127,7 @@ def test_interactive_mode_forwards_runtime_options():
     assert kwargs["minibatch_size"] == 2
     assert kwargs["num_workers"] == 8
     assert kwargs["epochs"] == 25
+    assert kwargs["weight_path"] == "/weights/full.ckpt"
     assert kwargs["set_overrides"] == ["model.detect_anomaly=true"]
 
 
@@ -148,6 +151,8 @@ def test_batch_mode_forwards_profile_overrides(capsys):
         "16",
         "--iterations",
         "100",
+        "--weight-path",
+        "/weights/full.ckpt",
         submitter=submitter,
     )
 
@@ -161,6 +166,7 @@ def test_batch_mode_forwards_profile_overrides(capsys):
     assert kwargs["bind_paths"] == "/data,/scratch"
     assert kwargs["batch_size"] == 16
     assert kwargs["iterations"] == 100
+    assert kwargs["weight_path"] == "/weights/full.ckpt"
     assert "Submitted job IDs: 123, 124" in capsys.readouterr().out
 
 

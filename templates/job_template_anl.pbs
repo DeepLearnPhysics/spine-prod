@@ -29,7 +29,7 @@
 {% endif %}
 
 echo "=================================="
-echo "SPINE Production Job (ANL/Polaris)"
+echo "{{ command_label|default('SPINE Production Job') }} (ANL/Polaris)"
 echo "=================================="
 echo "Job ID: $PBS_JOBID"
 {% if array_spec %}
@@ -119,7 +119,11 @@ APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD source {{ (larcv_path ~ '/configure.sh
 APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
+{% if custom_command %}
+APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD {{ custom_command }}"
+{% else %}
 APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD {{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+{% endif %}
 RUN_CMD="apptainer exec $APPTAINER_BIND_OPTS --fakeroot --nv $SPINE_CONTAINER_PATH bash -c '$APPTAINER_INNER_CMD'"
 
 echo "Running: $RUN_CMD"

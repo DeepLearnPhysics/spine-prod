@@ -100,6 +100,13 @@ class SpineCLI:
         return f"--module-weight {' '.join(values)}"
 
     @staticmethod
+    def format_weight_path(weight_path: Optional[str]) -> str:
+        """Format an optional complete-model checkpoint override."""
+        if not weight_path:
+            return ""
+        return f"--weight-path {shlex.quote(weight_path)}"
+
+    @staticmethod
     def format_export_weights(export_weights: Optional[str]) -> str:
         """Format an optional terminal model-export destination."""
         if not export_weights:

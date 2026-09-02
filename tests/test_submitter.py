@@ -475,6 +475,10 @@ class TestSubmitterHelpers:
             == "--module-weight uresnet_ppn=/weights/best.ckpt"
         )
         assert (
+            mock_submitter.spine_cli.format_weight_path("/weights/full chain.ckpt")
+            == "--weight-path '/weights/full chain.ckpt'"
+        )
+        assert (
             mock_submitter.spine_cli.format_export_weights("/weights/full chain.ckpt")
             == "--export-weights '/weights/full chain.ckpt'"
         )
@@ -486,6 +490,7 @@ class TestSubmitterHelpers:
 
         assert mock_submitter.spine_cli.format_named_sources(None) == ""
         assert mock_submitter.spine_cli.format_module_weights(None) == ""
+        assert mock_submitter.spine_cli.format_weight_path(None) == ""
         assert mock_submitter.spine_cli.format_export_weights(None) == ""
         with pytest.raises(TypeError, match="must be a mapping"):
             mock_submitter.spine_cli.format_named_sources({"larcv": "raw.root"})
@@ -614,6 +619,77 @@ class TestSubmitterHelpers:
 
         assert command == str(binary)
         assert bind_root == str(checkout)
+
+    def test_resolve_spine_report_command_uses_checkout_module(
+        self, mock_submitter, tmp_path
+    ):
+        checkout = tmp_path / "checkout"
+        report_module = checkout / "src" / "spine" / "bin" / "report.py"
+        report_module.parent.mkdir(parents=True)
+        report_module.touch()
+
+        command, bind_root = mock_submitter.runtime.resolve_spine_report_command(
+            str(checkout)
+        )
+
+        assert command.startswith(f"PYTHONPATH={checkout / 'src'}:")
+        assert command.endswith("python3 -m spine.bin.report")
+        assert bind_root == str(checkout)
+
+    def test_submit_report_materializes_provenance_and_scheduler_job(
+        self, mock_submitter, tmp_path
+    ):
+        source_config = tmp_path / "report.yaml"
+        source_config.write_text(
+            yaml.safe_dump(
+                {
+                    "metadata": {"dataset": None, "checkpoint": None},
+                    "metrics": {
+                        "segmentation": {
+                            "name": "segment_confusion",
+                            "source": "**/*segment.csv",
+                        }
+                    },
+                }
+            )
+        )
+        run_dir = tmp_path / "report-run"
+        input_dir = tmp_path / "raw" / "latest"
+        output_dir = run_dir / "artifacts"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_report_command",
+                return_value=(None, None),
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="42"),
+        ):
+            job_ids = mock_submitter.submit_report(
+                config=str(source_config),
+                input_dir=str(input_dir),
+                output_dir=str(output_dir),
+                run_dir=str(run_dir),
+                checkpoint="/weights/full.ckpt",
+                dataset="validation.root",
+            )
+
+        assert job_ids == ["42"]
+        attempt = (run_dir / "latest").resolve()
+        resolved = yaml.safe_load((attempt / "report.yaml").read_text())
+        assert resolved["metadata"] == {
+            "dataset": "validation.root",
+            "checkpoint": "/weights/full.ckpt",
+        }
+        script = (attempt / "submit.sbatch").read_text()
+        assert "spine-report --config" in script
+        assert f"--input-dir {input_dir}" in script
+        assert f"--output-dir {output_dir}" in script
 
     def test_container_helpers_cover_fallbacks(self, mock_submitter):
         with patch.dict(
@@ -2909,6 +2985,7 @@ class TestPipelineSubmission:
                                 "larcv": {"source": "validation.root"},
                                 "hdf5": {"source": "validation.h5"},
                             },
+                            "weight_path": "/tmp/full-seed.ckpt",
                             "module_weight": {"uresnet_ppn": "/tmp/snapshot-best.ckpt"},
                         },
                         {
@@ -2955,11 +3032,57 @@ class TestPipelineSubmission:
         assert configured["module_weights"] == {
             "uresnet_ppn": "/tmp/snapshot-best.ckpt"
         }
+        assert configured["weight_path"] == "/tmp/full-seed.ckpt"
 
         export = submit_job.call_args_list[2].kwargs
         assert export["dependency"] == "afterok:20"
         assert export["export_weights"] == "/tmp/full-chain.ckpt"
         assert export["module_weights"] == {"uresnet_ppn": "/tmp/snapshot-best.ckpt"}
+
+    def test_submit_pipeline_dispatches_report_stage(self, mock_submitter, tmp_path):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "evaluate",
+                            "config": "evaluate.yaml",
+                            "source": "validation.root",
+                            "run_dir": "/tmp/metrics/raw",
+                            "weight_path": "/tmp/full-chain.ckpt",
+                        },
+                        {
+                            "name": "report",
+                            "kind": "report",
+                            "depends_on": ["evaluate"],
+                            "config": "report.yaml",
+                            "input_dir": "/tmp/metrics/raw/latest",
+                            "output_dir": "/tmp/metrics/report/artifacts",
+                            "run_dir": "/tmp/metrics/report",
+                            "checkpoint": "/tmp/full-chain.ckpt",
+                            "dataset": "validation.root",
+                        },
+                    ]
+                }
+            )
+        )
+
+        with (
+            patch.object(mock_submitter, "submit_job", return_value=["10"]) as submit,
+            patch.object(
+                mock_submitter, "submit_report", return_value=["20"]
+            ) as submit_report,
+        ):
+            result = mock_submitter.submit_pipeline(str(pipeline_path))
+
+        assert result == {"evaluate": ["10"], "report": ["20"]}
+        assert submit.call_args.kwargs["weight_path"] == "/tmp/full-chain.ckpt"
+        report = submit_report.call_args.kwargs
+        assert report["dependency"] == "afterok:10"
+        assert report["input_dir"] == "/tmp/metrics/raw/latest"
+        assert report["output_dir"] == "/tmp/metrics/report/artifacts"
+        assert report["checkpoint"] == "/tmp/full-chain.ckpt"
 
     def test_submit_pipeline_forwards_in_place_cache_extension(
         self, mock_submitter, tmp_path

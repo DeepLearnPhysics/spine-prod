@@ -1,0 +1,16 @@
+__meta__:
+  kind: bundle
+  version: "260828"
+  date: "2026-08-28"
+  description: Evaluate the trained generic 260828 full chain
+
+include:
+  - infer/generic/base/base_240718.yaml
+  - infer/generic/io/io_240805.yaml
+  - model/generic/full_chain/model_260828.yaml
+  - infer/generic/post/post_240718.yaml
+  - test/generic/full_chain/analyzers_v1.yaml
+
+override:
+  # This stage emits analyzer CSVs only; reconstruction HDF5 is unnecessary.
+  io.writer: null

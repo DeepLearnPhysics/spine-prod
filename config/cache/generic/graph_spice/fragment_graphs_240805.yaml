@@ -11,5 +11,5 @@ model:
     graph_spice: !include model/generic/graph_spice/network_240805.yaml
     grappa_shower: !include model/generic/grappa_shower/network_240718.yaml
     grappa_shower_loss: !include model/generic/grappa_shower/loss_240718.yaml
-    grappa_track: !include model/generic/grappa_track/network_240718.yaml
+    grappa_track: !include model/generic/grappa_track/network_full_chain_240718.yaml
     grappa_track_loss: !include model/generic/grappa_track/loss_240718.yaml

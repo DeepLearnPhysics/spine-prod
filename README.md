@@ -651,6 +651,11 @@ writer output fields. See
 prototype with centralized paths. Its materialization jobs append successive
 stage groups to one source-derived HDF5 cache per training or validation file,
 then compose the independently trained modules into one full-chain checkpoint.
+The generic full-chain pipelines finally evaluate that assembled checkpoint
+with SPINE's metric analyzers and submit a CPU-only `kind: report` reduction.
+The report stage waits for all metric inference jobs, records dataset and
+checkpoint provenance, and writes plots plus `summary.json` under
+`metrics/full_chain/report/artifacts`.
 
 ## Run Management
 

@@ -34,7 +34,7 @@
 
 # Job metadata
 echo "=================================="
-echo "SPINE Production Job (NERSC)"
+echo "{{ command_label|default('SPINE Production Job') }} (NERSC)"
 echo "=================================="
 echo "Job ID: $SLURM_JOB_ID"
 {% if array_spec %}
@@ -117,7 +117,11 @@ INNER_CMD="${INNER_CMD}source {{ (larcv_path ~ '/configure.sh')|tojson }}; "
 INNER_CMD="${INNER_CMD}source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
+{% if custom_command %}
+INNER_CMD="${INNER_CMD}{{ custom_command }}"
+{% else %}
 INNER_CMD="${INNER_CMD}{{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+{% endif %}
 
 # Add Shifter modules requested by the job profile/options
 SHIFTER_MODULES=()

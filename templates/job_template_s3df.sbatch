@@ -31,7 +31,7 @@
 
 # Job metadata
 echo "=================================="
-echo "SPINE Production Job (S3DF)"
+echo "{{ command_label|default('SPINE Production Job') }} (S3DF)"
 echo "=================================="
 echo "Job ID: $SLURM_JOB_ID"
 {% if array_spec %}
@@ -118,7 +118,11 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (larcv_path ~ '/configur
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
+{% if custom_command %}
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD {{ custom_command }}"
+{% else %}
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD {{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+{% endif %}
 SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
 RUN_CMD="$SINGULARITY_CMD"
 

@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  version: "260828"
+  date: "2026-08-28"
+  description: Generic 260828 track GrapPA network for full-chain aggregation
+
+# The standalone 260828 network mirrors the canonical SPINE training example.
+# Full-chain aggregation additionally requires the model to materialize groups.
+include: model/generic/grappa_track/network_260828.yaml
+
+override:
+  nodes.make_groups: true
+  nodes.grouping_method: score

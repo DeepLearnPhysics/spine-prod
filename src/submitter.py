@@ -11,6 +11,7 @@ from .file_handler import FileHandler
 from .interactive import InteractiveRunner
 from .pipeline import PipelineRunner
 from .preload import preload_downloads
+from .report import ReportRunner
 from .runtime import RuntimeResolver
 from .spine_cli import SpineCLI
 
@@ -35,6 +36,7 @@ class Submitter:
         self.spine_cli = SpineCLI()
         self.batch = BatchRunner(self)
         self.interactive = InteractiveRunner(self)
+        self.report = ReportRunner(self)
         self.pipeline = PipelineRunner(self)
 
     @property
@@ -53,6 +55,10 @@ class Submitter:
     def run_interactive(self, *args: Any, **kwargs: Any) -> int:
         """Execute one job through the interactive component."""
         return self.interactive.run_interactive(*args, **kwargs)
+
+    def submit_report(self, *args: Any, **kwargs: Any) -> List[str]:
+        """Submit one completed-metric report reduction."""
+        return self.report.submit_report(*args, **kwargs)
 
     def submit_pipeline(self, *args: Any, **kwargs: Any) -> Dict[str, List[str]]:
         """Submit an ordered workflow through the pipeline component."""

@@ -37,6 +37,7 @@ class InteractiveRunner(SubmissionComponent):
         interactive_runtime: str = "auto",
         bind_paths: Optional[str] = None,
         spine_path: Optional[str] = None,
+        weight_path: Optional[str] = None,
     ) -> int:
         """Run SPINE processing interactively (no SLURM submission).
 
@@ -104,6 +105,8 @@ class InteractiveRunner(SubmissionComponent):
         spine_path : str, optional
             Override the SPINE executable with a checkout directory or an
             explicit executable path.
+        weight_path : str, optional
+            Complete-model checkpoint override forwarded to SPINE.
 
         Returns
         -------
@@ -242,6 +245,7 @@ class InteractiveRunner(SubmissionComponent):
             else ""
         )
         spine_cli_overrides = self.context.spine_cli.format_set_overrides(set_overrides)
+        weight_path_override = self.context.spine_cli.format_weight_path(weight_path)
         spine_runtime_options = self.context.spine_cli.format_runtime_options(
             world_size,
             batch_size,
@@ -270,7 +274,13 @@ class InteractiveRunner(SubmissionComponent):
         )
         spine_cmd = " ".join(part for part in spine_cmd_parts if part)
         spine_options = " ".join(
-            part for part in [spine_runtime_options, spine_cli_overrides] if part
+            part
+            for part in [
+                spine_runtime_options,
+                spine_cli_overrides,
+                weight_path_override,
+            ]
+            if part
         )
         if spine_options:
             spine_cmd = f"{spine_cmd} {spine_options}"

@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 track GrapPA network for full-chain aggregation
+
+include: model/common/grappa_track/network_v1.yaml
+
+override:
+  nodes.make_groups: true
+  nodes.grouping_method: score

@@ -146,3 +146,29 @@ stages:
       grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
       grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
       grappa_inter: ${workspace}/train/grappa_inter/weights/snapshot-best.ckpt
+
+  # Evaluate the assembled checkpoint on held-out events and emit metric CSVs.
+  - name: evaluate_full_chain
+    depends_on: [export_full_chain_weights]
+    config: test/generic/full_chain/evaluate_240805.yaml
+    source: ${validation_source}
+    run_dir: ${workspace}/metrics/full_chain/raw
+    # The evaluation config has no HDF5 writer; retain analyzer CSVs only.
+    in_place: true
+    weight_path: ${workspace}/weights/full_chain_240805.ckpt
+    num_workers: 16
+    files_per_task: 1
+    ntasks: 50
+
+  # Reduce all completed metric shards into checksummed JSON and plots.
+  - name: report_full_chain
+    kind: report
+    depends_on: [evaluate_full_chain]
+    config: test/generic/full_chain/report_v1.yaml
+    input_dir: ${workspace}/metrics/full_chain/raw/latest
+    output_dir: ${workspace}/metrics/full_chain/report/artifacts
+    run_dir: ${workspace}/metrics/full_chain/report
+    checkpoint: ${workspace}/weights/full_chain_240805.ckpt
+    dataset: ${validation_source}
+    profile: s3df_milano
+    time: "00:30:00"
