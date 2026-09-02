@@ -691,6 +691,35 @@ class TestSubmitterHelpers:
         assert f"--input-dir {input_dir}" in script
         assert f"--output-dir {output_dir}" in script
 
+    def test_report_config_materialization_supports_legacy_pyyaml(self, tmp_path):
+        """Generated report recipes must not require PyYAML's sort_keys option."""
+        from src.report import ReportRunner
+
+        source = tmp_path / "source.yaml"
+        source.write_text("metadata: {}\nmetrics: {}\n", encoding="utf-8")
+        attempt = tmp_path / "attempt"
+        attempt.mkdir()
+        safe_dump = yaml.safe_dump
+
+        def legacy_safe_dump(document, **kwargs):
+            if "sort_keys" in kwargs:
+                raise TypeError("dump_all() got an unexpected keyword argument")
+            return safe_dump(document, **kwargs)
+
+        with patch("src.report.yaml.safe_dump", side_effect=legacy_safe_dump):
+            destination = ReportRunner._materialize_config(
+                source,
+                attempt,
+                checkpoint="weights.ckpt",
+                dataset="test.root",
+            )
+
+        resolved = yaml.safe_load(destination.read_text(encoding="utf-8"))
+        assert resolved["metadata"] == {
+            "checkpoint": "weights.ckpt",
+            "dataset": "test.root",
+        }
+
     def test_container_helpers_cover_fallbacks(self, mock_submitter):
         with patch.dict(
             os.environ,
