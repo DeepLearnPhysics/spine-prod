@@ -4,8 +4,8 @@
 __meta__:
   kind: mod
   name: "smearing"
-  version: "260818"
-  date: "2026-08-18"
+  version: "260902"
+  date: "2026-09-02"
   description: "25% charge-smearing detector variation"
   applies_to: [mc]
   compatible_with:
