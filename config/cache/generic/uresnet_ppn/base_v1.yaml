@@ -29,11 +29,16 @@ io:
         clust_label:
           parser: cluster3d
           cluster_event: cluster3d_pcluster
-          particle_event: particle_corrected
           sparse_semantics_event: sparse3d_pcluster_semantics
-          add_particle_info: true
           clean_data: true
           shape_precedence: [2, 1, 0, 3, 4, 6]
+          # Match the historical full-chain supervision policy at the point
+          # where canonical adapted truth is first materialized.
+          particle_info:
+            particle_event: particle_corrected
+            type_include_secondary: false
+            type_include_mpr: false
+            primary_include_mpr: false
   writer:
     name: stage_hdf5
     file_name: null

@@ -17,6 +17,19 @@ profiles:
     time: "2:00:00"
     description: "Highest-performance GPU processing on Hopper partition"
 
+  # Full S3DF Hopper node for distributed training
+  s3df_hopper_full:
+    site: s3df
+    partition: hopper
+    gpu_type: h200
+    gpu_mem: 141g
+    gpus: 4
+    cpus_per_task: 224
+    mem_per_cpu: 6g
+    exclusive: true
+    time: "2:00:00"
+    description: "Full-node GPU processing on Hopper partition"
+
   # Large GPU jobs (default) at S3DF
   # This is used to optimize batch sizes for training and inference.
   # Node resources: 4 GPUs, 112 CPUs, 952 GB RAM
@@ -31,6 +44,19 @@ profiles:
     mem_per_cpu: 8g
     time: "2:00:00"
     description: "High-performance GPU processing on Ampere partition"
+
+  # Full S3DF Ampere node for distributed training
+  s3df_ampere_full:
+    site: s3df
+    partition: ampere
+    gpu_type: a100
+    gpu_mem: 40g
+    gpus: 4
+    cpus_per_task: 112
+    mem_per_cpu: 8g
+    exclusive: true
+    time: "2:00:00"
+    description: "Full-node GPU processing on Ampere partition"
 
   # Smaller GPU jobs (cheaper) at S3DF
   # Node resources: 10 GPUs, 40 CPUs, 160 GB RAM
@@ -118,8 +144,35 @@ profiles:
     time: "2:00:00"
     description: "CPU-only tasks on NERSC Perlmutter (shared node)"
 
-  # NERSC Perlmutter GPU (full node, exclusive)
-  # Use for expensive training requiring full node (40GB standard)
+  # NERSC Perlmutter GPU (full node, 40GB standard)
+  nersc_gpu_full:
+    site: nersc
+    qos: regular
+    constraint: gpu
+    gpu_type: a100
+    gpu_mem: 40g
+    gpus_per_node: 4
+    cpus_per_task: 128
+    mem: 0 # Automated full node memory
+    exclusive: true
+    time: "2:00:00"
+    description: "Full-node GPU processing on NERSC Perlmutter (40GB A100)"
+
+  # NERSC Perlmutter GPU (full node, 80GB high-memory variant)
+  nersc_gpu_full_80gb:
+    site: nersc
+    qos: regular
+    constraint: gpu&hbm80g
+    gpu_type: a100
+    gpu_mem: 80g
+    gpus_per_node: 4
+    cpus_per_task: 128
+    mem: 0 # Automated full node memory
+    exclusive: true
+    time: "2:00:00"
+    description: "Full-node GPU processing on NERSC Perlmutter (80GB A100)"
+
+  # Backward-compatible aliases for the original full-node profile names
   nersc_gpu_exclusive:
     site: nersc
     qos: regular
@@ -129,11 +182,10 @@ profiles:
     gpus_per_node: 4
     cpus_per_task: 128
     mem: 0 # Automated full node memory
+    exclusive: true
     time: "2:00:00"
-    description: "Full-node GPU processing on NERSC Perlmutter (40GB A100)"
+    description: "Alias for nersc_gpu_full"
 
-  # NERSC Perlmutter GPU (full node, exclusive)
-  # Use for expensive training requiring full node (80GB standard)
   nersc_gpu_exclusive_80gb:
     site: nersc
     qos: regular
@@ -143,8 +195,9 @@ profiles:
     gpus_per_node: 4
     cpus_per_task: 128
     mem: 0 # Automated full node memory
+    exclusive: true
     time: "2:00:00"
-    description: "Full-node GPU processing on NERSC Perlmutter (80GB A100)"
+    description: "Alias for nersc_gpu_full_80gb"
 
   # NERSC Perlmutter CPU (regular partition)
   # Node resources: 128 CPUs, 512 GB RAM
@@ -163,7 +216,7 @@ profiles:
   ##### ANL/Polaris Resource Profiles #####
   # ANL Polaris capacity queue. The prod queue has a 10-node minimum, so this
   # profile is the explicit non-debug single-node option.
-  # Node resources: 4x A100 GPUs, 32 CPU cores
+  # Node resources: 4x A100 GPUs, 32 CPU cores, 64 CPU threads, 512 GB RAM
   anl_polaris_capacity:
     site: anl
     scheduler: pbs
@@ -174,12 +227,30 @@ profiles:
     nodes: 1
     place: scatter
     gpus_per_node: 1
-    cpus_per_node: 32
-    cpus_per_task: 32
+    cpus_per_node: 16
+    cpus_per_task: 16
     filesystems: home:grand:eagle
     time: "2:00:00"
     bind_paths: null
     description: "Capacity queue GPU processing on ANL Polaris"
+
+  # ANL Polaris capacity queue using all four GPUs on one node
+  anl_polaris_capacity_full:
+    site: anl
+    scheduler: pbs
+    template: job_template_anl.pbs
+    account: "14453"
+    queue: capacity
+    system: polaris
+    nodes: 1
+    place: scatter:excl
+    gpus_per_node: 4
+    cpus_per_node: 64
+    cpus_per_task: 64
+    filesystems: home:grand:eagle
+    time: "2:00:00"
+    bind_paths: null
+    description: "Full-node GPU processing in the ANL Polaris capacity queue"
 
   # ANL Polaris debug queue
   anl_polaris_debug:
@@ -192,12 +263,30 @@ profiles:
     nodes: 1
     place: scatter
     gpus_per_node: 1
-    cpus_per_node: 32
-    cpus_per_task: 32
+    cpus_per_node: 16
+    cpus_per_task: 16
     filesystems: home:grand:eagle
     time: "1:00:00"
     bind_paths: null
     description: "Debug GPU processing on ANL Polaris"
+
+  # ANL Polaris debug queue using all four GPUs on one node
+  anl_polaris_debug_full:
+    site: anl
+    scheduler: pbs
+    template: job_template_anl.pbs
+    account: "14453"
+    queue: debug
+    system: polaris
+    nodes: 1
+    place: scatter:excl
+    gpus_per_node: 4
+    cpus_per_node: 64
+    cpus_per_task: 64
+    filesystems: home:grand:eagle
+    time: "1:00:00"
+    bind_paths: null
+    description: "Full-node GPU processing in the ANL Polaris debug queue"
 
 # Detector-specific defaults
 detectors:

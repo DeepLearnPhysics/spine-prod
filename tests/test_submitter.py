@@ -206,6 +206,68 @@ class TestProfileLoading:
             assert "infer/" in configs_dir
             assert "config/" not in configs_dir
 
+    def test_full_node_gpu_profiles_request_complete_nodes(self, workspace_root):
+        """Full-node profiles must expose every GPU and its CPU allocation."""
+        profiles = Submitter(basedir=workspace_root).profiles["profiles"]
+        expected = {
+            "s3df_hopper_full": ("gpus", 4, "cpus_per_task", 224),
+            "s3df_ampere_full": ("gpus", 4, "cpus_per_task", 112),
+            "nersc_gpu_full": (
+                "gpus_per_node",
+                4,
+                "cpus_per_task",
+                128,
+            ),
+            "nersc_gpu_full_80gb": (
+                "gpus_per_node",
+                4,
+                "cpus_per_task",
+                128,
+            ),
+            "anl_polaris_capacity_full": (
+                "gpus_per_node",
+                4,
+                "cpus_per_node",
+                64,
+            ),
+            "anl_polaris_debug_full": (
+                "gpus_per_node",
+                4,
+                "cpus_per_node",
+                64,
+            ),
+        }
+
+        for name, (gpu_key, gpus, cpu_key, cpus) in expected.items():
+            assert profiles[name][gpu_key] == gpus
+            assert profiles[name][cpu_key] == cpus
+            if profiles[name]["site"] in ("s3df", "nersc"):
+                assert profiles[name]["exclusive"] is True
+            else:
+                assert profiles[name]["place"] == "scatter:excl"
+
+        # Preserve commands using the historical NERSC terminology.
+        for old_name, new_name in (
+            ("nersc_gpu_exclusive", "nersc_gpu_full"),
+            ("nersc_gpu_exclusive_80gb", "nersc_gpu_full_80gb"),
+        ):
+            for key in ("gpus_per_node", "cpus_per_task", "constraint", "gpu_mem"):
+                assert profiles[old_name][key] == profiles[new_name][key]
+
+    def test_polaris_profiles_scale_cpus_with_gpus(self, workspace_root):
+        """Polaris profiles should request 16 logical CPUs per A100."""
+        profiles = Submitter(basedir=workspace_root).profiles["profiles"]
+
+        for queue in ("capacity", "debug"):
+            single = profiles[f"anl_polaris_{queue}"]
+            full = profiles[f"anl_polaris_{queue}_full"]
+            assert single["gpus_per_node"] == 1
+            assert single["cpus_per_node"] == 16
+            assert single["cpus_per_task"] == 16
+            assert full["gpus_per_node"] == 4
+            assert full["cpus_per_node"] == 64
+            assert full["cpus_per_task"] == 64
+
 
 class TestEnvironmentVariables:
     """Tests for environment variable handling."""
@@ -2727,6 +2789,7 @@ class TestCVMFSOption:
             "mem": "1g",
             "filesystems": "home:grand:eagle",
             "place": None,
+            "exclusive": False,
             "time": "00:10:00",
             "array_spec": None,
             "job_name": "test-job",
@@ -2751,6 +2814,36 @@ class TestCVMFSOption:
         }
         defaults.update(kwargs)
         return template.render(**defaults)
+
+    @pytest.mark.parametrize(
+        "template_name",
+        ["job_template_s3df.sbatch", "job_template_nersc.sbatch"],
+    )
+    def test_slurm_full_node_profiles_request_exclusive_access(
+        self, mock_submitter, template_name
+    ):
+        """Slurm templates should render explicit full-node exclusivity."""
+        shared = self._render_template(mock_submitter, template_name)
+        exclusive = self._render_template(mock_submitter, template_name, exclusive=True)
+
+        assert "#SBATCH --exclusive" not in shared
+        assert "#SBATCH --exclusive" in exclusive
+
+    def test_polaris_full_node_profiles_request_exclusive_placement(
+        self, mock_submitter
+    ):
+        """Polaris full-node profiles should render PBS exclusive placement."""
+        script = self._render_template(
+            mock_submitter,
+            "job_template_anl.pbs",
+            gpus_per_node=4,
+            cpus_per_node=64,
+            cpus_per_task=64,
+            place="scatter:excl",
+        )
+
+        assert "#PBS -l select=1:system=polaris:ncpus=64:ngpus=4" in script
+        assert "#PBS -l place=scatter:excl" in script
 
     def test_s3df_does_not_bind_cvmfs_by_default(self, mock_submitter):
         """Test S3DF leaves CVMFS out of bind paths by default."""

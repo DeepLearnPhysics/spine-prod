@@ -13,6 +13,9 @@
 #SBATCH --cpus-per-task={{ cpus_per_task }}
 #SBATCH --mem={{ mem }}
 #SBATCH --time={{ time }}
+{% if exclusive %}
+#SBATCH --exclusive
+{% endif %}
 
 {% if array_spec %}
 #SBATCH --array={{ array_spec }}

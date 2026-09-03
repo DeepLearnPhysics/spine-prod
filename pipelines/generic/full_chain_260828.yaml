@@ -28,6 +28,7 @@ stages:
   - name: train_uresnet_ppn
     config: train/generic/uresnet_ppn/train_240805.yaml
     stage: train
+    profile: s3df_ampere_full
     source: ${train_source}
     val_source: ${validation_source}
     val_entry_fraction_range: [0.0, 0.5]
@@ -55,6 +56,7 @@ stages:
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/generic/graph_spice/train_from_uresnet_ppn_240805.yaml
     stage: train
+    profile: s3df_ampere_full
     run_dir: ${workspace}/train/graph_spice
     tensorboard: true
     sources:
