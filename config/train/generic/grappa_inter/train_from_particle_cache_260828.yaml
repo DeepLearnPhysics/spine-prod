@@ -7,3 +7,7 @@ __meta__:
 include:
   - model/generic/grappa_inter/model_260828.yaml
   - train/generic/grappa_inter/from_particle_cache_v1.yaml
+
+override:
+  # Cached targets follow the reconstructed-particle policy used by the chain.
+  model.modules.grappa_loss: !include model/generic/grappa_inter/loss_full_chain_260828.yaml

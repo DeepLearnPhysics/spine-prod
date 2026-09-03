@@ -102,7 +102,7 @@ checkpoint on the held-out dataset and runs a dependent CPU-only report stage:
 - name: report_full_chain
   kind: report
   depends_on: [evaluate_full_chain]
-  config: test/generic/full_chain/report_v1.yaml
+  config: test/generic/full_chain/report_260828.yaml
   input_dir: ${workspace}/metrics/full_chain/raw/latest
   output_dir: ${workspace}/metrics/full_chain/report/artifacts
   run_dir: ${workspace}/metrics/full_chain/report
