@@ -14,3 +14,5 @@ include:
 override:
   # This stage emits analyzer CSVs only; reconstruction HDF5 is unnecessary.
   io.writer: null
+  # Adapt cluster truth into the reconstructed semantic point domain.
+  model.network_input.clust_label: clust_label

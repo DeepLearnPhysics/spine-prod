@@ -828,13 +828,17 @@ def test_generic_full_chain_report_excludes_delta_from_overall_ppn_metrics():
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 @pytest.mark.parametrize("version", ["240718", "240805", "260828"])
-def test_generic_full_chain_adapts_cluster_labels(version):
-    """Full-chain models must receive cluster truth for semantic adaptation."""
+def test_only_generic_full_chain_evaluation_adapts_cluster_labels(version):
+    """Evaluation must request adapted truth without taxing physics inference."""
     full_chain = load_config_with_includes(
         CONFIG_ROOT / "model" / "generic" / "full_chain" / f"model_{version}.yaml"
     )
+    evaluation = load_config_with_includes(
+        CONFIG_ROOT / "test" / "generic" / "full_chain" / f"evaluate_{version}.yaml"
+    )
 
-    assert full_chain["model"]["network_input"]["clust_label"] == "clust_label"
+    assert "clust_label" not in full_chain["model"]["network_input"]
+    assert evaluation["model"]["network_input"]["clust_label"] == "clust_label"
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
