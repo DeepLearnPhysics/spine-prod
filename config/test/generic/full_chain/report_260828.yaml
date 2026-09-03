@@ -1,5 +1,7 @@
 __meta__:
   kind: fragment
+  version: "260828"
+  date: "2026-08-28"
   description: Generic full-chain metric reduction recipe
 
 strict: true

@@ -100,7 +100,7 @@ def test_training_configs_use_canonical_top_level_train(config_path):
 def test_generic_training_bundles_pin_their_model_revision(config_path):
     """Every dated generic training bundle must pin one matching model revision."""
     with open(config_path, "r", encoding="utf-8") as config_file:
-        config = yaml.safe_load(config_file)
+        config = yaml.load(config_file, Loader=yaml.BaseLoader)
 
     model_version = config["__meta__"]["version"]
     model_includes = [
@@ -114,9 +114,9 @@ def test_generic_training_variants_follow_component_model_changes():
     """Sister recipes exist only for components that changed between releases."""
     variants = {
         model_dir.name: {
-            yaml.safe_load(config_path.read_text(encoding="utf-8"))["__meta__"][
-                "version"
-            ]
+            yaml.load(config_path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)[
+                "__meta__"
+            ]["version"]
             for config_path in model_dir.glob("train_*.yaml")
         }
         for model_dir in (CONFIG_ROOT / "train" / "generic").iterdir()
@@ -697,7 +697,7 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
     report = stages["report_full_chain"]
     assert report["kind"] == "report"
     assert report["depends_on"] == ["evaluate_full_chain"]
-    assert report["config"] == "test/generic/full_chain/report_v1.yaml"
+    assert report["config"] == "test/generic/full_chain/report_260828.yaml"
     assert report["input_dir"] == "/path/to/workflow/metrics/full_chain/raw/latest"
     assert report["output_dir"] == (
         "/path/to/workflow/metrics/full_chain/report/artifacts"
@@ -912,6 +912,51 @@ def test_standalone_interaction_grappa_has_unambiguous_primary_targets():
 
     assert "use_closest" not in primary_loss
     assert "secondary_label" not in primary_loss
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_260828_interaction_grappa_uses_full_chain_target_policy():
+    """Cached and assembled interaction models must share reconstruction cuts."""
+    standalone = load_config_with_includes(
+        CONFIG_ROOT / "model" / "generic" / "grappa_inter" / "model_260828.yaml"
+    )["model"]["modules"]["grappa_loss"]
+    training = load_config_with_includes(
+        CONFIG_ROOT
+        / "train"
+        / "generic"
+        / "grappa_inter"
+        / "train_from_particle_cache_260828.yaml"
+    )["model"]["modules"]["grappa_loss"]
+    cache = load_config_with_includes(
+        CONFIG_ROOT
+        / "cache"
+        / "generic"
+        / "grappa_shower_track"
+        / "particle_graphs_260828.yaml"
+    )["model"]["modules"]["grappa_inter_loss"]
+    full_chain = load_config_with_includes(
+        CONFIG_ROOT / "model" / "generic" / "full_chain" / "model_260828.yaml"
+    )["model"]["modules"]["grappa_inter_loss"]
+
+    # Standalone truth-grouped particles need no reconstruction-quality policy.
+    assert "min_iou" not in standalone["node_loss"]["type"]
+    assert "use_closest" not in standalone["node_loss"]["primary"]
+
+    assert training == full_chain
+    cache.pop("return_targets")
+    assert cache == full_chain
+    assert full_chain["node_loss"]["type"] == {
+        **standalone["node_loss"]["type"],
+        "min_iou": 0.5,
+        "match_target": "group",
+    }
+    assert full_chain["node_loss"]["primary"] == {
+        **standalone["node_loss"]["primary"],
+        "use_closest": True,
+        "secondary_label": 0,
+        "min_iou": 0.5,
+        "match_target": "group",
+    }
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
