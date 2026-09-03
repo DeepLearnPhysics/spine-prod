@@ -1747,6 +1747,15 @@ class TestBatchSpineOverride:
                 **kwargs,
             )
 
+    def test_submit_job_rejects_node_exclusions_for_pbs(self, mock_submitter):
+        """PBS has no portable equivalent of Slurm's node exclusion."""
+        with pytest.raises(ValueError, match="only supported by Slurm"):
+            mock_submitter.submit_job(
+                config="infer/generic/full_chain_240718.yaml",
+                profile="anl_polaris_debug",
+                exclude="x3001c0s1b0n0",
+            )
+
     def test_submit_job_forwards_explicit_training_sources(
         self, mock_submitter, tmp_path
     ):
@@ -2790,6 +2799,7 @@ class TestCVMFSOption:
             "filesystems": "home:grand:eagle",
             "place": None,
             "exclusive": False,
+            "exclude": None,
             "time": "00:10:00",
             "array_spec": None,
             "job_name": "test-job",
@@ -2828,6 +2838,20 @@ class TestCVMFSOption:
 
         assert "#SBATCH --exclusive" not in shared
         assert "#SBATCH --exclusive" in exclusive
+
+    @pytest.mark.parametrize(
+        "template_name",
+        ["job_template_s3df.sbatch", "job_template_nersc.sbatch"],
+    )
+    def test_slurm_profiles_render_node_exclusions(self, mock_submitter, template_name):
+        """Slurm templates should pass node exclusions to the scheduler."""
+        script = self._render_template(
+            mock_submitter,
+            template_name,
+            exclude="gpu042,gpu043",
+        )
+
+        assert "#SBATCH --exclude=gpu042,gpu043" in script
 
     def test_polaris_full_node_profiles_request_exclusive_placement(
         self, mock_submitter
@@ -3324,6 +3348,7 @@ class TestPipelineSubmission:
                     "profile": "s3df_hopper",
                     "spine_path": "/software/cli-spine",
                     "gpus": 4,
+                    "exclude": "sdfampere014",
                 },
             )
 
@@ -3332,6 +3357,7 @@ class TestPipelineSubmission:
             assert call.kwargs["profile"] == "s3df_hopper"
             assert call.kwargs["spine_path"] == "/software/cli-spine"
             assert call.kwargs["gpus"] == 4
+            assert call.kwargs["exclude"] == "sdfampere014"
             assert "gpus_per_node" not in call.kwargs
         assert submit_job.call_args_list[0].kwargs["time"] == "08:00:00"
         assert submit_job.call_args_list[1].kwargs["time"] == "04:00:00"

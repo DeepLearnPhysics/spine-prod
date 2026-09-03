@@ -453,6 +453,11 @@ class BatchRunner(SubmissionComponent):
         # Detect detector and get profile
         profile_config = self.config_mgr.get_profile(profile, detector)
         site = profile_config.get("site", "s3df")
+        scheduler = profile_config.get("scheduler")
+        if scheduler is None:
+            scheduler = "pbs" if site in ("anl", "polaris") else "slurm"
+        if scheduler == "pbs" and profile_overrides.get("exclude"):
+            raise ValueError("--exclude is only supported by Slurm profiles")
         if site == "s3df" and "gpus_per_node" in profile_overrides:
             raise ValueError("--gpus-per-node is not valid for S3DF profiles")
         if site != "s3df" and "gpus" in profile_overrides:

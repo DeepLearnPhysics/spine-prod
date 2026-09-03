@@ -362,6 +362,10 @@ Examples:
     mem_group.add_argument("--mem-per-node", help="Override memory per node")
 
     parser.add_argument("--constraint", help="Override constraint")
+    parser.add_argument(
+        "--exclude",
+        help="Exclude a comma-separated node list (Slurm only)",
+    )
     parser.add_argument("--nodes", type=int, help="Override number of nodes")
     parser.add_argument("--time", "-t", help="Override time limit")
     parser.add_argument(
@@ -529,6 +533,7 @@ Examples:
         "qos",
         "queue",
         "constraint",
+        "exclude",
         "gpus_per_node",
         "gpus",
         "cpus_per_task",
