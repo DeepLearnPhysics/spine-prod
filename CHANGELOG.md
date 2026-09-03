@@ -5,6 +5,20 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4] - 2026-09-02
+
+### Added
+- Added ICARUS -2% and +2% charge-response detector variations which preserve
+  the nominal in-chain gain calibration.
+- Added an SBND 25% charge-smearing detector variation which retains the
+  central response correction.
+
+### Fixed
+- Preserved postprocessor scheduling priorities when data modifiers replace
+  the full ICARUS or SBND post-processing calibration configuration.
+
+Full Changelog: [v0.8.3...v0.8.4](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.8.3...v0.8.4)
+
 ## [0.8.3] - 2026-08-20
 
 ### Added
