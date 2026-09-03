@@ -152,6 +152,8 @@ class BatchRunner(SubmissionComponent):
         num_workers: Optional[int] = None,
         epochs: Optional[float] = None,
         iterations: Optional[int] = None,
+        entry_fraction_range: Optional[Tuple[float, float]] = None,
+        val_entry_fraction_range: Optional[Tuple[float, float]] = None,
         spine_path: Optional[str] = None,
         stage: str = "inference",
         run_dir: Optional[str] = None,
@@ -243,6 +245,10 @@ class BatchRunner(SubmissionComponent):
             Number of SPINE training epochs.
         iterations : int, optional
             Number of SPINE driver iterations.
+        entry_fraction_range : tuple[float, float], optional
+            Half-open fractional range of main-dataset entries to process.
+        val_entry_fraction_range : tuple[float, float], optional
+            Half-open fractional range of validation entries to process.
         spine_path : str, optional
             Override the SPINE executable with a checkout directory or an
             explicit executable path.
@@ -303,12 +309,21 @@ class BatchRunner(SubmissionComponent):
             )
         if validation_named_sources and stage != "train":
             raise ValueError("Named validation sources are valid only for training")
+        if val_entry_fraction_range is not None and stage != "train":
+            raise ValueError("--val-entry-fraction-range is valid only for training")
         if export_weights:
             if stage != "inference":
                 raise ValueError("--export-weights requires stage=inference")
-            if files or named_sources or validation_files or validation_named_sources:
+            if (
+                files
+                or named_sources
+                or validation_files
+                or validation_named_sources
+                or entry_fraction_range is not None
+                or val_entry_fraction_range is not None
+            ):
                 raise ValueError(
-                    "--export-weights cannot be combined with data sources"
+                    "--export-weights cannot be combined with dataset selections"
                 )
             if output is not None or output_suffix is not None:
                 raise ValueError(
@@ -452,6 +467,10 @@ class BatchRunner(SubmissionComponent):
             epochs,
             iterations,
         )
+        entry_fraction_options = self.context.spine_cli.format_entry_fraction_ranges(
+            entry_fraction_range,
+            val_entry_fraction_range,
+        )
         extra_bind_roots = [
             root
             for root in [larcv_bind_root, flashmatch_bind_root, extra_bind_root]
@@ -573,6 +592,7 @@ class BatchRunner(SubmissionComponent):
             part
             for part in [
                 spine_runtime_options,
+                entry_fraction_options,
                 spine_cli_overrides,
                 named_source_overrides,
                 validation_named_source_overrides,
@@ -789,6 +809,8 @@ class BatchRunner(SubmissionComponent):
             "num_workers": num_workers,
             "epochs": epochs,
             "iterations": iterations,
+            "entry_fraction_range": entry_fraction_range,
+            "val_entry_fraction_range": val_entry_fraction_range,
             "source_type": source_type if files else None,
             "source_inputs": files or [],
             "source_manifest": str(input_manifest) if input_manifest else None,

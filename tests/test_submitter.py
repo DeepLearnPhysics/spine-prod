@@ -455,6 +455,18 @@ class TestSubmitterHelpers:
         with pytest.raises(ValueError, match="managed from the GPU allocation"):
             mock_submitter.spine_cli.format_set_overrides(["base.world_size=4"])
 
+    def test_format_spine_entry_fraction_ranges(self, mock_submitter):
+        """Dataset partitions use SPINE's explicit half-open CLI options."""
+        assert mock_submitter.spine_cli.format_entry_fraction_ranges(
+            entry_fraction_range=(0.5, 1.0),
+            val_entry_fraction_range=(0.0, 0.5),
+        ) == ("--entry-fraction-range 0.5 1.0 " "--val-entry-fraction-range 0.0 0.5")
+
+        with pytest.raises(ValueError, match="0 <= START < STOP <= 1"):
+            mock_submitter.spine_cli.format_entry_fraction_ranges(
+                entry_fraction_range=(0.5, 0.5)
+            )
+
     def test_format_spine_named_sources_and_module_weights(self, mock_submitter):
         sources = {
             "larcv": {"source_list": ["raw files.txt"]},
@@ -1695,6 +1707,8 @@ class TestBatchSpineOverride:
                 config="train/generic/uresnet/train_240718.yaml",
                 files=[str(train_source)],
                 validation_files=[str(validation_source)],
+                entry_fraction_range=(0.0, 1.0),
+                val_entry_fraction_range=(0.0, 0.5),
                 stage="train",
                 run_dir=str(run_dir),
             ) == ["train"]
@@ -1719,6 +1733,8 @@ class TestBatchSpineOverride:
         )
         assert f"--source-list {train_manifest.resolve()}" in script
         assert f"--val-source-list {validation_manifest.resolve()}" in script
+        assert "--entry-fraction-range 0.0 1.0" in script
+        assert "--val-entry-fraction-range 0.0 0.5" in script
         assert "#SBATCH --array=" not in script
         assert not (run_dir / "tasks").exists()
 
@@ -1727,6 +1743,8 @@ class TestBatchSpineOverride:
         assert metadata["validation_source_manifest"] == str(
             validation_manifest.resolve()
         )
+        assert metadata["entry_fraction_range"] == [0.0, 1.0]
+        assert metadata["val_entry_fraction_range"] == [0.0, 0.5]
 
     def test_submit_job_preserves_future_pipeline_training_sources(
         self, mock_submitter, tmp_path, capsys
@@ -2997,6 +3015,7 @@ class TestPipelineSubmission:
                             "stage": "train",
                             "source_list": "train_files.txt",
                             "val_source_list": "validation_files.txt",
+                            "val_entry_fraction_range": [0.0, 0.5],
                             "run_dir": "/tmp/train",
                             "time": "08:00:00",
                             "set": "model.weight_path=/tmp/seed.ckpt",
@@ -3045,6 +3064,7 @@ class TestPipelineSubmission:
         assert train["source_type"] == "source_list"
         assert train["validation_files"] == ["validation_files.txt"]
         assert train["validation_source_type"] == "source_list"
+        assert train["val_entry_fraction_range"] == [0.0, 0.5]
         assert train["set_overrides"] == ["model.weight_path=/tmp/seed.ckpt"]
         assert train["time"] == "08:00:00"
 
@@ -3422,6 +3442,10 @@ class TestPipelineSubmission:
             ),
             ({"module_weight": ["bad"]}, "module_weight must be a mapping"),
             ({"export_weights": 4}, "export_weights must be a string"),
+            (
+                {"entry_fraction_range": [0.8, 0.2]},
+                "0 <= START < STOP <= 1",
+            ),
         ],
     )
     def test_submit_pipeline_rejects_invalid_structured_fields(

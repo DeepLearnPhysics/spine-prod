@@ -11,6 +11,8 @@ formats: [png, json]
 # into its immutable copy of this recipe before spine-report executes.
 metadata:
   dataset: null
+  dataset_selection:
+    entry_fraction_range: [0.5, 1.0]
   checkpoint: null
 
 metrics:

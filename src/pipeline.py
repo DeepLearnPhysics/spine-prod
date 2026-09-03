@@ -9,6 +9,7 @@ import yaml
 
 from .component import SubmissionComponent
 from .run_manager import RunManager
+from .spine_cli import SpineCLI
 
 GLOBAL_FIELDS = frozenset(
     {
@@ -78,6 +79,8 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "validation_name",
         "rerun_validation",
         "tensorboard",
+        "entry_fraction_range",
+        "val_entry_fraction_range",
     }
 )
 
@@ -573,6 +576,13 @@ class PipelineDefinition:
                 raise ValueError(
                     f"Pipeline stage '{name}' {field} must be a non-empty string"
                 )
+        for field in ("entry_fraction_range", "val_entry_fraction_range"):
+            value = stage.get(field)
+            if value is not None:
+                try:
+                    SpineCLI.validate_fraction_range(f"Pipeline {field}", value)
+                except (TypeError, ValueError) as err:
+                    raise type(err)(f"Pipeline stage '{name}': {err}") from err
         in_place = stage.get("in_place")
         if in_place is not None and not isinstance(in_place, bool):
             raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
@@ -615,6 +625,10 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' validation inputs require stage=train"
             )
+        if lifecycle != "train" and stage.get("val_entry_fraction_range") is not None:
+            raise ValueError(
+                f"Pipeline stage '{name}' validation entry range requires stage=train"
+            )
         if lifecycle != "inference" and (
             stage.get("ntasks") is not None or stage.get("files_per_task") is not None
         ):
@@ -650,6 +664,8 @@ class PipelineDefinition:
                 "val_source",
                 "val_source_list",
                 "validation_sources",
+                "entry_fraction_range",
+                "val_entry_fraction_range",
             )
             if source_inputs:
                 raise ValueError(
@@ -684,6 +700,8 @@ class PipelineDefinition:
             "val_source_list",
             "sources",
             "validation_sources",
+            "entry_fraction_range",
+            "val_entry_fraction_range",
             "module_weight",
             "weight_path",
             "export_weights",
@@ -958,6 +976,8 @@ class PipelineRunner(SubmissionComponent):
                 "num_workers": stage.get("num_workers"),
                 "epochs": stage.get("epochs"),
                 "iterations": stage.get("iterations"),
+                "entry_fraction_range": stage.get("entry_fraction_range"),
+                "val_entry_fraction_range": stage.get("val_entry_fraction_range"),
             }
         )
         return options

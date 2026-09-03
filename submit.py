@@ -179,6 +179,20 @@ Examples:
         type=int,
         help="Number of SPINE data-loader worker processes",
     )
+    parser.add_argument(
+        "--entry-fraction-range",
+        type=float,
+        nargs=2,
+        metavar=("START", "STOP"),
+        help="Half-open fractional range of input entries to process",
+    )
+    parser.add_argument(
+        "--val-entry-fraction-range",
+        type=float,
+        nargs=2,
+        metavar=("START", "STOP"),
+        help="Half-open fractional range of validation entries to process",
+    )
     duration_group = parser.add_mutually_exclusive_group()
     duration_group.add_argument(
         "--epochs",
@@ -469,7 +483,9 @@ Examples:
     )
     if args.interactive and lifecycle_options:
         parser.error("run lifecycle options are currently supported in batch mode only")
-    if args.interactive and (args.val_source or args.val_source_list):
+    if args.interactive and (
+        args.val_source or args.val_source_list or args.val_entry_fraction_range
+    ):
         parser.error(
             "validation source options are currently supported in batch mode only"
         )
@@ -478,6 +494,8 @@ Examples:
         stage_specific_options = [
             ("--source/--source-list", args.source or args.source_list),
             ("--val-source/--val-source-list", args.val_source or args.val_source_list),
+            ("--entry-fraction-range", args.entry_fraction_range),
+            ("--val-entry-fraction-range", args.val_entry_fraction_range),
             ("--apply-mods", args.apply_mods),
             ("--set", args.set_overrides),
             ("--ntasks", args.ntasks is not None),
@@ -594,6 +612,7 @@ Examples:
                 bind_paths=args.bind_paths,
                 spine_path=args.spine_path,
                 weight_path=args.weight_path,
+                entry_fraction_range=args.entry_fraction_range,
             )
             return exit_code
 
@@ -637,6 +656,8 @@ Examples:
                 num_workers=args.num_workers,
                 epochs=args.epochs,
                 iterations=args.iterations,
+                entry_fraction_range=args.entry_fraction_range,
+                val_entry_fraction_range=args.val_entry_fraction_range,
                 spine_path=args.spine_path,
                 stage=args.stage or "inference",
                 run_dir=args.run_dir,
