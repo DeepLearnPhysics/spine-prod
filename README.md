@@ -250,12 +250,16 @@ Profile allocations are designed to:
 - **Turing**: Request full resources per GPU (4 CPUs × 4 GB/CPU = 16 GB per GPU)
 - **CPU nodes**: Request minimal resources (1 CPU × 4 GB = 4 GB) for flexible scheduling
 
+All `*_full` GPU profiles request exclusive access to the allocated node.
+
 ### Available Profiles
 
 | Profile | Partition | GPU Type | GPU Memory | GPUs | CPUs | Memory | Time | Use Case |
 |---------|-----------|----------|------------|------|------|--------|------|----------|
 | `s3df_hopper` | hopper | H200 | 141 GB | 1 | 56 | 6 GB/CPU | 2h | Highest-performance GPU processing |
+| `s3df_hopper_full` | hopper | H200 | 141 GB | 4 | 224 | 6 GB/CPU | 2h | Full-node distributed training |
 | `s3df_ampere` | ampere | A100 | 40 GB | 1 | 28 | 8 GB/CPU | 2h | High-performance GPU processing (default) |
+| `s3df_ampere_full` | ampere | A100 | 40 GB | 4 | 112 | 8 GB/CPU | 2h | Full-node distributed training |
 | `s3df_turing` | turing | RTX 2080 Ti | 11 GB | 1 | 4 | 4GB/CPU | 2h | Cheaper GPU inference |
 | `s3df_milano` | milano | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
 | `s3df_roma` | roma | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
@@ -281,10 +285,20 @@ Profile allocations are designed to:
 |---------|-----------|----------|------------|------|------|--------|------|----------|
 | `nersc_gpu` | gpu_ss11 | A100 | 40 GB | 1 | 32 | 4 GB/CPU | 2h | Standard GPU processing (default, best availability) |
 | `nersc_gpu_80gb` | gpu_ss11 | A100 | 80 GB | 1 | 32 | 4 GB/CPU | 2h | High-memory GPU processing (limited availability) |
-| `nersc_gpu_exclusive` | gpu | A100 | 40 GB | 4 | 32 | 4 GB/CPU | 2h | Full-node exclusive access (training) |
+| `nersc_gpu_full` | gpu | A100 | 40 GB | 4 | 128 | Full node | 2h | Full-node training |
+| `nersc_gpu_full_80gb` | gpu | A100 | 80 GB | 4 | 128 | Full node | 2h | Full-node high-memory training |
 | `nersc_cpu` | shared | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
 
-**Note:** The `nersc_gpu` profile uses 40GB A100s by default since there are 6x more nodes available (1,536 vs 256), resulting in significantly faster queue times. Use `nersc_gpu_80gb` only when you specifically need >40GB GPU memory.
+**Note:** The `nersc_gpu` profile uses 40GB A100s by default since there are 6x more nodes available (1,536 vs 256), resulting in significantly faster queue times. Use `nersc_gpu_80gb` only when you specifically need >40GB GPU memory. The former `nersc_gpu_exclusive` names remain available as backward-compatible aliases for the corresponding `*_full` profiles.
+
+### ANL Polaris Available Profiles
+
+| Profile | Queue | GPUs | CPUs | Time | Use Case |
+|---------|-------|------|------|------|----------|
+| `anl_polaris_capacity` | capacity | 1 | 16 | 2h | Standard single-GPU processing |
+| `anl_polaris_capacity_full` | capacity | 4 | 64 | 2h | Full-node distributed training |
+| `anl_polaris_debug` | debug | 1 | 16 | 1h | Short single-GPU testing |
+| `anl_polaris_debug_full` | debug | 4 | 64 | 1h | Short full-node testing |
 
 ### Profile Selection
 

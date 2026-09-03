@@ -264,13 +264,18 @@ def test_generic_models_and_cache_producers_name_dated_component_fragments():
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
-def test_generic_segmentation_cache_reuses_uresnet_ppn_revision():
+@pytest.mark.parametrize("version", ["240718", "240805"])
+def test_generic_segmentation_cache_reuses_uresnet_ppn_revision(version):
     """The cache producer must run the same network as standalone training."""
     cache = load_config_with_includes(
-        CONFIG_ROOT / "cache" / "generic" / "uresnet_ppn" / "segmentation_240805.yaml"
+        CONFIG_ROOT
+        / "cache"
+        / "generic"
+        / "uresnet_ppn"
+        / f"segmentation_{version}.yaml"
     )
     standalone = load_config_with_includes(
-        CONFIG_ROOT / "model" / "generic" / "uresnet_ppn" / "model_240805.yaml"
+        CONFIG_ROOT / "model" / "generic" / "uresnet_ppn" / f"model_{version}.yaml"
     )
 
     cache_module = cache["model"]["modules"]["uresnet_ppn"]
@@ -303,7 +308,12 @@ def test_generic_segmentation_cache_reuses_uresnet_ppn_revision():
     }
     cache_schema = cache["io"]["loader"]["dataset"]["schema"]
     assert set(cache_schema) == {"data", "seg_label", "clust_label"}
-    assert cache_schema["clust_label"]["particle_event"] == "particle_corrected"
+    assert cache_schema["clust_label"]["particle_info"] == {
+        "particle_event": "particle_corrected",
+        "type_include_secondary": False,
+        "type_include_mpr": False,
+        "primary_include_mpr": False,
+    }
     assert cache_schema["clust_label"]["shape_precedence"] == [2, 1, 0, 3, 4, 6]
 
 
@@ -779,6 +789,11 @@ def test_generic_full_chain_pipelines_pin_component_revisions(version, stage_ver
         stage["val_entry_fraction_range"] == [0.0, 0.5] for stage in training_stages
     )
     assert stages["report_full_chain"]["checkpoint"] == evaluation["weight_path"]
+
+    if version == "260828":
+        # Exercise full-node distributed training for the two costly stages.
+        for stage_name in ("train_uresnet_ppn", "train_graph_spice"):
+            assert stages[stage_name]["profile"] == "s3df_ampere_full"
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
