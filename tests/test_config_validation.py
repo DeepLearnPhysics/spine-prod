@@ -117,6 +117,22 @@ def test_versioned_modifiers_declare_mod_kind(config_path):
 
 
 @pytest.mark.parametrize(
+    "config_path",
+    sorted(CONFIG_INFER_ROOT.glob("*/modifier/**/*.yaml")),
+    ids=lambda path: str(path),
+)
+def test_modifier_postprocessor_replacements_preserve_priority(config_path):
+    """Whole postprocessor replacements must retain their scheduling priority."""
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = yaml.load(config_file, Loader=yaml.BaseLoader)
+
+    for key, value in config.get("override", {}).items():
+        is_postprocessor = key.startswith("post.") and key.count(".") == 1
+        if is_postprocessor and isinstance(value, dict):
+            assert "priority" in value, f"{key} replacement drops priority"
+
+
+@pytest.mark.parametrize(
     "config_path", sorted(CONFIG_INFER_ROOT.rglob("*.yaml")), ids=lambda path: str(path)
 )
 def test_metadata_version_matches_filename(config_path):

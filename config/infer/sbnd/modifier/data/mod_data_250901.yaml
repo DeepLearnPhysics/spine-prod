@@ -25,3 +25,4 @@ override:
     lifetime:
       lifetime: 35000 # us
       driftv: 0.1563 # cm/us
+    priority: 2
