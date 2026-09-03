@@ -9,6 +9,9 @@ model:
   network_input:
     data: data
     seg_label: seg_label
+    # The segmentation provider adapts cluster truth to its predicted semantic
+    # point domain and publishes it downstream as `clust_label_adapt`.
+    clust_label: clust_label
 
   modules:
     # Stable orchestration shared by detector-specific compositions.

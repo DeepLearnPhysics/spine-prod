@@ -813,6 +813,30 @@ def test_generic_full_chain_report_records_held_out_partition():
     }
 
 
+def test_generic_full_chain_report_excludes_delta_from_overall_ppn_metrics():
+    """Overall PPN efficiency and purity must retain the historical delta cut."""
+    report = yaml.safe_load(
+        (
+            CONFIG_ROOT / "test" / "generic" / "full_chain" / "report_260828.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    ppn = report["metrics"]["ppn"]
+
+    assert ppn["classes"] == ["shower", "track", "michel", "delta"]
+    assert ppn["overall_classes"] == ["shower", "track", "michel"]
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize("version", ["240718", "240805", "260828"])
+def test_generic_full_chain_adapts_cluster_labels(version):
+    """Full-chain models must receive cluster truth for semantic adaptation."""
+    full_chain = load_config_with_includes(
+        CONFIG_ROOT / "model" / "generic" / "full_chain" / f"model_{version}.yaml"
+    )
+
+    assert full_chain["model"]["network_input"]["clust_label"] == "clust_label"
+
+
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 @pytest.mark.parametrize("version", ["240718", "240805"])
 def test_generic_inference_wraps_authoritative_full_chain_model(version):
