@@ -322,6 +322,9 @@ optional assertion and is rejected when it disagrees with the allocation.
 # Override specific resources
 ./submit.py --config infer/icarus/latest --source data.root --time 2:00:00 --cpus-per-task 8
 
+# Exclude known-bad nodes from a Slurm submission
+./submit.py --config infer/icarus/latest --source data.root --exclude sdfampere014
+
 # Override SPINE configuration values at runtime
 ./submit.py --config infer/generic/latest --source data.root --batch-size 1
 

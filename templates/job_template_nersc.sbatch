@@ -16,6 +16,9 @@
 {% if exclusive %}
 #SBATCH --exclusive
 {% endif %}
+{% if exclude %}
+#SBATCH --exclude={{ exclude }}
+{% endif %}
 
 {% if array_spec %}
 #SBATCH --array={{ array_spec }}

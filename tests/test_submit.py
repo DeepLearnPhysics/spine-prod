@@ -145,6 +145,8 @@ def test_batch_mode_forwards_profile_overrides(capsys):
         "gpu",
         "--gpus-per-node",
         "4",
+        "--exclude",
+        "gpu042,gpu043",
         "--bind-paths",
         "/data,/scratch",
         "--batch-size",
@@ -163,6 +165,7 @@ def test_batch_mode_forwards_profile_overrides(capsys):
     assert kwargs["files"] == ["input.root"]
     assert kwargs["partition"] == "gpu"
     assert kwargs["gpus_per_node"] == 4
+    assert kwargs["exclude"] == "gpu042,gpu043"
     assert kwargs["bind_paths"] == "/data,/scratch"
     assert kwargs["batch_size"] == 16
     assert kwargs["iterations"] == 100

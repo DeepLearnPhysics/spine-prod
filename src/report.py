@@ -56,6 +56,12 @@ class ReportRunner(SubmissionComponent):
         )
 
         profile_config = self.config_mgr.get_profile(profile, detector)
+        site = profile_config.get("site", "s3df")
+        scheduler = profile_config.get("scheduler")
+        if scheduler is None:
+            scheduler = "pbs" if site in ("anl", "polaris") else "slurm"
+        if scheduler == "pbs" and profile_overrides.get("exclude"):
+            raise ValueError("--exclude is only supported by Slurm profiles")
         profile_config.update(profile_overrides)
         if not profile_config.get("account") and detector in self.profiles["detectors"]:
             profile_config["account"] = self.profiles["detectors"][detector].get(
