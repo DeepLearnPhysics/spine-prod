@@ -1,5 +1,6 @@
 """Formatting and validation for SPINE command-line arguments."""
 
+import math
 import shlex
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
@@ -134,6 +135,41 @@ class SpineCLI:
         return " ".join(
             f"{flag} {value}" for flag, value in options if value is not None
         )
+
+    @classmethod
+    def format_entry_fraction_ranges(
+        cls,
+        entry_fraction_range: Optional[Tuple[float, float]] = None,
+        val_entry_fraction_range: Optional[Tuple[float, float]] = None,
+    ) -> str:
+        """Format deterministic main and validation entry partitions."""
+        options = []
+        for flag, value in (
+            ("--entry-fraction-range", entry_fraction_range),
+            ("--val-entry-fraction-range", val_entry_fraction_range),
+        ):
+            if value is None:
+                continue
+            start, stop = cls.validate_fraction_range(flag, value)
+            options.append(f"{flag} {start} {stop}")
+        return " ".join(options)
+
+    @staticmethod
+    def validate_fraction_range(
+        flag: str, value: Tuple[float, float]
+    ) -> Tuple[float, float]:
+        """Require one finite, nonempty fractional interval."""
+        if isinstance(value, (str, bytes)) or len(value) != 2:
+            raise ValueError(f"{flag} requires exactly two values")
+        start, stop = value
+        if not all(isinstance(bound, (int, float)) for bound in (start, stop)):
+            raise TypeError(f"{flag} bounds must be numbers")
+        start, stop = float(start), float(stop)
+        if not all(math.isfinite(bound) for bound in (start, stop)):
+            raise ValueError(f"{flag} bounds must be finite")
+        if not 0.0 <= start < stop <= 1.0:
+            raise ValueError(f"{flag} must satisfy 0 <= START < STOP <= 1")
+        return start, stop
 
     @staticmethod
     def align_world_size(

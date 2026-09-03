@@ -30,6 +30,7 @@ stages:
     stage: train
     source: ${train_source}
     val_source: ${validation_source}
+    val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
 
@@ -66,6 +67,7 @@ stages:
         source: ${validation_source}
       hdf5:
         source: ${workspace}/cache/validation/test_cache.h5
+    val_entry_fraction_range: [0.0, 0.5]
 
   # Append fragment graphs and GrapPA supervision for both particle branches.
   - name: cache_${split.name}_fragment_graphs
@@ -93,6 +95,7 @@ stages:
     stage: train
     source: ${workspace}/cache/train/train_cache.h5
     val_source: ${workspace}/cache/validation/test_cache.h5
+    val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/grappa_shower
     tensorboard: true
 
@@ -103,6 +106,7 @@ stages:
     stage: train
     source: ${workspace}/cache/train/train_cache.h5
     val_source: ${workspace}/cache/validation/test_cache.h5
+    val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/grappa_track
     tensorboard: true
 
@@ -129,6 +133,7 @@ stages:
     stage: train
     source: ${workspace}/cache/train/train_cache.h5
     val_source: ${workspace}/cache/validation/test_cache.h5
+    val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/grappa_inter
     tensorboard: true
 
@@ -152,6 +157,7 @@ stages:
     depends_on: [export_full_chain_weights]
     config: test/generic/full_chain/evaluate_240805.yaml
     source: ${validation_source}
+    entry_fraction_range: [0.5, 1.0]
     run_dir: ${workspace}/metrics/full_chain/raw
     # The evaluation config has no HDF5 writer; retain analyzer CSVs only.
     in_place: true

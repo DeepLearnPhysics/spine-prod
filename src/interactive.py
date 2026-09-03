@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from .component import SubmissionComponent
 
@@ -34,6 +34,7 @@ class InteractiveRunner(SubmissionComponent):
         num_workers: Optional[int] = None,
         epochs: Optional[float] = None,
         iterations: Optional[int] = None,
+        entry_fraction_range: Optional[Tuple[float, float]] = None,
         interactive_runtime: str = "auto",
         bind_paths: Optional[str] = None,
         spine_path: Optional[str] = None,
@@ -97,6 +98,8 @@ class InteractiveRunner(SubmissionComponent):
             Number of SPINE training epochs.
         iterations : int, optional
             Number of SPINE driver iterations.
+        entry_fraction_range : tuple[float, float], optional
+            Half-open fractional range of input entries to process.
         interactive_runtime : str, optional
             Runtime for interactive execution: 'auto', 'local', or 'container'.
         bind_paths : str, optional
@@ -254,6 +257,9 @@ class InteractiveRunner(SubmissionComponent):
             epochs,
             iterations,
         )
+        entry_fraction_options = self.context.spine_cli.format_entry_fraction_ranges(
+            entry_fraction_range=entry_fraction_range
+        )
         local_spine_cmd, extra_bind_root = self.context.runtime.resolve_spine_command(
             spine_path
         )
@@ -277,6 +283,7 @@ class InteractiveRunner(SubmissionComponent):
             part
             for part in [
                 spine_runtime_options,
+                entry_fraction_options,
                 spine_cli_overrides,
                 weight_path_override,
             ]

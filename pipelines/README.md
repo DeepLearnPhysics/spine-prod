@@ -24,6 +24,7 @@ stages:
     #   larcv: {source: /path/to/raw.root}
     #   hdf5: {source: /path/to/cache.h5}
     # validation_sources: ...         # same shape for validation
+    # val_entry_fraction_range: [0.0, 0.5]  # validation-only partition
     # module_weight: {module: /path/to/checkpoint.ckpt}
     # weight_path: /path/to/composed.ckpt  # complete-model checkpoint
     # export_weights: /path/to/composed.ckpt  # terminal model-only stage
@@ -33,6 +34,12 @@ stages:
     files_per_task: 5       # optional, overrides even splitting and uses ntasks as concurrency cap
     depends_on: []          # optional list of stage names
 ```
+
+`entry_fraction_range` and `val_entry_fraction_range` forward SPINE's
+half-open fractional entry selectors. The generic full-chain pipelines retain
+the entire validation source in their caches, validate training against
+`[0.0, 0.5)`, and reserve `[0.5, 1.0)` for the final evaluation. Keeping the
+derived caches complete preserves positional alignment for mixed datasets.
 
 ## Usage
 

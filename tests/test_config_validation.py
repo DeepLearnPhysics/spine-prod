@@ -770,6 +770,14 @@ def test_generic_full_chain_pipelines_pin_component_revisions(version, stage_ver
     evaluation = stages["evaluate_full_chain"]
     assert evaluation["config"].endswith(f"evaluate_{version}.yaml")
     assert evaluation["weight_path"].endswith(f"full_chain_{version}.ckpt")
+    assert evaluation["entry_fraction_range"] == [0.5, 1.0]
+    training_stages = [
+        stage for stage in stages.values() if stage.get("stage") == "train"
+    ]
+    assert training_stages
+    assert all(
+        stage["val_entry_fraction_range"] == [0.0, 0.5] for stage in training_stages
+    )
     assert stages["report_full_chain"]["checkpoint"] == evaluation["weight_path"]
 
 
@@ -790,6 +798,19 @@ def test_generic_full_chain_evaluation_uses_metric_analyzers_without_hdf5(versio
         "save",
     }
     assert "weight_path" not in config["model"]
+
+
+def test_generic_full_chain_report_records_held_out_partition():
+    """The published report must identify the tested subset of its dataset."""
+    report = yaml.safe_load(
+        (
+            CONFIG_ROOT / "test" / "generic" / "full_chain" / "report_260828.yaml"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert report["metadata"]["dataset_selection"] == {
+        "entry_fraction_range": [0.5, 1.0]
+    }
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
