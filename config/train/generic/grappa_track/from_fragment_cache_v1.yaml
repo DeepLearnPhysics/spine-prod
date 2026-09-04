@@ -11,8 +11,6 @@ override:
     staged: true
     stage: fragmentation
     keys:
-      - data
-      - track_fragment_clusts
       - track_fragment_edge_index
       - track_fragment_node_features
       - track_fragment_edge_features
@@ -20,8 +18,6 @@ override:
       - particle_aggregation_track_edge_valid
 
   model.network_input:
-    data: data
-    clusts: track_fragment_clusts
     edge_index: track_fragment_edge_index
     node_features: track_fragment_node_features
     edge_features: track_fragment_edge_features
@@ -31,6 +27,7 @@ override:
     edge_valid: particle_aggregation_track_edge_valid
 
 remove:
+  - model.network_input.data
   - model.network_input.coord_label
   - model.loss_input.clust_label
   - model.modules.grappa.graph
