@@ -472,12 +472,12 @@ def test_generic_particle_grappas_train_only_from_cached_graphs(
     assert dataset["staged"] is True
     assert dataset["stage"] == "fragmentation"
     assert config["model"]["network_input"] == {
-        "data": "data",
-        "clusts": f"{prefix}_clusts",
         "edge_index": f"{prefix}_edge_index",
         "node_features": f"{prefix}_node_features",
         "edge_features": f"{prefix}_edge_features",
     }
+    assert "data" not in dataset["keys"]
+    assert f"{prefix}_clusts" not in dataset["keys"]
     assert set(config["model"]["modules"]["grappa"]) == {"nodes", "gnn_model"}
     assert set(config["model"]["loss_input"]) == {
         key
@@ -557,13 +557,11 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     writer_keys = set(cache["io"]["writer"]["keys"])
     training_dataset = training["io"]["loader"]["dataset"]
     reader_keys = set(training_dataset["keys"])
-    inherited_keys = set(training_dataset["stage_map"])
-    assert training_dataset["stage_map"] == {"data": "fragmentation"}
-    assert reader_keys - inherited_keys <= writer_keys
-    assert inherited_keys.isdisjoint(writer_keys)
+    assert "stage_map" not in training_dataset
+    assert reader_keys <= writer_keys
+    assert "data" not in reader_keys
+    assert "particle_clusts" not in reader_keys
     assert training["model"]["network_input"] == {
-        "data": "data",
-        "clusts": "particle_clusts",
         "edge_index": "particle_edge_index",
         "node_features": "particle_node_features",
         "edge_features": "particle_edge_features",
