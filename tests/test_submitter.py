@@ -4068,10 +4068,10 @@ class TestPipelineSubmission:
                 to_stage="first",
             )
 
-    def test_submit_pipeline_rejects_weight_override_outside_selected_range(
+    def test_submit_pipeline_rejects_weight_override_for_skipped_stage(
         self, mock_submitter, tmp_path
     ):
-        """A bounded launch must not silently ignore a stage-specific seed."""
+        """A restart must not silently ignore a seed for an earlier stage."""
         pipeline_path = tmp_path / "pipeline.yaml"
         pipeline_path.write_text(
             yaml.safe_dump(
@@ -4085,7 +4085,7 @@ class TestPipelineSubmission:
         )
 
         with patch.object(mock_submitter, "submit_job") as submit_job:
-            with pytest.raises(ValueError, match="outside the selected pipeline range"):
+            with pytest.raises(ValueError, match="skipped before --from-stage"):
                 mock_submitter.submit_pipeline(
                     str(pipeline_path),
                     from_stage="cache",
@@ -4093,6 +4093,34 @@ class TestPipelineSubmission:
                 )
 
         submit_job.assert_not_called()
+
+    def test_submit_pipeline_allows_weight_override_for_deferred_stage(
+        self, mock_submitter, tmp_path
+    ):
+        """A reusable bounded command may retain seeds for later stages."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {"name": "first", "config": "first.yaml"},
+                        {"name": "later", "config": "later.yaml"},
+                    ]
+                }
+            )
+        )
+
+        with patch.object(mock_submitter, "submit_job", return_value=[]) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                to_stage="first",
+                stage_module_weights=[
+                    ["later", "model=/weights/later.ckpt"],
+                ],
+            )
+
+        assert result == {"first": []}
+        assert submit_job.call_count == 1
 
     @pytest.mark.parametrize(
         ("pipeline", "message"),

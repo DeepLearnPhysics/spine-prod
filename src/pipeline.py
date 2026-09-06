@@ -1018,12 +1018,11 @@ class PipelineRunner(SubmissionComponent):
             from_stage,
             to_stage,
         )
-        selected_names = {stage["name"] for stage in stages}
-        unused_weight_stages = set(parsed_stage_weights) - selected_names
-        if unused_weight_stages:
+        skipped_weight_stages = set(parsed_stage_weights).intersection(skipped)
+        if skipped_weight_stages:
             raise ValueError(
-                "Stage module-weight override targets stage outside the "
-                "selected pipeline range: " + ", ".join(sorted(unused_weight_stages))
+                "Stage module-weight override targets a stage skipped before "
+                "--from-stage: " + ", ".join(sorted(skipped_weight_stages))
             )
         print(f"Loading pipeline: {pipeline_path}")
         if definition.workspace is not None:
