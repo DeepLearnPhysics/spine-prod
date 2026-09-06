@@ -7,6 +7,7 @@ workspace: null
 variables:
   train_source_list: /sdf/data/neutrino/pdune/sim/sp/mpvmpr_v0/train_file_list.txt
   validation_source_list: /sdf/data/neutrino/pdune/sim/sp/mpvmpr_v0/test_file_list.txt
+  filter_cache_dir: ${workspace}/filter/counts
 
 collections:
   splits:
@@ -14,23 +15,62 @@ collections:
       source_list: ${train_source_list}
       cache_dir: ${workspace}/cache/train
       cache_source_list: ${workspace}/cache/train/cache_file_list.txt
+      entry_filter: ${workspace}/filter/train/accepted.yaml
+      filtered_source_list: ${workspace}/filter/train/accepted_files.txt
     - name: validation
       source_list: ${validation_source_list}
       cache_dir: ${workspace}/cache/validation
       cache_source_list: ${workspace}/cache/validation/cache_file_list.txt
+      entry_filter: ${workspace}/filter/validation/accepted.yaml
+      filtered_source_list: ${workspace}/filter/validation/accepted_files.txt
 
 defaults:
   profile: s3df_ampere
   time: "08:00:00"
 
 stages:
+  # Measure raw product sizes once per source, reusing compatible scan records.
+  - name: scan_${split.name}_filter
+    for_each:
+      collection: splits
+      as: split
+    kind: filter
+    operation: scan
+    config: filter/protodune-sp/space_points_260210.yaml
+    source_list: ${split.source_list}
+    cache_dir: ${filter_cache_dir}
+    run_dir: ${workspace}/filter/${split.name}/scan
+    profile: s3df_milano
+    cpus_per_task: 16
+    workers: 16
+
+  # Build file-aware manifests accepting events with fewer than 500k points.
+  - name: build_${split.name}_filter
+    for_each:
+      collection: splits
+      as: split
+    kind: filter
+    operation: build
+    depends_on: ["scan_${split.name}_filter"]
+    config: filter/protodune-sp/space_points_260210.yaml
+    source_list: ${split.source_list}
+    cache_dir: ${filter_cache_dir}
+    output: ${split.entry_filter}
+    output_source_list: ${split.filtered_source_list}
+    run_dir: ${workspace}/filter/${split.name}/build
+    profile: s3df_milano
+
   # Train binary deghosting directly from the raw charge and chi-squared views.
   - name: train_uresnet_deghost
+    depends_on: [build_train_filter, build_validation_filter]
     config: train/protodune-sp/uresnet_deghost/train_260210.yaml
     stage: train
     profile: s3df_ampere_full
+    time: "2-00:00:00"
     source_list: ${train_source_list}
     val_source_list: ${validation_source_list}
+    entry_filter: ${workspace}/filter/train/accepted.yaml
+    val_entry_filter: ${workspace}/filter/validation/accepted.yaml
     val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/uresnet_deghost
     tensorboard: true
@@ -43,12 +83,14 @@ stages:
     depends_on: [train_uresnet_deghost]
     config: cache/protodune-sp/uresnet_deghost/deghosting_260210.yaml
     source_list: ${split.source_list}
+    entry_filter: ${split.entry_filter}
     run_dir: ${split.cache_dir}/deghosting
     output: ${split.cache_dir}
     output_suffix: cache
     output_source_list: ${split.cache_source_list}
     files_per_task: 1
-    ntasks: 50
+    # Train and validation arrays run together: two tasks each cap total GPUs at 4.
+    ntasks: 2
     module_weight:
       uresnet_deghost: ${workspace}/train/uresnet_deghost/weights/snapshot-best.ckpt
 
@@ -58,6 +100,7 @@ stages:
     config: train/protodune-sp/uresnet_ppn/train_from_deghost_cache_260210.yaml
     stage: train
     profile: s3df_ampere_full
+    time: "2-00:00:00"
     run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
     source_list: ${workspace}/cache/train/cache_file_list.txt
@@ -75,7 +118,7 @@ stages:
     in_place: true
     source_list: ${split.cache_source_list}
     files_per_task: 1
-    ntasks: 50
+    ntasks: 2
     module_weight:
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
@@ -85,6 +128,7 @@ stages:
     config: train/protodune-sp/graph_spice/train_from_segmentation_cache_260210.yaml
     stage: train
     profile: s3df_ampere_full
+    time: "2-00:00:00"
     source_list: ${workspace}/cache/train/cache_file_list.txt
     val_source_list: ${workspace}/cache/validation/cache_file_list.txt
     val_entry_fraction_range: [0.0, 0.5]
@@ -102,7 +146,7 @@ stages:
     in_place: true
     source_list: ${split.cache_source_list}
     files_per_task: 1
-    ntasks: 50
+    ntasks: 2
     module_weight:
       graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
 
@@ -139,7 +183,7 @@ stages:
     run_dir: ${split.cache_dir}/particle_aggregation
     in_place: true
     files_per_task: 1
-    ntasks: 50
+    ntasks: 2
     module_weight:
       grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
       grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
@@ -182,7 +226,7 @@ stages:
     weight_path: ${workspace}/weights/full_chain_260210.ckpt
     num_workers: 16
     files_per_task: 1
-    ntasks: 50
+    ntasks: 4
 
   # Reduce completed metric shards into checksummed JSON and plots.
   - name: report_full_chain

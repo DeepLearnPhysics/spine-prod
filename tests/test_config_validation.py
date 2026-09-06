@@ -630,6 +630,10 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
         for stage in pipeline.stages
         if stage["name"] not in {"export_full_chain_weights", "report_full_chain"}
     )
+    for name, stage in stages.items():
+        if name.startswith("cache_"):
+            assert stage["ntasks"] == 2
+    assert stages["evaluate_full_chain"]["ntasks"] == 4
 
     # Every materialization stage extends one source-derived cache per split.
     train_cache = "/path/to/workflow/cache/train/train_cache.h5"
@@ -1278,11 +1282,16 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
     )
     names = [stage["name"] for stage in pipeline.stages]
 
-    assert names[:4] == [
+    assert names[:9] == [
+        "scan_train_filter",
+        "scan_validation_filter",
+        "build_train_filter",
+        "build_validation_filter",
         "train_uresnet_deghost",
         "cache_train_deghosting",
         "cache_validation_deghosting",
         "train_uresnet_ppn",
+        "cache_train_segmentation",
     ]
     assert names[-3:] == [
         "export_full_chain_weights",
@@ -1303,6 +1312,14 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
         "grappa_inter",
     }
     for split in ("train", "validation"):
+        build = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"build_{split}_filter"
+        )
+        assert build["output"] == (
+            f"/tmp/protodune-sp-260210/filter/{split}/accepted.yaml"
+        )
         deghost = next(
             stage
             for stage in pipeline.stages
@@ -1311,6 +1328,30 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
         assert deghost["output_source_list"] == (
             f"/tmp/protodune-sp-260210/cache/{split}/cache_file_list.txt"
         )
+        assert deghost["entry_filter"] == build["output"]
+
+    train_deghost = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_uresnet_deghost"
+    )
+    assert train_deghost["depends_on"] == [
+        "build_train_filter",
+        "build_validation_filter",
+    ]
+    assert train_deghost["entry_filter"].endswith("/filter/train/accepted.yaml")
+    assert train_deghost["val_entry_filter"].endswith(
+        "/filter/validation/accepted.yaml"
+    )
+    for name in ("train_uresnet_deghost", "train_uresnet_ppn", "train_graph_spice"):
+        training = next(stage for stage in pipeline.stages if stage["name"] == name)
+        assert training["time"] == "2-00:00:00"
+
+    for stage in pipeline.stages:
+        if stage["name"].startswith("cache_"):
+            assert stage["ntasks"] == 2
+    evaluation = next(
+        stage for stage in pipeline.stages if stage["name"] == "evaluate_full_chain"
+    )
+    assert evaluation["ntasks"] == 4
 
 
 def write_composite_config(tmp_path, base_config, modifier_config):

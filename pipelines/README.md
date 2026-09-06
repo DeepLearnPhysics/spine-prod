@@ -25,12 +25,14 @@ stages:
     #   hdf5: {source: /path/to/cache.h5}
     # validation_sources: ...         # same shape for validation
     # val_entry_fraction_range: [0.0, 0.5]  # validation-only partition
+    # entry_filter: /path/to/train-filter.yaml
+    # val_entry_filter: /path/to/validation-filter.yaml
     # module_weight: {module: /path/to/checkpoint.ckpt}
     # weight_path: /path/to/composed.ckpt  # complete-model checkpoint
     # export_weights: /path/to/composed.ckpt  # terminal model-only stage
     # set: [nested.config.key=value]
     profile: s3df_hopper    # optional stage override of the default
-    ntasks: 50              # optional, target number of tasks if files_per_task is omitted
+    ntasks: 4               # target tasks, or array concurrency with files_per_task
     files_per_task: 5       # optional, overrides even splitting and uses ntasks as concurrency cap
     depends_on: []          # optional list of stage names
 ```
@@ -40,6 +42,42 @@ half-open fractional entry selectors. The generic full-chain pipelines retain
 the entire validation source in their caches, validate training against
 `[0.0, 0.5)`, and reserve `[0.5, 1.0)` for the final evaluation. Keeping the
 derived caches complete preserves positional alignment for mixed datasets.
+
+Standalone `kind: filter` stages run the reusable `spine-filter` workflow
+before raw data reaches the parser. A scan records per-source measurements;
+its dependent build publishes a file-aware manifest and accepted-source list:
+
+```yaml
+- name: scan_train_filter
+  kind: filter
+  operation: scan
+  config: filter/protodune-sp/space_points_260210.yaml
+  source_list: /path/to/train.txt
+  cache_dir: ${workspace}/filter/counts
+  run_dir: ${workspace}/filter/train/scan
+  workers: 16
+
+- name: build_train_filter
+  kind: filter
+  operation: build
+  depends_on: [scan_train_filter]
+  config: filter/protodune-sp/space_points_260210.yaml
+  source_list: /path/to/train.txt
+  cache_dir: ${workspace}/filter/counts
+  output: ${workspace}/filter/train/accepted.yaml
+  output_source_list: ${workspace}/filter/train/accepted_files.txt
+  run_dir: ${workspace}/filter/train/build
+```
+
+SPINE stages consume these artifacts through `entry_filter` and
+`val_entry_filter`. Apply them whenever a stage reads the corresponding raw
+LArCV domain; do not reapply them to compact, pure-HDF5 caches.
+
+`ntasks` controls scheduler-array splitting and, when paired with
+`files_per_task`, caps concurrent array tasks. `workers` belongs specifically
+to `spine-filter scan` and controls source-file inspection processes within its
+single CPU job. SPINE's `num_workers` independently controls DataLoader worker
+processes inside one training or inference task.
 
 ## Usage
 
@@ -97,7 +135,7 @@ inclusively.
 
 See `icarus_production_example.yaml` for a complete example.
 
-## Generic staged-training prototype
+## Generic staged training
 
 `generic/uresnet_ppn_to_graph_spice_240805.yaml` defines the first cached model
 transition:
@@ -109,10 +147,10 @@ transition:
 3. Train standalone Graph-SPICE from raw LArCV truth plus the aligned cache.
 
 Each original source file has one staged cache. Later materialization jobs in
-the full-chain prototype append named groups to that same HDF5 file rather
+the full-chain pipelines append named groups to that same HDF5 file rather
 than producing a new physical file for every transition.
 
-The generic prototypes define their train and validation inputs once under
+The generic pipelines define their train and validation inputs once under
 `collections.splits`. A stage-level `for_each` expands cache templates into
 independent, concretely named jobs before dependency validation and submission.
 The full-chain workflow finishes with a CPU-only `export_weights` stage that
@@ -139,8 +177,8 @@ checkpoint on the held-out dataset and runs a dependent CPU-only report stage:
 resolved report recipe records the dataset and hashes the composed checkpoint;
 `summary.json` and plots are written beneath the stable artifact directory.
 
-The generic prototypes declare `workspace: null`; choose the shared output root
-at launch with `--workspace /path/to/workflow`. The prototype uses SPINE's
+The generic pipelines declare `workspace: null`; choose the shared output root
+at launch with `--workspace /path/to/workflow`. They use SPINE's
 target-qualified source overrides for the mixed Graph-SPICE dataset and
 `--module-weight` for the cached segmentation jobs; it requires no generic
 `--set` overrides. SPINE validates stored source provenance and fails rather
@@ -153,7 +191,9 @@ one stage needs a different checkout.
 ## ProtoDUNE-SP staged training
 
 `protodune-sp/full_chain_260210.yaml` extends the same cache-and-train model to
-a chain with learned deghosting. It first trains binary UResNet deghosting,
+a chain with learned deghosting. It first scans the train and validation file
+collections and rejects entries containing 500,000 or more reconstructed space
+points. It then trains binary UResNet deghosting,
 then materializes calibrated charge, the original-row mapping and raw
 supervision exactly once. UResNet-PPN trains on that cached point domain, so
 the expensive deghosting, calibration and LArCV parsing paths are not repeated

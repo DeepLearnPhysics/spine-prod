@@ -1,4 +1,4 @@
-# Prototype staged training of every learned component used by the generic
+# Staged training of every learned component used by the generic
 # 240718 full chain. Supply its destination with CLI --workspace.
 # Each split owns one cache file; materialization stages append named groups.
 
@@ -46,7 +46,8 @@ stages:
     output: ${split.cache_dir}
     output_suffix: cache
     files_per_task: 1
-    ntasks: 50
+    # Train and validation arrays run together: two tasks each cap total GPUs at 4.
+    ntasks: 2
     module_weight:
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
@@ -79,7 +80,7 @@ stages:
     run_dir: ${split.cache_dir}/fragmentation
     in_place: true
     files_per_task: 1
-    ntasks: 50
+    ntasks: 2
     sources:
       larcv:
         source: ${split.source}
@@ -121,7 +122,7 @@ stages:
     run_dir: ${split.cache_dir}/particle_aggregation
     in_place: true
     files_per_task: 1
-    ntasks: 50
+    ntasks: 2
     module_weight:
       grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
       grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
@@ -164,7 +165,7 @@ stages:
     weight_path: ${workspace}/weights/full_chain_240718.ckpt
     num_workers: 16
     files_per_task: 1
-    ntasks: 50
+    ntasks: 4
 
   # Reduce all completed metric shards into checksummed JSON and plots.
   - name: report_full_chain

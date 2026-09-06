@@ -9,6 +9,7 @@ from .client import SlurmClient
 from .config_manager import ConfigManager
 from .control import JobController
 from .file_handler import FileHandler
+from .filter import FilterRunner
 from .interactive import InteractiveRunner
 from .pipeline import PipelineRunner
 from .preload import preload_downloads
@@ -38,6 +39,7 @@ class Submitter:
         self.spine_cli = SpineCLI()
         self.batch = BatchRunner(self)
         self.interactive = InteractiveRunner(self)
+        self.filter = FilterRunner(self)
         self.report = ReportRunner(self)
         self.pipeline = PipelineRunner(self)
 
@@ -61,6 +63,10 @@ class Submitter:
     def submit_report(self, *args: Any, **kwargs: Any) -> List[str]:
         """Submit one completed-metric report reduction."""
         return self.report.submit_report(*args, **kwargs)
+
+    def submit_filter(self, *args: Any, **kwargs: Any) -> List[str]:
+        """Submit one file-aware entry-filter operation."""
+        return self.filter.submit_filter(*args, **kwargs)
 
     def submit_pipeline(self, *args: Any, **kwargs: Any) -> Dict[str, List[str]]:
         """Submit an ordered workflow through the pipeline component."""

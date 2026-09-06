@@ -1,0 +1,23 @@
+__meta__:
+  kind: bundle
+  version: "260210"
+  date: "2026-02-10"
+  description: Reject pathological ProtoDUNE-SP tomographic events
+
+input:
+  name: larcv
+
+# Retain all three historical counters for diagnostics. Only reconstructed
+# space-point multiplicity determines whether an entry is accepted.
+measurements:
+  sparse3d_reco:
+    kind: product_size
+  sparse3d_pcluster:
+    kind: product_size
+  particle_pcluster:
+    kind: product_size
+
+filters:
+  # max_count is exclusive: accepted entries contain fewer than 500k points.
+  sparse3d_reco:
+    max_count: 500000

@@ -679,6 +679,15 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             {
                 "name": "job",
                 "config": "x.yaml",
+                "val_entry_filter": "/filters/validation.yaml",
+            },
+            ValueError,
+            "validation entry filter requires stage=train",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
                 "stage": "validation",
                 "run_dir": "/run",
                 "ntasks": 2,
@@ -737,6 +746,78 @@ def test_pipeline_log_index_rejects_existing_regular_path(tmp_path):
 
     with pytest.raises(ValueError, match="log index path is not a symlink"):
         PipelineRunner._prepare_log_index(str(workspace), [{"name": "stage"}])
+
+
+def test_filter_stage_contract_and_submission_options():
+    """Filter stages map onto the standalone scanner without SPINE fields."""
+    scan = {
+        "name": "scan",
+        "kind": "filter",
+        "operation": "scan",
+        "config": "filter.yaml",
+        "source_list": "files.txt",
+        "cache_dir": "/filter/counts",
+        "run_dir": "/filter/scan",
+        "workers": 16,
+        "force": True,
+    }
+    resolved = PipelineDefinition._resolve_stage(scan, 1, {}, {}, set())
+    options = PipelineRunner._submission_options(
+        resolved, dependency="afterok:10", retry=True
+    )
+
+    assert options["operation"] == "scan"
+    assert options["source_list"] == "files.txt"
+    assert options["sources"] is None
+    assert options["workers"] == 16
+    assert options["force"] is True
+    assert options["dependency"] == "afterok:10"
+    assert options["retry"] is True
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"operation": "other"}, "operation must be scan or build"),
+        ({"source_list": None}, "exactly one of"),
+        ({"source": "input.root"}, "only one of"),
+        ({"cache_dir": None}, "requires: cache_dir"),
+        ({"workers": 0}, "workers must be a positive integer"),
+        ({"force": "yes"}, "force must be a boolean"),
+        ({"output": "/tmp/filter.yaml"}, "cannot define build outputs"),
+        (
+            {"operation": "build", "workers": 2},
+            "requires: output, output_source_list",
+        ),
+        (
+            {
+                "operation": "build",
+                "output": "/tmp/filter.yaml",
+                "output_source_list": "/tmp/files.txt",
+                "workers": 2,
+            },
+            "cannot define workers or force",
+        ),
+        ({"entry_filter": "/tmp/filter.yaml"}, "cannot use SPINE/report field"),
+    ],
+)
+def test_filter_stage_rejects_invalid_contracts(change, message):
+    """Operation-specific filter fields fail during whole-pipeline validation."""
+    stage = {
+        "name": "filter",
+        "kind": "filter",
+        "operation": "scan",
+        "config": "filter.yaml",
+        "source_list": "files.txt",
+        "cache_dir": "/tmp/counts",
+        "run_dir": "/tmp/scan",
+    }
+    stage.update(change)
+    if change.get("source_list") is None and "source_list" in change:
+        stage.pop("source_list")
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        PipelineDefinition._resolve_stage(stage, 1, {}, {}, set())
 
 
 @pytest.mark.parametrize(

@@ -530,6 +530,18 @@ class TestSubmitterHelpers:
                 entry_fraction_range=(0.5, 0.5)
             )
 
+    def test_format_spine_entry_filters(self, mock_submitter):
+        """Eligibility manifests are quoted independently for train and val."""
+        assert mock_submitter.spine_cli.format_entry_filters(
+            "/filters/train accepted.yaml", "/filters/validation.yaml"
+        ) == (
+            "--entry-filter '/filters/train accepted.yaml' "
+            "--val-entry-filter /filters/validation.yaml"
+        )
+        assert mock_submitter.spine_cli.format_entry_filters() == ""
+        with pytest.raises(ValueError, match="non-empty path"):
+            mock_submitter.spine_cli.format_entry_filters("")
+
     def test_format_spine_named_sources_and_module_weights(self, mock_submitter):
         sources = {
             "larcv": {"source_list": ["raw files.txt"]},
@@ -710,6 +722,248 @@ class TestSubmitterHelpers:
         assert command.startswith(f"PYTHONPATH={checkout / 'src'}:")
         assert command.endswith("python3 -m spine.bin.report")
         assert bind_root == str(checkout)
+
+    def test_resolve_spine_filter_command_uses_checkout_module(
+        self, mock_submitter, tmp_path
+    ):
+        checkout = tmp_path / "checkout"
+        filter_module = checkout / "src" / "spine" / "bin" / "filter.py"
+        filter_module.parent.mkdir(parents=True)
+        filter_module.touch()
+
+        command, bind_root = mock_submitter.runtime.resolve_spine_filter_command(
+            str(checkout)
+        )
+
+        assert command.startswith(f"PYTHONPATH={checkout / 'src'}:")
+        assert command.endswith("python3 -m spine.bin.filter")
+        assert bind_root == str(checkout)
+
+        for configured in (checkout / "bin" / "spine", checkout / "custom"):
+            command, bind_root = mock_submitter.runtime.resolve_spine_filter_command(
+                str(configured)
+            )
+            assert command.endswith("python3 -m spine.bin.filter")
+            assert bind_root == str(checkout)
+
+        with pytest.raises(RuntimeError, match="does not provide spine.bin.filter"):
+            mock_submitter.runtime.resolve_spine_filter_command(str(tmp_path / "bad"))
+
+        with patch("src.runtime.shutil.which", return_value="/usr/bin/spine-filter"):
+            assert mock_submitter.runtime.resolve_spine_filter_command() == (
+                "/usr/bin/spine-filter",
+                None,
+            )
+        with patch("src.runtime.shutil.which", return_value=None):
+            assert mock_submitter.runtime.resolve_spine_filter_command() == (None, None)
+
+    def test_submit_filter_scan_builds_persistent_scheduler_job(
+        self, mock_submitter, tmp_path
+    ):
+        """A scan job records its exact reusable counter-cache invocation."""
+        run_dir = tmp_path / "filter-scan"
+        cache_dir = tmp_path / "counts"
+        config = "filter/protodune-sp/space_points_260210.yaml"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_filter_command",
+                return_value=("spine-filter", "/checkout"),
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="41"),
+        ):
+            job_ids = mock_submitter.submit_filter(
+                config=config,
+                operation="scan",
+                sources=["/data/input one.root", "/data/input-two.root"],
+                cache_dir=str(cache_dir),
+                run_dir=str(run_dir),
+                workers=16,
+                force=True,
+                dependency="afterok:40",
+            )
+
+        assert job_ids == ["41"]
+        attempt = (run_dir / "latest").resolve()
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "spine-filter scan" in script
+        assert "--source '/data/input one.root' /data/input-two.root" in script
+        assert "--workers 16 --force" in script
+        assert "#SBATCH --dependency=afterok:40" in script
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["kind"] == "filter"
+        assert metadata["operation"] == "scan"
+        assert metadata["workers"] == 16
+        assert metadata["force"] is True
+
+    def test_submit_filter_build_publishes_manifest_paths(
+        self, mock_submitter, tmp_path
+    ):
+        """A build job owns both final filter artifacts and supports dry runs."""
+        run_dir = tmp_path / "filter-build"
+        output = tmp_path / "artifacts" / "accepted.yaml"
+        source_output = tmp_path / "artifacts" / "accepted.txt"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_filter_command",
+                return_value=(None, None),
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value=None),
+        ):
+            job_ids = mock_submitter.submit_filter(
+                config="filter/protodune-sp/space_points_260210.yaml",
+                operation="build",
+                source_list="/data/files.txt",
+                cache_dir=str(tmp_path / "counts"),
+                output=str(output),
+                output_source_list=str(source_output),
+                run_dir=str(run_dir),
+                dry_run=True,
+            )
+
+        assert job_ids == []
+        script = ((run_dir / "latest").resolve() / "submit.sbatch").read_text()
+        assert "spine-filter build" in script
+        assert "--source-list /data/files.txt" in script
+        assert f"--output {output}" in script
+        assert f"--output-source-list {source_output}" in script
+        assert output.parent.is_dir()
+
+    def test_submit_filter_uses_detector_account_fallback(
+        self, mock_submitter, tmp_path
+    ):
+        """Filter jobs inherit the detector account when a profile omits it."""
+        detector_account = mock_submitter.profiles["detectors"]["protodune-sp"][
+            "account"
+        ]
+        profile = {
+            "site": "s3df",
+            "scheduler": "slurm",
+            "description": "Account fallback test",
+        }
+        with (
+            patch.object(
+                mock_submitter.config_mgr,
+                "get_profile",
+                return_value=profile,
+            ),
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_filter_command",
+                return_value=("spine-filter", None),
+            ),
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value=None),
+        ):
+            mock_submitter.submit_filter(
+                config="filter/protodune-sp/space_points_260210.yaml",
+                operation="scan",
+                sources=["/data/input.root"],
+                cache_dir=str(tmp_path / "counts"),
+                run_dir=str(tmp_path / "run"),
+                dry_run=True,
+            )
+
+        metadata = json.loads(
+            ((tmp_path / "run" / "latest").resolve() / "job_metadata.json").read_text()
+        )
+        assert metadata["profile_config"]["account"] == detector_account
+
+    @pytest.mark.parametrize(
+        ("kwargs", "error", "message"),
+        [
+            ({"operation": "other"}, ValueError, "one of: scan, build"),
+            ({"sources": None}, ValueError, "exactly one"),
+            (
+                {"sources": ["input.root"], "source_list": "files.txt"},
+                ValueError,
+                "exactly one",
+            ),
+            ({"cache_dir": None}, ValueError, "require cache_dir"),
+            ({"workers": 0}, ValueError, "at least one"),
+            ({"force": "yes"}, TypeError, "must be a boolean"),
+            ({"output": "filter.yaml"}, ValueError, "cannot define build outputs"),
+            (
+                {"operation": "build"},
+                ValueError,
+                "requires output and output_source_list",
+            ),
+            (
+                {
+                    "operation": "build",
+                    "output": "filter.yaml",
+                    "output_source_list": "files.txt",
+                    "workers": 2,
+                },
+                ValueError,
+                "cannot define workers or force",
+            ),
+        ],
+    )
+    def test_filter_runner_rejects_invalid_operations(
+        self, mock_submitter, kwargs, error, message
+    ):
+        """Standalone validation rejects ambiguous or cross-operation fields."""
+        values = {
+            "operation": "scan",
+            "sources": ["input.root"],
+            "source_list": None,
+            "cache_dir": "/tmp/counts",
+            "output": None,
+            "output_source_list": None,
+            "workers": None,
+            "force": False,
+        }
+        values.update(kwargs)
+        with pytest.raises(error, match=message):
+            mock_submitter.filter._validate_operation(**values)
+
+    def test_filter_runner_rejects_existing_run_and_pbs_exclusion(
+        self, mock_submitter, tmp_path
+    ):
+        """Persistent filter attempts and scheduler controls fail explicitly."""
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (run_dir / "existing").touch()
+        base = {
+            "config": "filter/protodune-sp/space_points_260210.yaml",
+            "operation": "scan",
+            "sources": ["input.root"],
+            "cache_dir": str(tmp_path / "counts"),
+            "run_dir": str(run_dir),
+        }
+        with pytest.raises(ValueError, match="run directory is not empty"):
+            mock_submitter.submit_filter(**base)
+
+        base["run_dir"] = str(tmp_path / "pbs-run")
+        with (
+            patch.object(
+                mock_submitter.config_mgr,
+                "get_profile",
+                return_value={
+                    "site": "anl",
+                    "scheduler": "pbs",
+                    "description": "PBS test",
+                },
+            ),
+            pytest.raises(ValueError, match="only supported by Slurm"),
+        ):
+            mock_submitter.submit_filter(**base, exclude="node01")
 
     def test_submit_report_materializes_provenance_and_scheduler_job(
         self, mock_submitter, tmp_path
@@ -1173,6 +1427,7 @@ class TestInteractiveExecution:
                 files=[str(input_file)],
                 no_writer=True,
                 output_suffix="custom_reco",
+                entry_filter="/filters/accepted.yaml",
                 interactive_runtime="local",
             )
 
@@ -1524,12 +1779,14 @@ class TestInteractiveExecution:
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
                 files=[str(input_file)],
                 output_suffix="custom_reco",
+                entry_filter="/filters/accepted.yaml",
                 interactive_runtime="local",
             )
 
         assert exit_code == 0
         command = run.call_args.args[0]
         assert "--output-suffix custom_reco" in command
+        assert "--entry-filter /filters/accepted.yaml" in command
 
     def test_run_interactive_in_place_omits_output_overrides(
         self, mock_submitter, tmp_path
@@ -1705,6 +1962,7 @@ class TestBatchSpineOverride:
             ({"stage": "train"}, "--run-dir is required"),
             ({"resume": True}, "valid only for training"),
             ({"validation_name": "data"}, "valid only for validation"),
+            ({"val_entry_filter": "/filters/val.yaml"}, "valid only for training"),
             (
                 {"validation_named_sources": {"larcv": {"source": "val.root"}}},
                 "Named validation sources are valid only for training",
@@ -1790,6 +2048,8 @@ class TestBatchSpineOverride:
                 validation_files=[str(validation_source)],
                 entry_fraction_range=(0.0, 1.0),
                 val_entry_fraction_range=(0.0, 0.5),
+                entry_filter="/filters/train.yaml",
+                val_entry_filter="/filters/validation.yaml",
                 stage="train",
                 run_dir=str(run_dir),
             ) == ["train"]
@@ -1816,6 +2076,8 @@ class TestBatchSpineOverride:
         assert f"--val-source-list {validation_manifest.resolve()}" in script
         assert "--entry-fraction-range 0.0 1.0" in script
         assert "--val-entry-fraction-range 0.0 0.5" in script
+        assert "--entry-filter /filters/train.yaml" in script
+        assert "--val-entry-filter /filters/validation.yaml" in script
         assert "#SBATCH --array=" not in script
         assert not (run_dir / "tasks").exists()
 
@@ -1826,6 +2088,8 @@ class TestBatchSpineOverride:
         )
         assert metadata["entry_fraction_range"] == [0.0, 1.0]
         assert metadata["val_entry_fraction_range"] == [0.0, 0.5]
+        assert metadata["entry_filter"] == "/filters/train.yaml"
+        assert metadata["val_entry_filter"] == "/filters/validation.yaml"
 
     def test_submit_job_preserves_future_pipeline_training_sources(
         self, mock_submitter, tmp_path, capsys
@@ -3348,6 +3612,56 @@ class TestPipelineSubmission:
         assert report["output_dir"] == "/tmp/metrics/report/artifacts"
         assert report["checkpoint"] == "/tmp/full-chain.ckpt"
         assert report["dataset_selection"] == {"entry_fraction_range": [0.5, 1.0]}
+
+    def test_submit_pipeline_dispatches_filter_stage(self, mock_submitter, tmp_path):
+        """Standalone filter stages preserve dependencies and operation fields."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "scan",
+                            "kind": "filter",
+                            "operation": "scan",
+                            "config": "filter.yaml",
+                            "source": ["one.root", "two.root"],
+                            "cache_dir": "/tmp/counts",
+                            "run_dir": "/tmp/filter/scan",
+                            "workers": 4,
+                        },
+                        {
+                            "name": "build",
+                            "kind": "filter",
+                            "operation": "build",
+                            "depends_on": ["scan"],
+                            "config": "filter.yaml",
+                            "source": ["one.root", "two.root"],
+                            "cache_dir": "/tmp/counts",
+                            "output": "/tmp/accepted.yaml",
+                            "output_source_list": "/tmp/accepted.txt",
+                            "run_dir": "/tmp/filter/build",
+                        },
+                    ]
+                }
+            )
+        )
+
+        with patch.object(
+            mock_submitter, "submit_filter", side_effect=[["10"], ["20"]]
+        ) as submit_filter:
+            result = mock_submitter.submit_pipeline(str(pipeline_path))
+
+        assert result == {"scan": ["10"], "build": ["20"]}
+        assert submit_filter.call_args_list[0].kwargs["sources"] == [
+            "one.root",
+            "two.root",
+        ]
+        assert submit_filter.call_args_list[0].kwargs["workers"] == 4
+        assert submit_filter.call_args_list[1].kwargs["dependency"] == "afterok:10"
+        assert submit_filter.call_args_list[1].kwargs["output"] == (
+            "/tmp/accepted.yaml"
+        )
 
     def test_submit_pipeline_rejects_invalid_report_dataset_selection(
         self, mock_submitter, tmp_path

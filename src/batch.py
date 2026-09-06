@@ -155,6 +155,8 @@ class BatchRunner(SubmissionComponent):
         iterations: Optional[int] = None,
         entry_fraction_range: Optional[Tuple[float, float]] = None,
         val_entry_fraction_range: Optional[Tuple[float, float]] = None,
+        entry_filter: Optional[str] = None,
+        val_entry_filter: Optional[str] = None,
         spine_path: Optional[str] = None,
         stage: str = "inference",
         run_dir: Optional[str] = None,
@@ -253,6 +255,10 @@ class BatchRunner(SubmissionComponent):
             Half-open fractional range of main-dataset entries to process.
         val_entry_fraction_range : tuple[float, float], optional
             Half-open fractional range of validation entries to process.
+        entry_filter : str, optional
+            File-aware eligibility manifest for the input dataset.
+        val_entry_filter : str, optional
+            File-aware eligibility manifest for the validation dataset.
         spine_path : str, optional
             Override the SPINE executable with a checkout directory or an
             explicit executable path.
@@ -326,6 +332,8 @@ class BatchRunner(SubmissionComponent):
             raise ValueError("Named validation sources are valid only for training")
         if val_entry_fraction_range is not None and stage != "train":
             raise ValueError("--val-entry-fraction-range is valid only for training")
+        if val_entry_filter is not None and stage != "train":
+            raise ValueError("--val-entry-filter is valid only for training")
         if export_weights:
             if stage != "inference":
                 raise ValueError("--export-weights requires stage=inference")
@@ -491,6 +499,10 @@ class BatchRunner(SubmissionComponent):
             entry_fraction_range,
             val_entry_fraction_range,
         )
+        entry_filter_options = self.context.spine_cli.format_entry_filters(
+            entry_filter,
+            val_entry_filter,
+        )
         extra_bind_roots = [
             root
             for root in [larcv_bind_root, flashmatch_bind_root, extra_bind_root]
@@ -613,6 +625,7 @@ class BatchRunner(SubmissionComponent):
             for part in [
                 spine_runtime_options,
                 entry_fraction_options,
+                entry_filter_options,
                 spine_cli_overrides,
                 named_source_overrides,
                 validation_named_source_overrides,
@@ -841,6 +854,8 @@ class BatchRunner(SubmissionComponent):
             "iterations": iterations,
             "entry_fraction_range": entry_fraction_range,
             "val_entry_fraction_range": val_entry_fraction_range,
+            "entry_filter": entry_filter,
+            "val_entry_filter": val_entry_filter,
             "source_type": source_type if files else None,
             "source_inputs": files or [],
             "source_manifest": str(input_manifest) if input_manifest else None,

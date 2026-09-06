@@ -206,11 +206,19 @@ Examples:
         help="Half-open fractional range of input entries to process",
     )
     parser.add_argument(
+        "--entry-filter",
+        help="File-aware eligibility manifest for the input dataset",
+    )
+    parser.add_argument(
         "--val-entry-fraction-range",
         type=float,
         nargs=2,
         metavar=("START", "STOP"),
         help="Half-open fractional range of validation entries to process",
+    )
+    parser.add_argument(
+        "--val-entry-filter",
+        help="File-aware eligibility manifest for the validation dataset",
     )
     duration_group = parser.add_mutually_exclusive_group()
     duration_group.add_argument(
@@ -542,7 +550,10 @@ Examples:
     if args.interactive and lifecycle_options:
         parser.error("run lifecycle options are currently supported in batch mode only")
     if args.interactive and (
-        args.val_source or args.val_source_list or args.val_entry_fraction_range
+        args.val_source
+        or args.val_source_list
+        or args.val_entry_fraction_range
+        or args.val_entry_filter
     ):
         parser.error(
             "validation source options are currently supported in batch mode only"
@@ -554,6 +565,8 @@ Examples:
             ("--val-source/--val-source-list", args.val_source or args.val_source_list),
             ("--entry-fraction-range", args.entry_fraction_range),
             ("--val-entry-fraction-range", args.val_entry_fraction_range),
+            ("--entry-filter", args.entry_filter),
+            ("--val-entry-filter", args.val_entry_filter),
             ("--apply-mods", args.apply_mods),
             ("--set", args.set_overrides),
             ("--ntasks", args.ntasks is not None),
@@ -673,6 +686,7 @@ Examples:
                 spine_path=args.spine_path,
                 weight_path=args.weight_path,
                 entry_fraction_range=args.entry_fraction_range,
+                entry_filter=args.entry_filter,
             )
             return exit_code
 
@@ -718,6 +732,8 @@ Examples:
                 iterations=args.iterations,
                 entry_fraction_range=args.entry_fraction_range,
                 val_entry_fraction_range=args.val_entry_fraction_range,
+                entry_filter=args.entry_filter,
+                val_entry_filter=args.val_entry_filter,
                 spine_path=args.spine_path,
                 stage=args.stage or "inference",
                 run_dir=args.run_dir,

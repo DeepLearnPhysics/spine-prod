@@ -84,6 +84,12 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "tensorboard",
         "entry_fraction_range",
         "val_entry_fraction_range",
+        "entry_filter",
+        "val_entry_filter",
+        "operation",
+        "cache_dir",
+        "workers",
+        "force",
     }
 )
 
@@ -657,6 +663,9 @@ class PipelineDefinition:
             "output_dir",
             "checkpoint",
             "dataset",
+            "entry_filter",
+            "val_entry_filter",
+            "cache_dir",
         ):
             value = stage.get(field)
             if value is not None and (not isinstance(value, str) or not value):
@@ -693,6 +702,9 @@ class PipelineDefinition:
     def _validate_lifecycle(cls, name: str, stage: Mapping[str, Any]) -> None:
         """Validate train, validation, and inference-only controls."""
         kind = stage.get("kind", "spine")
+        if kind == "filter":
+            cls._validate_filter(name, stage)
+            return
         if kind == "report":
             cls._validate_report(name, stage)
             return
@@ -731,6 +743,10 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' validation entry range requires stage=train"
             )
+        if lifecycle != "train" and stage.get("val_entry_filter") is not None:
+            raise ValueError(
+                f"Pipeline stage '{name}' validation entry filter requires stage=train"
+            )
         if lifecycle != "inference" and (
             stage.get("ntasks") is not None or stage.get("files_per_task") is not None
         ):
@@ -768,6 +784,8 @@ class PipelineDefinition:
                 "validation_sources",
                 "entry_fraction_range",
                 "val_entry_fraction_range",
+                "entry_filter",
+                "val_entry_filter",
             )
             if source_inputs:
                 raise ValueError(
@@ -782,6 +800,97 @@ class PipelineDefinition:
                     f"Pipeline stage '{name}' export_weights cannot be combined "
                     "with writer output options"
                 )
+
+    @classmethod
+    def _validate_filter(cls, name: str, stage: Mapping[str, Any]) -> None:
+        """Require one standalone scan or manifest-build operation."""
+        required = ("run_dir", "cache_dir", "operation")
+        missing = [field for field in required if not stage.get(field)]
+        if missing:
+            raise ValueError(
+                f"Pipeline filter stage '{name}' requires: " + ", ".join(missing)
+            )
+
+        operation = stage["operation"]
+        if operation not in ("scan", "build"):
+            raise ValueError(
+                f"Pipeline filter stage '{name}' operation must be scan or build"
+            )
+        source_fields = cls._present(stage, "source", "source_list")
+        if len(source_fields) != 1:
+            raise ValueError(
+                f"Pipeline filter stage '{name}' requires exactly one of: "
+                "source, source_list"
+            )
+
+        workers = stage.get("workers")
+        if workers is not None and (
+            isinstance(workers, bool) or not isinstance(workers, int) or workers < 1
+        ):
+            raise ValueError(
+                f"Pipeline filter stage '{name}' workers must be a positive integer"
+            )
+        force = stage.get("force")
+        if force is not None and not isinstance(force, bool):
+            raise TypeError(f"Pipeline filter stage '{name}' force must be a boolean")
+
+        if operation == "scan":
+            outputs = cls._present(stage, "output", "output_source_list")
+            if outputs:
+                raise ValueError(
+                    f"Pipeline filter scan stage '{name}' cannot define build outputs"
+                )
+        else:
+            missing_outputs = [
+                field
+                for field in ("output", "output_source_list")
+                if not stage.get(field)
+            ]
+            if missing_outputs:
+                raise ValueError(
+                    f"Pipeline filter build stage '{name}' requires: "
+                    + ", ".join(missing_outputs)
+                )
+            if workers is not None or force:
+                raise ValueError(
+                    f"Pipeline filter build stage '{name}' cannot define workers or force"
+                )
+
+        forbidden = cls._present(
+            stage,
+            "files",
+            "val_source",
+            "val_source_list",
+            "sources",
+            "validation_sources",
+            "entry_fraction_range",
+            "val_entry_fraction_range",
+            "entry_filter",
+            "val_entry_filter",
+            "module_weight",
+            "weight_path",
+            "export_weights",
+            "input_dir",
+            "output_dir",
+            "checkpoint",
+            "dataset",
+            "dataset_selection",
+            "in_place",
+            "ntasks",
+            "files_per_task",
+            "set",
+            "stage",
+            "resume",
+            "resume_from",
+            "validation_name",
+            "rerun_validation",
+            "tensorboard",
+        )
+        if forbidden:
+            raise ValueError(
+                f"Pipeline filter stage '{name}' cannot use SPINE/report field(s): "
+                + ", ".join(forbidden)
+            )
 
     @classmethod
     def _validate_report(cls, name: str, stage: Mapping[str, Any]) -> None:
@@ -810,6 +919,8 @@ class PipelineDefinition:
             "validation_sources",
             "entry_fraction_range",
             "val_entry_fraction_range",
+            "entry_filter",
+            "val_entry_filter",
             "module_weight",
             "weight_path",
             "export_weights",
@@ -825,6 +936,10 @@ class PipelineDefinition:
             "validation_name",
             "rerun_validation",
             "tensorboard",
+            "operation",
+            "cache_dir",
+            "workers",
+            "force",
         )
         if forbidden:
             raise ValueError(
@@ -945,7 +1060,13 @@ class PipelineRunner(SubmissionComponent):
                 dependency,
                 retry=from_stage is not None,
             )
-            if stage.get("kind", "spine") == "report":
+            kind = stage.get("kind", "spine")
+            if kind == "filter":
+                job_map[name] = self.context.submit_filter(
+                    dry_run=dry_run,
+                    **options,
+                )
+            elif kind == "report":
                 job_map[name] = self.context.submit_report(
                     dry_run=dry_run,
                     **options,
@@ -1045,6 +1166,30 @@ class PipelineRunner(SubmissionComponent):
             )
             return options
 
+        if stage.get("kind", "spine") == "filter":
+            options = {key: stage[key] for key in PROFILE_FIELDS if key in stage}
+            options.update(
+                {
+                    "config": stage["config"],
+                    "operation": stage["operation"],
+                    "run_dir": stage["run_dir"],
+                    "sources": cls._as_list(stage.get("source")),
+                    "source_list": stage.get("source_list"),
+                    "cache_dir": stage["cache_dir"],
+                    "output": stage.get("output"),
+                    "output_source_list": stage.get("output_source_list"),
+                    "workers": stage.get("workers"),
+                    "force": stage.get("force", False),
+                    "profile": stage.get("profile", "s3df_milano"),
+                    "job_name": stage.get("job_name", stage["name"]),
+                    "dependency": dependency,
+                    "spine_path": stage.get("spine_path"),
+                    "cvmfs": stage.get("cvmfs", False),
+                    "retry": retry,
+                }
+            )
+            return options
+
         source_key, files = cls._source(stage, "files", "source", "source_list")
         val_key, val_files = cls._source(stage, "val_source", "val_source_list")
 
@@ -1103,6 +1248,8 @@ class PipelineRunner(SubmissionComponent):
                 "iterations": stage.get("iterations"),
                 "entry_fraction_range": stage.get("entry_fraction_range"),
                 "val_entry_fraction_range": stage.get("val_entry_fraction_range"),
+                "entry_filter": stage.get("entry_filter"),
+                "val_entry_filter": stage.get("val_entry_filter"),
             }
         )
         return options

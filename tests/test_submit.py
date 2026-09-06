@@ -150,6 +150,8 @@ def test_interactive_mode_forwards_runtime_options():
         "25",
         "--weight-path",
         "/weights/full.ckpt",
+        "--entry-filter",
+        "/filters/accepted.yaml",
         "--set",
         "model.detect_anomaly=true",
         submitter=submitter,
@@ -167,6 +169,7 @@ def test_interactive_mode_forwards_runtime_options():
     assert kwargs["num_workers"] == 8
     assert kwargs["epochs"] == 25
     assert kwargs["weight_path"] == "/weights/full.ckpt"
+    assert kwargs["entry_filter"] == "/filters/accepted.yaml"
     assert kwargs["set_overrides"] == ["model.detect_anomaly=true"]
 
 
@@ -255,6 +258,10 @@ def test_batch_mode_forwards_training_and_validation_sources():
         "train.txt",
         "--val-source-list",
         "validation.txt",
+        "--entry-filter",
+        "/filters/train.yaml",
+        "--val-entry-filter",
+        "/filters/validation.yaml",
         submitter=submitter,
     )
 
@@ -264,6 +271,8 @@ def test_batch_mode_forwards_training_and_validation_sources():
     assert kwargs["source_type"] == "source_list"
     assert kwargs["validation_files"] == ["validation.txt"]
     assert kwargs["validation_source_type"] == "source_list"
+    assert kwargs["entry_filter"] == "/filters/train.yaml"
+    assert kwargs["val_entry_filter"] == "/filters/validation.yaml"
 
 
 def test_pipeline_mode_prints_stage_jobs(capsys):
@@ -454,6 +463,7 @@ def test_cli_rejects_undeclared_long_option_abbreviations():
     "stage_args",
     [
         ("--source", "input.root"),
+        ("--entry-filter", "accepted.yaml"),
         ("--apply-mods", "data"),
         ("--set", "base.seed=7"),
         ("--ntasks", "4"),

@@ -1,4 +1,4 @@
-# Prototype transition: train UResNet-PPN, cache its predictions and adapted
+# Staged transition: train UResNet-PPN, cache its predictions and adapted
 # cluster truth, then train standalone Graph-SPICE from those stage products.
 # Supply the workflow destination with CLI --workspace.
 # The cache naming matches the appendable full-chain workflow.
@@ -44,7 +44,8 @@ stages:
     output: ${split.cache_dir}
     output_suffix: cache
     files_per_task: 1
-    ntasks: 50
+    # Train and validation arrays run together: two tasks each cap total GPUs at 4.
+    ntasks: 2
     module_weight:
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
