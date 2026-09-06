@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic interaction GrapPA model revision with 64-wide GNN layers
+
+include: model/common/grappa_inter/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/generic/grappa_inter/network_240718.yaml
+  model.modules.grappa_loss: !include model/generic/grappa_inter/loss_240718.yaml

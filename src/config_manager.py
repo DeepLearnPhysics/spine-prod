@@ -57,6 +57,43 @@ class ConfigManager:
                 return detector
         return "unknown_detector"
 
+    def resolve_config_path(self, config: str) -> Path:
+        """Resolve a configuration using the standard SPINE search roots.
+
+        Relative paths are checked from the current working directory, the
+        spine-prod repository root, its ``config`` directory, and each entry
+        in ``SPINE_CONFIG_PATH``. This makes repository-relative forms such as
+        ``config/train/generic/uresnet/train_240718.yaml`` and SPINE-style
+        forms such as ``train/generic/uresnet/train_240718.yaml`` equivalent.
+        """
+        config_path = Path(config).expanduser()
+        if config_path.is_absolute():
+            candidates = [config_path]
+        else:
+            candidates = [
+                config_path,
+                self.basedir / config_path,
+                self.basedir / "config" / config_path,
+            ]
+            search_path = os.getenv("SPINE_CONFIG_PATH", "")
+            candidates.extend(
+                Path(root).expanduser() / config_path
+                for root in search_path.split(os.pathsep)
+                if root
+            )
+
+        tried = []
+        for candidate in candidates:
+            resolved = candidate.resolve()
+            if resolved in tried:
+                continue
+            tried.append(resolved)
+            if resolved.is_file():
+                return resolved
+
+        attempted = "\n".join(f"  Tried: {path}" for path in tried)
+        raise FileNotFoundError(f"Config not found: {config}\n{attempted}")
+
     def get_profile(self, profile_name: str, detector: Optional[str] = None) -> Dict:
         """Get resource profile with detector defaults.
 
@@ -181,7 +218,7 @@ class ConfigManager:
             metadata["version"] = version
             metadata["date"] = datetime.strptime(version, "%y%m%d").date().isoformat()
         metadata["description"] = description
-        return yaml.safe_dump({"__meta__": metadata}, sort_keys=False) + "\n"
+        return yaml.safe_dump({"__meta__": metadata}) + "\n"
 
     def resolve_modifier_version(
         self,

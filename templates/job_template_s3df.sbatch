@@ -10,6 +10,12 @@
 #SBATCH --cpus-per-task={{ cpus_per_task }}
 #SBATCH --mem-per-cpu={{ mem_per_cpu }}
 #SBATCH --time={{ time }}
+{% if exclusive %}
+#SBATCH --exclusive
+{% endif %}
+{% if exclude %}
+#SBATCH --exclude={{ exclude }}
+{% endif %}
 
 {% if array_spec %}
 #SBATCH --array={{ array_spec }}
@@ -20,17 +26,18 @@
 #SBATCH --output={{ log_dir }}/{{ job_name }}_%A_%a.out
 #SBATCH --error={{ log_dir }}/{{ job_name }}_%A_%a.err
 {% else %}
-#SBATCH --output={{ log_dir }}/{{ job_name }}_%j.out
-#SBATCH --error={{ log_dir }}/{{ job_name }}_%j.err
+#SBATCH --output={{ stdout_path }}
+#SBATCH --error={{ stderr_path }}
 {% endif %}
 
 {% if dependency %}
 #SBATCH --dependency={{ dependency }}
+#SBATCH --kill-on-invalid-dep=yes
 {% endif %}
 
 # Job metadata
 echo "=================================="
-echo "SPINE Production Job (S3DF)"
+echo "{{ command_label|default('SPINE Production Job') }} (S3DF)"
 echo "=================================="
 echo "Job ID: $SLURM_JOB_ID"
 {% if array_spec %}
@@ -73,8 +80,12 @@ cat "$TASK_FILE_LIST"
 echo
 {% elif file_list_pattern %}
 # Single job: use the single file list
+{% if task_dir_pattern %}
 TASK_DIR="{{ task_dir_pattern | replace('*', '1') }}"
 TASK_FILE_LIST="{{ file_list_pattern | replace('*', '1') }}"
+{% else %}
+TASK_FILE_LIST="{{ file_list_pattern }}"
+{% endif %}
 FIRST_FILE=$(head -n 1 "$TASK_FILE_LIST")
 if [[ ! -f "$FIRST_FILE" ]]; then
     echo "ERROR: Input file not found: $FIRST_FILE"
@@ -86,7 +97,11 @@ echo "Files in this task:"
 cat "$TASK_FILE_LIST"
 echo
 {% else %}
+{% if input_manifest %}
+echo "Using input file list: {{ input_manifest }}"
+{% else %}
 echo "Using input files defined in the config"
+{% endif %}
 echo
 {% endif %}
 
@@ -109,7 +124,11 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (larcv_path ~ '/configur
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
+{% if custom_command %}
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD {{ custom_command }}"
+{% else %}
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD {{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+{% endif %}
 SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
 RUN_CMD="$SINGULARITY_CMD"
 

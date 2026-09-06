@@ -12,12 +12,13 @@ The configurations in this directory are used to:
 
 ## Available Configurations
 
-The currently populated configuration trees are:
+The currently populated configuration tree is:
 
-- **`config/`**: Legacy component and full-chain `.cfg` training recipes
-- **`icarus/`**: YAML training configurations for ICARUS
+- **`generic/`**: YAML benchmark recipes for the generic dataset
 
-The `dune10kt-1x2x6/` directory is reserved for future checked-in DUNE 10 kt training configurations and is not currently populated.
+Detector-specific training trees will be added as their historical recipes are
+reviewed and migrated to the composed configuration structure demonstrated by
+the generic benchmark.
 
 ## Configuration Structure
 
@@ -30,7 +31,7 @@ Training configurations typically include:
 - **Augmentation**: Data augmentation strategies
 - **Validation**: Validation datasets and metrics
 
-SPINE v0.17.0 uses a top-level `train` block and an optional sibling
+SPINE v1.0.0 uses a top-level `train` block and an optional sibling
 `validation` block. Integrated validation at checkpoint boundaries is
 recommended for new training productions because it records the validation
 metrics with the training process and supports early stopping and stable best
@@ -38,7 +39,21 @@ checkpoints.
 
 ## Versioning and Reproducibility
 
-Training configurations preserve the names used for each training campaign. Where a dated version is present, it uses the same YYMMDD convention as inference configurations. Each recipe should document the setup used to produce its corresponding weights and link those weights to the appropriate configuration under `config/infer/`.
+Each model directory contains a SPINE-schema training fragment such as
+`base_v1.yaml` and immutable dated runnable bundles such as
+`train_240718.yaml`. The runnable bundle pins the detector model revision with
+the same date under `config/model/`; production submissions must use the dated
+path rather than a mutable `latest` alias. Each recipe should document the
+setup used to produce its corresponding weights and link those weights to the
+appropriate configuration under `config/infer/`.
+
+Sister training bundles are added only when the component model actually
+changes between inference revisions. Generic UResNet, shower GrapPA, and track
+GrapPA each have one bundle because their models did not change between the
+`240718` and `240805` full-chain releases. UResNet-PPN, Graph-SPICE, and
+interaction GrapPA have one for each revision. Each GrapPA stage also has a
+`260828` benchmark that tracks SPINE's current standalone example rather than
+a historical generic full-chain release.
 
 ## Usage
 
@@ -46,19 +61,27 @@ Training configurations are submitted as persistent named runs:
 
 ```bash
 # Basic training
-./submit.py -c config/train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default
+./submit.py -c train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default \
+  --source-list /path/to/train_file_list.txt \
+  --val-source-list /path/to/validation_file_list.txt
+
+# --gpus controls both scheduler allocation and SPINE world size. An explicit
+# --world-size is accepted only when it matches the allocated GPU count.
 
 # Multi-GPU training
-./submit.py -c config/train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default --gpus 4
+./submit.py -c train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default \
+  --gpus 4 \
+  --source-list /path/to/train_file_list.txt \
+  --val-source-list /path/to/validation_file_list.txt
 
 # Strictly resume complete training state from the latest checkpoint
-./submit.py -c config/train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default --resume
+./submit.py -c train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default --resume
 ```
 
-spine-prod selects the latest numeric checkpoint, verifies its SPINE v0.17.0
+spine-prod selects the latest numeric checkpoint, verifies its SPINE
 checksum sidecar when present, and forwards SPINE's explicit `--resume` flag.
 Legacy checkpoints without checksum sidecars remain supported. Use
 `--resume-from RUN_DIR/weights/snapshot-N.ckpt` for an intentional rollback.
@@ -68,7 +91,7 @@ run standalone incremental validation against the same run directory:
 
 ```bash
 ./submit.py -c /path/to/validation.yaml \
-  --stage validation --run-dir /path/to/experiments/deghost/default
+  --stage validation --run-dir /path/to/experiments/uresnet/default
 ```
 
 ## Model Weights

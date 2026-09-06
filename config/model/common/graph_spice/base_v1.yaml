@@ -1,0 +1,19 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 standalone Graph-SPICE model structure
+
+model:
+  name: graph_spice
+  weight_path: null
+
+  network_input:
+    data: data
+    seg_label: seg_label
+
+  loss_input:
+    seg_label: seg_label
+    clust_label: clust_label
+
+  modules:
+    graph_spice: !include model/common/graph_spice/network_v1.yaml
+    graph_spice_loss: !include model/common/graph_spice/loss_v1.yaml

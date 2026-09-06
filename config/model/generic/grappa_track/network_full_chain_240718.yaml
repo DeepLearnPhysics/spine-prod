@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic 240718 track GrapPA network for full-chain aggregation
+
+include: model/generic/grappa_track/network_240718.yaml
+
+override:
+  nodes.make_groups: true
+  nodes.grouping_method: score

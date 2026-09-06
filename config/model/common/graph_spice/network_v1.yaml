@@ -1,0 +1,27 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 Graph-SPICE network structure
+
+shapes: [shower, track, michel, delta]
+use_raw_features: true
+invert: true
+make_clusters: true
+embedder:
+  spatial_embedding_dim: 3
+  feature_embedding_dim: 16
+  occupancy_mode: softplus
+  covariance_mode: softplus
+  uresnet: !include model/common/graph_spice/uresnet_v1.yaml
+kernel:
+  name: bilinear
+  num_features: 32
+constructor:
+  edge_threshold: 0.1
+  min_size: 3
+  label_edges: false
+  graph: null
+  orphan:
+    mode: radius
+    radius: 1.9
+    iterate: true
+    assign_all: true

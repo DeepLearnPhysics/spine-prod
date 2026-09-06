@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260828"
+  date: "2026-08-28"
+  description: Generic standalone interaction GrapPA model without fragment disambiguation
+
+include: model/common/grappa_inter/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/generic/grappa_inter/network_260828.yaml
+  model.modules.grappa_loss: !include model/generic/grappa_inter/loss_260828.yaml

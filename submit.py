@@ -8,7 +8,7 @@ Usage:
     ./submit.py --config infer/icarus --source test.root
     ./submit.py --config infer/icarus/latest --source-list file_list.txt
     ./submit.py --config infer/icarus/latest --apply-mods data --source data/*.root --profile s3df_ampere
-    ./submit.py --pipeline pipelines/icarus_production.yaml
+    ./submit.py --pipeline pipelines/icarus_production.yaml --workspace /path/to/run
     ./submit.py --config ... --source ... --central-dir
 """
 
@@ -24,6 +24,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="SPINE Production Batch Submission System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        allow_abbrev=False,
         epilog="""
 Examples:
   # Detector shorthand resolves to the latest composite config
@@ -47,7 +48,7 @@ Examples:
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source data/*.root --apply-mods data lite
 
   # Override SPINE config values at runtime
-  %(prog)s --config infer/generic/latest --source test.root --set base.world_size=0
+  %(prog)s --config infer/generic/latest --source test.root --batch-size 1
 
   # List available modifiers for a config
   %(prog)s --list-mods infer/icarus/full_chain_co_250625.yaml
@@ -59,14 +60,14 @@ Examples:
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source-list files.txt --files-per-task 5 --ntasks 20
 
   # Start or resume a persistent training run
-  %(prog)s --config config/train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default
-  %(prog)s --config config/train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default --resume
+  %(prog)s --config train/generic/uresnet/train_240718.yaml --stage train --run-dir /path/to/experiments/uresnet/default
+  %(prog)s --config train/generic/uresnet/train_240718.yaml --stage train --run-dir /path/to/experiments/uresnet/default --resume
 
   # Validate only checkpoints missing an associated validation log
-  %(prog)s --config /path/to/deghost_val.yaml --stage validation --run-dir /path/to/experiments/deghost/default
+  %(prog)s --config /path/to/uresnet_validation.yaml --stage validation --run-dir /path/to/experiments/uresnet/default
 
   # Pipeline mode
-  %(prog)s --pipeline pipelines/icarus_production.yaml
+  %(prog)s --pipeline pipelines/icarus_production.yaml --workspace /path/to/run
 
   # Dry run (does not submit jobs, but shows what would be done)
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source test.root --dry-run
@@ -98,6 +99,19 @@ Examples:
         help="Text file containing input file paths (one per line)",
     )
 
+    # Validation inputs for checkpoint-bound validation during training
+    val_source_group = parser.add_mutually_exclusive_group()
+    val_source_group.add_argument(
+        "--val-source",
+        nargs="+",
+        help="Validation input files or glob patterns",
+    )
+    val_source_group.add_argument(
+        "--val-source-list",
+        nargs=1,
+        help="Text file containing validation input paths (one per line)",
+    )
+
     # Configuration modifiers
     parser.add_argument(
         "--apply-mods",
@@ -120,7 +134,6 @@ Examples:
     parser.add_argument(
         "--profile",
         "-p",
-        default="auto",
         help="Resource profile (default: auto-detect)",
     )
     parser.add_argument(
@@ -141,12 +154,62 @@ Examples:
         ),
     )
 
+    # First-class SPINE runtime overrides
+    parser.add_argument(
+        "--world-size",
+        type=int,
+        help=(
+            "Assert the SPINE process count; batch jobs infer it from the "
+            "scheduler GPU allocation"
+        ),
+    )
+    batch_size_group = parser.add_mutually_exclusive_group()
+    batch_size_group.add_argument(
+        "--batch-size",
+        type=int,
+        help="Global SPINE data-loader batch size",
+    )
+    batch_size_group.add_argument(
+        "--minibatch-size",
+        type=int,
+        help="Per-process/GPU SPINE data-loader batch size",
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        help="Number of SPINE data-loader worker processes",
+    )
+    parser.add_argument(
+        "--entry-fraction-range",
+        type=float,
+        nargs=2,
+        metavar=("START", "STOP"),
+        help="Half-open fractional range of input entries to process",
+    )
+    parser.add_argument(
+        "--val-entry-fraction-range",
+        type=float,
+        nargs=2,
+        metavar=("START", "STOP"),
+        help="Half-open fractional range of validation entries to process",
+    )
+    duration_group = parser.add_mutually_exclusive_group()
+    duration_group.add_argument(
+        "--epochs",
+        type=float,
+        help="Number of SPINE training epochs",
+    )
+    duration_group.add_argument(
+        "--iterations",
+        type=int,
+        help="Number of SPINE driver iterations",
+    )
+
     # Job configuration
     parser.add_argument("--job-name", "-j", help="Custom job name")
     parser.add_argument(
         "--stage",
         choices=["inference", "train", "validation"],
-        default="inference",
         help="Run lifecycle stage (default: inference)",
     )
     parser.add_argument(
@@ -155,6 +218,24 @@ Examples:
             "Persistent run directory. Required for train and validation; "
             "optional for inference."
         ),
+    )
+    parser.add_argument(
+        "--workspace",
+        help=(
+            "Pipeline-wide output root exposed as ${workspace}. Required when "
+            "the pipeline declares workspace: null."
+        ),
+    )
+    parser.add_argument(
+        "--from-stage",
+        help=(
+            "Restart a pipeline at this stage, treating earlier stages as "
+            "completed and safely reusing existing stage directories."
+        ),
+    )
+    parser.add_argument(
+        "--to-stage",
+        help="Stop a pipeline submission after this stage (inclusive).",
     )
     resume_group = parser.add_mutually_exclusive_group()
     resume_group.add_argument(
@@ -181,6 +262,10 @@ Examples:
         help="Enable TensorBoard logging in the stage-specific run directory",
     )
     parser.add_argument(
+        "--weight-path",
+        help="Complete-model checkpoint override forwarded to SPINE",
+    )
+    parser.add_argument(
         "--output",
         "-o",
         help=(
@@ -193,6 +278,14 @@ Examples:
         help=(
             "Override the suffix used for input-derived HDF5 output names "
             "(default: final config stem)."
+        ),
+    )
+    parser.add_argument(
+        "--in-place",
+        action="store_true",
+        help=(
+            "Leave the writer destination config-defined. This suppresses all "
+            "automatic SPINE output overrides for staged-cache extension."
         ),
     )
     parser.add_argument(
@@ -230,6 +323,8 @@ Examples:
     )
     parser.add_argument(
         "--spine-path",
+        "--spine",
+        dest="spine_path",
         help=(
             "Override the SPINE executable with a checkout directory or explicit "
             "executable path. Directories resolve to bin/spine or bin/run.py."
@@ -267,6 +362,10 @@ Examples:
     mem_group.add_argument("--mem-per-node", help="Override memory per node")
 
     parser.add_argument("--constraint", help="Override constraint")
+    parser.add_argument(
+        "--exclude",
+        help="Exclude a comma-separated node list (Slurm only)",
+    )
     parser.add_argument("--nodes", type=int, help="Override number of nodes")
     parser.add_argument("--time", "-t", help="Override time limit")
     parser.add_argument(
@@ -293,7 +392,6 @@ Examples:
     parser.add_argument(
         "--interactive-runtime",
         choices=["auto", "local", "container"],
-        default="auto",
         help=(
             "Runtime for --interactive: local uses spine on PATH, container uses "
             "SPINE_CONTAINER_PATH/SPINE_CONTAINER_TAG, auto falls back to "
@@ -304,7 +402,6 @@ Examples:
     parser.add_argument(
         "--task-id",
         type=int,
-        default=1,
         help="Task ID to run in interactive mode (default: 1)",
     )
     parser.add_argument(
@@ -314,6 +411,15 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    if args.workspace is not None and not args.pipeline:
+        parser.error("--workspace is only supported with --pipeline")
+    if args.from_stage is not None and not args.pipeline:
+        parser.error("--from-stage is only supported with --pipeline")
+    if args.to_stage is not None and not args.pipeline:
+        parser.error("--to-stage is only supported with --pipeline")
+    if args.weight_path is not None and args.pipeline:
+        parser.error("--weight-path is stage-specific and cannot override a pipeline")
 
     # Handle deprecated --local-output flag
     if getattr(args, "local_output", False):
@@ -376,13 +482,49 @@ Examples:
             args.validation_name,
             args.rerun_validation,
             args.tensorboard,
-            args.stage != "inference",
+            args.stage is not None,
         ]
     )
     if args.interactive and lifecycle_options:
         parser.error("run lifecycle options are currently supported in batch mode only")
-    if args.pipeline and lifecycle_options:
-        parser.error("run lifecycle options must be specified within a pipeline stage")
+    if args.interactive and (
+        args.val_source or args.val_source_list or args.val_entry_fraction_range
+    ):
+        parser.error(
+            "validation source options are currently supported in batch mode only"
+        )
+
+    if args.pipeline:
+        stage_specific_options = [
+            ("--source/--source-list", args.source or args.source_list),
+            ("--val-source/--val-source-list", args.val_source or args.val_source_list),
+            ("--entry-fraction-range", args.entry_fraction_range),
+            ("--val-entry-fraction-range", args.val_entry_fraction_range),
+            ("--apply-mods", args.apply_mods),
+            ("--set", args.set_overrides),
+            ("--ntasks", args.ntasks is not None),
+            ("--files-per-task", args.files_per_task is not None),
+            ("--job-name", args.job_name),
+            ("--stage", args.stage is not None),
+            ("--run-dir", args.run_dir),
+            ("--resume/--resume-from", args.resume or args.resume_from),
+            ("--validation-name", args.validation_name),
+            ("--rerun-validation", args.rerun_validation),
+            ("--tensorboard", args.tensorboard),
+            ("--output", args.output),
+            ("--output-suffix", args.output_suffix),
+            ("--in-place", args.in_place),
+            ("--no-writer", args.no_writer),
+            ("--dependency", args.dependency),
+            ("--task-id", args.task_id is not None),
+            ("--interactive-runtime", args.interactive_runtime is not None),
+        ]
+        invalid_options = [option for option, value in stage_specific_options if value]
+        if invalid_options:
+            parser.error(
+                "pipeline stages must configure stage-specific options in YAML: "
+                + ", ".join(invalid_options)
+            )
 
     # Build profile overrides
     profile_overrides = {}
@@ -391,6 +533,7 @@ Examples:
         "qos",
         "queue",
         "constraint",
+        "exclude",
         "gpus_per_node",
         "gpus",
         "cpus_per_task",
@@ -408,8 +551,35 @@ Examples:
     try:
         if args.pipeline:
             # Pipeline mode
+            pipeline_overrides = {
+                key: value
+                for key, value in {
+                    "profile": args.profile,
+                    "larcv_path": args.larcv_path,
+                    "flashmatch_path": args.flashmatch_path,
+                    "spine_path": args.spine_path,
+                    "world_size": args.world_size,
+                    "batch_size": args.batch_size,
+                    "minibatch_size": args.minibatch_size,
+                    "num_workers": args.num_workers,
+                    "epochs": args.epochs,
+                    "iterations": args.iterations,
+                }.items()
+                if value is not None
+            }
+            if args.flashmatch:
+                pipeline_overrides["flashmatch"] = True
+            if args.cvmfs:
+                pipeline_overrides["cvmfs"] = True
+            pipeline_overrides.update(profile_overrides)
             job_map = submitter.submit_pipeline(
-                args.pipeline, dry_run=args.dry_run, preload=args.preload
+                args.pipeline,
+                dry_run=args.dry_run,
+                preload=args.preload,
+                overrides=pipeline_overrides,
+                workspace=args.workspace,
+                from_stage=args.from_stage,
+                to_stage=args.to_stage,
             )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():
@@ -426,9 +596,10 @@ Examples:
                 source_type=source_type,
                 output=args.output,
                 output_suffix=args.output_suffix,
+                in_place=args.in_place,
                 no_writer=args.no_writer,
                 files_per_task=args.files_per_task,
-                task_id=args.task_id,
+                task_id=args.task_id or 1,
                 larcv_path=args.larcv_path,
                 flashmatch_path=args.flashmatch_path,
                 flashmatch=args.flashmatch,
@@ -436,9 +607,17 @@ Examples:
                 apply_mods=args.apply_mods,
                 preload=args.preload,
                 set_overrides=args.set_overrides,
-                interactive_runtime=args.interactive_runtime,
+                world_size=args.world_size,
+                batch_size=args.batch_size,
+                minibatch_size=args.minibatch_size,
+                num_workers=args.num_workers,
+                epochs=args.epochs,
+                iterations=args.iterations,
+                interactive_runtime=args.interactive_runtime or "auto",
                 bind_paths=args.bind_paths,
                 spine_path=args.spine_path,
+                weight_path=args.weight_path,
+                entry_fraction_range=args.entry_fraction_range,
             )
             return exit_code
 
@@ -447,15 +626,23 @@ Examples:
             # Determine which source type was provided
             files = args.source if args.source else args.source_list
             source_type = "source" if args.source else "source_list"
+            validation_files = (
+                args.val_source if args.val_source else args.val_source_list
+            )
+            validation_source_type = "source" if args.val_source else "source_list"
 
             job_ids = submitter.submit_job(
                 config=args.config,
                 files=files,
                 source_type=source_type,
-                profile=args.profile,
+                validation_files=validation_files,
+                validation_source_type=validation_source_type,
+                weight_path=args.weight_path,
+                profile=args.profile or "auto",
                 job_name=args.job_name,
                 output=args.output,
                 output_suffix=args.output_suffix,
+                in_place=args.in_place,
                 no_writer=args.no_writer,
                 ntasks=args.ntasks,
                 files_per_task=args.files_per_task,
@@ -468,8 +655,16 @@ Examples:
                 dry_run=args.dry_run,
                 preload=args.preload,
                 set_overrides=args.set_overrides,
+                world_size=args.world_size,
+                batch_size=args.batch_size,
+                minibatch_size=args.minibatch_size,
+                num_workers=args.num_workers,
+                epochs=args.epochs,
+                iterations=args.iterations,
+                entry_fraction_range=args.entry_fraction_range,
+                val_entry_fraction_range=args.val_entry_fraction_range,
                 spine_path=args.spine_path,
-                stage=args.stage,
+                stage=args.stage or "inference",
                 run_dir=args.run_dir,
                 resume=args.resume,
                 resume_from=args.resume_from,
@@ -482,7 +677,7 @@ Examples:
             if job_ids and not args.dry_run:
                 print(f"\n=== Submitted job IDs: {', '.join(job_ids)} ===")
 
-    except (FileNotFoundError, ValueError, OSError, RuntimeError) as e:
+    except (FileNotFoundError, TypeError, ValueError, OSError, RuntimeError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
 

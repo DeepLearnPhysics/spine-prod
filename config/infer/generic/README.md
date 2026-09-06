@@ -27,9 +27,12 @@ Each main config includes modular YAML files:
 - **`io/io_common.yaml`**: Common IO settings
 
 **Model Components:**
-- **`model/model_240718.yaml`**: July 2024 weights and model settings
-- **`model/model_240805.yaml`**: August 2024 weights and model settings
-- **`model/model_common.yaml`**: Common model architecture
+- **`model/model_240718.yaml`**: July 2024 published weight selection
+- **`model/model_240805.yaml`**: August 2024 published weight selection
+- **`config/model/generic/full_chain/`**: Authoritative weight-free, dated model
+  compositions shared by inference and checkpoint export
+- **`config/model/common/full_chain/base_v1.yaml`**: Shared chain wiring composed
+  from the common component network and loss fragments
 
 **Post-processing Components:**
 - **`post/post_240718.yaml`**: Post-processing configuration (July 2024)

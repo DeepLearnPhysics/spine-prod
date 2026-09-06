@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic 240718 UResNet network
+
+include: model/common/uresnet/network_v1.yaml

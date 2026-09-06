@@ -5,6 +5,50 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added a generic staged-training prototype that trains UResNet-PPN,
+  materializes its canonical semantic predictions and adapted cluster truth,
+  and trains standalone Graph-SPICE from aligned raw data and cache inputs.
+- Added pipeline support for CLI-equivalent `source`, `source_list`,
+  `val_source`, `val_source_list`, and `set` stage fields.
+- Added structured composite `sources` and `validation_sources` pipeline
+  fields and module-specific checkpoint forwarding through `module_weight`.
+- Added per-stage scheduler resource overrides to pipeline definitions.
+- Added versioned common and generic model definitions for UResNet,
+  UResNet-PPN, Graph-SPICE, and the shower, track, and interaction GrapPA
+  stages, together with dated generic training benchmarks that pin explicit
+  model revisions. The `260828` GrapPA revisions follow SPINE's standalone
+  examples while preserving historical generic full-chain variants and omit
+  inapplicable closest-node relabeling from standalone interaction GrapPA.
+- Added first-class training and validation source forwarding through
+  `--source`/`--source-list` and `--val-source`/`--val-source-list`.
+- Added first-class forwarding for SPINE runtime resource and duration options.
+
+### Changed
+- Separated detector-independent model structures from detector-specific model
+  revisions under `config/model/common/` and `config/model/generic/`.
+- Moved the standard full-chain analyzer and metric-report recipes under
+  `config/test/common/`, with dataset selections recorded by each pipeline.
+- Updated the minimum/default SPINE runtime to v1.1.0.
+- Replaced generic TensorBoard `--set` overrides with SPINE's native
+  `--tensorboard` and `--tensorboard-dir` options.
+- Aligned SPINE world size with the effective scheduler GPU allocation and
+  rejected conflicting explicit process counts.
+
+### Fixed
+- Made `train/...` and other configuration paths resolve relative to the
+  standard `config/` search root, consistently with `infer/...` paths.
+- Allowed new training runs to use directories containing only empty directory
+  structure while continuing to reject material pre-existing content.
+- Avoided creating the default `runs/` directory when an explicit run directory
+  means it will not be used.
+- Fixed lifecycle-generated TensorBoard overrides being split by the scheduler
+  shell before reaching SPINE.
+- Made re-sourcing `configure.sh` refresh automatically derived container
+  version, tag, and path values without replacing explicit user overrides.
+
 ## [0.8.4] - 2026-09-02
 
 ### Added

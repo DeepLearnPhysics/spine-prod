@@ -1,0 +1,19 @@
+__meta__:
+  kind: fragment
+  version: "260828"
+  date: "2026-08-28"
+  description: Generic 260828 full-chain interaction GrapPA loss
+
+include: model/generic/grappa_inter/loss_260828.yaml
+
+override:
+  # Require reconstructed particles to substantially overlap one truth particle.
+  node_loss.type.min_iou: 0.5
+  node_loss.type.match_target: group
+
+  # Only the sufficiently matched piece nearest the true creation point may be
+  # supervised as an interaction primary after upstream particle aggregation.
+  node_loss.primary.use_closest: true
+  node_loss.primary.secondary_label: 0
+  node_loss.primary.min_iou: 0.5
+  node_loss.primary.match_target: group

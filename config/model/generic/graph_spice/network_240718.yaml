@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic 240718 Graph-SPICE network with KNN graph construction
+
+include: model/common/graph_spice/network_v1.yaml
+
+override:
+  embedder.uresnet.spatial_size: 6144
+  constructor.graph:
+    name: knn
+    k: 5

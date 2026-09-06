@@ -12,37 +12,10 @@ __meta__:
   tags: []
   training_set: "v1"
 
-include: model_common.yaml
+include: model/generic/full_chain/model_240718.yaml
 
 override:
   # First full chain weights for generic simulations
   model.weight_path: !download
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/generic/generic_snapshot_240718.ckpt
     hash: 94f47955e5d8ac7c8d39465e795a58ff48c65629b3b62c4b35954c5a7e38ba84
-
-  # PPN endpoint classification enabled
-  model.modules.uresnet_ppn.ppn.classify_endpoints: true
-
-  # PPN loss - do not restrict to clusters
-  model.modules.ppn_loss.restrict_to_clusters: false
-
-  # GraphSPICE spatial size
-  model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
-
-  # GraphSPICE constructor graph settings (knn-based)
-  model.modules.graph_spice.constructor.graph:
-    name: knn
-    k: 5
-
-  # Direction and dE/dx radii settings for GrapPA modules
-  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
-  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_track.node_encoder.dir_max_dist: -1
-  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1
-
-  # GraPPA inter-aggregation layer widths
-  model.modules.grappa_inter.gnn_model.edge_layer.mlp.width: 64
-  model.modules.grappa_inter.gnn_model.node_layer.message_mlp.width: 64
-  model.modules.grappa_inter.gnn_model.node_layer.aggr_mlp.width: 64

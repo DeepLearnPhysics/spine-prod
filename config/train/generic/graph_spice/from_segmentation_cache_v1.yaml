@@ -1,0 +1,29 @@
+__meta__:
+  kind: fragment
+  description: Generic Graph-SPICE training from cached semantics and adapted truth
+
+include: train/generic/graph_spice/base_v1.yaml
+
+remove:
+  - validation.file_keys
+
+override:
+  io.loader.dataset:
+    name: mixed
+    larcv:
+      file_keys: null
+      schema:
+        data:
+          parser: sparse3d
+          sparse_event: sparse3d_pcluster
+    hdf5:
+      file_keys: null
+      staged: true
+      stage: segmentation
+      keys: [seg_pred, clust_label_adapt]
+
+  validation.sources:
+    larcv:
+      file_keys: null
+    hdf5:
+      file_keys: null

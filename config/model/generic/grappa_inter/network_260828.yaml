@@ -1,0 +1,12 @@
+__meta__:
+  kind: fragment
+  version: "260828"
+  date: "2026-08-28"
+  description: Generic 260828 interaction GrapPA network matching the SPINE example
+
+include: model/common/grappa_inter/network_v1.yaml
+
+override:
+  gnn_model.edge_layer.mlp.width: 128
+  gnn_model.node_layer.message_mlp.width: 128
+  gnn_model.node_layer.aggr_mlp.width: 128

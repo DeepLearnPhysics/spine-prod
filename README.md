@@ -29,7 +29,8 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v0.17.1.
+The current default is SPINE v1.1.0. Maintained configurations require SPINE
+v1.1.0 or later.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
@@ -41,9 +42,12 @@ source configure.sh
 
 **Updating SPINE Version:** Update the repository default in
 `DEFAULT_SPINE_VERSION`. The default S3DF image path is derived automatically
-as `/sdf/data/neutrino/images/spine_v<version-with-dashes>.sif`.
+as `/sdf/data/neutrino/images/spine_v<version-with-dashes>.sif`. Re-source
+`configure.sh` after changing the file; automatically derived version, tag, and
+path values refresh together, while explicit overrides remain unchanged.
 ```bash
 echo x.y.z > DEFAULT_SPINE_VERSION
+source configure.sh
 ```
 
 ### 2. Basic Job Submission
@@ -78,8 +82,8 @@ echo x.y.z > DEFAULT_SPINE_VERSION
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
 # Start a persistent training run using the loader defined in the config
-./submit.py --config config/train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default
+./submit.py --config train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default
 
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
@@ -108,7 +112,7 @@ Interactive mode performs all the same config composition, file chunking, and en
 ./submit.py -I --config infer/icarus/latest --source /path/to/test.root
 
 # Force container-backed interactive execution
-./submit.py -I --interactive-runtime container --config infer/generic/latest --source test.root --set base.world_size=0
+./submit.py -I --interactive-runtime container --config infer/generic/latest --source test.root --world-size 0
 
 # Test with modifiers applied
 ./submit.py -I --config infer/icarus/latest --source test.root --apply-mods data lite
@@ -132,7 +136,7 @@ instead of the `spine` executable on `PATH`. The checkout root is added to
 container bind paths automatically where supported.
 
 ```bash
-./submit.py --spine-path /path/to/spine -I --interactive-runtime local --config infer/generic/latest --source test.root --set base.world_size=0
+./submit.py --spine-path /path/to/spine -I --interactive-runtime local --config infer/generic/latest --source test.root --world-size 0
 ```
 
 ### EAF Interactive Container Setup
@@ -155,6 +159,7 @@ spine-prod/
 ├── README.md                # This file
 │
 ├── config/                  # All SPINE configs (inference & training)
+│   ├── cache/               # Stage-cache materialization configs
 │   ├── infer/               # Inference configs (referenced as infer/...)
 │   │   ├── 2x2/             # 2x2 detector configs
 │   │   ├── dune10kt-1x2x6/  # DUNE 10 kt module 1x2x6 configs
@@ -165,6 +170,7 @@ spine-prod/
 │   │   ├── protodune-vd/    # ProtoDUNE vertical-drift configs
 │   │   ├── sbnd/            # SBND detector configs
 │   │   └── common/          # Shared configs
+│   ├── model/               # Common structures and detector revisions
 │   └── train/               # Training configs (referenced as train/...)
 ├── templates/               # Job templates
 │   ├── profiles.yaml        # Resource profiles
@@ -173,6 +179,8 @@ spine-prod/
 │   └── job_template_anl.pbs
 │
 ├── pipelines/               # Multi-stage pipeline definitions
+│   ├── generic/              # Generic detector workflow revisions
+│   │   └── uresnet_ppn_to_graph_spice_240805.yaml
 │   └── icarus_production_example.yaml
 │
 ├── scripts/                 # Utility scripts
@@ -242,12 +250,16 @@ Profile allocations are designed to:
 - **Turing**: Request full resources per GPU (4 CPUs × 4 GB/CPU = 16 GB per GPU)
 - **CPU nodes**: Request minimal resources (1 CPU × 4 GB = 4 GB) for flexible scheduling
 
+All `*_full` GPU profiles request exclusive access to the allocated node.
+
 ### Available Profiles
 
 | Profile | Partition | GPU Type | GPU Memory | GPUs | CPUs | Memory | Time | Use Case |
 |---------|-----------|----------|------------|------|------|--------|------|----------|
 | `s3df_hopper` | hopper | H200 | 141 GB | 1 | 56 | 6 GB/CPU | 2h | Highest-performance GPU processing |
+| `s3df_hopper_full` | hopper | H200 | 141 GB | 4 | 224 | 6 GB/CPU | 2h | Full-node distributed training |
 | `s3df_ampere` | ampere | A100 | 40 GB | 1 | 28 | 8 GB/CPU | 2h | High-performance GPU processing (default) |
+| `s3df_ampere_full` | ampere | A100 | 40 GB | 4 | 112 | 8 GB/CPU | 2h | Full-node distributed training |
 | `s3df_turing` | turing | RTX 2080 Ti | 11 GB | 1 | 4 | 4GB/CPU | 2h | Cheaper GPU inference |
 | `s3df_milano` | milano | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
 | `s3df_roma` | roma | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
@@ -273,14 +285,29 @@ Profile allocations are designed to:
 |---------|-----------|----------|------------|------|------|--------|------|----------|
 | `nersc_gpu` | gpu_ss11 | A100 | 40 GB | 1 | 32 | 4 GB/CPU | 2h | Standard GPU processing (default, best availability) |
 | `nersc_gpu_80gb` | gpu_ss11 | A100 | 80 GB | 1 | 32 | 4 GB/CPU | 2h | High-memory GPU processing (limited availability) |
-| `nersc_gpu_exclusive` | gpu | A100 | 40 GB | 4 | 32 | 4 GB/CPU | 2h | Full-node exclusive access (training) |
+| `nersc_gpu_full` | gpu | A100 | 40 GB | 4 | 128 | Full node | 2h | Full-node training |
+| `nersc_gpu_full_80gb` | gpu | A100 | 80 GB | 4 | 128 | Full node | 2h | Full-node high-memory training |
 | `nersc_cpu` | shared | - | - | 0 | 1 | 4 GB/CPU | 2h | CPU-only analysis |
 
-**Note:** The `nersc_gpu` profile uses 40GB A100s by default since there are 6x more nodes available (1,536 vs 256), resulting in significantly faster queue times. Use `nersc_gpu_80gb` only when you specifically need >40GB GPU memory.
+**Note:** The `nersc_gpu` profile uses 40GB A100s by default since there are 6x more nodes available (1,536 vs 256), resulting in significantly faster queue times. Use `nersc_gpu_80gb` only when you specifically need >40GB GPU memory. The former `nersc_gpu_exclusive` names remain available as backward-compatible aliases for the corresponding `*_full` profiles.
+
+### ANL Polaris Available Profiles
+
+| Profile | Queue | GPUs | CPUs | Time | Use Case |
+|---------|-------|------|------|------|----------|
+| `anl_polaris_capacity` | capacity | 1 | 16 | 2h | Standard single-GPU processing |
+| `anl_polaris_capacity_full` | capacity | 4 | 64 | 2h | Full-node distributed training |
+| `anl_polaris_debug` | debug | 1 | 16 | 1h | Short single-GPU testing |
+| `anl_polaris_debug_full` | debug | 4 | 64 | 1h | Short full-node testing |
 
 ### Profile Selection
 
 Profiles are auto-detected based on detector and config, or can be specified explicitly:
+
+For batch jobs, spine-prod derives SPINE's world size from the effective GPU
+allocation after applying profile overrides. For example, `--gpus 4` both
+requests four GPUs and launches four SPINE processes. `--world-size` is an
+optional assertion and is rejected when it disagrees with the allocation.
 
 ```bash
 # Auto-detect (default)
@@ -295,8 +322,11 @@ Profiles are auto-detected based on detector and config, or can be specified exp
 # Override specific resources
 ./submit.py --config infer/icarus/latest --source data.root --time 2:00:00 --cpus-per-task 8
 
+# Exclude known-bad nodes from a Slurm submission
+./submit.py --config infer/icarus/latest --source data.root --exclude sdfampere014
+
 # Override SPINE configuration values at runtime
-./submit.py --config infer/generic/latest --source data.root --set base.world_size=0
+./submit.py --config infer/generic/latest --source data.root --batch-size 1
 
 # Preload model weights on the submit host before submitting
 ./submit.py --config infer/2x2/full_chain_240819.yaml --source data.root --profile anl_polaris_debug --preload
@@ -315,10 +345,11 @@ logs, TensorBoard events, and submission records remain associated.
 ### Start a Training Run
 
 The training configuration owns the model, data loader, optimizer, total epoch
-count, checkpoint interval, and optional on-the-fly validation. SPINE v0.17.0
+count, checkpoint interval, and optional on-the-fly validation. SPINE v1.0.0
 uses a top-level `train` block and an optional sibling `validation` block;
-spine-prod owns artifact locations. Inputs for training and validation must be
-configured in SPINE rather than passed through `--source` or `--source-list`.
+spine-prod owns artifact locations. Inputs may remain in the configuration or
+be supplied at submission time with `--source`/`--source-list` for training and
+`--val-source`/`--val-source-list` for integrated validation.
 
 For a new production, running validation in the training process is the
 recommended strategy. It evaluates the live model at checkpoint boundaries,
@@ -350,18 +381,19 @@ validation:
 
 ```bash
 ./submit.py \
-  --config config/train/icarus/deghost/deghost.yaml \
+  --config train/generic/uresnet/train_240718.yaml \
   --stage train \
-  --run-dir /path/to/experiments/deghost/default \
+  --run-dir /path/to/experiments/uresnet/default \
   --profile nersc_gpu_exclusive \
   --tensorboard \
-  --set io.loader.dataset.file_keys=/path/to/train_file_list.txt
+  --source-list /path/to/train_file_list.txt \
+  --val-source-list /path/to/validation_file_list.txt
 ```
 
 A new training run refuses to use a nonempty directory. Its artifact layout is:
 
 ```text
-experiments/deghost/default/
+experiments/uresnet/default/
 ├── run_metadata.json
 ├── train_log-0000000.csv
 ├── weights/
@@ -372,13 +404,22 @@ experiments/deghost/default/
 ├── tensorboard/
 │   ├── train/
 │   └── validation/
-└── submissions/
-    └── train/
-        └── TIMESTAMP/
-            ├── job_metadata.json
-            ├── submit.sbatch
-            └── logs/
+├── latest -> attempts/TIMESTAMP
+├── stdout.log -> latest/stdout.log
+├── stderr.log -> latest/stderr.log
+└── attempts/
+    └── TIMESTAMP/
+        ├── inputs.txt
+        ├── validation_inputs.txt
+        ├── job_metadata.json
+        ├── submit.sbatch
+        ├── stdout.log
+        └── stderr.log
 ```
+
+`tensorboard/` is created only when TensorBoard is requested. The timestamped
+attempt preserves an exact submission record, while the stable links make the
+current scheduler logs available directly from the run root.
 
 Use sibling run directories such as `default`, `augment`, and `ablate` for
 comparable variants of one experiment.
@@ -389,9 +430,9 @@ If training is interrupted, resume the same run explicitly:
 
 ```bash
 ./submit.py \
-  --config config/train/icarus/deghost/deghost.yaml \
+  --config train/generic/uresnet/train_240718.yaml \
   --stage train \
-  --run-dir /path/to/experiments/deghost/default \
+  --run-dir /path/to/experiments/uresnet/default \
   --profile nersc_gpu_exclusive \
   --resume
 ```
@@ -399,7 +440,7 @@ If training is interrupted, resume the same run explicitly:
 spine-prod's `--resume` selects the checkpoint with the largest numeric suffix,
 passes that exact path together with SPINE's strict `--resume` flag, reuses
 `weights/snapshot` as the checkpoint prefix, and writes a new
-`train_log-<start>.csv` segment beside the old log. SPINE v0.17.0 restores all
+`train_log-<start>.csv` segment beside the old log. SPINE v1.0.0 restores all
 available optimizer, scheduler, epoch, RNG, and loader continuation state;
 missing state required by strict resume is an error. SPINE's `TrainDrawer`
 concatenates the log segments. To roll back intentionally, use
@@ -413,7 +454,7 @@ verification.
 
 The configured epoch count remains the total target, not a number of additional
 epochs. To extend a run without changing the stored configuration file, pass a
-runtime override such as `--set base.epochs=400` when resuming.
+runtime override such as `--epochs 400` when resuming.
 
 ### Run Validation Independently
 
@@ -421,9 +462,9 @@ Attach standalone validation to the training run:
 
 ```bash
 ./submit.py \
-  --config /path/to/deghost_val.yaml \
+  --config /path/to/uresnet_validation.yaml \
   --stage validation \
-  --run-dir /path/to/experiments/deghost/default \
+  --run-dir /path/to/experiments/uresnet/default \
   --profile nersc_gpu \
   --tensorboard
 ```
@@ -441,10 +482,10 @@ CSV files beside the training logs, which is the layout expected by
 
 ```bash
 ./submit.py \
-  --config /path/to/deghost_data_val.yaml \
+  --config /path/to/uresnet_data_validation.yaml \
   --stage validation \
   --validation-name data \
-  --run-dir /path/to/experiments/deghost/default
+  --run-dir /path/to/experiments/uresnet/default
 ```
 
 Named CSV logs live under `validation/<name>/`, and their TensorBoard events
@@ -452,7 +493,7 @@ live under `tensorboard/validation/<name>/`. Validation identity includes the
 configuration digest; changing a suite's configuration requires a new name or
 an explicit `--rerun-validation`.
 
-With SPINE v0.17.0, the primary validation configured alongside `train` needs
+With SPINE v1.0.0, the primary validation configured alongside `train` needs
 only the training command. Standalone validation remains useful for legacy
 runs, alternate datasets, and checkpoints produced without integrated
 validation or after changing the validation policy.
@@ -464,7 +505,7 @@ The primary CSV layout can be passed directly to SPINE's `TrainDrawer`:
 ```python
 from spine.vis.drawer.train import TrainDrawer
 
-drawer = TrainDrawer("/path/to/experiments/deghost")
+drawer = TrainDrawer("/path/to/experiments/uresnet")
 drawer.draw(
     model=["default", "augment", "ablate"],
     metric="loss",
@@ -476,7 +517,7 @@ TensorBoard discovers the corresponding train and validation event streams
 recursively:
 
 ```bash
-tensorboard --logdir /path/to/experiments/deghost
+tensorboard --logdir /path/to/experiments/uresnet
 ```
 
 ## Pipeline Mode
@@ -488,59 +529,208 @@ Pipelines allow you to chain multiple processing stages with automatic dependenc
 Create a YAML file in `pipelines/`:
 
 ```yaml
+workspace: null
+
+variables:
+  raw_source: /path/to/raw/*.root
+
+defaults:
+  profile: s3df_ampere
+  time: "08:00:00"
+
 stages:
   - name: reconstruction
     config: infer/icarus/latest
-    files: /path/to/raw/*.root
-    profile: s3df_ampere
+    source: ${raw_source}
+    run_dir: ${workspace}/reconstruction
+    output: ${workspace}/reconstruction/output
     ntasks: 100
     # Replace with a concrete YAML config if you need specific modifiers
-  
+
   - name: analysis
     depends_on: [reconstruction]  # Wait for reconstruction to complete
     config: path/to/downstream_stage.yaml
-    files: output_reco/*.h5
+    source: ${workspace}/reconstruction/output/*.h5
+    run_dir: ${workspace}/analysis
     profile: s3df_milano
     ntasks: 20
 ```
 
+`workspace` defines the pipeline's shared output root and is available as the
+reserved `${workspace}` variable. Declaring `workspace: null` keeps a checked-in
+pipeline independent of its launch location and requires an explicit
+`--workspace` at submission. A concrete YAML value remains a valid default and
+can also be overridden from the CLI. Pipelines that do not use a shared
+workspace may omit the field entirely.
+
+Additional string values under `variables` can reference the workspace or one
+another. Expansion applies recursively to stage fields, including structured
+sources and module weights. Undefined variables, dependency cycles, missing
+required workspaces, and invalid declarations fail before any job is submitted;
+environment variables are not expanded implicitly.
+
+Repeated stage variants can be declared as a flat string collection and
+expanded before validation:
+
+```yaml
+collections:
+  splits:
+    - name: train
+      source: /data/train.root
+    - name: validation
+      source: /data/test.root
+
+stages:
+  - name: cache_${split.name}
+    for_each:
+      collection: splits
+      as: split
+    config: cache/example.yaml
+    source: ${split.source}
+```
+
+This produces the concrete `cache_train` and `cache_validation` stages. It is
+load-time shorthand only: dependencies still name concrete stages explicitly,
+and each expanded stage remains an independent scheduler job.
+
 ### Submit Pipeline
 
 ```bash
-./submit.py --pipeline pipelines/my_pipeline.yaml
+./submit.py \
+  --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/production
 ```
+
+Pipeline-wide CLI overrides take precedence over individual stage values, which
+in turn take precedence over `defaults`. This is useful for launch-specific
+software and scheduler settings:
+
+```bash
+./submit.py \
+  --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/production \
+  --spine-path /path/to/spine \
+  --profile s3df_hopper \
+  --account my_account
+```
+
+Software paths, profiles, scheduler resources, and first-class SPINE runtime
+options can be overridden pipeline-wide. Inputs, outputs, run directories,
+dependencies, model weights, and lifecycle options remain stage-specific and
+must be configured in YAML. Unsupported pipeline CLI options and unknown YAML
+fields fail before any jobs are submitted. `--spine` is an explicit alias for
+`--spine-path`.
+
+### Restart a Pipeline
+
+After canceling or confirming termination of a failed pipeline submission,
+restart it at the first failed stage while retaining its workspace:
+
+```bash
+./submit.py \
+  --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/production \
+  --from-stage cache_train_fragment_graphs
+```
+
+Stages earlier in pipeline order are treated as completed. Dependencies among
+the selected stages are rebuilt with the new scheduler IDs, while dependencies
+on skipped stages are considered satisfied by their existing artifacts.
+Use `--to-stage NAME` to stop at an inclusive boundary when only a bounded
+range should be regenerated.
+
+On Slurm, dependent stages are submitted with
+`--kill-on-invalid-dep=yes`, so a stage is canceled automatically when an
+upstream `afterok` dependency can no longer succeed. PBS Professional provides
+the corresponding deletion behavior as part of its native dependency
+semantics and requires no additional directive.
+
+Every submission, including the first, receives a new `attempts/TIMESTAMP`
+directory, preserving earlier scripts, logs, and metadata. Each stage root has
+a `latest` link to its current attempt. A retried
+training stage resumes its latest valid checkpoint automatically. If its
+previous scheduler job never started, the unchanged empty training run is
+reused. A run containing training logs but no checkpoint is rejected because
+there is no unambiguous state from which to resume. Do not use `--from-stage`
+while jobs from the previous submission are still active.
+
+Pipeline stages accept the CLI-equivalent `source`, `source_list`,
+`val_source`, and `val_source_list` fields. Composite datasets use structured
+`sources` and `validation_sources`, while `module_weight` forwards named model
+checkpoints through SPINE's native CLI. A model-only `export_weights` stage
+composes those checkpoints into one inference artifact without initializing
+data I/O. An inference stage with `in_place: true` passes no `--output`,
+`--output-dir`, or `--output-suffix` override, leaving writer routing entirely
+to SPINE. This is the intended mode for extending a staged HDF5 cache through
+SPINE's transactional sidecar mechanism; it cannot be combined with explicit
+writer output fields. See
+`pipelines/generic/full_chain_240805.yaml` for a complete staged-training
+prototype with centralized paths. Its materialization jobs append successive
+stage groups to one source-derived HDF5 cache per training or validation file,
+then compose the independently trained modules into one full-chain checkpoint.
+The generic full-chain pipelines finally evaluate that assembled checkpoint
+with SPINE's metric analyzers and submit a CPU-only `kind: report` reduction.
+The report stage waits for all metric inference jobs, records dataset,
+selection, and checkpoint provenance, and writes plots plus `summary.json` under
+`metrics/full_chain/report/artifacts`.
 
 ## Run Management
 
 ### Job Artifacts
 
-Inference creates a timestamped directory in `runs/` automatically. Explicit
-inputs are divided into scheduler chunks and each array task receives its own
-input list, SPINE logs, and output directory:
+Inference creates a timestamped run directory automatically. Every submission
+uses the same attempt layout. The common single-task case is deliberately
+flat:
 
 ```
 runs/20260810_143022_spine_icarus_latest/
-├── job_metadata.json
-├── scheduler/
-│   └── chunk_000/
-│       ├── submit.sbatch
-│       └── logs/                 # Scheduler stdout/stderr
-└── tasks/
-    └── chunk_000/
-        ├── task_1/
-        │   ├── inputs.txt
-        │   ├── logs/             # SPINE CSV logs
-        │   └── output/           # Outputs for this task only
-        └── task_2/
-            ├── inputs.txt
-            ├── logs/
-            └── output/
+├── latest -> attempts/TIMESTAMP
+├── stdout.log -> latest/stdout.log
+├── stderr.log -> latest/stderr.log
+└── attempts/
+    └── TIMESTAMP/
+        ├── inputs.txt
+        ├── job_metadata.json
+        ├── submit.sbatch
+        ├── stdout.log
+        ├── stderr.log
+        ├── inference_log-*.csv
+        └── output/
 ```
 
-Chunk directories also bound the number of entries in each task directory.
+`output/` is created only when spine-prod supplies the default writer output;
+it is omitted when `--output` selects an external destination or `--in-place`
+leaves the writer destination config-defined. There are no empty scheduler,
+task, or log directories.
+
+Only a real scheduler array creates task directories. Scheduler chunking is
+represented by numbered submit scripts instead of another directory layer:
+
+```
+attempts/TIMESTAMP/
+├── job_metadata.json
+├── submit_000.sbatch
+├── submit_001.sbatch
+├── JOB_*.out                   # Scheduler array logs
+├── JOB_*.err
+└── tasks/
+    ├── 000_1/
+    │   ├── inputs.txt
+    │   ├── inference_log-*.csv
+    │   └── output/
+    └── 000_2/
+        └── ...
+```
+
 Use an explicit `--output` only when a deliberately shared or externally
 managed output location is required. An optional `--run-dir` can select a
-specific new inference directory; it must be empty.
+specific new inference directory; it must be empty. Existing run trees are not
+migrated or modified; the new layout applies to new attempts.
+
+Pipeline workspaces also expose `logs/<stage>`, a symlink to each stage's
+latest attempt. Thus the current scheduler log for a scalar stage is available
+as `WORKSPACE/logs/STAGE/stdout.log` or `stderr.log` without traversing the
+stage's durable artifact hierarchy.
 
 ### Monitoring Jobs
 
@@ -557,8 +747,11 @@ qstat -u $USER
 # View job details on PBS
 qstat -fx <job_id>
 
-# View logs
-tail -f runs/<run_dir>/scheduler/chunk_*/logs/*.out
+# View the latest scalar-job log
+tail -f runs/<run_dir>/stdout.log
+
+# View one pipeline stage's latest log
+tail -f <workspace>/logs/<stage>/stdout.log
 
 # Cancel job on SLURM
 scancel <job_id>
@@ -725,7 +918,8 @@ pip install jinja2 pyyaml
 
 ### Job Failures
 
-1. Check batch logs in `runs/<run_dir>/scheduler/chunk_*/logs/`
+1. Check the latest batch log at `runs/<run_dir>/stdout.log` and
+   `runs/<run_dir>/stderr.log` (or inspect `latest/` for an array)
 2. Review run metadata in `runs/<run_dir>/job_metadata.json`
 3. Test configuration on a single file with `--dry-run`
 4. Verify input files exist and are accessible
@@ -808,7 +1002,9 @@ Set by `configure.sh`:
 - `SPINE_CONTAINER_VERSION` - Tagged SPINE container version
 - `SPINE_CONTAINER_PATH` - Singularity/Apptainer image path
 - `SPINE_CONTAINER_TAG` - Registry image tag for Shifter-style runtimes, including `docker:`
+- `SPINE_CONTAINER_VERSION_AUTO` - Tracks whether the version follows the repository default
 - `SPINE_CONTAINER_PATH_AUTO` - Tracks whether `SPINE_CONTAINER_PATH` was auto-derived
+- `SPINE_CONTAINER_TAG_AUTO` - Tracks whether the registry tag was auto-derived
 - `SPINE_CONTAINER_RUNTIME_BIN` - Optional full path or command name for the Singularity/Apptainer executable used by interactive SIF execution
 - `SPINE_CONTAINER_RUNTIME_ARGS` - Optional extra Singularity/Apptainer arguments for interactive SIF execution
 - `SPINE_CONTAINER_PLATFORM` - Docker/Podman platform for interactive fallback

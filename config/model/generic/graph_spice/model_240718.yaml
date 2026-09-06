@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic Graph-SPICE model revision with KNN graph construction
+
+include: model/common/graph_spice/base_v1.yaml
+
+override:
+  model.modules.graph_spice: !include model/generic/graph_spice/network_240718.yaml
+  model.modules.graph_spice_loss: !include model/generic/graph_spice/loss_240718.yaml

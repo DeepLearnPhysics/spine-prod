@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic 240805 point proposal loss restricted to clusters
+
+include: model/common/uresnet_ppn/ppn_loss_v1.yaml
+
+override:
+  restrict_to_clusters: true

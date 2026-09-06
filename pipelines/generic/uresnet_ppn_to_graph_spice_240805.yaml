@@ -1,0 +1,66 @@
+# Prototype transition: train UResNet-PPN, cache its predictions and adapted
+# cluster truth, then train standalone Graph-SPICE from those stage products.
+# Supply the workflow destination with CLI --workspace.
+# The cache naming matches the appendable full-chain workflow.
+
+workspace: null
+
+variables:
+  train_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/train.root
+  validation_source: /sdf/data/neutrino/generic/mpvmpr_2020_01_v04/test.root
+
+collections:
+  splits:
+    - name: train
+      source: ${train_source}
+      cache_dir: ${workspace}/cache/train
+      cache_file: ${workspace}/cache/train/train_cache.h5
+    - name: validation
+      source: ${validation_source}
+      cache_dir: ${workspace}/cache/validation
+      cache_file: ${workspace}/cache/validation/test_cache.h5
+
+defaults:
+  profile: s3df_ampere
+  time: "08:00:00"
+
+stages:
+  - name: train_uresnet_ppn
+    config: train/generic/uresnet_ppn/train_240805.yaml
+    stage: train
+    source: ${train_source}
+    val_source: ${validation_source}
+    run_dir: ${workspace}/train/uresnet_ppn
+    tensorboard: true
+
+  - name: cache_${split.name}_segmentation
+    for_each:
+      collection: splits
+      as: split
+    depends_on: [train_uresnet_ppn]
+    config: cache/generic/uresnet_ppn/segmentation_240805.yaml
+    source: ${split.source}
+    run_dir: ${split.cache_dir}/segmentation
+    output: ${split.cache_dir}
+    output_suffix: cache
+    files_per_task: 1
+    ntasks: 50
+    module_weight:
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
+
+  - name: train_graph_spice
+    depends_on: [cache_train_segmentation, cache_validation_segmentation]
+    config: train/generic/graph_spice/train_from_uresnet_ppn_240805.yaml
+    stage: train
+    run_dir: ${workspace}/train/graph_spice
+    tensorboard: true
+    sources:
+      larcv:
+        source: ${train_source}
+      hdf5:
+        source: ${workspace}/cache/train/train_cache.h5
+    validation_sources:
+      larcv:
+        source: ${validation_source}
+      hdf5:
+        source: ${workspace}/cache/validation/test_cache.h5

@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260828"
+  date: "2026-08-28"
+  description: Generic shower GrapPA benchmark matching the SPINE standalone example
+
+include:
+  - model/generic/grappa_shower/model_260828.yaml
+  - train/generic/grappa_shower/base_v1.yaml

@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  version: "240805"
+  date: "2024-08-05"
+  description: Generic 240805 point proposal network without endpoint classification
+
+include: model/common/uresnet_ppn/ppn_v1.yaml
+
+override:
+  classify_endpoints: false

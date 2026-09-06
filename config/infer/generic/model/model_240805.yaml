@@ -12,37 +12,10 @@ __meta__:
   tags: []
   training_set: "v1"
 
-include: model_common.yaml
+include: model/generic/full_chain/model_240805.yaml
 
 override:
   # First full chain weights for generic simulations
   model.weight_path: !download
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/generic/generic_snapshot_240805.ckpt
     hash: 212be7374716ad23962be9b1cd5556f0556a4ec06760946b263521ad4bfdd044
-
-  # PPN endpoint classification enabled
-  model.modules.uresnet_ppn.ppn.classify_endpoints: false
-
-  # PPN loss - restrict to clusters
-  model.modules.ppn_loss.restrict_to_clusters: true
-
-  # GraphSPICE spatial size (smaller than 240718)
-  model.modules.graph_spice.embedder.uresnet.spatial_size: 768
-
-  # GraphSPICE constructor graph settings (radius-based)
-  model.modules.graph_spice.constructor.graph:
-    name: radius
-    r: 1.9
-
-  # GraPPA inter-aggregation layer widths (wider than 240718)
-  model.modules.grappa_inter.gnn_model.edge_layer.mlp.width: 128
-  model.modules.grappa_inter.gnn_model.node_layer.message_mlp.width: 128
-  model.modules.grappa_inter.gnn_model.node_layer.aggr_mlp.width: 128
-
-  # Direction and dE/dx radii settings for GrapPA modules
-  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
-  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_track.node_encoder.dir_max_dist: -1
-  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1

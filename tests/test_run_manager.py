@@ -55,8 +55,7 @@ def test_config_digest_and_new_training_run(tmp_path):
     assert metadata["training_config"] == str(Path(config).resolve())
     assert metadata["training_config_sha256"] == RunManager.config_digest(config)
     assert (run_dir / "weights").is_dir()
-    assert (run_dir / "tensorboard" / "train").is_dir()
-    assert (run_dir / "tensorboard" / "validation").is_dir()
+    assert not (run_dir / "tensorboard").exists()
 
 
 def test_new_training_run_rejects_existing_run_and_unrelated_content(tmp_path):
@@ -82,6 +81,7 @@ def test_new_training_run_allows_internal_config_workspace(tmp_path):
     config = write_config(tmp_path / "train.yaml")
     run_dir = tmp_path / "default"
     (run_dir / ".spine-prod" / "configs").mkdir(parents=True)
+    (run_dir / "precreated" / "empty" / "directories").mkdir(parents=True)
 
     assert RunManager.prepare_training_run(run_dir, config) is None
 
@@ -96,6 +96,29 @@ def test_resume_requires_matching_run_config_and_checkpoint(tmp_path):
     write_config(Path(config), "base:\n  epochs: 2\n")
     with pytest.raises(ValueError, match="different training configuration"):
         RunManager.prepare_training_run(run_dir, config, resume=True)
+
+
+def test_retry_reuses_unstarted_run_or_latest_checkpoint(tmp_path):
+    """Pipeline retries should handle canceled and interrupted training jobs."""
+    run_dir, config = initialize_run(tmp_path)
+    RunManager.record_training_jobs(run_dir, ["123"])
+
+    assert RunManager.prepare_training_run(run_dir, config, retry=True) is None
+
+    latest = checkpoint(run_dir, 100)
+    assert RunManager.prepare_training_run(run_dir, config, retry=True) == latest
+
+
+def test_retry_rejects_ambiguous_or_changed_training_run(tmp_path):
+    """Retry must not restart an unverifiable partial run from scratch."""
+    run_dir, config = initialize_run(tmp_path)
+    (run_dir / "train_log-0000001.csv").write_text("iter,loss\n0,1\n")
+    with pytest.raises(ValueError, match="logs but no checkpoint"):
+        RunManager.prepare_training_run(run_dir, config, retry=True)
+
+    changed = write_config(tmp_path / "changed.yaml", "base:\n  epochs: 2\n")
+    with pytest.raises(ValueError, match="different configuration"):
+        RunManager.prepare_training_run(run_dir, changed, retry=True)
 
     metadata = json.loads((run_dir / "run_metadata.json").read_text())
     metadata["training_config_sha256"] = RunManager.config_digest(config)
@@ -232,11 +255,26 @@ def test_prepare_validation_checks_run_checkpoints_and_identity(tmp_path):
     assert selected == [saved]
 
 
-def test_create_stage_submission_directories(tmp_path):
-    train = RunManager.create_submission_dir(tmp_path, "train")
-    validation = RunManager.create_submission_dir(tmp_path, "validation", "data")
+def test_create_attempt_directory_and_stable_links(tmp_path):
+    attempt = RunManager.create_attempt_dir(tmp_path)
 
-    assert train.parent == tmp_path / "submissions" / "train"
-    assert (train / "logs").is_dir()
-    assert validation.parent == tmp_path / "submissions" / "validation" / "data"
-    assert (validation / "logs").is_dir()
+    assert attempt.parent == tmp_path / "attempts"
+    assert (tmp_path / "latest").resolve() == attempt
+    assert list(attempt.iterdir()) == []
+
+    RunManager.expose_attempt_logs(tmp_path, has_array=False)
+    assert (tmp_path / "stdout.log").readlink() == Path("latest/stdout.log")
+    assert (tmp_path / "stderr.log").readlink() == Path("latest/stderr.log")
+
+    RunManager.expose_attempt_logs(tmp_path, has_array=True)
+    assert not (tmp_path / "stdout.log").is_symlink()
+    assert not (tmp_path / "stderr.log").is_symlink()
+
+
+def test_replace_symlink_rejects_existing_regular_path(tmp_path):
+    """Managed links must never overwrite an ordinary filesystem entry."""
+    link = tmp_path / "latest"
+    link.touch()
+
+    with pytest.raises(ValueError, match="Cannot replace non-symlink path"):
+        RunManager.replace_symlink(link, Path("attempts/current"))
