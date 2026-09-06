@@ -29,7 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Separated detector-independent model structures from detector-specific model
   revisions under `config/model/common/` and `config/model/generic/`.
-- Updated the minimum/default SPINE runtime to v1.0.4.
+- Moved the standard full-chain analyzer and metric-report recipes under
+  `config/test/common/`, with dataset selections recorded by each pipeline.
+- Updated the minimum/default SPINE runtime to v1.1.0.
 - Replaced generic TensorBoard `--set` overrides with SPINE's native
   `--tensorboard` and `--tensorboard-dir` options.
 - Aligned SPINE world size with the effective scheduler GPU allocation and

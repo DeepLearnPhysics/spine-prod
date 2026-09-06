@@ -4,7 +4,7 @@ import shlex
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import yaml
 
@@ -23,6 +23,7 @@ class ReportRunner(SubmissionComponent):
         run_dir: str,
         checkpoint: Optional[str] = None,
         dataset: Optional[str] = None,
+        dataset_selection: Optional[Mapping[str, Any]] = None,
         profile: str = "s3df_milano",
         job_name: str = "spine_report",
         dependency: Optional[str] = None,
@@ -53,6 +54,7 @@ class ReportRunner(SubmissionComponent):
             attempt_dir,
             checkpoint=checkpoint,
             dataset=dataset,
+            dataset_selection=dataset_selection,
         )
 
         profile_config = self.config_mgr.get_profile(profile, detector)
@@ -156,6 +158,9 @@ class ReportRunner(SubmissionComponent):
             "output_dir": output_path,
             "checkpoint": checkpoint,
             "dataset": dataset,
+            "dataset_selection": (
+                dict(dataset_selection) if dataset_selection is not None else None
+            ),
             "spine_path": spine_path,
             "profile": profile,
             "profile_config": profile_config,
@@ -172,6 +177,7 @@ class ReportRunner(SubmissionComponent):
         attempt_dir: Path,
         checkpoint: Optional[str],
         dataset: Optional[str],
+        dataset_selection: Optional[Mapping[str, Any]] = None,
     ) -> Path:
         """Copy a report recipe while injecting run-specific provenance."""
         document = yaml.safe_load(source.read_text(encoding="utf-8")) or {}
@@ -182,6 +188,8 @@ class ReportRunner(SubmissionComponent):
             metadata["checkpoint"] = checkpoint
         if dataset is not None:
             metadata["dataset"] = dataset
+        if dataset_selection is not None:
+            metadata["dataset_selection"] = dict(dataset_selection)
         document["metadata"] = metadata
 
         destination = attempt_dir / "report.yaml"

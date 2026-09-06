@@ -29,8 +29,8 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v1.0.4. Maintained configurations require SPINE
-v1.0.4 or later.
+The current default is SPINE v1.1.0. Maintained configurations require SPINE
+v1.1.0 or later.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
@@ -82,8 +82,8 @@ source configure.sh
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
 # Start a persistent training run using the loader defined in the config
-./submit.py --config train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default
+./submit.py --config train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default
 
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
@@ -381,9 +381,9 @@ validation:
 
 ```bash
 ./submit.py \
-  --config train/icarus/deghost/deghost.yaml \
+  --config train/generic/uresnet/train_240718.yaml \
   --stage train \
-  --run-dir /path/to/experiments/deghost/default \
+  --run-dir /path/to/experiments/uresnet/default \
   --profile nersc_gpu_exclusive \
   --tensorboard \
   --source-list /path/to/train_file_list.txt \
@@ -393,7 +393,7 @@ validation:
 A new training run refuses to use a nonempty directory. Its artifact layout is:
 
 ```text
-experiments/deghost/default/
+experiments/uresnet/default/
 ├── run_metadata.json
 ├── train_log-0000000.csv
 ├── weights/
@@ -430,9 +430,9 @@ If training is interrupted, resume the same run explicitly:
 
 ```bash
 ./submit.py \
-  --config train/icarus/deghost/deghost.yaml \
+  --config train/generic/uresnet/train_240718.yaml \
   --stage train \
-  --run-dir /path/to/experiments/deghost/default \
+  --run-dir /path/to/experiments/uresnet/default \
   --profile nersc_gpu_exclusive \
   --resume
 ```
@@ -462,9 +462,9 @@ Attach standalone validation to the training run:
 
 ```bash
 ./submit.py \
-  --config /path/to/deghost_val.yaml \
+  --config /path/to/uresnet_validation.yaml \
   --stage validation \
-  --run-dir /path/to/experiments/deghost/default \
+  --run-dir /path/to/experiments/uresnet/default \
   --profile nersc_gpu \
   --tensorboard
 ```
@@ -482,10 +482,10 @@ CSV files beside the training logs, which is the layout expected by
 
 ```bash
 ./submit.py \
-  --config /path/to/deghost_data_val.yaml \
+  --config /path/to/uresnet_data_validation.yaml \
   --stage validation \
   --validation-name data \
-  --run-dir /path/to/experiments/deghost/default
+  --run-dir /path/to/experiments/uresnet/default
 ```
 
 Named CSV logs live under `validation/<name>/`, and their TensorBoard events
@@ -505,7 +505,7 @@ The primary CSV layout can be passed directly to SPINE's `TrainDrawer`:
 ```python
 from spine.vis.drawer.train import TrainDrawer
 
-drawer = TrainDrawer("/path/to/experiments/deghost")
+drawer = TrainDrawer("/path/to/experiments/uresnet")
 drawer.draw(
     model=["default", "augment", "ablate"],
     metric="loss",
@@ -517,7 +517,7 @@ TensorBoard discovers the corresponding train and validation event streams
 recursively:
 
 ```bash
-tensorboard --logdir /path/to/experiments/deghost
+tensorboard --logdir /path/to/experiments/uresnet
 ```
 
 ## Pipeline Mode
@@ -670,8 +670,8 @@ stage groups to one source-derived HDF5 cache per training or validation file,
 then compose the independently trained modules into one full-chain checkpoint.
 The generic full-chain pipelines finally evaluate that assembled checkpoint
 with SPINE's metric analyzers and submit a CPU-only `kind: report` reduction.
-The report stage waits for all metric inference jobs, records dataset and
-checkpoint provenance, and writes plots plus `summary.json` under
+The report stage waits for all metric inference jobs, records dataset,
+selection, and checkpoint provenance, and writes plots plus `summary.json` under
 `metrics/full_chain/report/artifacts`.
 
 ## Run Management

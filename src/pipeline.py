@@ -62,6 +62,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "output_dir",
         "checkpoint",
         "dataset",
+        "dataset_selection",
         "job_name",
         "output",
         "output_suffix",
@@ -693,6 +694,12 @@ class PipelineDefinition:
                 f"Pipeline report stage '{name}' requires: " + ", ".join(missing)
             )
 
+        dataset_selection = stage.get("dataset_selection")
+        if dataset_selection is not None and not isinstance(dataset_selection, Mapping):
+            raise TypeError(
+                f"Pipeline report stage '{name}' dataset_selection must be a mapping"
+            )
+
         forbidden = cls._present(
             stage,
             "files",
@@ -913,6 +920,7 @@ class PipelineRunner(SubmissionComponent):
                     "run_dir": stage["run_dir"],
                     "checkpoint": stage.get("checkpoint"),
                     "dataset": stage.get("dataset"),
+                    "dataset_selection": stage.get("dataset_selection"),
                     "profile": stage.get("profile", "s3df_milano"),
                     "job_name": stage.get("job_name", stage["name"]),
                     "dependency": dependency,

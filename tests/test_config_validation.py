@@ -6,8 +6,8 @@ This module provides automated tests for SPINE-prod configuration files:
    files (e.g., icarus_full_chain_*.yaml) parse correctly with includes and
    overrides properly resolved.
 
-2. **Legacy Configuration Tests**: Ensures backward compatibility by testing
-   deprecated configuration files in the legacy/ directories.
+2. **Training Configuration Tests**: Ensures maintained training bundles use
+   the current configuration schema.
 
 3. **Metadata Stripping**: Verifies that __meta__ blocks are properly removed
    from final configurations and don't pollute the SPINE runtime config.
@@ -43,12 +43,8 @@ ACTIVE_CONFIGS = sorted(
         for config_path in CONFIG_ROOT.rglob("*.yaml")
         if "legacy" not in config_path.parts
     ]
-    + list((CONFIG_ROOT / "train" / "config").rglob("*.cfg"))
 )
-TRAIN_CONFIGS = sorted(
-    list((CONFIG_ROOT / "train" / "config").rglob("*.cfg"))
-    + list((CONFIG_ROOT / "train").rglob("*.yaml"))
-)
+TRAIN_CONFIGS = sorted((CONFIG_ROOT / "train").rglob("*.yaml"))
 GENERIC_TRAIN_BUNDLES = sorted(
     (CONFIG_ROOT / "train" / "generic").glob("*/train_*.yaml")
 )
@@ -705,12 +701,13 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
     report = stages["report_full_chain"]
     assert report["kind"] == "report"
     assert report["depends_on"] == ["evaluate_full_chain"]
-    assert report["config"] == "test/generic/full_chain/report_260828.yaml"
+    assert report["config"] == "test/common/full_chain/report_v1.yaml"
     assert report["input_dir"] == "/path/to/workflow/metrics/full_chain/raw/latest"
     assert report["output_dir"] == (
         "/path/to/workflow/metrics/full_chain/report/artifacts"
     )
     assert report["checkpoint"] == checkpoint
+    assert report["dataset_selection"] == {"entry_fraction_range": [0.5, 1.0]}
     assert report["profile"] == "s3df_milano"
 
 
@@ -787,6 +784,12 @@ def test_generic_full_chain_pipelines_pin_component_revisions(version, stage_ver
         stage["val_entry_fraction_range"] == [0.0, 0.5] for stage in training_stages
     )
     assert stages["report_full_chain"]["checkpoint"] == evaluation["weight_path"]
+    assert stages["report_full_chain"]["config"] == (
+        "test/common/full_chain/report_v1.yaml"
+    )
+    assert stages["report_full_chain"]["dataset_selection"] == {
+        "entry_fraction_range": [0.5, 1.0]
+    }
 
     if version == "260828":
         # Exercise full-node distributed training for the two costly stages.
@@ -813,25 +816,23 @@ def test_generic_full_chain_evaluation_uses_metric_analyzers_without_hdf5(versio
     assert "weight_path" not in config["model"]
 
 
-def test_generic_full_chain_report_records_held_out_partition():
-    """The published report must identify the tested subset of its dataset."""
+def test_common_full_chain_report_leaves_dataset_selection_to_the_pipeline():
+    """The reusable report must not hard-code a detector's held-out subset."""
     report = yaml.safe_load(
-        (
-            CONFIG_ROOT / "test" / "generic" / "full_chain" / "report_260828.yaml"
-        ).read_text(encoding="utf-8")
+        (CONFIG_ROOT / "test" / "common" / "full_chain" / "report_v1.yaml").read_text(
+            encoding="utf-8"
+        )
     )
 
-    assert report["metadata"]["dataset_selection"] == {
-        "entry_fraction_range": [0.5, 1.0]
-    }
+    assert "dataset_selection" not in report["metadata"]
 
 
-def test_generic_full_chain_report_excludes_delta_from_overall_ppn_metrics():
+def test_common_full_chain_report_excludes_delta_from_overall_ppn_metrics():
     """Overall PPN efficiency and purity must retain the historical delta cut."""
     report = yaml.safe_load(
-        (
-            CONFIG_ROOT / "test" / "generic" / "full_chain" / "report_260828.yaml"
-        ).read_text(encoding="utf-8")
+        (CONFIG_ROOT / "test" / "common" / "full_chain" / "report_v1.yaml").read_text(
+            encoding="utf-8"
+        )
     )
     ppn = report["metrics"]["ppn"]
 

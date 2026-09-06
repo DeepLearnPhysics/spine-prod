@@ -9,10 +9,11 @@ include:
   - infer/generic/io/io_240805.yaml
   - model/generic/full_chain/model_260828.yaml
   - infer/generic/post/post_240718.yaml
-  - test/generic/full_chain/analyzers_v1.yaml
+  - test/common/full_chain/analyzers_v1.yaml
 
 override:
   # This stage emits analyzer CSVs only; reconstruction HDF5 is unnecessary.
   io.writer: null
+
   # Adapt cluster truth into the reconstructed semantic point domain.
   model.network_input.clust_label: clust_label

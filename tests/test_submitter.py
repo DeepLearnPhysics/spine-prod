@@ -751,6 +751,7 @@ class TestSubmitterHelpers:
                 run_dir=str(run_dir),
                 checkpoint="/weights/full.ckpt",
                 dataset="validation.root",
+                dataset_selection={"entry_fraction_range": [0.5, 1.0]},
             )
 
         assert job_ids == ["42"]
@@ -759,6 +760,7 @@ class TestSubmitterHelpers:
         assert resolved["metadata"] == {
             "dataset": "validation.root",
             "checkpoint": "/weights/full.ckpt",
+            "dataset_selection": {"entry_fraction_range": [0.5, 1.0]},
         }
         script = (attempt / "submit.sbatch").read_text()
         assert "spine-report --config" in script
@@ -1098,7 +1100,7 @@ class TestInteractiveExecution:
             patch("src.interactive.subprocess.run", return_value=completed) as run,
         ):
             exit_code = mock_submitter.run_interactive(
-                config="config/train/icarus/deghost/deghost.yaml",
+                config="config/train/generic/uresnet/train_240718.yaml",
                 interactive_runtime="local",
             )
 
@@ -1142,7 +1144,7 @@ class TestInteractiveExecution:
             match="Cannot use --output/--output-suffix without --source/--source-list",
         ):
             mock_submitter.run_interactive(
-                config="config/train/icarus/deghost/deghost.yaml",
+                config="config/train/generic/uresnet/train_240718.yaml",
                 output_suffix="custom_reco",
             )
 
@@ -1723,7 +1725,7 @@ class TestBatchSpineOverride:
         """Test lifecycle-only options are rejected outside their stage."""
         with pytest.raises(ValueError, match=message):
             mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml", **kwargs
+                config="config/train/generic/uresnet/train_240718.yaml", **kwargs
             )
 
     @pytest.mark.parametrize(
@@ -2000,7 +2002,7 @@ class TestBatchSpineOverride:
         missing_source = tmp_path / "missing.root"
         with pytest.raises(ValueError, match="No validation input files found"):
             mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
+                config="config/train/generic/uresnet/train_240718.yaml",
                 validation_files=[str(missing_source)],
                 stage="train",
                 run_dir=str(tmp_path / "run"),
@@ -2014,7 +2016,7 @@ class TestBatchSpineOverride:
         source.touch()
         with pytest.raises(ValueError, match="valid only for inference"):
             mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
+                config="config/train/generic/uresnet/train_240718.yaml",
                 files=[str(source)],
                 stage="train",
                 run_dir=str(tmp_path / "run"),
@@ -2030,7 +2032,7 @@ class TestBatchSpineOverride:
         (run_dir / "artifact").touch()
         with pytest.raises(ValueError, match="Inference run directory is not empty"):
             mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
+                config="config/train/generic/uresnet/train_240718.yaml",
                 run_dir=str(run_dir),
             )
 
@@ -2047,7 +2049,7 @@ class TestBatchSpineOverride:
         ):
             assert (
                 mock_submitter.submit_job(
-                    config="config/train/icarus/deghost/deghost.yaml",
+                    config="config/train/generic/uresnet/train_240718.yaml",
                     run_dir=str(run_dir),
                 )
                 == []
@@ -2061,7 +2063,7 @@ class TestBatchSpineOverride:
     ):
         """A pipeline retry should write new scheduler artifacts beside the old."""
         run_dir = tmp_path / "cache-stage"
-        config = "config/train/icarus/deghost/deghost.yaml"
+        config = "config/train/generic/uresnet/train_240718.yaml"
         with (
             patch.object(
                 mock_submitter.batch,
@@ -2100,7 +2102,7 @@ class TestBatchSpineOverride:
     ):
         """Test training creation and resume reuse logs, weights, and metadata."""
         run_dir = tmp_path / "experiments" / "deghost" / "default"
-        config = "config/train/icarus/deghost/deghost.yaml"
+        config = "config/train/generic/uresnet/train_240718.yaml"
 
         with (
             patch.object(
@@ -2160,8 +2162,8 @@ class TestBatchSpineOverride:
     ):
         """Test validation submits only checkpoints without complete CSV logs."""
         run_dir = tmp_path / "experiments" / "deghost" / "default"
-        train_config = "config/train/icarus/deghost/deghost.yaml"
-        val_config = "config/train/config/uresnet_ppn/uresnet_ppn_val.cfg"
+        train_config = "config/train/generic/uresnet/train_240718.yaml"
+        val_config = "config/test/generic/full_chain/evaluate_240718.yaml"
         RunManager.prepare_training_run(run_dir, train_config)
         first = run_dir / "weights" / "snapshot-9.ckpt"
         second = run_dir / "weights" / "snapshot-19.ckpt"
@@ -2223,8 +2225,8 @@ class TestBatchSpineOverride:
     ):
         """Test named validation gets isolated logs and an explicit overwrite plan."""
         run_dir = tmp_path / "run"
-        train_config = "config/train/icarus/deghost/deghost.yaml"
-        val_config = "config/train/config/uresnet_ppn/uresnet_ppn_val.cfg"
+        train_config = "config/train/generic/uresnet/train_240718.yaml"
+        val_config = "config/test/generic/full_chain/evaluate_240718.yaml"
         RunManager.prepare_training_run(run_dir, train_config)
         saved = run_dir / "weights" / "snapshot-4.ckpt"
         saved.touch()
@@ -2590,7 +2592,7 @@ class TestBatchSpineOverride:
             patch.object(mock_submitter.batch_client, "submit", return_value="12345"),
         ):
             job_ids = mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
+                config="config/train/generic/uresnet/train_240718.yaml",
                 profile="s3df_ampere",
             )
 
@@ -2612,7 +2614,7 @@ class TestBatchSpineOverride:
             match="Cannot use --ntasks/--files-per-task without --source/--source-list",
         ):
             mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
+                config="config/train/generic/uresnet/train_240718.yaml",
                 profile="s3df_ampere",
                 ntasks=2,
             )
@@ -2624,7 +2626,7 @@ class TestBatchSpineOverride:
             match="Cannot use --output/--output-suffix without --source/--source-list",
         ):
             mock_submitter.submit_job(
-                config="config/train/icarus/deghost/deghost.yaml",
+                config="config/train/generic/uresnet/train_240718.yaml",
                 profile="s3df_ampere",
                 output_suffix="custom_reco",
             )
@@ -3228,6 +3230,7 @@ class TestPipelineSubmission:
                             "run_dir": "/tmp/metrics/report",
                             "checkpoint": "/tmp/full-chain.ckpt",
                             "dataset": "validation.root",
+                            "dataset_selection": {"entry_fraction_range": [0.5, 1.0]},
                         },
                     ]
                 }
@@ -3249,6 +3252,33 @@ class TestPipelineSubmission:
         assert report["input_dir"] == "/tmp/metrics/raw/latest"
         assert report["output_dir"] == "/tmp/metrics/report/artifacts"
         assert report["checkpoint"] == "/tmp/full-chain.ckpt"
+        assert report["dataset_selection"] == {"entry_fraction_range": [0.5, 1.0]}
+
+    def test_submit_pipeline_rejects_invalid_report_dataset_selection(
+        self, mock_submitter, tmp_path
+    ):
+        """Report provenance selections must be structured mappings."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "report",
+                            "kind": "report",
+                            "config": "report.yaml",
+                            "input_dir": "/tmp/metrics/raw",
+                            "output_dir": "/tmp/metrics/report/artifacts",
+                            "run_dir": "/tmp/metrics/report",
+                            "dataset_selection": [0.5, 1.0],
+                        }
+                    ]
+                }
+            )
+        )
+
+        with pytest.raises(TypeError, match="dataset_selection must be a mapping"):
+            mock_submitter.submit_pipeline(str(pipeline_path))
 
     def test_submit_pipeline_forwards_in_place_cache_extension(
         self, mock_submitter, tmp_path

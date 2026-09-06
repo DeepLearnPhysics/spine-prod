@@ -60,11 +60,11 @@ Examples:
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source-list files.txt --files-per-task 5 --ntasks 20
 
   # Start or resume a persistent training run
-  %(prog)s --config train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default
-  %(prog)s --config train/icarus/deghost/deghost.yaml --stage train --run-dir /path/to/experiments/deghost/default --resume
+  %(prog)s --config train/generic/uresnet/train_240718.yaml --stage train --run-dir /path/to/experiments/uresnet/default
+  %(prog)s --config train/generic/uresnet/train_240718.yaml --stage train --run-dir /path/to/experiments/uresnet/default --resume
 
   # Validate only checkpoints missing an associated validation log
-  %(prog)s --config /path/to/deghost_val.yaml --stage validation --run-dir /path/to/experiments/deghost/default
+  %(prog)s --config /path/to/uresnet_validation.yaml --stage validation --run-dir /path/to/experiments/uresnet/default
 
   # Pipeline mode
   %(prog)s --pipeline pipelines/icarus_production.yaml --workspace /path/to/run

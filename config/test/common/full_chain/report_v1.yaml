@@ -1,18 +1,14 @@
 __meta__:
   kind: fragment
-  version: "260828"
-  date: "2026-08-28"
-  description: Generic full-chain metric reduction recipe
+  description: Standard v1 full-chain metric reduction recipe
 
 strict: true
 formats: [png, json]
 
-# The report stage injects the exact composed checkpoint and dataset identity
+# The report stage injects the exact checkpoint, dataset, and dataset selection
 # into its immutable copy of this recipe before spine-report executes.
 metadata:
   dataset: null
-  dataset_selection:
-    entry_fraction_range: [0.5, 1.0]
   checkpoint: null
 
 metrics:

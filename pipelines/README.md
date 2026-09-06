@@ -109,12 +109,14 @@ checkpoint on the held-out dataset and runs a dependent CPU-only report stage:
 - name: report_full_chain
   kind: report
   depends_on: [evaluate_full_chain]
-  config: test/generic/full_chain/report_260828.yaml
+  config: test/common/full_chain/report_v1.yaml
   input_dir: ${workspace}/metrics/full_chain/raw/latest
   output_dir: ${workspace}/metrics/full_chain/report/artifacts
   run_dir: ${workspace}/metrics/full_chain/report
   checkpoint: ${workspace}/weights/full_chain_240805.ckpt
   dataset: ${validation_source}
+  dataset_selection:
+    entry_fraction_range: [0.5, 1.0]
   profile: s3df_milano
 ```
 

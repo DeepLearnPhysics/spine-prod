@@ -1,6 +1,6 @@
 __meta__:
   kind: fragment
-  description: Full-chain analyzer records consumed by the generic metric report
+  description: Standard full-chain analyzer records consumed by metric reports
 
 # Fragment construction and adapted-space matching are required to evaluate
 # the fragment-level aggregation outputs of the trained chain.

@@ -12,13 +12,13 @@ The configurations in this directory are used to:
 
 ## Available Configurations
 
-The currently populated configuration trees are:
+The currently populated configuration tree is:
 
-- **`config/`**: Legacy component and full-chain `.cfg` training recipes
 - **`generic/`**: YAML benchmark recipes for the generic dataset
-- **`icarus/`**: YAML training configurations for ICARUS
 
-The `dune10kt-1x2x6/` directory is reserved for future checked-in DUNE 10 kt training configurations and is not currently populated.
+Detector-specific training trees will be added as their historical recipes are
+reviewed and migrated to the composed configuration structure demonstrated by
+the generic benchmark.
 
 ## Configuration Structure
 
@@ -91,7 +91,7 @@ run standalone incremental validation against the same run directory:
 
 ```bash
 ./submit.py -c /path/to/validation.yaml \
-  --stage validation --run-dir /path/to/experiments/deghost/default
+  --stage validation --run-dir /path/to/experiments/uresnet/default
 ```
 
 ## Model Weights

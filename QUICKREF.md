@@ -7,8 +7,8 @@ recorded in `DEFAULT_SPINE_VERSION`; `configure.sh` exports
 `SPINE_CONTAINER_VERSION` from that value and derives the registry tag and
 default S3DF `.sif` path. The container provides SPINE, OpT0Finder, and runtime
 dependencies; batch jobs invoke the `spine` executable from inside the
-container. The current default is SPINE v1.0.4; maintained configurations
-require SPINE v1.0.4 or later.
+container. The current default is SPINE v1.1.0; maintained configurations
+require SPINE v1.1.0 or later.
 
 ## Common Commands
 
@@ -72,20 +72,20 @@ require SPINE v1.0.4 or later.
 ./submit.py --config infer/icarus/latest --source data/*.root --files-per-task 5
 
 # Start a persistent training run with independent train/validation inputs
-./submit.py --config train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default \
+./submit.py --config train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default \
   --source-list train.txt --val-source-list validation.txt
 
 # Resume from the latest numeric checkpoint
-./submit.py --config train/icarus/deghost/deghost.yaml \
-  --stage train --run-dir /path/to/experiments/deghost/default --resume
+./submit.py --config train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/experiments/uresnet/default --resume
 
 # Resume verifies the SPINE checkpoint checksum sidecar when present; legacy checkpoints
 # without sidecars remain supported.
 
 # Validate only checkpoints without complete validation logs
-./submit.py --config /path/to/deghost_val.yaml \
-  --stage validation --run-dir /path/to/experiments/deghost/default
+./submit.py --config /path/to/uresnet_validation.yaml \
+  --stage validation --run-dir /path/to/experiments/uresnet/default
 
 # Custom time limit
 ./submit.py --config infer/icarus/latest --source data.root --time 2:00:00
