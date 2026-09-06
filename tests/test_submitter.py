@@ -4068,10 +4068,10 @@ class TestPipelineSubmission:
                 to_stage="first",
             )
 
-    def test_submit_pipeline_rejects_weight_override_for_skipped_stage(
+    def test_submit_pipeline_allows_weight_override_for_skipped_stage(
         self, mock_submitter, tmp_path
     ):
-        """A restart must not silently ignore a seed for an earlier stage."""
+        """A reusable restart command may retain seeds for earlier stages."""
         pipeline_path = tmp_path / "pipeline.yaml"
         pipeline_path.write_text(
             yaml.safe_dump(
@@ -4084,15 +4084,15 @@ class TestPipelineSubmission:
             )
         )
 
-        with patch.object(mock_submitter, "submit_job") as submit_job:
-            with pytest.raises(ValueError, match="skipped before --from-stage"):
-                mock_submitter.submit_pipeline(
-                    str(pipeline_path),
-                    from_stage="cache",
-                    stage_module_weights=[["train", "model=/weights/model.ckpt"]],
-                )
+        with patch.object(mock_submitter, "submit_job", return_value=[]) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                from_stage="cache",
+                stage_module_weights=[["train", "model=/weights/model.ckpt"]],
+            )
 
-        submit_job.assert_not_called()
+        assert result == {"cache": []}
+        assert submit_job.call_count == 1
 
     def test_submit_pipeline_allows_weight_override_for_deferred_stage(
         self, mock_submitter, tmp_path
