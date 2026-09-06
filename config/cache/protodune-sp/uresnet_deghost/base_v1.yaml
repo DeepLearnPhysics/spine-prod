@@ -35,44 +35,18 @@ io:
           parser: sparse3d
           sparse_event_list: [sparse3d_reco_cryo, sparse3d_reco_tpc]
           feature_only: true
-        seg_label:
-          parser: sparse3d
-          sparse_event: sparse3d_pcluster_semantics_ghost
-        ppn_label:
-          parser: particle_points
-          sparse_event: sparse3d_pcluster
-          particle_event: particle_corrected
-          include_point_tagging: false
-        clust_label:
-          parser: cluster3d
-          cluster_event: cluster3d_pcluster
-          particle_event: particle_corrected
-          sparse_semantics_event: sparse3d_pcluster_semantics
-          add_particle_info: true
-          clean_data: true
-        coord_label:
-          parser: particle_coords
-          particle_event: particle_corrected
-          cluster_event: cluster3d_pcluster
         meta:
           parser: meta
-          sparse_event: sparse3d_pcluster
-        run_info:
-          parser: run_info
           sparse_event: sparse3d_pcluster
   writer:
     name: stage_hdf5
     file_name: null
     stage: deghosting
     overwrite_stage: true
-    # Persist raw truth once; all later stages consume only this cache.
+    # Persist only products which cannot be reconstructed from the LArCV file.
     keys:
       - data_calib
       - orig_index
-      - seg_label
-      - ppn_label
-      - clust_label
-      - coord_label
 
 model:
   name: full_chain
@@ -81,9 +55,7 @@ model:
   network_input:
     data: data
     sources: sources
-    seg_label: seg_label
     meta: meta
-    run_info: run_info
 
   modules:
     chain:

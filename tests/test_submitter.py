@@ -497,6 +497,58 @@ class TestFileChunking:
         with pytest.raises(ValueError, match=message):
             mock_submitter.batch.resolve_files_per_task(10, **kwargs)
 
+    def test_parse_named_sources_preserves_aligned_file_order(
+        self, mock_submitter, tmp_path
+    ):
+        """Composite source lists resolve into aligned target sequences."""
+        larcv = [tmp_path / f"input_{index}.root" for index in range(2)]
+        hdf5 = [tmp_path / f"input_{index}_cache.h5" for index in range(2)]
+        for path in [*larcv, *hdf5]:
+            path.touch()
+        larcv_list = tmp_path / "larcv.txt"
+        hdf5_list = tmp_path / "hdf5.txt"
+        larcv_list.write_text("\n".join(map(str, larcv)), encoding="utf-8")
+        hdf5_list.write_text("\n".join(map(str, hdf5)), encoding="utf-8")
+
+        resolved = mock_submitter.file_handler.parse_named_sources(
+            {
+                "larcv": {"source_list": str(larcv_list)},
+                "hdf5": {"source_list": str(hdf5_list)},
+            }
+        )
+        assert resolved == {
+            "larcv": [str(path) for path in larcv],
+            "hdf5": [str(path) for path in hdf5],
+        }
+
+    @pytest.mark.parametrize(
+        ("sources", "message"),
+        [
+            ({"larcv": {}}, "must specify exactly one"),
+            ({"larcv": {"source": []}}, "contains no input files"),
+        ],
+    )
+    def test_parse_named_sources_rejects_invalid_targets(
+        self, mock_submitter, sources, message
+    ):
+        with pytest.raises(ValueError, match=message):
+            mock_submitter.file_handler.parse_named_sources(sources)
+
+    def test_parse_named_sources_rejects_unaligned_counts(
+        self, mock_submitter, tmp_path
+    ):
+        """Every mixed source target must contribute one file per pair."""
+        paths = [tmp_path / f"input_{index}.root" for index in range(2)]
+        for path in paths:
+            path.touch()
+        with pytest.raises(ValueError, match="aligned file counts"):
+            mock_submitter.file_handler.parse_named_sources(
+                {
+                    "larcv": {"source": [str(path) for path in paths]},
+                    "hdf5": {"source": str(paths[0])},
+                }
+            )
+
 
 class TestSubmitterHelpers:
     """Tests for scheduler, path, and template selection helpers."""
@@ -972,6 +1024,7 @@ class TestSubmitterHelpers:
         source_config.write_text(
             yaml.safe_dump(
                 {
+                    "include": "test/common/full_chain/report_v1.yaml",
                     "metadata": {"dataset": None, "checkpoint": None},
                     "metrics": {
                         "segmentation": {
@@ -1017,6 +1070,7 @@ class TestSubmitterHelpers:
             "checkpoint": "/weights/full.ckpt",
             "dataset_selection": {"entry_fraction_range": [0.5, 1.0]},
         }
+        assert resolved["include"] == "test/common/full_chain/report_v1.yaml"
         script = (attempt / "submit.sbatch").read_text()
         assert "spine-report --config" in script
         assert f"--input-dir {input_dir}" in script
@@ -2194,6 +2248,7 @@ class TestBatchSpineOverride:
                 named_sources=named_sources,
                 output=str(output),
                 output_suffix="cache",
+                allow_missing_inputs=True,
             ) == ["cache"]
 
         script = next(
@@ -2202,6 +2257,56 @@ class TestBatchSpineOverride:
         assert f"--output-dir {output}" in script
         assert "--output-suffix cache" in script
         assert output.is_dir()
+
+    def test_submit_job_arrays_aligned_named_source_lists(
+        self, mock_submitter, tmp_path
+    ):
+        """Mixed inference arrays create one aligned manifest per target."""
+        run_dir = tmp_path / "run"
+        source_lists = {}
+        expected = {}
+        for target, suffix in (("larcv", ".root"), ("hdf5", ".h5")):
+            paths = [tmp_path / f"input_{index}{suffix}" for index in range(2)]
+            for path in paths:
+                path.touch()
+            manifest = tmp_path / f"{target}.txt"
+            manifest.write_text("\n".join(map(str, paths)), encoding="utf-8")
+            source_lists[target] = {"source_list": str(manifest)}
+            expected[target] = paths
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="cache"),
+        ):
+            assert mock_submitter.submit_job(
+                config="cache/generic/graph_spice/fragment_graphs_240805.yaml",
+                named_sources=source_lists,
+                run_dir=str(run_dir),
+                in_place=True,
+                files_per_task=1,
+                ntasks=2,
+            ) == ["cache"]
+
+        attempt = run_dir / "latest"
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "#SBATCH --array=1-2" in script
+        assert " -S $TASK_FILE_LIST" not in script
+        assert "--source-list larcv=$TASK_DIR/larcv.txt" in script
+        assert "hdf5=$TASK_DIR/hdf5.txt" in script
+        for index in (1, 2):
+            task_dir = attempt / "tasks" / f"000_{index}"
+            for target in expected:
+                assert (task_dir / f"{target}.txt").read_text().strip() == str(
+                    expected[target][index - 1]
+                )
+
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["num_files"] == 2
+        assert metadata["resolved_files_per_task"] == 1
 
     def test_submit_job_writes_expected_stage_cache_source_list(
         self, mock_submitter, tmp_path

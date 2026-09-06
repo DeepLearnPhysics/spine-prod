@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260906"
+  date: "2026-09-06"
+  description: ProtoDUNE-SP 260906 standalone interaction GrapPA network
+
+include: model/protodune-sp/grappa_inter/network_260210.yaml
+
+override:
+  # Scale the generic 150/7.5 cm thresholds from 3 mm to 5 mm voxels.
+  graph.max_length: [300, 300, 0, 0, 15, 15, 15, 0, 0, 0]

@@ -1,0 +1,14 @@
+__meta__:
+  kind: bundle
+  version: "260906"
+  date: "2026-09-06"
+  description: Append ProtoDUNE-SP 260906 particle graphs and supervision
+
+include: cache/protodune-sp/grappa_shower_track/base_v1.yaml
+
+model:
+  modules:
+    grappa_shower: !include model/protodune-sp/grappa_shower/network_260210.yaml
+    grappa_track: !include model/protodune-sp/grappa_track/network_full_chain_260906.yaml
+    grappa_inter: !include model/protodune-sp/grappa_inter/network_full_chain_260906.yaml
+    grappa_inter_loss: !include model/protodune-sp/grappa_inter/loss_full_chain_260906.yaml

@@ -41,18 +41,14 @@ io:
     keep_open: true
     overwrite_stage: true
     keys:
-      # Inputs needed to build particles after the standalone GrapPAs train.
-      - data
-      - coord_label
+      # Fragment assignments are model outputs needed to build particles.
       - fragment_clusts
       - fragment_shapes
 
       # Precomputed graph inputs consumed by the concurrent training jobs.
-      - shower_fragment_clusts
       - shower_fragment_edge_index
       - shower_fragment_node_features
       - shower_fragment_edge_features
-      - track_fragment_clusts
       - track_fragment_edge_index
       - track_fragment_node_features
       - track_fragment_edge_features

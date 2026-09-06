@@ -17,12 +17,29 @@ io:
     num_workers: 16
     collate_fn: all
     dataset:
-      name: hdf5
-      file_keys: null
-      staged: true
-      stage: deghosting
-      keep_open: true
-      keys: [data_calib, orig_index, seg_label, clust_label]
+      name: mixed
+      larcv:
+        file_keys: null
+        schema:
+          seg_label:
+            parser: sparse3d
+            sparse_event: sparse3d_pcluster_semantics_ghost
+          clust_label:
+            parser: cluster3d
+            cluster_event: cluster3d_pcluster
+            sparse_semantics_event: sparse3d_pcluster_semantics
+            clean_data: true
+            particle_info:
+              particle_event: particle_corrected
+              type_include_secondary: false
+              type_include_mpr: false
+              primary_include_mpr: false
+      hdf5:
+        file_keys: null
+        staged: true
+        stage: deghosting
+        keep_open: true
+        keys: [data_calib, orig_index]
   writer:
     name: stage_hdf5
     file_name: null

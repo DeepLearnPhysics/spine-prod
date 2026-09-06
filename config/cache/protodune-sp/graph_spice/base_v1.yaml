@@ -7,17 +7,21 @@ include: cache/generic/graph_spice/base_v1.yaml
 override:
   io.loader.minibatch_size: 16
   io.loader.dataset:
-    name: hdf5
-    file_keys: null
-    staged: true
-    stage: segmentation
-    keep_open: true
-    stage_map:
-      data_calib: deghosting
-      coord_label: deghosting
-    keys: [data_calib, coord_label, seg_pred, ppn_points, clust_label_adapt]
+    name: mixed
+    larcv:
+      file_keys: null
+      schema:
+        coord_label:
+          parser: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+    hdf5:
+      file_keys: null
+      staged: true
+      stage: segmentation
+      keep_open: true
+      stage_map:
+        data_calib: deghosting
+      keys: [data_calib, seg_pred, ppn_points, clust_label_adapt]
 
   model.network_input.data: data_calib
-
-  # Calibrated point data and coordinate truth remain owned upstream.
-  io.writer.keys-: [data]

@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260906"
+  date: "2026-09-06"
+  description: ProtoDUNE-SP 260906 Graph-SPICE network with native image extent
+
+include: model/protodune-sp/graph_spice/network_260210.yaml
+
+override:
+  # Maximum dimension of the 2368 x 1280 x 1471 mpvmpr v1 sparse image.
+  embedder.uresnet.spatial_size: 2368

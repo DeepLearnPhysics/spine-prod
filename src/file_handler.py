@@ -3,7 +3,7 @@
 import glob
 import os
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List, Mapping
 
 
 class FileHandler:
@@ -63,6 +63,48 @@ class FileHandler:
                         print(f"WARNING: File not found: {item}")
 
         return files
+
+    def parse_named_sources(
+        self,
+        sources: Mapping[str, Mapping[str, Any]],
+        allow_missing: bool = False,
+    ) -> Dict[str, List[str]]:
+        """Resolve every target in a composite dataset source mapping.
+
+        All targets must resolve to the same number of files. This lets an
+        inference array preserve the one-to-one correspondence between, for
+        example, a LArCV file and its stage-cache sidecar.
+        """
+        resolved = {}
+        expected_count = None
+        for target, source_cfg in sources.items():
+            selectors = [key for key in ("source", "source_list") if key in source_cfg]
+            if len(selectors) != 1:
+                raise ValueError(
+                    f"Named source '{target}' must specify exactly one of: "
+                    "source, source_list"
+                )
+            selector = selectors[0]
+            values = source_cfg[selector]
+            if not isinstance(values, list):
+                values = [values]
+            files = self.parse_files(
+                values,
+                selector,
+                allow_missing=allow_missing,
+            )
+            if not files:
+                raise ValueError(f"Named source '{target}' contains no input files")
+            if expected_count is None:
+                expected_count = len(files)
+            elif len(files) != expected_count:
+                raise ValueError(
+                    "Named sources must contain aligned file counts; "
+                    f"'{target}' has {len(files)}, expected {expected_count}"
+                )
+            resolved[target] = files
+
+        return resolved
 
     @staticmethod
     def stage_cache_output_paths(

@@ -1,0 +1,18 @@
+# Data-only modification for the ProtoDUNE-SP 260906 model configuration
+
+__meta__:
+  kind: mod
+  name: "data"
+  version: "260906"
+  date: "2026-09-06"
+  description: "Data-only configuration with the collection-plane data gain"
+  applies_to: [data]
+  compatible_with:
+    model: ">=260906"
+    post: ">=260210"
+
+include: mod_data_common.yaml
+
+override:
+  # Invert the collection-plane data calibration constant (ADC/electron).
+  model.modules.calibration.gain.gain: 963.3911368015414 # e-/ADC

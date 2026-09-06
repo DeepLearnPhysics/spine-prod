@@ -118,11 +118,15 @@ stages:
       as: split
     depends_on: [train_grappa_shower, train_grappa_track]
     config: cache/generic/grappa_shower_track/particle_graphs_240805.yaml
-    source: ${split.cache_file}
     run_dir: ${split.cache_dir}/particle_aggregation
     in_place: true
     files_per_task: 1
     ntasks: 2
+    sources:
+      larcv:
+        source: ${split.source}
+      hdf5:
+        source: ${split.cache_file}
     module_weight:
       grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
       grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
@@ -171,7 +175,7 @@ stages:
   - name: report_full_chain
     kind: report
     depends_on: [evaluate_full_chain]
-    config: test/common/full_chain/report_v1.yaml
+    config: test/generic/full_chain/report_240718.yaml
     input_dir: ${workspace}/metrics/full_chain/raw/latest
     output_dir: ${workspace}/metrics/full_chain/report/artifacts
     run_dir: ${workspace}/metrics/full_chain/report

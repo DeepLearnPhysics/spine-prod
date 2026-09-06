@@ -422,11 +422,11 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
     for path in ("shower", "track"):
         prefix = f"{path}_fragment"
         assert {
-            f"{prefix}_clusts",
             f"{prefix}_edge_index",
             f"{prefix}_node_features",
             f"{prefix}_edge_features",
         }.issubset(keys)
+        assert f"{prefix}_clusts" not in keys
     assert {
         "particle_aggregation_shower_node_target",
         "particle_aggregation_shower_node_valid",
@@ -502,8 +502,9 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
 
     loader = cache["io"]["loader"]
     assert loader["num_workers"] == 16
-    assert loader["dataset"]["keep_open"] is True
-    assert loader["dataset"]["stage_map"] == {
+    assert loader["dataset"]["name"] == "mixed"
+    assert loader["dataset"]["hdf5"]["keep_open"] is True
+    assert loader["dataset"]["hdf5"]["stage_map"] == {
         "ppn_points": "segmentation",
         "clust_label_adapt": "segmentation",
     }
@@ -595,7 +596,12 @@ def test_generic_cache_stages_have_disjoint_product_ownership():
             )
             owners[key] = stage
 
-    assert owners["data"] == "fragmentation"
+    # Raw LArCV products are mixed back in and must never acquire a cache owner.
+    assert "data" not in owners
+    assert "coord_label" not in owners
+    assert "shower_fragment_clusts" not in owners
+    assert "track_fragment_clusts" not in owners
+    assert "particle_clusts" not in owners
 
 
 def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
@@ -653,8 +659,13 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
         assert stages[name]["in_place"] is True
         assert "output" not in stages[name]
         assert "output_suffix" not in stages[name]
-    assert stages["cache_train_particle_graphs"]["source"] == train_cache
-    assert stages["cache_validation_particle_graphs"]["source"] == validation_cache
+    assert stages["cache_train_particle_graphs"]["sources"]["hdf5"]["source"] == (
+        train_cache
+    )
+    assert (
+        stages["cache_validation_particle_graphs"]["sources"]["hdf5"]["source"]
+        == validation_cache
+    )
     assert stages["train_grappa_inter"]["source"] == train_cache
     assert stages["train_grappa_inter"]["val_source"] == validation_cache
 
@@ -705,7 +716,7 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
     report = stages["report_full_chain"]
     assert report["kind"] == "report"
     assert report["depends_on"] == ["evaluate_full_chain"]
-    assert report["config"] == "test/common/full_chain/report_v1.yaml"
+    assert report["config"] == "test/generic/full_chain/report_240718.yaml"
     assert report["input_dir"] == "/path/to/workflow/metrics/full_chain/raw/latest"
     assert report["output_dir"] == (
         "/path/to/workflow/metrics/full_chain/report/artifacts"
@@ -789,7 +800,7 @@ def test_generic_full_chain_pipelines_pin_component_revisions(version, stage_ver
     )
     assert stages["report_full_chain"]["checkpoint"] == evaluation["weight_path"]
     assert stages["report_full_chain"]["config"] == (
-        "test/common/full_chain/report_v1.yaml"
+        "test/generic/full_chain/report_240718.yaml"
     )
     assert stages["report_full_chain"]["dataset_selection"] == {
         "entry_fraction_range": [0.5, 1.0]
@@ -1237,6 +1248,37 @@ def test_protodune_sp_260210_model_is_shared_and_preserves_deployed_choices():
     assert "orient" not in modules["grappa_inter_loss"]["node_loss"]
 
 
+def test_protodune_sp_260906_model_uses_updated_geometry_and_objectives():
+    """The 260906 chain encodes the mpvmpr v1 geometry and loss policy."""
+    model = load_config_with_includes(
+        CONFIG_ROOT / "model/protodune-sp/full_chain/model_260906.yaml"
+    )["model"]
+    modules = model["modules"]
+
+    assert modules["calibration"]["gain"]["gain"] == pytest.approx(1.0 / 1.0156e-3)
+    assert modules["graph_spice"]["embedder"]["uresnet"]["spatial_size"] == 2368
+    assert modules["grappa_track"]["graph"]["max_length"] == 60
+    assert modules["grappa_inter"]["graph"]["max_length"] == [
+        300,
+        300,
+        0,
+        0,
+        15,
+        15,
+        15,
+        0,
+        0,
+        0,
+    ]
+    inter_loss = modules["grappa_inter_loss"]["node_loss"]
+    assert "orient" in inter_loss
+    assert inter_loss["type"]["min_iou"] == 0.5
+    assert inter_loss["type"]["match_target"] == "group"
+    assert inter_loss["primary"]["use_closest"] is True
+    assert inter_loss["primary"]["min_iou"] == 0.5
+    assert inter_loss["primary"]["match_target"] == "group"
+
+
 def test_protodune_sp_cache_stages_own_only_new_products():
     """Each ProtoDUNE-SP transition appends products absent upstream."""
     root = CONFIG_ROOT / "cache/protodune-sp"
@@ -1251,27 +1293,112 @@ def test_protodune_sp_cache_stages_own_only_new_products():
         root / "grappa_shower_track/particle_graphs_260210.yaml"
     )
 
-    assert deghost["io"]["writer"]["keys"] == [
-        "data_calib",
-        "orig_index",
-        "seg_label",
-        "ppn_label",
-        "clust_label",
-        "coord_label",
-    ]
+    assert deghost["io"]["writer"]["keys"] == ["data_calib", "orig_index"]
+    assert set(deghost["io"]["loader"]["dataset"]["schema"]) == {
+        "data",
+        "sources",
+        "meta",
+    }
+    assert deghost["model"]["network_input"] == {
+        "data": "data",
+        "sources": "sources",
+        "meta": "meta",
+    }
     assert segmentation["io"]["writer"]["keys"] == [
         "seg_pred",
         "ppn_points",
         "clust_label_adapt",
     ]
     assert "data_calib" not in fragmentation["io"]["writer"]["keys"]
-    assert fragmentation["io"]["loader"]["dataset"]["stage_map"] == {
-        "data_calib": "deghosting",
-        "coord_label": "deghosting",
-    }
+    fragmentation_dataset = fragmentation["io"]["loader"]["dataset"]
+    assert fragmentation_dataset["name"] == "mixed"
+    assert fragmentation_dataset["hdf5"]["stage_map"] == {"data_calib": "deghosting"}
+    assert "coord_label" in fragmentation_dataset["larcv"]["schema"]
     particle_keys = particles["io"]["writer"]["keys"]
     assert "interaction_aggregation_node_orient_target" not in particle_keys
     assert "interaction_aggregation_node_orient_valid" not in particle_keys
+
+
+def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
+    """Both dated segmentation caches parse canonical particle truth."""
+    root = CONFIG_ROOT / "cache/protodune-sp"
+    for version in ("260210", "260906"):
+        segmentation_cache = load_config_with_includes(
+            root / f"uresnet_ppn/segmentation_{version}.yaml"
+        )
+        clust_parser = segmentation_cache["io"]["loader"]["dataset"]["larcv"]["schema"][
+            "clust_label"
+        ]
+        assert clust_parser["particle_info"] == {
+            "particle_event": "particle_corrected",
+            "type_include_secondary": False,
+            "type_include_mpr": False,
+            "primary_include_mpr": False,
+        }
+
+    particles = load_config_with_includes(
+        root / "grappa_shower_track/particle_graphs_260906.yaml"
+    )
+    particle_keys = particles["io"]["writer"]["keys"]
+    assert "interaction_aggregation_node_orient_target" in particle_keys
+    assert "interaction_aggregation_node_orient_valid" in particle_keys
+
+    ppn_train = load_config_with_includes(
+        CONFIG_ROOT
+        / "train/protodune-sp/uresnet_ppn/train_from_deghost_cache_260906.yaml"
+    )
+    segmentation = ppn_train["model"]["modules"]["chain"]["stages"][0]
+    assert segmentation["config"]["adapt_labels"] is False
+
+
+def test_protodune_sp_evaluation_and_report_include_deghosting_metrics():
+    """ProtoDUNE evaluation preserves ghost indexes and reports their accuracy."""
+    for version in ("260210", "260906"):
+        evaluation = load_config_with_includes(
+            CONFIG_ROOT / f"test/protodune-sp/full_chain/evaluate_{version}.yaml"
+        )
+        assert evaluation["post"]["match"]["ghost"] is True
+        assert evaluation["ana"]["segment_eval"]["ghost"] is True
+
+    generic_report = load_config_with_includes(
+        CONFIG_ROOT / "test/generic/full_chain/report_240718.yaml"
+    )
+    assert "deghosting" not in generic_report["metrics"]
+
+    report = load_config_with_includes(
+        CONFIG_ROOT / "test/protodune-sp/full_chain/report_260210.yaml"
+    )
+    assert report["metrics"]["deghosting"] == {
+        "name": "segment_confusion",
+        "source": "**/*segment_eval_summary.csv",
+        "class_mapping": {
+            "Non-ghost": ["shower", "track", "michel", "delta", "low_energy"],
+            "Ghost": ["ghost"],
+        },
+    }
+
+
+def test_generic_training_particle_info_uses_primary_non_mpr_truth():
+    """All generic standalone label parsers share the canonical type policy."""
+    for component in (
+        "uresnet_ppn",
+        "graph_spice",
+        "grappa_shower",
+        "grappa_track",
+        "grappa_inter",
+    ):
+        config = load_config_with_includes(
+            CONFIG_ROOT / f"train/generic/{component}/base_v1.yaml"
+        )
+        parser_name = (
+            "clust_label" if component in {"uresnet_ppn", "graph_spice"} else "data"
+        )
+        particle_info = config["io"]["loader"]["dataset"]["schema"][parser_name][
+            "particle_info"
+        ]
+        assert particle_info["type_include_secondary"] is False
+        assert particle_info["type_include_mpr"] is False
+        assert particle_info["primary_include_mpr"] is False
 
 
 def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report():
@@ -1348,10 +1475,57 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
     for stage in pipeline.stages:
         if stage["name"].startswith("cache_"):
             assert stage["ntasks"] == 2
+
+    mixed_stages = {
+        "train_uresnet_ppn",
+        "cache_train_segmentation",
+        "train_graph_spice",
+        "cache_train_fragment_graphs",
+        "cache_train_particle_graphs",
+    }
+    for name in mixed_stages:
+        stage = next(stage for stage in pipeline.stages if stage["name"] == name)
+        assert set(stage["sources"]) == {"larcv", "hdf5"}
+        assert stage["entry_filter"].endswith("/filter/train/accepted.yaml")
+        if name.startswith("train_"):
+            assert set(stage["validation_sources"]) == {"larcv", "hdf5"}
+            assert stage["val_entry_filter"].endswith(
+                "/filter/validation/accepted.yaml"
+            )
     evaluation = next(
         stage for stage in pipeline.stages if stage["name"] == "evaluate_full_chain"
     )
     assert evaluation["ntasks"] == 4
+    report = next(
+        stage for stage in pipeline.stages if stage["name"] == "report_full_chain"
+    )
+    assert report["config"] == "test/protodune-sp/full_chain/report_260210.yaml"
+
+
+def test_protodune_sp_260906_pipeline_uses_mpvmpr_v1_and_dated_configs():
+    """The 260906 workflow consumes mpvmpr v1 and pins its revised leaves."""
+    pipeline = PipelineDefinition.load(
+        Path(__file__).parent.parent / "pipelines/protodune-sp/full_chain_260906.yaml",
+        workspace_override="/tmp/protodune-sp-260906",
+    )
+    source_list = "/sdf/data/neutrino/pdune/sim/sp/mpvmpr_v1/train_file_list.txt"
+    train_deghost = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_uresnet_deghost"
+    )
+    assert train_deghost["source_list"] == source_list
+
+    dated_configs = {
+        stage["name"]: stage.get("config")
+        for stage in pipeline.stages
+        if stage["name"] not in {"scan_train_filter", "scan_validation_filter"}
+        and not stage["name"].startswith("build_")
+        and stage["name"] != "report_full_chain"
+    }
+    assert all("260906" in config for config in dated_configs.values())
+    report = next(
+        stage for stage in pipeline.stages if stage["name"] == "report_full_chain"
+    )
+    assert report["config"] == "test/protodune-sp/full_chain/report_260210.yaml"
 
 
 def write_composite_config(tmp_path, base_config, modifier_config):

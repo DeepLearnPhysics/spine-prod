@@ -1,0 +1,11 @@
+__meta__:
+  kind: bundle
+  version: "260906"
+  date: "2026-09-06"
+  description: Append ProtoDUNE-SP 260906 segmentation products
+
+include: cache/protodune-sp/uresnet_ppn/base_v1.yaml
+
+model:
+  modules:
+    uresnet_ppn: !include model/protodune-sp/uresnet_ppn/network_260210.yaml

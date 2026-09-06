@@ -669,6 +669,8 @@ class BatchRunner(SubmissionComponent):
         )
 
         file_chunks = [[]]
+        resolved_named_sources = None
+        inference_source_count = len(file_list)
         concurrent_task_limit = None
         if stage == "inference" and file_list:
             max_array_size = self.profiles["defaults"]["max_array_size"]
@@ -680,9 +682,25 @@ class BatchRunner(SubmissionComponent):
             )
             if files_per_task is not None and ntasks is not None:
                 concurrent_task_limit = ntasks
+        elif stage == "inference" and named_sources:
+            resolved_named_sources = self.file_handler.parse_named_sources(
+                named_sources,
+                allow_missing=allow_missing_inputs,
+            )
+            source_count = len(next(iter(resolved_named_sources.values())))
+            inference_source_count = source_count
+            max_array_size = self.profiles["defaults"]["max_array_size"]
+            effective_files_per_task = self.resolve_files_per_task(
+                source_count, ntasks=ntasks, files_per_task=files_per_task
+            )
+            file_chunks = self.file_handler.chunk_files(
+                list(range(source_count)), max_array_size, effective_files_per_task
+            )
+            if files_per_task is not None and ntasks is not None:
+                concurrent_task_limit = ntasks
 
         task_count = sum(len(chunk) for chunk in file_chunks)
-        has_array = stage == "inference" and bool(file_list) and task_count > 1
+        has_array = stage == "inference" and task_count > 1
         RunManager.expose_attempt_logs(job_dir, has_array)
         print(f"Splitting into {len(file_chunks)} scheduler job(s)")
 
@@ -692,6 +710,7 @@ class BatchRunner(SubmissionComponent):
         for chunk_idx, chunk in enumerate(file_chunks):
             task_dir_pattern = None
             file_list_pattern = None
+            named_source_args = None
             chunk_output_args = output_args
             chunk_spine_log_dir = spine_log_dir
 
@@ -743,6 +762,34 @@ class BatchRunner(SubmissionComponent):
                             ]
                         )
                         default_output_location = str(scalar_output)
+            elif stage == "inference" and resolved_named_sources:
+                # Each task receives aligned manifests for every mixed-dataset
+                # target. The first manifest also drives template diagnostics.
+                target_names = list(resolved_named_sources)
+                task_dir_pattern = str(attempt_dir / "tasks" / f"{chunk_idx:03d}_*")
+                file_list_pattern = f"{task_dir_pattern}/{target_names[0]}.txt"
+                for task_idx, index_group in enumerate(chunk, start=1):
+                    task_dir = attempt_dir / "tasks" / f"{chunk_idx:03d}_{task_idx}"
+                    task_dir.mkdir(parents=True, exist_ok=True)
+                    for target, source_files in resolved_named_sources.items():
+                        manifest = task_dir / f"{target}.txt"
+                        with manifest.open("w", encoding="utf-8") as stream:
+                            for index in index_group:
+                                stream.write(f"{source_files[index]}\n")
+                named_source_args = " ".join(
+                    f"{target}=$TASK_DIR/{target}.txt" for target in target_names
+                )
+                named_source_args = f"--source-list {named_source_args}"
+                # Replace the global full-list overrides with task-local lists.
+                chunk_spine_overrides = spine_cli_overrides.replace(
+                    named_source_overrides, named_source_args, 1
+                )
+                chunk_spine_log_dir = "$TASK_DIR"
+            else:
+                chunk_spine_overrides = spine_cli_overrides
+
+            if not (stage == "inference" and resolved_named_sources):
+                chunk_spine_overrides = spine_cli_overrides
 
             batch_client = self.get_batch_client(profile_config)
             template = batch_client.load_template(
@@ -774,6 +821,7 @@ class BatchRunner(SubmissionComponent):
                 dependency=chunk_dependency,
                 basedir=str(self.basedir),
                 file_list_pattern=file_list_pattern,
+                named_source_args=named_source_args,
                 input_manifest=(str(input_manifest) if input_manifest else None),
                 task_dir_pattern=task_dir_pattern,
                 spine_log_dir=chunk_spine_log_dir,
@@ -791,7 +839,7 @@ class BatchRunner(SubmissionComponent):
                 flashmatch=flashmatch,
                 cvmfs=cvmfs,
                 spine_cmd=spine_cmd or "spine",
-                spine_cli_overrides=spine_cli_overrides,
+                spine_cli_overrides=chunk_spine_overrides,
                 **profile_config,
             )
 
@@ -813,6 +861,8 @@ class BatchRunner(SubmissionComponent):
                     else len(file_list)
                 )
                 print(f"  Files: {num_chunk_files}")
+            elif resolved_named_sources:
+                print(f"  Files: {sum(len(group) for group in chunk)} aligned sets")
             else:
                 print("  Files: config-defined input list")
             print(f"  Profile: {profile} ({profile_config['description']})")
@@ -874,14 +924,24 @@ class BatchRunner(SubmissionComponent):
             "in_place": in_place,
             "profile": profile,
             "profile_config": profile_config,
-            "num_files": len(file_list) if file_list else None,
+            "num_files": (
+                len(file_list)
+                if file_list
+                else (
+                    len(next(iter(resolved_named_sources.values())))
+                    if resolved_named_sources
+                    else None
+                )
+            ),
             "num_chunks": len(file_chunks),
             "files_per_task": files_per_task,
             "resolved_files_per_task": (
                 self.resolve_files_per_task(
-                    len(file_list), ntasks=ntasks, files_per_task=files_per_task
+                    inference_source_count,
+                    ntasks=ntasks,
+                    files_per_task=files_per_task,
                 )
-                if stage == "inference" and file_list
+                if stage == "inference" and (file_list or resolved_named_sources)
                 else None
             ),
             "ntasks": ntasks,

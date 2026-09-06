@@ -1,12 +1,12 @@
-# Staged training of every learned component used by the ProtoDUNE-SP 260210
-# full chain. Supply its destination with CLI --workspace.
+# Staged training of every learned component used by the ProtoDUNE-SP 260906
+# full chain on mpvmpr v1. Supply its destination with CLI --workspace.
 # Each source file owns one cache file; later stages append named groups.
 
 workspace: null
 
 variables:
-  train_source_list: /sdf/data/neutrino/pdune/sim/sp/mpvmpr_v0/train_file_list.txt
-  validation_source_list: /sdf/data/neutrino/pdune/sim/sp/mpvmpr_v0/test_file_list.txt
+  train_source_list: /sdf/data/neutrino/pdune/sim/sp/mpvmpr_v1/train_file_list.txt
+  validation_source_list: /sdf/data/neutrino/pdune/sim/sp/mpvmpr_v1/test_file_list.txt
   filter_cache_dir: ${workspace}/filter/counts
 
 collections:
@@ -63,7 +63,7 @@ stages:
   # Train binary deghosting directly from the raw charge and chi-squared views.
   - name: train_uresnet_deghost
     depends_on: [build_train_filter, build_validation_filter]
-    config: train/protodune-sp/uresnet_deghost/train_260210.yaml
+    config: train/protodune-sp/uresnet_deghost/train_260906.yaml
     stage: train
     profile: s3df_ampere_full
     time: "2-00:00:00"
@@ -81,7 +81,7 @@ stages:
       collection: splits
       as: split
     depends_on: [train_uresnet_deghost]
-    config: cache/protodune-sp/uresnet_deghost/deghosting_260210.yaml
+    config: cache/protodune-sp/uresnet_deghost/deghosting_260906.yaml
     source_list: ${split.source_list}
     entry_filter: ${split.entry_filter}
     run_dir: ${split.cache_dir}/deghosting
@@ -97,7 +97,7 @@ stages:
   # Train semantic segmentation and point proposal on the cached point domain.
   - name: train_uresnet_ppn
     depends_on: [cache_train_deghosting, cache_validation_deghosting]
-    config: train/protodune-sp/uresnet_ppn/train_from_deghost_cache_260210.yaml
+    config: train/protodune-sp/uresnet_ppn/train_from_deghost_cache_260906.yaml
     stage: train
     profile: s3df_ampere_full
     time: "2-00:00:00"
@@ -123,7 +123,7 @@ stages:
       collection: splits
       as: split
     depends_on: [train_uresnet_ppn]
-    config: cache/protodune-sp/uresnet_ppn/segmentation_260210.yaml
+    config: cache/protodune-sp/uresnet_ppn/segmentation_260906.yaml
     run_dir: ${split.cache_dir}/segmentation
     in_place: true
     sources:
@@ -140,7 +140,7 @@ stages:
   # Train Graph-SPICE from cached predictions plus LArCV coordinate truth.
   - name: train_graph_spice
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
-    config: train/protodune-sp/graph_spice/train_from_segmentation_cache_260210.yaml
+    config: train/protodune-sp/graph_spice/train_from_segmentation_cache_260906.yaml
     stage: train
     profile: s3df_ampere_full
     time: "2-00:00:00"
@@ -166,7 +166,7 @@ stages:
       collection: splits
       as: split
     depends_on: [train_graph_spice]
-    config: cache/protodune-sp/graph_spice/fragment_graphs_260210.yaml
+    config: cache/protodune-sp/graph_spice/fragment_graphs_260906.yaml
     run_dir: ${split.cache_dir}/fragmentation
     in_place: true
     sources:
@@ -183,7 +183,7 @@ stages:
   # Train shower aggregation and shower-primary identification from cache.
   - name: train_grappa_shower
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
-    config: train/protodune-sp/grappa_shower/train_from_fragment_cache_260210.yaml
+    config: train/protodune-sp/grappa_shower/train_from_fragment_cache_260906.yaml
     stage: train
     source_list: ${workspace}/cache/train/cache_file_list.txt
     val_source_list: ${workspace}/cache/validation/cache_file_list.txt
@@ -194,7 +194,7 @@ stages:
   # Train track aggregation concurrently from the same fragment cache.
   - name: train_grappa_track
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
-    config: train/protodune-sp/grappa_track/train_from_fragment_cache_260210.yaml
+    config: train/protodune-sp/grappa_track/train_from_fragment_cache_260906.yaml
     stage: train
     source_list: ${workspace}/cache/train/cache_file_list.txt
     val_source_list: ${workspace}/cache/validation/cache_file_list.txt
@@ -208,7 +208,7 @@ stages:
       collection: splits
       as: split
     depends_on: [train_grappa_shower, train_grappa_track]
-    config: cache/protodune-sp/grappa_shower_track/particle_graphs_260210.yaml
+    config: cache/protodune-sp/grappa_shower_track/particle_graphs_260906.yaml
     run_dir: ${split.cache_dir}/particle_aggregation
     in_place: true
     sources:
@@ -226,7 +226,7 @@ stages:
   # Train interaction aggregation and particle classifiers from cached graphs.
   - name: train_grappa_inter
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
-    config: train/protodune-sp/grappa_inter/train_from_particle_cache_260210.yaml
+    config: train/protodune-sp/grappa_inter/train_from_particle_cache_260906.yaml
     stage: train
     source_list: ${workspace}/cache/train/cache_file_list.txt
     val_source_list: ${workspace}/cache/validation/cache_file_list.txt
@@ -237,11 +237,11 @@ stages:
   # Export all six learned modules as one inference checkpoint.
   - name: export_full_chain_weights
     depends_on: [train_grappa_inter]
-    config: model/protodune-sp/full_chain/model_260210.yaml
+    config: model/protodune-sp/full_chain/model_260906.yaml
     profile: s3df_milano
     time: "00:30:00"
     run_dir: ${workspace}/weights/export
-    export_weights: ${workspace}/weights/full_chain_260210.ckpt
+    export_weights: ${workspace}/weights/full_chain_260906.ckpt
     module_weight:
       uresnet_deghost: ${workspace}/train/uresnet_deghost/weights/snapshot-best.ckpt
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
@@ -250,15 +250,15 @@ stages:
       grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
       grappa_inter: ${workspace}/train/grappa_inter/weights/snapshot-best.ckpt
 
-  # Evaluate held-out events with the assembled full-chain checkpoint.
+  # Evaluate the held-out half of the v1 test split with the assembled model.
   - name: evaluate_full_chain
     depends_on: [export_full_chain_weights]
-    config: test/protodune-sp/full_chain/evaluate_260210.yaml
+    config: test/protodune-sp/full_chain/evaluate_260906.yaml
     source_list: ${validation_source_list}
     entry_fraction_range: [0.5, 1.0]
     run_dir: ${workspace}/metrics/full_chain/raw
     in_place: true
-    weight_path: ${workspace}/weights/full_chain_260210.ckpt
+    weight_path: ${workspace}/weights/full_chain_260906.ckpt
     num_workers: 16
     files_per_task: 1
     ntasks: 4
@@ -271,7 +271,7 @@ stages:
     input_dir: ${workspace}/metrics/full_chain/raw/latest
     output_dir: ${workspace}/metrics/full_chain/report/artifacts
     run_dir: ${workspace}/metrics/full_chain/report
-    checkpoint: ${workspace}/weights/full_chain_260210.ckpt
+    checkpoint: ${workspace}/weights/full_chain_260906.ckpt
     dataset: ${validation_source_list}
     dataset_selection:
       entry_fraction_range: [0.5, 1.0]

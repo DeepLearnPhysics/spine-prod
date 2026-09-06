@@ -126,7 +126,7 @@ INNER_CMD="${INNER_CMD}source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; 
 {% if custom_command %}
 INNER_CMD="${INNER_CMD}exec {{ custom_command }}"
 {% else %}
-INNER_CMD="${INNER_CMD}exec {{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+INNER_CMD="${INNER_CMD}exec {{ spine_cmd|default('spine') }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 {% endif %}
 
 # Add Shifter modules requested by the job profile/options

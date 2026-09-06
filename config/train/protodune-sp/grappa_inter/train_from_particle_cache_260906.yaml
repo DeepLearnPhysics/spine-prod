@@ -1,0 +1,13 @@
+__meta__:
+  kind: bundle
+  version: "260906"
+  date: "2026-09-06"
+  description: ProtoDUNE-SP 260906 interaction GrapPA training from particle cache
+
+include:
+  - model/protodune-sp/grappa_inter/model_260906.yaml
+  - train/protodune-sp/grappa_inter/from_particle_cache_v1.yaml
+
+override:
+  # Cached targets are formed in the full-chain reconstructed-particle domain.
+  model.modules.grappa_loss: !include model/protodune-sp/grappa_inter/loss_full_chain_260906.yaml

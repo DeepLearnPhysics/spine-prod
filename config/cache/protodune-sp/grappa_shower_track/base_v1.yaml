@@ -5,21 +5,28 @@ __meta__:
 include: cache/generic/grappa_shower_track/base_v1.yaml
 
 override:
-  io.loader.dataset.stage_map:
-    data_calib: deghosting
-    coord_label: deghosting
-    ppn_points: segmentation
-    clust_label_adapt: segmentation
-  io.loader.dataset.keys:
-    - data_calib
-    - ppn_points
-    - coord_label
-    - clust_label_adapt
-    - fragment_clusts
-    - fragment_shapes
+  io.loader.dataset:
+    name: mixed
+    larcv:
+      file_keys: null
+      schema:
+        coord_label:
+          parser: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+    hdf5:
+      file_keys: null
+      staged: true
+      stage: fragmentation
+      stage_map:
+        data_calib: deghosting
+        ppn_points: segmentation
+        clust_label_adapt: segmentation
+      keep_open: true
+      keys:
+        - data_calib
+        - ppn_points
+        - clust_label_adapt
+        - fragment_clusts
+        - fragment_shapes
   model.network_input.data: data_calib
-
-  # The 260210 interaction loss does not supervise orientation.
-  io.writer.keys-:
-    - interaction_aggregation_node_orient_target
-    - interaction_aggregation_node_orient_valid

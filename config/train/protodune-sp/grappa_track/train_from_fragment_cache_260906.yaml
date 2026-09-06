@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260906"
+  date: "2026-09-06"
+  description: ProtoDUNE-SP 260906 track GrapPA training from fragment cache
+
+include:
+  - model/protodune-sp/grappa_track/model_260906.yaml
+  - train/protodune-sp/grappa_track/from_fragment_cache_v1.yaml

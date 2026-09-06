@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260906"
+  date: "2026-09-06"
+  description: ProtoDUNE-SP 260906 track GrapPA network for full-chain aggregation
+
+include: model/protodune-sp/grappa_track/network_260906.yaml
+
+override:
+  nodes.make_groups: true
+  nodes.grouping_method: score
