@@ -5,11 +5,12 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] - 2026-09-05
 
 ### Added
 - Added an SBND Gen-II data modifier for calibrated production.
-- Added a generic staged-training prototype that trains UResNet-PPN,
+- Added a generic staged-training reference implementation that trains
+  UResNet-PPN,
   materializes its canonical semantic predictions and adapted cluster truth,
   and trains standalone Graph-SPICE from aligned raw data and cache inputs.
 - Added pipeline support for CLI-equivalent `source`, `source_list`,
@@ -51,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shell before reaching SPINE.
 - Made re-sourcing `configure.sh` refresh automatically derived container
   version, tag, and path values without replacing explicit user overrides.
+
+Full Changelog: [v0.8.4...v0.9.0](https://github.com/DeepLearnPhysics/spine-prod/compare/v0.8.4...v0.9.0)
 
 ## [0.8.4] - 2026-09-02
 
