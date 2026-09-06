@@ -1199,6 +1199,120 @@ def load_config_with_includes(config_path):
         return load_config_file(str(config_path))
 
 
+def test_protodune_sp_260210_model_is_shared_and_preserves_deployed_choices():
+    """The inference wrapper adds weights to one reusable dated model."""
+    shared = load_config_with_includes(
+        CONFIG_ROOT / "model/protodune-sp/full_chain/model_260210.yaml"
+    )["model"]
+    deployed = load_config_with_includes(
+        CONFIG_ROOT / "infer/protodune-sp/model/model_260210.yaml"
+    )["model"]
+
+    assert deployed.pop("weight_path") == "/fake/weights/checkpoint.ckpt"
+    assert deployed == shared
+
+    modules = shared["modules"]
+    assert modules["chain"]["deghosting"] == "uresnet"
+    assert modules["chain"]["charge_rescaling"] == "collection"
+    assert modules["chain"]["calibration"] == "apply"
+    assert modules["calibration"]["stage"] == "segmentation"
+    assert modules["graph_spice"]["embedder"]["uresnet"]["spatial_size"] == 6144
+    assert modules["grappa_shower"]["graph"]["max_length"] == [
+        300,
+        0,
+        300,
+        300,
+        0,
+        0,
+        0,
+        15,
+        0,
+        15,
+    ]
+    assert modules["grappa_inter"]["nodes"]["grouping_through_track"] is True
+    assert "orient" not in modules["grappa_inter_loss"]["node_loss"]
+
+
+def test_protodune_sp_cache_stages_own_only_new_products():
+    """Each ProtoDUNE-SP transition appends products absent upstream."""
+    root = CONFIG_ROOT / "cache/protodune-sp"
+    deghost = load_config_with_includes(root / "uresnet_deghost/deghosting_260210.yaml")
+    segmentation = load_config_with_includes(
+        root / "uresnet_ppn/segmentation_260210.yaml"
+    )
+    fragmentation = load_config_with_includes(
+        root / "graph_spice/fragment_graphs_260210.yaml"
+    )
+    particles = load_config_with_includes(
+        root / "grappa_shower_track/particle_graphs_260210.yaml"
+    )
+
+    assert deghost["io"]["writer"]["keys"] == [
+        "data_calib",
+        "orig_index",
+        "seg_label",
+        "ppn_label",
+        "clust_label",
+        "coord_label",
+    ]
+    assert segmentation["io"]["writer"]["keys"] == [
+        "seg_pred",
+        "ppn_points",
+        "clust_label_adapt",
+    ]
+    assert "data_calib" not in fragmentation["io"]["writer"]["keys"]
+    assert fragmentation["io"]["loader"]["dataset"]["stage_map"] == {
+        "data_calib": "deghosting",
+        "coord_label": "deghosting",
+    }
+    particle_keys = particles["io"]["writer"]["keys"]
+    assert "interaction_aggregation_node_orient_target" not in particle_keys
+    assert "interaction_aggregation_node_orient_valid" not in particle_keys
+
+
+def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report():
+    """The expanded 260210 workflow captures every trained chain module."""
+    pipeline = PipelineDefinition.load(
+        Path(__file__).parent.parent / "pipelines/protodune-sp/full_chain_260210.yaml",
+        workspace_override="/tmp/protodune-sp-260210",
+    )
+    names = [stage["name"] for stage in pipeline.stages]
+
+    assert names[:4] == [
+        "train_uresnet_deghost",
+        "cache_train_deghosting",
+        "cache_validation_deghosting",
+        "train_uresnet_ppn",
+    ]
+    assert names[-3:] == [
+        "export_full_chain_weights",
+        "evaluate_full_chain",
+        "report_full_chain",
+    ]
+    export = next(
+        stage
+        for stage in pipeline.stages
+        if stage["name"] == "export_full_chain_weights"
+    )
+    assert set(export["module_weight"]) == {
+        "uresnet_deghost",
+        "uresnet_ppn",
+        "graph_spice",
+        "grappa_shower",
+        "grappa_track",
+        "grappa_inter",
+    }
+    for split in ("train", "validation"):
+        deghost = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"cache_{split}_deghosting"
+        )
+        assert deghost["output_source_list"] == (
+            f"/tmp/protodune-sp-260210/cache/{split}/cache_file_list.txt"
+        )
+
+
 def write_composite_config(tmp_path, base_config, modifier_config):
     """Create a temporary bundle which applies a modifier to a base config."""
     composite_path = tmp_path / "composite.yaml"

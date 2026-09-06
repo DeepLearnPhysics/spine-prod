@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "260210"
+  date: "2026-02-10"
+  description: ProtoDUNE-SP 260210 Graph-SPICE loss
+
+include: model/common/graph_spice/loss_v1.yaml

@@ -1,0 +1,31 @@
+__meta__:
+  kind: fragment
+  version: "260210"
+  date: "2026-02-10"
+  description: ProtoDUNE-SP full chain composed from the February 2026 components
+
+include: model/common/full_chain/base_v1.yaml
+
+override:
+  model.network_input.sources: sources
+  model.network_input.meta: meta
+  model.network_input.run_info: run_info
+
+  model.modules.chain.deghosting: uresnet
+  model.modules.chain.charge_rescaling: collection
+  model.modules.chain.calibration: apply
+  model.modules.calibration: !include model/protodune-sp/calibration/calibration_260210.yaml
+  model.modules.calibration.stage: segmentation
+
+  model.modules.uresnet_deghost: !include model/protodune-sp/uresnet_deghost/network_260210.yaml
+  model.modules.uresnet_deghost_loss: !include model/protodune-sp/uresnet_deghost/loss_260210.yaml
+  model.modules.uresnet_ppn: !include model/protodune-sp/uresnet_ppn/network_260210.yaml
+  model.modules.uresnet_ppn_loss: !include model/protodune-sp/uresnet_ppn/loss_260210.yaml
+  model.modules.graph_spice: !include model/protodune-sp/graph_spice/network_260210.yaml
+  model.modules.graph_spice_loss: !include model/protodune-sp/graph_spice/loss_260210.yaml
+  model.modules.grappa_shower: !include model/protodune-sp/grappa_shower/network_260210.yaml
+  model.modules.grappa_shower_loss: !include model/protodune-sp/grappa_shower/loss_260210.yaml
+  model.modules.grappa_track: !include model/protodune-sp/grappa_track/network_full_chain_260210.yaml
+  model.modules.grappa_track_loss: !include model/protodune-sp/grappa_track/loss_260210.yaml
+  model.modules.grappa_inter: !include model/protodune-sp/grappa_inter/network_full_chain_260210.yaml
+  model.modules.grappa_inter_loss: !include model/protodune-sp/grappa_inter/loss_260210.yaml

@@ -1,0 +1,23 @@
+__meta__:
+  kind: fragment
+  description: Append ProtoDUNE-SP fragment graphs and GrapPA supervision
+
+include: cache/generic/graph_spice/base_v1.yaml
+
+override:
+  io.loader.minibatch_size: 16
+  io.loader.dataset:
+    name: hdf5
+    file_keys: null
+    staged: true
+    stage: segmentation
+    keep_open: true
+    stage_map:
+      data_calib: deghosting
+      coord_label: deghosting
+    keys: [data_calib, coord_label, seg_pred, ppn_points, clust_label_adapt]
+
+  model.network_input.data: data_calib
+
+  # Calibrated point data and coordinate truth remain owned upstream.
+  io.writer.keys-: [data]

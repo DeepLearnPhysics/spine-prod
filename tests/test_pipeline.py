@@ -133,6 +133,105 @@ def test_pipeline_may_omit_unused_workspace(tmp_path):
     assert definition.stages[0]["name"] == "job"
 
 
+def test_stage_module_weights_override_yaml_by_stage(tmp_path):
+    """Launch-time seeds should merge into only their named SPINE stage."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "train",
+                    "config": "train.yaml",
+                    "stage": "train",
+                    "run_dir": "/run",
+                    "module_weight": {
+                        "backbone": "/weights/yaml.ckpt",
+                        "head": "/weights/head.ckpt",
+                    },
+                },
+                {"name": "cache", "config": "cache.yaml"},
+            ]
+        },
+    )
+    overrides = PipelineDefinition.parse_stage_module_weights(
+        [
+            ["train", "backbone=/weights/cli.ckpt"],
+            ["train", "extra=/weights/extra=best.ckpt"],
+        ]
+    )
+
+    definition = PipelineDefinition.load(str(path), stage_module_weights=overrides)
+
+    assert definition.stages[0]["module_weight"] == {
+        "backbone": "/weights/cli.ckpt",
+        "head": "/weights/head.ckpt",
+        "extra": "/weights/extra=best.ckpt",
+    }
+    assert "module_weight" not in definition.stages[1]
+
+
+@pytest.mark.parametrize(
+    ("values", "error", "message"),
+    [
+        (["train=model.ckpt"], ValueError, "requires STAGE and MODULE=PATH"),
+        (
+            [["bad stage", "model=/weights/model.ckpt"]],
+            ValueError,
+            "valid pipeline stage",
+        ),
+        ([["train", "model"]], ValueError, "must use MODULE=PATH"),
+        ([["train", "bad.module=/weights/model.ckpt"]], ValueError, "valid identifier"),
+        ([["train", "model="]], ValueError, "PATH must not be empty"),
+        (
+            [
+                ["train", "model=/weights/first.ckpt"],
+                ["train", "model=/weights/second.ckpt"],
+            ],
+            ValueError,
+            "Duplicate",
+        ),
+    ],
+)
+def test_stage_module_weight_parser_rejects_malformed_values(values, error, message):
+    """Malformed stage-qualified seeds should fail before pipeline loading."""
+    with pytest.raises(error, match=message):
+        PipelineDefinition.parse_stage_module_weights(values)
+
+
+def test_empty_stage_module_weight_input_is_a_noop():
+    """An omitted repeatable CLI option should produce no overrides."""
+    assert PipelineDefinition.parse_stage_module_weights(None) == {}
+
+
+@pytest.mark.parametrize(
+    ("stages", "overrides", "error", "message"),
+    [
+        (
+            [{"name": "train", "config": "train.yaml"}],
+            {"missing": {"model": "/weights/model.ckpt"}},
+            ValueError,
+            "Unknown pipeline stage",
+        ),
+        (
+            [{"name": "report", "config": "report.yaml", "kind": "report"}],
+            {"report": {"model": "/weights/model.ckpt"}},
+            ValueError,
+            "cannot receive module weights",
+        ),
+        (
+            [{"name": "train", "config": "train.yaml"}],
+            {"train": ["not-a-mapping"]},
+            TypeError,
+            "must be a mapping",
+        ),
+    ],
+)
+def test_stage_module_weight_targets_are_validated(stages, overrides, error, message):
+    """Every override target must be valid before any stage is mutated."""
+    with pytest.raises(error, match=message):
+        PipelineDefinition._apply_stage_module_weights(stages, overrides)
+
+
 def test_pipeline_expands_collection_stage_templates(tmp_path):
     """Each collection item should become an ordinary validated stage."""
     path = write_pipeline(
@@ -518,6 +617,24 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             {"name": "job", "config": "x.yaml", "weight_path": ""},
             ValueError,
             "weight_path must be a non-empty string",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "module_weight": {"bad.module": "/weights/model.ckpt"},
+            },
+            ValueError,
+            "module_weight keys must be valid identifiers",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "module_weight": {"model": ""},
+            },
+            ValueError,
+            "module_weight path.*must be a non-empty string",
         ),
         (
             {"name": "job", "config": "x.yaml", "kind": "other"},

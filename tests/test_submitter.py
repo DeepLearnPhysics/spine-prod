@@ -1939,6 +1939,55 @@ class TestBatchSpineOverride:
         assert "--output-suffix cache" in script
         assert output.is_dir()
 
+    def test_submit_job_writes_expected_stage_cache_source_list(
+        self, mock_submitter, tmp_path
+    ):
+        """A first cache stage can publish paths for dependent array jobs."""
+        sources = [tmp_path / "first.root", tmp_path / "second.root"]
+        for source in sources:
+            source.touch()
+        output = tmp_path / "cache"
+        source_list = output / "cache_file_list.txt"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="cache"),
+        ):
+            assert mock_submitter.submit_job(
+                config="cache/generic/uresnet_ppn/segmentation_240805.yaml",
+                files=[str(source) for source in sources],
+                output=str(output),
+                output_suffix="cache",
+                output_source_list=str(source_list),
+            ) == ["cache"]
+
+        assert source_list.read_text(encoding="utf-8").splitlines() == [
+            str(output / "first_cache.h5"),
+            str(output / "second_cache.h5"),
+        ]
+        metadata = json.loads(
+            next(mock_submitter.jobs_dir.glob("**/job_metadata.json")).read_text()
+        )
+        assert metadata["output_source_list"] == str(source_list)
+
+    def test_submit_job_rejects_incomplete_output_source_list_contract(
+        self, mock_submitter, tmp_path
+    ):
+        """Publishing future cache paths requires deterministic output naming."""
+        source = tmp_path / "input.root"
+        source.touch()
+
+        with pytest.raises(ValueError, match="explicit output directory and suffix"):
+            mock_submitter.submit_job(
+                config="cache/generic/uresnet_ppn/segmentation_240805.yaml",
+                files=[str(source)],
+                output_source_list=str(tmp_path / "cache_files.txt"),
+            )
+
     def test_submit_job_exports_composed_module_weights(self, mock_submitter, tmp_path):
         """A model-only batch job should forward composition options to SPINE."""
         run_dir = tmp_path / "weights" / "export"
@@ -3210,7 +3259,13 @@ class TestPipelineSubmission:
         with patch.object(
             mock_submitter, "submit_job", side_effect=[["10"], ["20"], ["30"]]
         ) as submit_job:
-            result = mock_submitter.submit_pipeline(str(pipeline_path))
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                stage_module_weights=[
+                    ["configured_inputs", "uresnet_ppn=/tmp/cli-seed.ckpt"],
+                    ["configured_inputs", "graph_spice=/tmp/graph-seed.ckpt"],
+                ],
+            )
 
         assert result == {
             "train": ["10"],
@@ -3237,7 +3292,8 @@ class TestPipelineSubmission:
             "hdf5": {"source": "validation.h5"},
         }
         assert configured["module_weights"] == {
-            "uresnet_ppn": "/tmp/snapshot-best.ckpt"
+            "uresnet_ppn": "/tmp/cli-seed.ckpt",
+            "graph_spice": "/tmp/graph-seed.ckpt",
         }
         assert configured["weight_path"] == "/tmp/full-seed.ckpt"
 
@@ -3697,6 +3753,32 @@ class TestPipelineSubmission:
                 from_stage="second",
                 to_stage="first",
             )
+
+    def test_submit_pipeline_rejects_weight_override_outside_selected_range(
+        self, mock_submitter, tmp_path
+    ):
+        """A bounded launch must not silently ignore a stage-specific seed."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {"name": "train", "config": "train.yaml"},
+                        {"name": "cache", "config": "cache.yaml"},
+                    ]
+                }
+            )
+        )
+
+        with patch.object(mock_submitter, "submit_job") as submit_job:
+            with pytest.raises(ValueError, match="outside the selected pipeline range"):
+                mock_submitter.submit_pipeline(
+                    str(pipeline_path),
+                    from_stage="cache",
+                    stage_module_weights=[["train", "model=/weights/model.ckpt"]],
+                )
+
+        submit_job.assert_not_called()
 
     @pytest.mark.parametrize(
         ("pipeline", "message"),

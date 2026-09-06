@@ -25,7 +25,8 @@ Each main config includes modular YAML files:
 
 **Model Components:**
 - **`model/model_260210.yaml`**: Feb 2026 weights and model settings
-- **`model/model_common.yaml`**: Common model architecture
+- **`config/model/protodune-sp/full_chain/model_260210.yaml`**: Shared dated
+  architecture used by inference, training caches, testing and weight export
 
 **Post-processing Components:**
 - **`post/post_260210.yaml`**: Post-processing configuration (Feb 2026)

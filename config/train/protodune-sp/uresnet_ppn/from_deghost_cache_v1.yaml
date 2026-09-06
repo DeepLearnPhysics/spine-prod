@@ -1,0 +1,72 @@
+__meta__:
+  kind: fragment
+  description: ProtoDUNE-SP UResNet-PPN training from cached deghosted data
+
+base:
+  world_size: 1
+  epochs: 50.0
+  seed: 0
+  unwrap: false
+  log_dir: null
+  log_step: 1
+
+io:
+  loader:
+    batch_size: 64
+    shuffle: false
+    num_workers: 16
+    collate_fn: all
+    sampler:
+      name: random_sequence
+      seed: 0
+    dataset:
+      name: hdf5
+      file_keys: null
+      staged: true
+      stage: deghosting
+      keep_open: true
+      keys: [data_calib, orig_index, seg_label, ppn_label, clust_label]
+
+train:
+  weight_prefix: null
+  save_epoch: 1.0
+  optimizer:
+    name: Adam
+    lr: 0.001
+
+validation:
+  file_keys: null
+  fraction: 1.0
+  early_stopping:
+    monitor: loss
+    mode: min
+    patience: 5
+    min_delta: 0.0
+  best_checkpoint: true
+
+model:
+  name: full_chain
+  weight_path: null
+  to_numpy: false
+
+  network_input:
+    data: data_calib
+    orig_index: orig_index
+    seg_label: seg_label
+    clust_label: clust_label
+
+  loss_input:
+    seg_label: seg_label
+    ppn_label: ppn_label
+    clust_label: clust_label
+
+  modules:
+    chain:
+      stages:
+        - name: segmentation
+          provider: segmentation
+          uses: uresnet_ppn
+          loss: uresnet_ppn_loss
+          config:
+            mode: uresnet
+            point_proposal: ppn

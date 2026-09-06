@@ -66,6 +66,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "job_name",
         "output",
         "output_suffix",
+        "output_source_list",
         "in_place",
         "no_writer",
         "ntasks",
@@ -146,12 +147,14 @@ class PipelineDefinition:
         pipeline_path: str,
         overrides: Optional[Mapping[str, Any]] = None,
         workspace_override: Optional[str] = None,
+        stage_module_weights: Optional[Mapping[str, Mapping[str, str]]] = None,
     ) -> "PipelineDefinition":
         """Load and validate a pipeline without contacting a scheduler.
 
-        Configuration precedence is ``defaults < stage < CLI overrides``.
-        Every stage is validated before the definition is returned, preventing
-        a malformed later stage from leaving a partially submitted workflow.
+        Configuration precedence is ``defaults < stage < global CLI overrides
+        < stage-specific module weights``. Every stage is validated before the
+        definition is returned, preventing a malformed later stage from
+        leaving a partially submitted workflow.
         """
         with Path(pipeline_path).open("r", encoding="utf-8") as stream:
             document = yaml.safe_load(stream)
@@ -214,7 +217,88 @@ class PipelineDefinition:
             stages.append(stage)
             prior_names.add(stage["name"])
 
+        cls._apply_stage_module_weights(stages, stage_module_weights or {})
         return cls(tuple(stages), workspace)
+
+    @staticmethod
+    def parse_stage_module_weights(
+        values: Optional[Sequence[Sequence[str]]],
+    ) -> Dict[str, Dict[str, str]]:
+        """Parse repeated ``STAGE MODULE=PATH`` command-line assignments.
+
+        Parameters
+        ----------
+        values : sequence of two-string sequences, optional
+            Raw values collected by ``argparse`` for repeated
+            ``--stage-module-weight`` options.
+
+        Returns
+        -------
+        dict
+            Stage names mapped to destination modules and checkpoint paths.
+        """
+        result: Dict[str, Dict[str, str]] = {}
+        for value in values or ():
+            if isinstance(value, (str, bytes)) or len(value) != 2:
+                raise ValueError("--stage-module-weight requires STAGE and MODULE=PATH")
+            stage, assignment = value
+            if not isinstance(stage, str) or not STAGE_NAME_PATTERN.match(stage):
+                raise ValueError(
+                    "--stage-module-weight STAGE must be a valid pipeline stage name"
+                )
+            if not isinstance(assignment, str) or "=" not in assignment:
+                raise ValueError(
+                    "--stage-module-weight assignment must use MODULE=PATH"
+                )
+            module, path = assignment.split("=", 1)
+            if not module or not VARIABLE_NAME_PATTERN.match(module):
+                raise ValueError(
+                    "--stage-module-weight MODULE must be a valid identifier"
+                )
+            if not path:
+                raise ValueError("--stage-module-weight PATH must not be empty")
+            stage_weights = result.setdefault(stage, {})
+            if module in stage_weights:
+                raise ValueError(
+                    "Duplicate --stage-module-weight assignment for "
+                    f"{stage}:{module}"
+                )
+            stage_weights[module] = path
+        return result
+
+    @classmethod
+    def _apply_stage_module_weights(
+        cls,
+        stages: Sequence[Dict[str, Any]],
+        overrides: Mapping[str, Mapping[str, str]],
+    ) -> None:
+        """Merge validated launch-time weights into named SPINE stages."""
+        stage_map = {stage["name"]: stage for stage in stages}
+        unknown = set(overrides) - set(stage_map)
+        if unknown:
+            raise ValueError(
+                "Unknown pipeline stage module-weight override(s): "
+                + ", ".join(sorted(unknown))
+            )
+
+        # Validate every target before mutating any resolved stage.
+        for name, module_weights in overrides.items():
+            stage = stage_map[name]
+            if stage.get("kind", "spine") != "spine":
+                raise ValueError(
+                    f"Pipeline stage '{name}' cannot receive module weights"
+                )
+            if not isinstance(module_weights, Mapping):
+                raise TypeError(
+                    f"Pipeline stage '{name}' module-weight override must be a mapping"
+                )
+            cls._validate_module_weights(name, module_weights)
+
+        for name, module_weights in overrides.items():
+            stage = stage_map[name]
+            merged = dict(stage.get("module_weight") or {})
+            merged.update(module_weights)
+            stage["module_weight"] = merged
 
     @staticmethod
     def _resolve_workspace(
@@ -554,6 +638,9 @@ class PipelineDefinition:
             value = stage.get(field)
             if value is not None and not isinstance(value, Mapping):
                 raise TypeError(f"Pipeline stage '{name}' {field} must be a mapping")
+        module_weights = stage.get("module_weight")
+        if module_weights is not None:
+            PipelineDefinition._validate_module_weights(name, module_weights)
         export_weights = stage.get("export_weights")
         if export_weights is not None:
             if not isinstance(export_weights, str):
@@ -586,6 +673,21 @@ class PipelineDefinition:
         in_place = stage.get("in_place")
         if in_place is not None and not isinstance(in_place, bool):
             raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
+
+    @staticmethod
+    def _validate_module_weights(name: str, module_weights: Mapping[Any, Any]) -> None:
+        """Require scalar destination-module checkpoint assignments."""
+        for module, path in module_weights.items():
+            if not isinstance(module, str) or not VARIABLE_NAME_PATTERN.match(module):
+                raise ValueError(
+                    f"Pipeline stage '{name}' module_weight keys must be "
+                    "valid identifiers"
+                )
+            if not isinstance(path, str) or not path:
+                raise ValueError(
+                    f"Pipeline stage '{name}' module_weight path for "
+                    f"'{module}' must be a non-empty string"
+                )
 
     @classmethod
     def _validate_lifecycle(cls, name: str, stage: Mapping[str, Any]) -> None:
@@ -748,6 +850,7 @@ class PipelineRunner(SubmissionComponent):
         workspace: Optional[str] = None,
         from_stage: Optional[str] = None,
         to_stage: Optional[str] = None,
+        stage_module_weights: Optional[Sequence[Sequence[str]]] = None,
     ) -> Dict[str, List[str]]:
         """Submit an ordered multi-stage production pipeline.
 
@@ -776,16 +879,23 @@ class PipelineRunner(SubmissionComponent):
         to_stage : str, optional
             Stop after this stage in pipeline order. This can bound a restart
             to the stages that must be regenerated.
+        stage_module_weights : sequence, optional
+            Repeated launch-time ``STAGE MODULE=PATH`` assignments. These
+            override matching module weights in the pipeline document.
 
         Returns
         -------
         dict
             Mapping from stage names to scheduler job IDs.
         """
+        parsed_stage_weights = PipelineDefinition.parse_stage_module_weights(
+            stage_module_weights
+        )
         definition = PipelineDefinition.load(
             pipeline_path,
             overrides,
             workspace_override=workspace,
+            stage_module_weights=parsed_stage_weights,
         )
         all_stages = definition.stages
         stages, skipped, deferred = self._select_stages(
@@ -793,6 +903,13 @@ class PipelineRunner(SubmissionComponent):
             from_stage,
             to_stage,
         )
+        selected_names = {stage["name"] for stage in stages}
+        unused_weight_stages = set(parsed_stage_weights) - selected_names
+        if unused_weight_stages:
+            raise ValueError(
+                "Stage module-weight override targets stage outside the "
+                "selected pipeline range: " + ", ".join(sorted(unused_weight_stages))
+            )
         print(f"Loading pipeline: {pipeline_path}")
         if definition.workspace is not None:
             print(f"Workspace: {definition.workspace}")
@@ -954,6 +1071,7 @@ class PipelineRunner(SubmissionComponent):
                 "job_name": stage.get("job_name", stage["name"]),
                 "output": stage.get("output"),
                 "output_suffix": stage.get("output_suffix"),
+                "output_source_list": stage.get("output_source_list"),
                 "in_place": stage.get("in_place", False),
                 "ntasks": stage.get("ntasks"),
                 "files_per_task": stage.get("files_per_task"),

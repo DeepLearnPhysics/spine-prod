@@ -133,6 +133,7 @@ class BatchRunner(SubmissionComponent):
         job_name: Optional[str] = None,
         output: Optional[str] = None,
         output_suffix: Optional[str] = None,
+        output_source_list: Optional[str] = None,
         in_place: bool = False,
         no_writer: bool = False,
         ntasks: Optional[int] = None,
@@ -201,6 +202,9 @@ class BatchRunner(SubmissionComponent):
         output_suffix : str, optional
             Output HDF5 suffix when output names are derived from input files,
             by default None
+        output_source_list : str, optional
+            Write the deterministic source-routed output paths to this text
+            file for dependent pipeline stages.
         in_place : bool, optional
             Leave the writer destination entirely config-defined. This suppresses
             all automatic ``--output*`` arguments so SPINE can extend staged
@@ -267,9 +271,9 @@ class BatchRunner(SubmissionComponent):
         tensorboard : bool, optional
             Enable stage-specific TensorBoard event logging.
         allow_missing_inputs : bool, optional
-            Preserve exact direct input paths expected from an upstream
-            pipeline stage. This internal pipeline option does not relax glob
-            or source-list resolution.
+            Preserve direct paths and glob patterns expected from an upstream
+            pipeline stage. This internal pipeline option does not relax
+            source-list resolution.
         retry : bool, optional
             Reuse an existing pipeline stage directory while preserving prior
             submissions. Training resumes its latest checkpoint when present.
@@ -289,6 +293,17 @@ class BatchRunner(SubmissionComponent):
         if in_place and (output is not None or output_suffix is not None):
             raise ValueError(
                 "--in-place cannot be combined with --output or --output-suffix"
+            )
+        if output_source_list and (
+            in_place
+            or not files
+            or named_sources
+            or not output
+            or not output_suffix
+            or Path(output).suffix.lower() in {".h5", ".hdf5"}
+        ):
+            raise ValueError(
+                "output_source_list requires an explicit output directory and suffix"
             )
 
         if stage not in ("inference", "train", "validation"):
@@ -624,6 +639,16 @@ class BatchRunner(SubmissionComponent):
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
+        if output_source_list:
+            assert output is not None and output_suffix is not None
+            output_manifest_path = Path(output_source_list)
+            output_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_paths = self.file_handler.stage_cache_output_paths(
+                file_list, output, output_suffix
+            )
+            with output_manifest_path.open("w", encoding="utf-8") as stream:
+                for cache_path in cache_paths:
+                    stream.write(f"{cache_path}\n")
         output_args = (
             self.context.spine_cli.format_output_args(output, output_dir, output_suffix)
             if not in_place and (file_list or named_sources) and output
@@ -851,6 +876,7 @@ class BatchRunner(SubmissionComponent):
                 None if in_place else output_dir if output else default_output_location
             ),
             "output_suffix": output_suffix,
+            "output_source_list": output_source_list,
             "resume_checkpoint": (
                 str(resume_checkpoint) if resume_checkpoint is not None else None
             ),

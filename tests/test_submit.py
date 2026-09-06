@@ -288,6 +288,7 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         workspace="/runs/benchmark",
         from_stage=None,
         to_stage=None,
+        stage_module_weights=None,
     )
     output = capsys.readouterr().out
     assert "reco: 42" in output
@@ -329,6 +330,42 @@ def test_pipeline_rejects_stage_specific_weight_path():
             "pipeline.yaml",
             "--weight-path",
             "/weights/model.ckpt",
+        )
+
+
+def test_pipeline_forwards_stage_module_weights():
+    """Stage-qualified module seeds should reach pipeline validation intact."""
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--stage-module-weight",
+        "train_uresnet_ppn",
+        "uresnet_ppn=/weights/ppn.ckpt",
+        "--stage-module-weight",
+        "train_graph_spice",
+        "graph_spice=/weights/graph.ckpt",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert submitter.submit_pipeline.call_args.kwargs["stage_module_weights"] == [
+        ["train_uresnet_ppn", "uresnet_ppn=/weights/ppn.ckpt"],
+        ["train_graph_spice", "graph_spice=/weights/graph.ckpt"],
+    ]
+
+
+def test_stage_module_weight_requires_pipeline():
+    """A stage name has no meaning for an ordinary single-job submission."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--config",
+            "train.yaml",
+            "--stage-module-weight",
+            "train",
+            "model=/weights/model.ckpt",
         )
 
 

@@ -1,0 +1,106 @@
+__meta__:
+  kind: fragment
+  description: Materialize deghosted and calibrated ProtoDUNE-SP point data
+
+base:
+  world_size: 1
+  iterations: -1
+  seed: 0
+  unwrap: true
+  split_output: true
+  log_step: 1
+
+io:
+  loader:
+    minibatch_size: 4
+    shuffle: false
+    num_workers: 16
+    collate_fn: all
+    dataset:
+      name: larcv
+      file_keys: null
+      schema:
+        data:
+          parser: sparse3d
+          sparse_event_list:
+            - sparse3d_reco
+            - sparse3d_reco_chi2
+            - sparse3d_reco_hit_charge0
+            - sparse3d_reco_hit_charge1
+            - sparse3d_reco_hit_charge2
+            - sparse3d_reco_hit_key0
+            - sparse3d_reco_hit_key1
+            - sparse3d_reco_hit_key2
+        sources:
+          parser: sparse3d
+          sparse_event_list: [sparse3d_reco_cryo, sparse3d_reco_tpc]
+          feature_only: true
+        seg_label:
+          parser: sparse3d
+          sparse_event: sparse3d_pcluster_semantics_ghost
+        ppn_label:
+          parser: particle_points
+          sparse_event: sparse3d_pcluster
+          particle_event: particle_corrected
+          include_point_tagging: false
+        clust_label:
+          parser: cluster3d
+          cluster_event: cluster3d_pcluster
+          particle_event: particle_corrected
+          sparse_semantics_event: sparse3d_pcluster_semantics
+          add_particle_info: true
+          clean_data: true
+        coord_label:
+          parser: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+        meta:
+          parser: meta
+          sparse_event: sparse3d_pcluster
+        run_info:
+          parser: run_info
+          sparse_event: sparse3d_pcluster
+  writer:
+    name: stage_hdf5
+    file_name: null
+    stage: deghosting
+    overwrite_stage: true
+    # Persist raw truth once; all later stages consume only this cache.
+    keys:
+      - data_calib
+      - orig_index
+      - seg_label
+      - ppn_label
+      - clust_label
+      - coord_label
+
+model:
+  name: full_chain
+  to_numpy: true
+
+  network_input:
+    data: data
+    sources: sources
+    seg_label: seg_label
+    meta: meta
+    run_info: run_info
+
+  modules:
+    chain:
+      stages:
+        - name: deghosting
+          provider: deghost
+          uses: uresnet_deghost
+          config:
+            mode: uresnet
+            charge_rescaling: collection
+
+        - name: calibration
+          provider: calibration
+          config:
+            mode: apply
+
+override:
+  # Strip the full-chain prefix while loading the standalone checkpoint.
+  model.modules.uresnet_deghost.model_name: ""
+  model.modules.uresnet_deghost.weight_path: ""

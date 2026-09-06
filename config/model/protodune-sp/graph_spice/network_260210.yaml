@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  version: "260210"
+  date: "2026-02-10"
+  description: ProtoDUNE-SP 260210 Graph-SPICE network
+
+include: model/common/graph_spice/network_v1.yaml
+
+override:
+  embedder.uresnet.spatial_size: 6144
+  constructor.graph:
+    name: radius
+    r: 1.9

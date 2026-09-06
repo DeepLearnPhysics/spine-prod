@@ -62,11 +62,29 @@ def test_parse_direct_sources_preserves_expected_pipeline_output(handler, tmp_pa
     assert handler.parse_files([str(future)], allow_missing=True) == [str(future)]
 
 
-def test_allow_missing_does_not_preserve_unresolved_glob(handler, tmp_path):
-    """Future inputs must be exact because an unmatched glob is indeterminate."""
+def test_allow_missing_preserves_unresolved_glob(handler, tmp_path):
+    """A dependent job may expand its upstream cache glob at runtime."""
     pattern = str(tmp_path / "*.h5")
 
-    assert handler.parse_files([pattern], allow_missing=True) == []
+    assert handler.parse_files([pattern], allow_missing=True) == [pattern]
+
+
+def test_stage_cache_output_paths_follow_writer_naming(handler, tmp_path):
+    """Predicted cache paths use each source basename and configured suffix."""
+    assert handler.stage_cache_output_paths(
+        ["/input/a.root", "/other/b.larcv.root"], str(tmp_path), "cache"
+    ) == [
+        str(tmp_path / "a_cache.h5"),
+        str(tmp_path / "b.larcv_cache.h5"),
+    ]
+
+
+def test_stage_cache_output_paths_reject_duplicate_basenames(handler, tmp_path):
+    """Two source directories cannot silently claim one output cache path."""
+    with pytest.raises(ValueError, match="basenames must be unique"):
+        handler.stage_cache_output_paths(
+            ["/first/data.root", "/second/data.root"], str(tmp_path), "cache"
+        )
 
 
 @pytest.mark.parametrize(

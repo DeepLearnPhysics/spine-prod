@@ -50,9 +50,9 @@ derived caches complete preserves positional alignment for mixed datasets.
 ```
 
 Pipeline settings resolve in this order: profile defaults, pipeline `defaults`,
-stage fields, then explicit CLI overrides. For example, this runs every stage
-with the same checkout and scheduler account while overriding any profiles in
-the YAML:
+stage fields, global CLI overrides, then stage-specific module-weight
+overrides. For example, this runs every stage with the same checkout and
+scheduler account while overriding any profiles in the YAML:
 
 ```bash
 ./submit.py --pipeline pipelines/my_pipeline.yaml \
@@ -62,9 +62,24 @@ the YAML:
 
 Pipeline-wide CLI overrides are supported for software paths, profiles,
 scheduler resources, and first-class SPINE runtime options. Data sources,
-outputs, dependencies, run lifecycle settings, and model weights must remain on
-their individual stages. Unknown fields and unsupported pipeline CLI options
-are rejected rather than ignored.
+outputs, dependencies, and run lifecycle settings remain on their individual
+stages. Unknown fields and unsupported pipeline CLI options are rejected rather
+than ignored.
+
+An existing checkpoint can initialize one destination module without editing
+the stable pipeline document. Qualify each override by both stage and module:
+
+```bash
+./submit.py --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/workflow \
+  --stage-module-weight train_uresnet_ppn \
+    uresnet_ppn=/path/to/uresnet_ppn.ckpt \
+  --stage-module-weight train_graph_spice \
+    graph_spice=/path/to/graph_spice.ckpt
+```
+
+The option may be repeated. It overrides a matching `module_weight` entry in
+YAML and initializes parameters without requesting training-state resume.
 
 To continue an interrupted workflow in the same workspace, cancel or confirm
 termination of its old jobs and restart at the first failed stage:
@@ -134,6 +149,26 @@ than silently pairing the wrong events.
 To run against an unreleased checkout, pass `--spine-path /path/to/spine` when
 submitting the pipeline. A stage-level `spine_path` remains available when only
 one stage needs a different checkout.
+
+## ProtoDUNE-SP staged training
+
+`protodune-sp/full_chain_260210.yaml` extends the same cache-and-train model to
+a chain with learned deghosting. It first trains binary UResNet deghosting,
+then materializes calibrated charge, the original-row mapping and raw
+supervision exactly once. UResNet-PPN trains on that cached point domain, so
+the expensive deghosting, calibration and LArCV parsing paths are not repeated
+each epoch. The remaining Graph-SPICE and GrapPA transitions append only their
+new products to the source-specific staged caches.
+
+The `260210` pipeline intentionally preserves the deployed model choices. It
+is the reviewable baseline from which a new dated ProtoDUNE-SP revision can
+adopt selected decisions from the generic `260828` study.
+
+Because ProtoDUNE-SP inputs are file lists, the first cache stages publish
+deterministic `cache_file_list.txt` manifests. Dependent cache stages can then
+be submitted as file-parallel arrays before those HDF5 files physically exist;
+the scheduler dependency guarantees that each predicted path is valid before
+its consumer starts.
 
 ### Recovering the PPN cache transition
 

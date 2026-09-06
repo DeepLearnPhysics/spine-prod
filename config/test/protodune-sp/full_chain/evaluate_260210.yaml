@@ -1,0 +1,19 @@
+__meta__:
+  kind: bundle
+  version: "260210"
+  date: "2026-02-10"
+  description: Evaluate the trained ProtoDUNE-SP 260210 full chain
+
+include:
+  - infer/protodune-sp/base/base_260210.yaml
+  - infer/protodune-sp/io/io_260210.yaml
+  - model/protodune-sp/full_chain/model_260210.yaml
+  - infer/protodune-sp/post/post_260210.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+
+override:
+  # This stage emits analyzer CSVs only; reconstruction HDF5 is unnecessary.
+  io.writer: null
+
+  # Adapt cluster truth into the reconstructed semantic point domain.
+  model.network_input.clust_label: clust_label

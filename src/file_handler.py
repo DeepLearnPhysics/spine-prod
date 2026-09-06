@@ -2,6 +2,7 @@
 
 import glob
 import os
+from pathlib import Path
 from typing import List
 
 
@@ -24,9 +25,9 @@ class FileHandler:
             Either 'source' (direct paths/globs) or 'source_list' (text file),
             by default 'source'
         allow_missing : bool, optional
-            Preserve missing direct paths that an upstream pipeline stage will
-            create before this job starts. Globs and source lists must still
-            exist when the submission is prepared.
+            Preserve missing direct paths or glob patterns that an upstream
+            pipeline stage will create before this job starts. Source-list
+            files must still exist when the submission is prepared.
 
         Returns
         -------
@@ -47,7 +48,13 @@ class FileHandler:
             for item in file_input:
                 if "*" in item or "?" in item:
                     # Expand glob
-                    files.extend(sorted(glob.glob(item)))
+                    matches = sorted(glob.glob(item))
+                    if matches:
+                        files.extend(matches)
+                    elif allow_missing:
+                        # The dependent job lets SPINE expand this after the
+                        # scheduler has materialized the upstream files.
+                        files.append(item)
                 else:
                     # Direct file path
                     if os.path.exists(item) or allow_missing:
@@ -56,6 +63,22 @@ class FileHandler:
                         print(f"WARNING: File not found: {item}")
 
         return files
+
+    @staticmethod
+    def stage_cache_output_paths(
+        source_files: List[str], output_dir: str, suffix: str
+    ) -> List[str]:
+        """Predict source-routed stage-cache paths for an output manifest."""
+        directory = Path(output_dir)
+        paths = [
+            str(directory / f"{Path(source).stem}_{suffix}.h5")
+            for source in source_files
+        ]
+        if len(paths) != len(set(paths)):
+            raise ValueError(
+                "Stage-cache output names collide; source basenames must be unique"
+            )
+        return paths
 
     def chunk_files(
         self, files: List[str], max_array_size: int, files_per_task: int

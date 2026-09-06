@@ -285,6 +285,16 @@ Examples:
         help="Complete-model checkpoint override forwarded to SPINE",
     )
     parser.add_argument(
+        "--stage-module-weight",
+        action="append",
+        nargs=2,
+        metavar=("STAGE", "MODULE=PATH"),
+        help=(
+            "Initialize one module in a named pipeline stage from a checkpoint. "
+            "May be specified multiple times."
+        ),
+    )
+    parser.add_argument(
         "--output",
         "-o",
         help=(
@@ -442,6 +452,8 @@ Examples:
         parser.error("--to-stage is only supported with --pipeline")
     if args.weight_path is not None and args.pipeline:
         parser.error("--weight-path is stage-specific and cannot override a pipeline")
+    if args.stage_module_weight is not None and not args.pipeline:
+        parser.error("--stage-module-weight is only supported with --pipeline")
 
     # Handle deprecated --local-output flag
     if getattr(args, "local_output", False):
@@ -622,6 +634,7 @@ Examples:
                 workspace=args.workspace,
                 from_stage=args.from_stage,
                 to_stage=args.to_stage,
+                stage_module_weights=args.stage_module_weight,
             )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():
