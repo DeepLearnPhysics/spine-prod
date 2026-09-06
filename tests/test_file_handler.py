@@ -20,6 +20,14 @@ def test_parse_source_list_ignores_blank_lines(handler, tmp_path):
     ]
 
 
+def test_parse_source_list_rejects_repeated_paths(handler, tmp_path):
+    source_list = tmp_path / "files.txt"
+    source_list.write_text("first.root\nsecond.root\nfirst.root\n")
+
+    with pytest.raises(ValueError, match="repeated file paths.*first.root"):
+        handler.parse_files([str(source_list)], "source_list")
+
+
 def test_parse_source_list_requires_one_path(handler):
     with pytest.raises(ValueError, match="exactly one"):
         handler.parse_files(["one.txt", "two.txt"], "source_list")
@@ -81,10 +89,14 @@ def test_stage_cache_output_paths_follow_writer_naming(handler, tmp_path):
 
 def test_stage_cache_output_paths_reject_duplicate_basenames(handler, tmp_path):
     """Two source directories cannot silently claim one output cache path."""
-    with pytest.raises(ValueError, match="basenames must be unique"):
+    with pytest.raises(ValueError, match="globally unique source basenames"):
         handler.stage_cache_output_paths(
             ["/first/data.root", "/second/data.root"], str(tmp_path), "cache"
         )
+
+
+def test_duplicates_preserves_first_duplicate_order(handler):
+    assert handler._duplicates(["a", "b", "a", "c", "b", "a"]) == ["a", "b"]
 
 
 @pytest.mark.parametrize(

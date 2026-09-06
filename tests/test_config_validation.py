@@ -1473,8 +1473,12 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
         assert training["time"] == "2-00:00:00"
 
     for stage in pipeline.stages:
-        if stage["name"].startswith("cache_"):
-            assert stage["ntasks"] == 2
+        if stage["name"].startswith("cache_train_"):
+            assert stage["ntasks"] == 4
+            assert "files_per_task" not in stage
+        elif stage["name"].startswith("cache_validation_"):
+            assert stage["ntasks"] == 1
+            assert "files_per_task" not in stage
 
     mixed_stages = {
         "train_uresnet_ppn",
@@ -1513,6 +1517,14 @@ def test_protodune_sp_260906_pipeline_uses_mpvmpr_v1_and_dated_configs():
         stage for stage in pipeline.stages if stage["name"] == "train_uresnet_deghost"
     )
     assert train_deghost["source_list"] == source_list
+
+    for stage in pipeline.stages:
+        if stage["name"].startswith("cache_train_"):
+            assert stage["ntasks"] == 4
+            assert "files_per_task" not in stage
+        elif stage["name"].startswith("cache_validation_"):
+            assert stage["ntasks"] == 1
+            assert "files_per_task" not in stage
 
     dated_configs = {
         stage["name"]: stage.get("config")

@@ -42,7 +42,16 @@ class FileHandler:
                 raise ValueError("--source-list/-S accepts exactly one text file")
             source_list_path = file_input[0]
             with open(source_list_path, "r", encoding="utf-8") as f:
-                files.extend([line.strip() for line in f if line.strip()])
+                listed_files = [line.strip() for line in f if line.strip()]
+            duplicate_paths = self._duplicates(listed_files)
+            if duplicate_paths:
+                examples = ", ".join(duplicate_paths[:3])
+                raise ValueError(
+                    f"Source list '{source_list_path}' contains repeated file "
+                    f"paths ({len(duplicate_paths)} unique duplicate(s)); each "
+                    f"source must appear exactly once. Examples: {examples}"
+                )
+            files.extend(listed_files)
         else:
             # Handle direct sources (paths, globs)
             for item in file_input:
@@ -116,11 +125,29 @@ class FileHandler:
             str(directory / f"{Path(source).stem}_{suffix}.h5")
             for source in source_files
         ]
-        if len(paths) != len(set(paths)):
+        duplicate_paths = FileHandler._duplicates(paths)
+        if duplicate_paths:
+            colliding_names = ", ".join(Path(path).name for path in duplicate_paths[:3])
             raise ValueError(
-                "Stage-cache output names collide; source basenames must be unique"
+                "Stage-cache output names collide because distinct source paths "
+                "share a basename. SPINE split-output caches currently require "
+                "globally unique source basenames. Colliding output example(s): "
+                f"{colliding_names}"
             )
         return paths
+
+    @staticmethod
+    def _duplicates(values: List[str]) -> List[str]:
+        """Return repeated values once, preserving first duplicate order."""
+        seen = set()
+        repeated = set()
+        duplicates = []
+        for value in values:
+            if value in seen and value not in repeated:
+                duplicates.append(value)
+                repeated.add(value)
+            seen.add(value)
+        return duplicates
 
     def chunk_files(
         self, files: List[str], max_array_size: int, files_per_task: int

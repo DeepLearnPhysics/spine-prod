@@ -13,12 +13,14 @@ collections:
   splits:
     - name: train
       source_list: ${train_source_list}
+      cache_tasks: 4
       cache_dir: ${workspace}/cache/train
       cache_source_list: ${workspace}/cache/train/cache_file_list.txt
       entry_filter: ${workspace}/filter/train/accepted.yaml
       filtered_source_list: ${workspace}/filter/train/accepted_files.txt
     - name: validation
       source_list: ${validation_source_list}
+      cache_tasks: 1
       cache_dir: ${workspace}/cache/validation
       cache_source_list: ${workspace}/cache/validation/cache_file_list.txt
       entry_filter: ${workspace}/filter/validation/accepted.yaml
@@ -88,9 +90,8 @@ stages:
     output: ${split.cache_dir}
     output_suffix: cache
     output_source_list: ${split.cache_source_list}
-    files_per_task: 1
-    # Train and validation arrays run together: two tasks each cap total GPUs at 4.
-    ntasks: 2
+    # Group each split into a small number of long-lived cache processes.
+    ntasks: ${split.cache_tasks}
     module_weight:
       uresnet_deghost: ${workspace}/train/uresnet_deghost/weights/snapshot-best.ckpt
 
@@ -132,8 +133,7 @@ stages:
       hdf5:
         source_list: ${split.cache_source_list}
     entry_filter: ${split.entry_filter}
-    files_per_task: 1
-    ntasks: 2
+    ntasks: ${split.cache_tasks}
     module_weight:
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
@@ -175,8 +175,7 @@ stages:
       hdf5:
         source_list: ${split.cache_source_list}
     entry_filter: ${split.entry_filter}
-    files_per_task: 1
-    ntasks: 2
+    ntasks: ${split.cache_tasks}
     module_weight:
       graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
 
@@ -217,8 +216,7 @@ stages:
       hdf5:
         source_list: ${split.cache_source_list}
     entry_filter: ${split.entry_filter}
-    files_per_task: 1
-    ntasks: 2
+    ntasks: ${split.cache_tasks}
     module_weight:
       grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
       grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt

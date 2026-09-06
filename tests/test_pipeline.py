@@ -98,6 +98,28 @@ def test_workspace_override_resolves_portable_pipeline(tmp_path):
     assert definition.stages[0]["output"] == "/runs/benchmark/cache/train"
 
 
+def test_collection_exact_substitution_preserves_scalar_type(tmp_path):
+    """Typed collection fields remain typed in their expanded stages."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "collections": {"splits": [{"name": "train", "tasks": 4}]},
+            "stages": [
+                {
+                    "name": "cache_${split.name}",
+                    "for_each": {"collection": "splits", "as": "split"},
+                    "config": "cache.yaml",
+                    "ntasks": "${split.tasks}",
+                }
+            ],
+        },
+    )
+
+    definition = PipelineDefinition.load(str(path))
+
+    assert definition.stages[0]["ntasks"] == 4
+
+
 def test_workspace_override_replaces_yaml_default(tmp_path):
     """The launch value should take precedence over a concrete YAML workspace."""
     path = write_pipeline(
@@ -325,11 +347,11 @@ def test_pipeline_expands_collection_stage_templates(tmp_path):
         ),
         (
             {
-                "collections": {"splits": [{"name": 1}]},
+                "collections": {"splits": [{"name": ["train"]}]},
                 "stages": [{"name": "job", "config": "x.yaml"}],
             },
             TypeError,
-            "value 'name' must be a string",
+            "value 'name' must be a scalar",
         ),
         (
             {
@@ -590,6 +612,9 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
     assert PipelineDefinition._expand_variables(
         ("${value}",), {"value": "expanded"}, "test"
     ) == ("expanded",)
+
+    with pytest.raises(TypeError, match="cannot be embedded"):
+        PipelineDefinition._expand_variables("prefix-${count}", {"count": 2}, "test")
 
     with pytest.raises(ValueError, match="both larcv_path and larcv_basedir"):
         PipelineDefinition._normalize_aliases(

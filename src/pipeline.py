@@ -389,15 +389,15 @@ class PipelineDefinition:
     @classmethod
     def _resolve_collections(
         cls, raw_collections: Any, variables: Mapping[str, str]
-    ) -> Dict[str, Tuple[Mapping[str, str], ...]]:
+    ) -> Dict[str, Tuple[Mapping[str, Any], ...]]:
         """Validate reusable collections used by stage ``for_each`` blocks.
 
         Collections are deliberately small data tables: each is a non-empty
-        list of flat string mappings. Global pipeline variables are expanded
-        in their values before the entries become iteration-local variables.
+        list of flat scalar mappings. Global pipeline variables are expanded
+        in string values before entries become iteration-local variables.
         """
         collections = cls._require_mapping(raw_collections, "Pipeline collections")
-        resolved: Dict[str, Tuple[Mapping[str, str], ...]] = {}
+        resolved: Dict[str, Tuple[Mapping[str, Any], ...]] = {}
         for name, raw_items in collections.items():
             if not isinstance(name, str) or not VARIABLE_NAME_PATTERN.match(name):
                 raise ValueError(
@@ -419,8 +419,8 @@ class PipelineDefinition:
                         raise ValueError(
                             f"{context} keys must be valid identifiers: {key!r}"
                         )
-                    if not isinstance(value, str):
-                        raise TypeError(f"{context} value '{key}' must be a string")
+                    if not isinstance(value, (str, int, float, bool)):
+                        raise TypeError(f"{context} value '{key}' must be a scalar")
                 items.append(cls._expand_variables(item, variables, context))
             resolved[name] = tuple(items)
         return resolved
@@ -430,7 +430,7 @@ class PipelineDefinition:
         cls,
         raw_stages: Any,
         variables: Mapping[str, str],
-        collections: Mapping[str, Sequence[Mapping[str, str]]],
+        collections: Mapping[str, Sequence[Mapping[str, Any]]],
     ) -> List[Any]:
         """Expand ``for_each`` templates into ordinary concrete stages."""
         if not isinstance(raw_stages, list) or not raw_stages:
@@ -495,13 +495,28 @@ class PipelineDefinition:
         """Recursively expand pipeline variables in strings and containers."""
         if isinstance(value, str):
 
+            exact = VARIABLE_PATTERN.fullmatch(value)
+            if exact:
+                name = exact.group(1)
+                if name not in variables:
+                    raise ValueError(
+                        f"Undefined pipeline variable '{name}' in {context}"
+                    )
+                return variables[name]
+
             def replace(match):
                 name = match.group(1)
                 if name not in variables:
                     raise ValueError(
                         f"Undefined pipeline variable '{name}' in {context}"
                     )
-                return variables[name]
+                replacement = variables[name]
+                if not isinstance(replacement, str):
+                    raise TypeError(
+                        f"Non-string pipeline variable '{name}' cannot be embedded "
+                        f"in a larger string in {context}"
+                    )
+                return replacement
 
             return VARIABLE_PATTERN.sub(replace, value)
         if isinstance(value, Mapping):
