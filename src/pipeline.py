@@ -199,9 +199,6 @@ class PipelineDefinition:
         raw_stages = cls._expand_stage_templates(
             document.get("stages"), variables, collections
         )
-        if not isinstance(raw_stages, list) or not raw_stages:
-            raise ValueError("Pipeline must define a non-empty stages list")
-
         default_layer = cls._normalize_aliases(defaults, "Pipeline defaults")
         override_layer = cls._normalize_aliases(override_values, "Pipeline overrides")
         stages = []

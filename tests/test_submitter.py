@@ -961,6 +961,13 @@ class TestInteractiveExecution:
         with pytest.raises(ValueError, match="interactive_runtime"):
             mock_submitter.run_interactive("config.yaml", interactive_runtime="other")
 
+    def test_run_interactive_rejects_in_place_output_override(self, mock_submitter):
+        """In-place execution cannot also redirect the writer."""
+        with pytest.raises(ValueError, match="--in-place cannot be combined"):
+            mock_submitter.run_interactive(
+                "config.yaml", in_place=True, output="result.h5"
+            )
+
     def test_run_interactive_rejects_missing_and_invalid_task_inputs(
         self, mock_submitter, tmp_path
     ):
@@ -3461,6 +3468,180 @@ class TestPipelineSubmission:
                 mock_submitter.submit_pipeline(str(pipeline_path), from_stage="missing")
 
         submit_job.assert_not_called()
+
+    def test_report_rejects_non_mapping_configuration(self, tmp_path):
+        """Report recipes must be mappings before provenance is injected."""
+        from src.report import ReportRunner
+
+        source = tmp_path / "source.yaml"
+        source.write_text("- invalid\n", encoding="utf-8")
+        attempt = tmp_path / "attempt"
+        attempt.mkdir()
+
+        with pytest.raises(TypeError, match="must contain a mapping"):
+            ReportRunner._materialize_config(source, attempt, None, None)
+
+    def test_submit_report_rejects_existing_run_without_retry(
+        self, mock_submitter, tmp_path
+    ):
+        """An existing report attempt requires an explicit retry."""
+        source = tmp_path / "report.yaml"
+        source.write_text("metrics: {}\n", encoding="utf-8")
+        run_dir = tmp_path / "report-run"
+        run_dir.mkdir()
+        (run_dir / "existing").touch()
+
+        with pytest.raises(ValueError, match="run directory is not empty"):
+            mock_submitter.submit_report(
+                config=str(source),
+                input_dir=str(tmp_path / "input"),
+                output_dir=str(tmp_path / "output"),
+                run_dir=str(run_dir),
+            )
+
+    def test_submit_report_rejects_slurm_exclusion_for_pbs(
+        self, mock_submitter, tmp_path
+    ):
+        """PBS report jobs must reject the Slurm-only exclusion option."""
+        source = tmp_path / "report.yaml"
+        source.write_text("metrics: {}\n", encoding="utf-8")
+
+        with (
+            patch.object(
+                mock_submitter.config_mgr,
+                "get_profile",
+                return_value={
+                    "site": "anl",
+                    "scheduler": "pbs",
+                    "description": "PBS test",
+                },
+            ),
+            pytest.raises(ValueError, match="only supported by Slurm"),
+        ):
+            mock_submitter.submit_report(
+                config=str(source),
+                input_dir=str(tmp_path / "input"),
+                output_dir=str(tmp_path / "output"),
+                run_dir=str(tmp_path / "run"),
+                exclude="node01",
+            )
+
+    def test_submit_report_adds_checkout_bind_account_and_dependency(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        """Report jobs derive omitted site resources and bind a source checkout."""
+        source = tmp_path / "report.yaml"
+        source.write_text("metrics: {}\n", encoding="utf-8")
+        profile = {
+            "site": "s3df",
+            "scheduler": "slurm",
+            "description": "Slurm test",
+        }
+
+        with (
+            patch.object(
+                mock_submitter.config_mgr,
+                "detect_detector",
+                return_value="icarus",
+            ),
+            patch.object(
+                mock_submitter.config_mgr, "get_profile", return_value=profile
+            ),
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_report_command",
+                return_value=("python3 -m spine.bin.report", "/checkout"),
+            ),
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="42"),
+        ):
+            assert mock_submitter.submit_report(
+                config=str(source),
+                input_dir=str(tmp_path / "input"),
+                output_dir=str(tmp_path / "output"),
+                run_dir=str(tmp_path / "run"),
+                dependency="afterok:41",
+            ) == ["42"]
+
+        assert profile["bind_paths"] == "/sdf/,/checkout"
+        assert profile["account"]
+        assert "Dependency: afterok:41" in capsys.readouterr().out
+
+    def test_resolve_spine_report_command_path_forms_and_fallbacks(
+        self, mock_submitter, tmp_path
+    ):
+        """Report resolution supports executable-like paths and PATH fallback."""
+        checkout = tmp_path / "checkout"
+        report_module = checkout / "src" / "spine" / "bin" / "report.py"
+        report_module.parent.mkdir(parents=True)
+        report_module.touch()
+
+        for configured in (checkout / "bin" / "spine", checkout / "custom"):
+            command, bind_root = mock_submitter.runtime.resolve_spine_report_command(
+                str(configured)
+            )
+            assert command.endswith("python3 -m spine.bin.report")
+            assert bind_root == str(checkout)
+
+        with pytest.raises(RuntimeError, match="does not provide spine.bin.report"):
+            mock_submitter.runtime.resolve_spine_report_command(str(tmp_path / "bad"))
+
+        with patch("src.runtime.shutil.which", return_value="/usr/bin/spine-report"):
+            assert mock_submitter.runtime.resolve_spine_report_command() == (
+                "/usr/bin/spine-report",
+                None,
+            )
+
+        with patch("src.runtime.shutil.which", return_value=None):
+            assert mock_submitter.runtime.resolve_spine_report_command() == (None, None)
+
+    @pytest.mark.parametrize(
+        ("value", "error", "message"),
+        [
+            ((0.0,), ValueError, "exactly two values"),
+            (("zero", 1.0), TypeError, "bounds must be numbers"),
+            ((float("nan"), 1.0), ValueError, "bounds must be finite"),
+        ],
+    )
+    def test_validate_entry_fraction_range_rejects_malformed_bounds(
+        self, mock_submitter, value, error, message
+    ):
+        """Entry ranges require two finite numeric bounds."""
+        with pytest.raises(error, match=message):
+            mock_submitter.spine_cli.validate_fraction_range("--entry", value)
+
+    @pytest.mark.parametrize(
+        ("options", "message"),
+        [
+            (
+                {
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "resume": True,
+                    "weight_path": "/weights/start.ckpt",
+                },
+                "weight-path cannot be combined",
+            ),
+            (
+                {"val_entry_fraction_range": (0.0, 0.5)},
+                "valid only for training",
+            ),
+            (
+                {"stage": "train", "run_dir": "/tmp/train", "in_place": True},
+                "in-place is valid only for inference",
+            ),
+        ],
+    )
+    def test_submit_job_rejects_additional_lifecycle_conflicts(
+        self, mock_submitter, options, message
+    ):
+        """Single-job validation rejects incompatible lifecycle controls."""
+        with pytest.raises(ValueError, match=message):
+            mock_submitter.submit_job(config="config.yaml", **options)
 
     def test_submit_pipeline_rejects_reversed_stage_range(
         self, mock_submitter, tmp_path

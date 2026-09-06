@@ -282,6 +282,17 @@ def test_pipeline_rejects_interactive_mode():
         run_main("--pipeline", "pipeline.yaml", "--interactive")
 
 
+def test_pipeline_rejects_stage_specific_weight_path():
+    """A global pipeline override cannot select one stage's checkpoint."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--pipeline",
+            "pipeline.yaml",
+            "--weight-path",
+            "/weights/model.ckpt",
+        )
+
+
 def test_pipeline_mode_forwards_global_overrides():
     submitter = Mock()
     submitter.submit_pipeline.return_value = {}
@@ -301,6 +312,7 @@ def test_pipeline_mode_forwards_global_overrides():
         "12:00:00",
         "--iterations",
         "10",
+        "--flashmatch",
         "--cvmfs",
         submitter=submitter,
     )
@@ -313,6 +325,7 @@ def test_pipeline_mode_forwards_global_overrides():
         "gpus": 4,
         "time": "12:00:00",
         "iterations": 10,
+        "flashmatch": True,
         "cvmfs": True,
     }
     assert submitter.submit_pipeline.call_args.kwargs["workspace"] is None

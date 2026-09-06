@@ -269,3 +269,12 @@ def test_create_attempt_directory_and_stable_links(tmp_path):
     RunManager.expose_attempt_logs(tmp_path, has_array=True)
     assert not (tmp_path / "stdout.log").is_symlink()
     assert not (tmp_path / "stderr.log").is_symlink()
+
+
+def test_replace_symlink_rejects_existing_regular_path(tmp_path):
+    """Managed links must never overwrite an ordinary filesystem entry."""
+    link = tmp_path / "latest"
+    link.touch()
+
+    with pytest.raises(ValueError, match="Cannot replace non-symlink path"):
+        RunManager.replace_symlink(link, Path("attempts/current"))

@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover - imported only by static type checkers
     from .submitter import Submitter
 
 
