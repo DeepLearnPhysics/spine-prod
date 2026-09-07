@@ -51,6 +51,10 @@ class BatchClient:
         """Submit a batch script and return its job ID."""
         raise NotImplementedError
 
+    def graceful_stop(self, job_id: str, dry_run: bool = False) -> None:
+        """Request graceful completion of a running SPINE training job."""
+        raise NotImplementedError
+
     def format_dependency(self, dependency: Optional[str]) -> Optional[str]:
         """Format a dependency string for scheduler directives."""
         return dependency

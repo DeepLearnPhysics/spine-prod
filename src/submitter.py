@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from .batch import BatchRunner
 from .client import SlurmClient
 from .config_manager import ConfigManager
+from .control import JobController
 from .file_handler import FileHandler
 from .interactive import InteractiveRunner
 from .pipeline import PipelineRunner
@@ -33,6 +34,7 @@ class Submitter:
         # Components share managers and paths through this façade; operational
         # behavior remains in the component that owns it.
         self.runtime = RuntimeResolver(self)
+        self.control = JobController(self)
         self.spine_cli = SpineCLI()
         self.batch = BatchRunner(self)
         self.interactive = InteractiveRunner(self)
@@ -63,6 +65,10 @@ class Submitter:
     def submit_pipeline(self, *args: Any, **kwargs: Any) -> Dict[str, List[str]]:
         """Submit an ordered workflow through the pipeline component."""
         return self.pipeline.submit_pipeline(*args, **kwargs)
+
+    def graceful_stop(self, *args: Any, **kwargs: Any) -> str:
+        """Request successful checkpointed completion of a training job."""
+        return self.control.graceful_stop(*args, **kwargs)
 
     def preload_downloads(self, config: str):
         """Materialize SPINE download directives before execution."""

@@ -88,6 +88,9 @@ source configure.sh
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
 
+# Ask a running training job to checkpoint and finish successfully
+./submit.py --graceful-stop 12345678
+
 # Dry run (see what would be submitted)
 ./submit.py --config infer/icarus/latest --source test.root --dry-run
 
@@ -455,6 +458,38 @@ verification.
 The configured epoch count remains the total target, not a number of additional
 epochs. To extend a run without changing the stored configuration file, pass a
 runtime override such as `--epochs 400` when resuming.
+
+### Gracefully Complete Training
+
+SPINE versions with graceful-training control can accept the current training
+progress without canceling the downstream workflow. The following command asks
+SPINE to finish its active minibatch, run configured validation, write a
+complete checkpoint, update the best checkpoint when appropriate, and exit
+successfully:
+
+```bash
+./submit.py --graceful-stop 12345678
+```
+
+spine-prod detects Slurm through ``scancel`` or PBS through ``qsig``. If both
+scheduler clients are available on the submit host, select one explicitly:
+
+```bash
+./submit.py --graceful-stop 12345678 --scheduler slurm
+./submit.py --graceful-stop 12345678.server --scheduler pbs
+```
+
+On Slurm, spine-prod signals only the batch shell with ``SIGUSR1``; on PBS it
+uses ``qsig``. All maintained templates trap and forward that request through
+the Singularity, Shifter, or Apptainer runtime. The inner shell then ``exec``s
+SPINE so that the training process receives the signal directly. Once SPINE
+returns status zero, normal ``afterok`` dependencies may proceed.
+
+This is an intentional successful completion, unlike ``scancel JOB_ID`` or a
+``SIGTERM`` caused by timeout or machine failure. Do not use it with a SPINE
+version that lacks the graceful ``SIGUSR1`` training handler; such a process
+will terminate unsuccessfully instead of checkpointing. Use ``--dry-run`` to
+inspect the scheduler command without signaling the job.
 
 ### Run Validation Independently
 

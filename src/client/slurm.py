@@ -40,6 +40,24 @@ class SlurmClient(BatchClient):
         job_id = result.stdout.strip().split()[-1]
         return job_id
 
+    def graceful_stop(self, job_id: str, dry_run: bool = False) -> None:
+        """Send ``SIGUSR1`` to the job's signal-forwarding batch shell."""
+        command = ["scancel", "--signal=USR1", "--batch", job_id]
+        if dry_run:
+            print(f"[DRY RUN] Would run: {' '.join(command)}")
+            return
+
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            message = result.stderr.strip() or result.stdout.strip()
+            raise RuntimeError(f"Failed to signal Slurm job {job_id}: {message}")
+
     def submit_cleanup_job(
         self,
         paths_to_clean: List[str],

@@ -109,6 +109,7 @@ spine-prod/
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
 ./submit.py --interactive --config ... --source test.root
 ./submit.py --list-mods infer/icarus/full_chain_co_260501.yaml
+./submit.py --graceful-stop 12345678
 ```
 
 ## Imports for Programmatic Use

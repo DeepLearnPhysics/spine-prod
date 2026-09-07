@@ -66,8 +66,11 @@ Examples:
   # Validate only checkpoints missing an associated validation log
   %(prog)s --config /path/to/uresnet_validation.yaml --stage validation --run-dir /path/to/experiments/uresnet/default
 
-  # Pipeline mode
+    # Pipeline mode
   %(prog)s --pipeline pipelines/icarus_production.yaml --workspace /path/to/run
+
+  # Gracefully checkpoint and complete a running training job
+  %(prog)s --graceful-stop 12345678
 
   # Dry run (does not submit jobs, but shows what would be done)
   %(prog)s --config infer/icarus/full_chain_co_250625.yaml --source test.root --dry-run
@@ -82,6 +85,14 @@ Examples:
         "--list-mods",
         metavar="CONFIG",
         help="List available modifiers for a configuration",
+    )
+    mode_group.add_argument(
+        "--graceful-stop",
+        metavar="JOB_ID",
+        help=(
+            "Send SIGUSR1 to a training job so SPINE validates, checkpoints, "
+            "and exits successfully"
+        ),
     )
 
     # Input files, global patterns or file list (mutually exclusive)
@@ -135,6 +146,14 @@ Examples:
         "--profile",
         "-p",
         help="Resource profile (default: auto-detect)",
+    )
+    parser.add_argument(
+        "--scheduler",
+        choices=["slurm", "pbs"],
+        help=(
+            "Scheduler used by --graceful-stop; by default detect scancel or "
+            "qsig on PATH"
+        ),
     )
     parser.add_argument(
         "--ntasks",
@@ -412,6 +431,9 @@ Examples:
 
     args = parser.parse_args()
 
+    if args.scheduler is not None and args.graceful_stop is None:
+        parser.error("--scheduler is only supported with --graceful-stop")
+
     if args.workspace is not None and not args.pipeline:
         parser.error("--workspace is only supported with --pipeline")
     if args.from_stage is not None and not args.pipeline:
@@ -432,6 +454,26 @@ Examples:
 
     # Initialize submitter (central_dir True means write to spine-prod/runs)
     submitter = Submitter(central_dir=getattr(args, "central_dir", False))
+
+    # Graceful completion is an operation on an existing scheduler job and
+    # therefore requires no SPINE configuration or input-source processing.
+    if args.graceful_stop:
+        try:
+            scheduler = submitter.graceful_stop(
+                args.graceful_stop,
+                scheduler=args.scheduler,
+                dry_run=args.dry_run,
+            )
+        except (TypeError, ValueError, OSError, RuntimeError) as error:
+            print(f"ERROR: {error}", file=sys.stderr)
+            return 1
+
+        if not args.dry_run:
+            print(
+                f"Graceful completion requested for {scheduler} job "
+                f"{args.graceful_stop}."
+            )
+        return 0
 
     # Handle --list-mods
     if args.list_mods:

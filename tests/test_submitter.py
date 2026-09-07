@@ -15,6 +15,7 @@ These tests exercise the actual Python code to provide meaningful coverage metri
 import io
 import json
 import os
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -3054,6 +3055,37 @@ class TestCVMFSOption:
 
         assert 'source "/tmp/larcv/configure.sh"' in script
         assert 'source "/tmp/flashmatch/configure.sh"' in script
+
+    @pytest.mark.parametrize(
+        "template_name",
+        [
+            "job_template_s3df.sbatch",
+            "job_template_nersc.sbatch",
+            "job_template_anl.pbs",
+        ],
+    )
+    def test_templates_forward_graceful_stop_to_execed_workload(
+        self, mock_submitter, template_name
+    ):
+        """Every scheduler wrapper should relay USR1 across its container."""
+        script = self._render_template(mock_submitter, template_name)
+
+        assert "trap forward_graceful_stop USR1" in script
+        assert 'kill -USR1 "$SPINE_PROD_WORKLOAD_PID"' in script
+        assert 'eval "exec $RUN_CMD" &' in script
+        assert "exec spine -S $TASK_FILE_LIST" in script
+        syntax = subprocess.run(
+            ["bash", "-n"],
+            input=script,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        assert syntax.returncode == 0, syntax.stderr
+
+        if template_name == "job_template_nersc.sbatch":
+            assert 'scancel --signal=USR1 "${SLURM_JOB_ID}.0"' in script
 
 
 class TestBatchClientSelection:

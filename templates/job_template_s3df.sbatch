@@ -125,20 +125,42 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/con
 {% endif %}
 {% endif %}
 {% if custom_command %}
-SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD {{ custom_command }}"
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ custom_command }}"
 {% else %}
-SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD {{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 {% endif %}
 SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
 RUN_CMD="$SINGULARITY_CMD"
 
-# Execute
+# Relay an intentional completion request through the container boundary.
+SPINE_PROD_WORKLOAD_PID=""
+SPINE_PROD_STOP_FORWARDED=0
+forward_graceful_stop() {
+    SPINE_PROD_STOP_FORWARDED=1
+    if [[ -n "$SPINE_PROD_WORKLOAD_PID" ]] && \
+            kill -0 "$SPINE_PROD_WORKLOAD_PID" 2>/dev/null; then
+        echo "Forwarding SIGUSR1 to SPINE workload $SPINE_PROD_WORKLOAD_PID"
+        kill -USR1 "$SPINE_PROD_WORKLOAD_PID" 2>/dev/null || true
+    fi
+}
+trap forward_graceful_stop USR1
+
+# Run in the background so the batch shell can process and forward SIGUSR1.
 echo "Running: $RUN_CMD"
 echo
-eval $RUN_CMD
+eval "exec $RUN_CMD" &
+SPINE_PROD_WORKLOAD_PID=$!
+while true; do
+    SPINE_PROD_STOP_FORWARDED=0
+    wait "$SPINE_PROD_WORKLOAD_PID"
+    EXIT_STATUS=$?
+    if [[ $SPINE_PROD_STOP_FORWARDED -eq 1 && $EXIT_STATUS -gt 128 ]]; then
+        continue
+    fi
+    break
+done
+trap - USR1
 
-# Check exit status
-EXIT_STATUS=$?
 echo
 echo "=================================="
 echo "Finished: $(date)"

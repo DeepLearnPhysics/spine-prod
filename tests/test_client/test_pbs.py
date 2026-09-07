@@ -51,3 +51,26 @@ def test_dry_run_prints_script_without_invoking_qsub(client, tmp_path, capsys):
     output = capsys.readouterr().out
     assert "[DRY RUN]" in output
     assert "echo test" in output
+
+
+def test_graceful_stop_uses_qsig(client):
+    """PBS control should deliver SIGUSR1 to its forwarding batch shell."""
+    result = CompletedProcess([], 0, "", "")
+
+    with patch("src.client.pbs.subprocess.run", return_value=result) as run:
+        client.graceful_stop("12345.server")
+
+    assert run.call_args.args[0] == ["qsig", "-s", "SIGUSR1", "12345.server"]
+
+
+def test_graceful_stop_dry_run_and_failure(client, capsys):
+    """PBS signaling should preview cleanly and report scheduler failures."""
+    with patch("src.client.pbs.subprocess.run") as run:
+        client.graceful_stop("12345.server", dry_run=True)
+    run.assert_not_called()
+    assert "qsig -s SIGUSR1 12345.server" in capsys.readouterr().out
+
+    result = CompletedProcess([], 1, "unknown job", "")
+    with patch("src.client.pbs.subprocess.run", return_value=result):
+        with pytest.raises(RuntimeError, match="unknown job"):
+            client.graceful_stop("12345.server")

@@ -50,6 +50,45 @@ def test_list_modifiers_reports_lookup_errors(capsys):
     assert "ERROR: missing config" in capsys.readouterr().err
 
 
+def test_graceful_stop_routes_existing_job_without_configuration(capsys):
+    """Graceful completion should be a standalone scheduler operation."""
+    submitter = Mock()
+    submitter.graceful_stop.return_value = "slurm"
+
+    result, _, _ = run_main(
+        "--graceful-stop",
+        "12345",
+        "--scheduler",
+        "slurm",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    submitter.graceful_stop.assert_called_once_with(
+        "12345", scheduler="slurm", dry_run=False
+    )
+    assert "Graceful completion requested for slurm job 12345" in (
+        capsys.readouterr().out
+    )
+
+
+def test_graceful_stop_reports_control_failure(capsys):
+    """Scheduler signaling failures should produce a concise CLI error."""
+    submitter = Mock()
+    submitter.graceful_stop.side_effect = RuntimeError("unknown job")
+
+    result, _, _ = run_main("--graceful-stop", "12345", submitter=submitter)
+
+    assert result == 1
+    assert "ERROR: unknown job" in capsys.readouterr().err
+
+
+def test_scheduler_option_requires_graceful_stop():
+    """Scheduler selection is not a general submission override."""
+    with pytest.raises(SystemExit):
+        run_main("--config", "config.yaml", "--scheduler", "pbs")
+
+
 def test_list_modifiers_prints_multiple_usage_example(capsys):
     submitter = Mock()
     submitter.list_modifiers.return_value = {

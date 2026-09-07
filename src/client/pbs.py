@@ -43,3 +43,21 @@ class PBSClient(BatchClient):
 
         # qsub returns the job ID directly, often with a server suffix.
         return output[0]
+
+    def graceful_stop(self, job_id: str, dry_run: bool = False) -> None:
+        """Send ``SIGUSR1`` to the job's signal-forwarding PBS shell."""
+        command = ["qsig", "-s", "SIGUSR1", job_id]
+        if dry_run:
+            print(f"[DRY RUN] Would run: {' '.join(command)}")
+            return
+
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            message = result.stderr.strip() or result.stdout.strip()
+            raise RuntimeError(f"Failed to signal PBS job {job_id}: {message}")
