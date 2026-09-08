@@ -1503,8 +1503,8 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
     assert graph_spice["val_source_list"].endswith(
         "/cache/validation/cache_file_list.txt"
     )
-    assert graph_spice["entry_filter"].endswith("/filter/train/accepted.yaml")
-    assert graph_spice["val_entry_filter"].endswith("/filter/validation/accepted.yaml")
+    assert "entry_filter" not in graph_spice
+    assert "val_entry_filter" not in graph_spice
     evaluation = next(
         stage for stage in pipeline.stages if stage["name"] == "evaluate_full_chain"
     )

@@ -146,8 +146,6 @@ stages:
     time: "2-00:00:00"
     source_list: ${workspace}/cache/train/cache_file_list.txt
     val_source_list: ${workspace}/cache/validation/cache_file_list.txt
-    entry_filter: ${workspace}/filter/train/accepted.yaml
-    val_entry_filter: ${workspace}/filter/validation/accepted.yaml
     val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/graph_spice
     tensorboard: true
