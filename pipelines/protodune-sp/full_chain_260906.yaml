@@ -137,23 +137,15 @@ stages:
     module_weight:
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
-  # Train Graph-SPICE from cached predictions plus LArCV coordinate truth.
+  # Train Graph-SPICE entirely from cached deghosted points and adapted truth.
   - name: train_graph_spice
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/protodune-sp/graph_spice/train_from_segmentation_cache_260906.yaml
     stage: train
     profile: s3df_ampere_full
     time: "2-00:00:00"
-    sources:
-      larcv:
-        source_list: ${train_source_list}
-      hdf5:
-        source_list: ${workspace}/cache/train/cache_file_list.txt
-    validation_sources:
-      larcv:
-        source_list: ${validation_source_list}
-      hdf5:
-        source_list: ${workspace}/cache/validation/cache_file_list.txt
+    source_list: ${workspace}/cache/train/cache_file_list.txt
+    val_source_list: ${workspace}/cache/validation/cache_file_list.txt
     entry_filter: ${workspace}/filter/train/accepted.yaml
     val_entry_filter: ${workspace}/filter/validation/accepted.yaml
     val_entry_fraction_range: [0.0, 0.5]

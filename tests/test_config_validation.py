@@ -1483,7 +1483,6 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
     mixed_stages = {
         "train_uresnet_ppn",
         "cache_train_segmentation",
-        "train_graph_spice",
         "cache_train_fragment_graphs",
         "cache_train_particle_graphs",
     }
@@ -1496,6 +1495,16 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
             assert stage["val_entry_filter"].endswith(
                 "/filter/validation/accepted.yaml"
             )
+
+    graph_spice = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_graph_spice"
+    )
+    assert graph_spice["source_list"].endswith("/cache/train/cache_file_list.txt")
+    assert graph_spice["val_source_list"].endswith(
+        "/cache/validation/cache_file_list.txt"
+    )
+    assert graph_spice["entry_filter"].endswith("/filter/train/accepted.yaml")
+    assert graph_spice["val_entry_filter"].endswith("/filter/validation/accepted.yaml")
     evaluation = next(
         stage for stage in pipeline.stages if stage["name"] == "evaluate_full_chain"
     )
