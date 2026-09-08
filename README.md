@@ -480,10 +480,12 @@ scheduler clients are available on the submit host, select one explicitly:
 ```
 
 On Slurm, spine-prod signals only the batch shell with ``SIGUSR1``; on PBS it
-uses ``qsig``. All maintained templates trap and forward that request through
-the Singularity, Shifter, or Apptainer runtime. The inner shell then ``exec``s
-SPINE so that the training process receives the signal directly. Once SPINE
-returns status zero, normal ``afterok`` dependencies may proceed.
+uses ``qsig``. For training submissions, the shell translates that signal into
+a marker file scoped to the immutable submission attempt. SPINE rank zero polls
+the marker at minibatch boundaries and shares the request with other ranks.
+Signals therefore never cross the Singularity, Shifter, or Apptainer boundary
+or reach auxiliary processes. Once SPINE returns status zero, normal
+``afterok`` dependencies may proceed.
 
 This is an intentional successful completion, unlike ``scancel JOB_ID`` or a
 ``SIGTERM`` caused by timeout or machine failure. Do not use it with a SPINE

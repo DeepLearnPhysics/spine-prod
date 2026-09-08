@@ -569,6 +569,17 @@ class BatchRunner(SubmissionComponent):
         # Every scheduler submission gets the same immutable attempt layout,
         # including the first inference attempt. This keeps retries uniform.
         attempt_dir = RunManager.create_attempt_dir(job_dir)
+        graceful_stop_file = None
+        if stage == "train":
+            # Keep the request marker scoped to one immutable submission. A
+            # retry therefore cannot inherit a completed attempt's request.
+            graceful_stop_file = attempt_dir / "graceful_stop"
+            lifecycle_args.extend(
+                [
+                    "--graceful-stop-file",
+                    shlex.quote(str(graceful_stop_file)),
+                ]
+            )
         if stage == "inference":
             spine_log_dir = str(attempt_dir)
         elif stage == "validation":
@@ -840,6 +851,9 @@ class BatchRunner(SubmissionComponent):
                 cvmfs=cvmfs,
                 spine_cmd=spine_cmd or "spine",
                 spine_cli_overrides=chunk_spine_overrides,
+                graceful_stop_file=(
+                    str(graceful_stop_file) if graceful_stop_file else None
+                ),
                 **profile_config,
             )
 
@@ -958,6 +972,9 @@ class BatchRunner(SubmissionComponent):
             "validation_name": validation_name,
             "selected_checkpoints": [str(path) for path in selected_checkpoints],
             "tensorboard": tensorboard,
+            "graceful_stop_file": (
+                str(graceful_stop_file) if graceful_stop_file else None
+            ),
             "submitted": datetime.now().isoformat(),
             "command": " ".join(sys.argv),
         }

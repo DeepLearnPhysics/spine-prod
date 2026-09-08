@@ -2132,6 +2132,10 @@ class TestBatchSpineOverride:
         assert "--val-entry-fraction-range 0.0 0.5" in script
         assert "--entry-filter /filters/train.yaml" in script
         assert "--val-entry-filter /filters/validation.yaml" in script
+        marker = submission.resolve() / "graceful_stop"
+        assert f"--graceful-stop-file {marker}" in script
+        assert f'SPINE_PROD_GRACEFUL_STOP_FILE="{marker}"' in script
+        assert not marker.exists()
         assert "#SBATCH --array=" not in script
         assert not (run_dir / "tasks").exists()
 
@@ -2144,6 +2148,7 @@ class TestBatchSpineOverride:
         assert metadata["val_entry_fraction_range"] == [0.0, 0.5]
         assert metadata["entry_filter"] == "/filters/train.yaml"
         assert metadata["val_entry_filter"] == "/filters/validation.yaml"
+        assert metadata["graceful_stop_file"] == str(marker)
 
     def test_submit_job_preserves_future_pipeline_training_sources(
         self, mock_submitter, tmp_path, capsys
@@ -3249,6 +3254,7 @@ class TestCVMFSOption:
             "bind_paths": None,
             "spine_cmd": "spine",
             "spine_cli_overrides": "",
+            "graceful_stop_file": None,
         }
         defaults.update(kwargs)
         return template.render(**defaults)
@@ -3482,14 +3488,21 @@ class TestCVMFSOption:
             "job_template_anl.pbs",
         ],
     )
-    def test_templates_forward_graceful_stop_to_execed_workload(
+    def test_training_templates_translate_graceful_stop_to_marker(
         self, mock_submitter, template_name
     ):
-        """Every scheduler wrapper should relay USR1 across its container."""
-        script = self._render_template(mock_submitter, template_name)
+        """Training wrappers should translate USR1 without signaling children."""
+        marker = "/tmp/attempt/graceful_stop"
+        script = self._render_template(
+            mock_submitter,
+            template_name,
+            graceful_stop_file=marker,
+        )
 
-        assert "trap forward_graceful_stop USR1" in script
-        assert 'kill -USR1 "$SPINE_PROD_WORKLOAD_PID"' in script
+        assert "trap request_graceful_stop USR1" in script
+        assert f'SPINE_PROD_GRACEFUL_STOP_FILE="{marker}"' in script
+        assert 'touch -- "$SPINE_PROD_GRACEFUL_STOP_FILE"' in script
+        assert 'kill -USR1 "$SPINE_PROD_WORKLOAD_PID"' not in script
         assert 'eval "exec $RUN_CMD" &' in script
         assert "exec spine -S $TASK_FILE_LIST" in script
         syntax = subprocess.run(
@@ -3502,8 +3515,22 @@ class TestCVMFSOption:
         )
         assert syntax.returncode == 0, syntax.stderr
 
-        if template_name == "job_template_nersc.sbatch":
-            assert 'scancel --signal=USR1 "${SLURM_JOB_ID}.0"' in script
+    @pytest.mark.parametrize(
+        "template_name",
+        [
+            "job_template_s3df.sbatch",
+            "job_template_nersc.sbatch",
+            "job_template_anl.pbs",
+        ],
+    )
+    def test_nontraining_templates_do_not_install_graceful_stop(
+        self, mock_submitter, template_name
+    ):
+        """Nontraining wrappers should not expose graceful-stop machinery."""
+        script = self._render_template(mock_submitter, template_name)
+
+        assert "trap request_graceful_stop USR1" not in script
+        assert "SPINE_PROD_GRACEFUL_STOP_FILE" not in script
 
 
 class TestBatchClientSelection:
