@@ -1401,6 +1401,20 @@ def test_generic_training_particle_info_uses_primary_non_mpr_truth():
         assert particle_info["primary_include_mpr"] is False
 
 
+def test_protodune_sp_particle_grappa_minibatches_fit_variable_graphs():
+    """ProtoDUNE particle GrapPAs use detector-appropriate memory budgets."""
+    expected = {
+        "grappa_shower": 64,
+        "grappa_track": 128,
+        "grappa_inter": 256,
+    }
+    for component, minibatch_size in expected.items():
+        config = load_config_with_includes(
+            CONFIG_ROOT / f"train/protodune-sp/{component}/base_v1.yaml"
+        )
+        assert config["io"]["loader"]["minibatch_size"] == minibatch_size
+
+
 def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report():
     """The expanded 260210 workflow captures every trained chain module."""
     pipeline = PipelineDefinition.load(
