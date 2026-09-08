@@ -140,35 +140,26 @@ SHIFTER_MODULES+=("--module=cvmfs")
 
 RUN_CMD="srun -n 1 shifter ${SHIFTER_MODULES[*]} --image=$SPINE_CONTAINER_TAG bash -c \"$INNER_CMD\""
 
-# Relay an intentional completion request through srun and Shifter.
+# Slurm --full delivers SIGUSR1 to the batch shell and every job child. Absorb
+# the shell's copy while SPINE workers handle theirs at a minibatch boundary.
 SPINE_PROD_WORKLOAD_PID=""
-SPINE_PROD_STOP_FORWARDED=0
-forward_graceful_stop() {
-    SPINE_PROD_STOP_FORWARDED=1
-    if [[ -n "$SPINE_PROD_WORKLOAD_PID" ]] && \
-            kill -0 "$SPINE_PROD_WORKLOAD_PID" 2>/dev/null; then
-        echo "Forwarding SIGUSR1 to SPINE workload $SPINE_PROD_WORKLOAD_PID"
-        # Signal the Slurm step directly; arbitrary Unix signals sent to the
-        # local srun client are not guaranteed to reach its remote task.
-        if [[ -n "${SLURM_JOB_ID:-}" ]] && \
-                scancel --signal=USR1 "${SLURM_JOB_ID}.0"; then
-            return
-        fi
-        kill -USR1 "$SPINE_PROD_WORKLOAD_PID" 2>/dev/null || true
-    fi
+SPINE_PROD_STOP_RECEIVED=0
+receive_graceful_stop() {
+    SPINE_PROD_STOP_RECEIVED=1
+    echo "Received SIGUSR1; SPINE workers are completing gracefully"
 }
-trap forward_graceful_stop USR1
+trap receive_graceful_stop USR1
 
-# Run in the background so the batch shell can process and forward SIGUSR1.
+# Run in the background so the batch shell can absorb its copy of SIGUSR1.
 echo "Running: $RUN_CMD"
 echo
 eval "exec $RUN_CMD" &
 SPINE_PROD_WORKLOAD_PID=$!
 while true; do
-    SPINE_PROD_STOP_FORWARDED=0
+    SPINE_PROD_STOP_RECEIVED=0
     wait "$SPINE_PROD_WORKLOAD_PID"
     EXIT_STATUS=$?
-    if [[ $SPINE_PROD_STOP_FORWARDED -eq 1 && $EXIT_STATUS -gt 128 ]]; then
+    if [[ $SPINE_PROD_STOP_RECEIVED -eq 1 && $EXIT_STATUS -gt 128 ]]; then
         continue
     fi
     break

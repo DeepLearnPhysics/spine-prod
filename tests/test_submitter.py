@@ -3482,14 +3482,18 @@ class TestCVMFSOption:
             "job_template_anl.pbs",
         ],
     )
-    def test_templates_forward_graceful_stop_to_execed_workload(
+    def test_templates_handle_graceful_stop_for_execed_workload(
         self, mock_submitter, template_name
     ):
-        """Every scheduler wrapper should relay USR1 across its container."""
+        """Every scheduler wrapper should safely handle its USR1 delivery."""
         script = self._render_template(mock_submitter, template_name)
 
-        assert "trap forward_graceful_stop USR1" in script
-        assert 'kill -USR1 "$SPINE_PROD_WORKLOAD_PID"' in script
+        if template_name.endswith(".sbatch"):
+            assert "trap receive_graceful_stop USR1" in script
+            assert 'kill -USR1 "$SPINE_PROD_WORKLOAD_PID"' not in script
+        else:
+            assert "trap forward_graceful_stop USR1" in script
+            assert 'kill -USR1 "$SPINE_PROD_WORKLOAD_PID"' in script
         assert 'eval "exec $RUN_CMD" &' in script
         assert "exec spine -S $TASK_FILE_LIST" in script
         syntax = subprocess.run(
@@ -3501,9 +3505,6 @@ class TestCVMFSOption:
             check=False,
         )
         assert syntax.returncode == 0, syntax.stderr
-
-        if template_name == "job_template_nersc.sbatch":
-            assert 'scancel --signal=USR1 "${SLURM_JOB_ID}.0"' in script
 
 
 class TestBatchClientSelection:

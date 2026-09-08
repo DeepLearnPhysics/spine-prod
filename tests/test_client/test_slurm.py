@@ -40,8 +40,8 @@ def test_dry_run_prints_script_without_invoking_sbatch(client, tmp_path, capsys)
     assert "echo test" in capsys.readouterr().out
 
 
-def test_graceful_stop_signals_only_the_batch_shell(client):
-    """Slurm control should rely on the template's signal-forwarding trap."""
+def test_graceful_stop_signals_the_full_job(client):
+    """Slurm control should signal the batch shell and all SPINE workers."""
     result = CompletedProcess([], 0, "", "")
 
     with patch("src.client.slurm.subprocess.run", return_value=result) as run:
@@ -50,7 +50,7 @@ def test_graceful_stop_signals_only_the_batch_shell(client):
     assert run.call_args.args[0] == [
         "scancel",
         "--signal=USR1",
-        "--batch",
+        "--full",
         "12345",
     ]
 
@@ -60,7 +60,7 @@ def test_graceful_stop_dry_run_and_failure(client, capsys):
     with patch("src.client.slurm.subprocess.run") as run:
         client.graceful_stop("12345", dry_run=True)
     run.assert_not_called()
-    assert "scancel --signal=USR1 --batch 12345" in capsys.readouterr().out
+    assert "scancel --signal=USR1 --full 12345" in capsys.readouterr().out
 
     result = CompletedProcess([], 1, "", "invalid job")
     with patch("src.client.slurm.subprocess.run", return_value=result):
