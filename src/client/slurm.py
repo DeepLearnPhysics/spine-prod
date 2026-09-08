@@ -41,8 +41,8 @@ class SlurmClient(BatchClient):
         return job_id
 
     def graceful_stop(self, job_id: str, dry_run: bool = False) -> None:
-        """Send ``SIGUSR1`` to the complete Slurm job process tree."""
-        command = ["scancel", "--signal=USR1", "--full", job_id]
+        """Send ``SIGUSR1`` to the job's signal-forwarding batch shell."""
+        command = ["scancel", "--signal=USR1", "--batch", job_id]
         if dry_run:
             print(f"[DRY RUN] Would run: {' '.join(command)}")
             return

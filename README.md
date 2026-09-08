@@ -479,13 +479,11 @@ scheduler clients are available on the submit host, select one explicitly:
 ./submit.py --graceful-stop 12345678.server --scheduler pbs
 ```
 
-On Slurm, spine-prod uses ``scancel --full`` to deliver ``SIGUSR1`` to the
-batch shell and every SPINE worker. The Slurm templates absorb the shell's copy
-while workers finish at a safe minibatch boundary. On PBS, spine-prod uses
-``qsig`` and the template forwards the request through the Apptainer runtime.
-The inner shell ``exec``s SPINE so that the training process receives the
-signal directly. Once SPINE returns status zero, normal ``afterok``
-dependencies may proceed.
+On Slurm, spine-prod signals only the batch shell with ``SIGUSR1``; on PBS it
+uses ``qsig``. All maintained templates trap and forward that request through
+the Singularity, Shifter, or Apptainer runtime. The inner shell then ``exec``s
+SPINE so that the training process receives the signal directly. Once SPINE
+returns status zero, normal ``afterok`` dependencies may proceed.
 
 This is an intentional successful completion, unlike ``scancel JOB_ID`` or a
 ``SIGTERM`` caused by timeout or machine failure. Do not use it with a SPINE
