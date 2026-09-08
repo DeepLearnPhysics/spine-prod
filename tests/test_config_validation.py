@@ -1401,10 +1401,10 @@ def test_generic_training_particle_info_uses_primary_non_mpr_truth():
         assert particle_info["primary_include_mpr"] is False
 
 
-def test_protodune_sp_particle_grappa_minibatches_fit_variable_graphs():
-    """ProtoDUNE particle GrapPAs use detector-appropriate memory budgets."""
+def test_protodune_sp_training_uses_detector_appropriate_minibatches():
+    """ProtoDUNE training batches scale safely with distributed execution."""
     expected = {
-        "grappa_shower": 64,
+        "grappa_shower": 32,
         "grappa_track": 128,
         "grappa_inter": 256,
     }
@@ -1413,6 +1413,18 @@ def test_protodune_sp_particle_grappa_minibatches_fit_variable_graphs():
             CONFIG_ROOT / f"train/protodune-sp/{component}/base_v1.yaml"
         )
         assert config["io"]["loader"]["minibatch_size"] == minibatch_size
+
+    scalable_stages = {
+        "uresnet_ppn/from_deghost_cache_v1.yaml": 32,
+        "graph_spice/base_v1.yaml": 32,
+    }
+    for relative_path, minibatch_size in scalable_stages.items():
+        config = load_config_with_includes(
+            CONFIG_ROOT / "train/protodune-sp" / relative_path
+        )
+        loader = config["io"]["loader"]
+        assert loader["minibatch_size"] == minibatch_size
+        assert "batch_size" not in loader
 
 
 def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report():
@@ -1482,9 +1494,23 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
     assert train_deghost["val_entry_filter"].endswith(
         "/filter/validation/accepted.yaml"
     )
-    for name in ("train_uresnet_deghost", "train_uresnet_ppn", "train_graph_spice"):
+    assert train_deghost["time"] == "5-00:00:00"
+    for name in ("train_uresnet_ppn", "train_graph_spice"):
         training = next(stage for stage in pipeline.stages if stage["name"] == name)
         assert training["time"] == "2-00:00:00"
+
+    shower = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_shower"
+    )
+    track = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_track"
+    )
+    assert shower["profile"] == "s3df_ampere_full"
+    assert shower["time"] == "1-00:00:00"
+    assert track["depends_on"] == [
+        "cache_train_fragment_graphs",
+        "cache_validation_fragment_graphs",
+    ]
 
     for stage in pipeline.stages:
         if stage["name"].startswith("cache_train_"):
@@ -1540,6 +1566,20 @@ def test_protodune_sp_260906_pipeline_uses_mpvmpr_v1_and_dated_configs():
         stage for stage in pipeline.stages if stage["name"] == "train_uresnet_deghost"
     )
     assert train_deghost["source_list"] == source_list
+    assert train_deghost["time"] == "5-00:00:00"
+
+    shower = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_shower"
+    )
+    track = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_track"
+    )
+    assert shower["profile"] == "s3df_ampere_full"
+    assert shower["time"] == "1-00:00:00"
+    assert track["depends_on"] == [
+        "cache_train_fragment_graphs",
+        "cache_validation_fragment_graphs",
+    ]
 
     for stage in pipeline.stages:
         if stage["name"].startswith("cache_train_"):

@@ -68,7 +68,7 @@ stages:
     config: train/protodune-sp/uresnet_deghost/train_260906.yaml
     stage: train
     profile: s3df_ampere_full
-    time: "2-00:00:00"
+    time: "5-00:00:00"
     source_list: ${train_source_list}
     val_source_list: ${validation_source_list}
     entry_filter: ${workspace}/filter/train/accepted.yaml
@@ -174,6 +174,8 @@ stages:
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/protodune-sp/grappa_shower/train_from_fragment_cache_260906.yaml
     stage: train
+    profile: s3df_ampere_full
+    time: "1-00:00:00"
     source_list: ${workspace}/cache/train/cache_file_list.txt
     val_source_list: ${workspace}/cache/validation/cache_file_list.txt
     val_entry_fraction_range: [0.0, 0.5]
