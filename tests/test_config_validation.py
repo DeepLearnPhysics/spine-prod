@@ -1336,8 +1336,15 @@ def test_protodune_sp_cache_stages_own_only_new_products():
 
 
 def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
-    """Both dated segmentation caches parse canonical particle truth."""
+    """ProtoDUNE-SP training and caches parse canonical particle truth."""
     root = CONFIG_ROOT / "cache/protodune-sp"
+    expected_particle_info = {
+        "particle_event": "particle_corrected",
+        "neutrino_event": "neutrino_mpv",
+        "type_include_secondary": False,
+        "type_include_mpr": False,
+        "primary_include_mpr": False,
+    }
     for version in ("260210", "260906"):
         segmentation_cache = load_config_with_includes(
             root / f"uresnet_ppn/segmentation_{version}.yaml"
@@ -1345,12 +1352,13 @@ def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
         clust_parser = segmentation_cache["io"]["loader"]["dataset"]["larcv"]["schema"][
             "clust_label"
         ]
-        assert clust_parser["particle_info"] == {
-            "particle_event": "particle_corrected",
-            "type_include_secondary": False,
-            "type_include_mpr": False,
-            "primary_include_mpr": False,
-        }
+        assert clust_parser["particle_info"] == expected_particle_info
+
+    ppn_train = load_config_with_includes(
+        CONFIG_ROOT / "train/protodune-sp/uresnet_ppn/from_deghost_cache_v1.yaml"
+    )
+    ppn_schema = ppn_train["io"]["loader"]["dataset"]["larcv"]["schema"]
+    assert ppn_schema["clust_label"]["particle_info"] == expected_particle_info
 
     particles = load_config_with_includes(
         root / "grappa_shower_track/particle_graphs_260906.yaml"

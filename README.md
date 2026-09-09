@@ -676,6 +676,21 @@ on skipped stages are considered satisfied by their existing artifacts.
 Use `--to-stage NAME` to stop at an inclusive boundary when only a bounded
 range should be regenerated.
 
+For a sparse repair, select multiple stages in one option:
+
+```bash
+./submit.py \
+  --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/production \
+  --select-stage cache_train_segmentation cache_validation_segmentation \
+                 cache_train_particle_graphs cache_validation_particle_graphs
+```
+
+Selected stages run in pipeline order, regardless of their CLI order. Direct
+dependencies are contracted through omitted stages, so selected downstream
+stages still wait for the nearest selected ancestors. `--select-stage` cannot
+be combined with `--from-stage` or `--to-stage`.
+
 On Slurm, dependent stages are submitted with
 `--kill-on-invalid-dep=yes`, so a stage is canceled automatically when an
 upstream `afterok` dependency can no longer succeed. PBS Professional provides

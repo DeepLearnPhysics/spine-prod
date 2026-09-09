@@ -264,6 +264,14 @@ Examples:
         "--to-stage",
         help="Stop a pipeline submission after this stage (inclusive).",
     )
+    parser.add_argument(
+        "--select-stage",
+        nargs="+",
+        help=(
+            "Submit only these pipeline stages, in pipeline order. Dependencies "
+            "are contracted through omitted stages."
+        ),
+    )
     resume_group = parser.add_mutually_exclusive_group()
     resume_group.add_argument(
         "--resume",
@@ -458,6 +466,12 @@ Examples:
         parser.error("--from-stage is only supported with --pipeline")
     if args.to_stage is not None and not args.pipeline:
         parser.error("--to-stage is only supported with --pipeline")
+    if args.select_stage is not None and not args.pipeline:
+        parser.error("--select-stage is only supported with --pipeline")
+    if args.select_stage is not None and (
+        args.from_stage is not None or args.to_stage is not None
+    ):
+        parser.error("--select-stage cannot be combined with --from-stage/--to-stage")
     if args.weight_path is not None and args.pipeline:
         parser.error("--weight-path is stage-specific and cannot override a pipeline")
     if args.stage_module_weight is not None and not args.pipeline:
@@ -647,6 +661,7 @@ Examples:
                 workspace=args.workspace,
                 from_stage=args.from_stage,
                 to_stage=args.to_stage,
+                select_stages=args.select_stage,
                 stage_module_weights=args.stage_module_weight,
             )
             print("\n=== Pipeline submitted ===")

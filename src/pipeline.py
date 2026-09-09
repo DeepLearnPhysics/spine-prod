@@ -980,6 +980,7 @@ class PipelineRunner(SubmissionComponent):
         workspace: Optional[str] = None,
         from_stage: Optional[str] = None,
         to_stage: Optional[str] = None,
+        select_stages: Optional[Sequence[str]] = None,
         stage_module_weights: Optional[Sequence[Sequence[str]]] = None,
     ) -> Dict[str, List[str]]:
         """Submit an ordered multi-stage production pipeline.
@@ -1009,6 +1010,9 @@ class PipelineRunner(SubmissionComponent):
         to_stage : str, optional
             Stop after this stage in pipeline order. This can bound a restart
             to the stages that must be regenerated.
+        select_stages : sequence of str, optional
+            Submit only these named stages. Their pipeline order is retained,
+            and dependencies are contracted through omitted stages.
         stage_module_weights : sequence, optional
             Repeated launch-time ``STAGE MODULE=PATH`` assignments. These
             override matching module weights in the pipeline document.
@@ -1032,6 +1036,7 @@ class PipelineRunner(SubmissionComponent):
             all_stages,
             from_stage,
             to_stage,
+            select_stages,
         )
         selected_names = {stage["name"] for stage in stages}
         inactive_weight_stages = set(parsed_stage_weights) - selected_names
@@ -1039,8 +1044,10 @@ class PipelineRunner(SubmissionComponent):
         if definition.workspace is not None:
             print(f"Workspace: {definition.workspace}")
         print(f"Stages: {len(stages)}")
-        if skipped:
+        if skipped and select_stages is None:
             print(f"Skipped as completed: {', '.join(skipped)}")
+        elif skipped:
+            print(f"Not selected: {', '.join(skipped)}")
         if deferred:
             print(f"Not selected after stop: {', '.join(deferred)}")
         if inactive_weight_stages:
@@ -1073,7 +1080,7 @@ class PipelineRunner(SubmissionComponent):
             options = self._submission_options(
                 stage,
                 dependency,
-                retry=from_stage is not None,
+                retry=from_stage is not None or select_stages is not None,
             )
             kind = stage.get("kind", "spine")
             if kind == "filter":
@@ -1131,9 +1138,57 @@ class PipelineRunner(SubmissionComponent):
         stages: Sequence[Mapping[str, Any]],
         from_stage: Optional[str],
         to_stage: Optional[str],
+        select_stages: Optional[Sequence[str]] = None,
     ) -> Tuple[Sequence[Mapping[str, Any]], List[str], List[str]]:
-        """Select an inclusive ordered range and describe omitted stages."""
+        """Select an ordered range or dependency-aware sparse stage set."""
         names = [stage["name"] for stage in stages]
+        if select_stages is not None:
+            if from_stage is not None or to_stage is not None:
+                raise ValueError(
+                    "Pipeline select_stages cannot be combined with stage boundaries"
+                )
+            if not select_stages:
+                raise ValueError("Pipeline select_stages must not be empty")
+            if any(not isinstance(name, str) or not name for name in select_stages):
+                raise ValueError(
+                    "Pipeline select_stages must contain non-empty strings"
+                )
+            if len(set(select_stages)) != len(select_stages):
+                raise ValueError("Pipeline select_stages must not contain duplicates")
+            unknown = set(select_stages) - set(names)
+            if unknown:
+                raise ValueError(
+                    "Unknown selected pipeline stage(s): " + ", ".join(sorted(unknown))
+                )
+
+            selected_names = set(select_stages)
+            stage_map = {stage["name"]: stage for stage in stages}
+
+            def selected_dependencies(name: str) -> List[str]:
+                """Find the nearest selected ancestors of one selected stage."""
+                result: List[str] = []
+
+                def visit(dependency: str) -> None:
+                    if dependency in selected_names:
+                        if dependency not in result:
+                            result.append(dependency)
+                        return
+                    for ancestor in stage_map[dependency].get("depends_on", []):
+                        visit(ancestor)
+
+                for dependency in stage_map[name].get("depends_on", []):
+                    visit(dependency)
+                return result
+
+            selected = []
+            for stage in stages:
+                if stage["name"] in selected_names:
+                    resolved = dict(stage)
+                    resolved["depends_on"] = selected_dependencies(stage["name"])
+                    selected.append(resolved)
+            omitted = [name for name in names if name not in selected_names]
+            return selected, omitted, []
+
         start = 0
         stop = len(stages)
         if from_stage is not None:

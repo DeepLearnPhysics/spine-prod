@@ -861,3 +861,34 @@ def test_pipeline_stage_selection_rejects_invalid_boundaries(
         PipelineRunner._select_stages(
             [{"name": "stage"}], from_stage=from_stage, to_stage=to_stage
         )
+
+
+@pytest.mark.parametrize(
+    ("selection", "message"),
+    [
+        ([], "must not be empty"),
+        ([""], "must contain non-empty strings"),
+        (["stage", "stage"], "must not contain duplicates"),
+        (["missing"], "Unknown selected pipeline stage"),
+    ],
+)
+def test_sparse_pipeline_stage_selection_rejects_invalid_names(selection, message):
+    """Sparse selection must be explicit, unique, and resolvable."""
+    with pytest.raises(ValueError, match=message):
+        PipelineRunner._select_stages(
+            [{"name": "stage"}],
+            from_stage=None,
+            to_stage=None,
+            select_stages=selection,
+        )
+
+
+def test_sparse_pipeline_stage_selection_rejects_boundaries():
+    """The internal selection API also rejects ambiguous selection modes."""
+    with pytest.raises(ValueError, match="cannot be combined"):
+        PipelineRunner._select_stages(
+            [{"name": "stage"}],
+            from_stage="stage",
+            to_stage=None,
+            select_stages=["stage"],
+        )

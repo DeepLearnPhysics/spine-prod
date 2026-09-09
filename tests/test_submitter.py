@@ -4003,6 +4003,75 @@ class TestPipelineSubmission:
 
         submit_job.assert_not_called()
 
+    def test_submit_pipeline_selects_sparse_stages_and_contracts_dependencies(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        """Sparse retries retain order and nearest selected dependencies."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {"name": "source", "config": "source.yaml"},
+                        {
+                            "name": "cache_train",
+                            "config": "cache.yaml",
+                            "depends_on": ["source"],
+                        },
+                        {
+                            "name": "cache_validation",
+                            "config": "cache.yaml",
+                            "depends_on": ["source"],
+                        },
+                        {
+                            "name": "train",
+                            "config": "train.yaml",
+                            "depends_on": ["cache_train", "cache_validation"],
+                        },
+                        {
+                            "name": "particle_train",
+                            "config": "particle.yaml",
+                            "depends_on": ["train"],
+                        },
+                        {
+                            "name": "particle_validation",
+                            "config": "particle.yaml",
+                            "depends_on": ["train"],
+                        },
+                    ]
+                }
+            )
+        )
+
+        with patch.object(
+            mock_submitter,
+            "submit_job",
+            side_effect=[["20"], ["21"], ["30"], ["31"]],
+        ) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                select_stages=[
+                    "particle_validation",
+                    "cache_validation",
+                    "particle_train",
+                    "cache_train",
+                ],
+            )
+
+        assert list(result) == [
+            "cache_train",
+            "cache_validation",
+            "particle_train",
+            "particle_validation",
+        ]
+        assert submit_job.call_args_list[0].kwargs["dependency"] is None
+        assert submit_job.call_args_list[1].kwargs["dependency"] is None
+        assert submit_job.call_args_list[2].kwargs["dependency"] == "afterok:20:21"
+        assert submit_job.call_args_list[3].kwargs["dependency"] == "afterok:20:21"
+        assert all(call.kwargs["retry"] for call in submit_job.call_args_list)
+        output = capsys.readouterr().out
+        assert "Not selected: source, train" in output
+
     def test_report_rejects_non_mapping_configuration(self, tmp_path):
         """Report recipes must be mappings before provenance is injected."""
         from src.report import ReportRunner

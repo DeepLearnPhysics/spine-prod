@@ -297,6 +297,7 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         workspace="/runs/benchmark",
         from_stage=None,
         to_stage=None,
+        select_stages=None,
         stage_module_weights=None,
     )
     output = capsys.readouterr().out
@@ -436,6 +437,27 @@ def test_pipeline_mode_forwards_restart_stage():
     assert submitter.submit_pipeline.call_args.kwargs["to_stage"] is None
 
 
+def test_pipeline_mode_forwards_selected_stages():
+    """One compact option should forward the requested sparse stage set."""
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--select-stage",
+        "cache_train",
+        "cache_validation",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert submitter.submit_pipeline.call_args.kwargs["select_stages"] == [
+        "cache_train",
+        "cache_validation",
+    ]
+
+
 def test_workspace_is_rejected_outside_pipeline_mode():
     """A pipeline workspace must not silently behave like a job run directory."""
     with pytest.raises(SystemExit, match="2"):
@@ -452,6 +474,25 @@ def test_to_stage_is_rejected_outside_pipeline_mode():
     """A pipeline stop boundary has no meaning for a single job."""
     with pytest.raises(SystemExit, match="2"):
         run_main("--config", "config.yaml", "--to-stage", "train")
+
+
+def test_select_stage_is_rejected_outside_pipeline_mode():
+    """Sparse pipeline selection has no meaning for a single job."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main("--config", "config.yaml", "--select-stage", "train")
+
+
+def test_select_stage_rejects_range_boundaries():
+    """Sparse and contiguous selection modes must remain unambiguous."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--pipeline",
+            "pipeline.yaml",
+            "--select-stage",
+            "train",
+            "--from-stage",
+            "train",
+        )
 
 
 def test_cli_rejects_undeclared_long_option_abbreviations():

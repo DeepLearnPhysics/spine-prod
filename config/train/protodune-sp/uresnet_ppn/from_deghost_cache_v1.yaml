@@ -39,6 +39,7 @@ io:
             clean_data: true
             particle_info:
               particle_event: particle_corrected
+              neutrino_event: neutrino_mpv
               type_include_secondary: false
               type_include_mpr: false
               primary_include_mpr: false

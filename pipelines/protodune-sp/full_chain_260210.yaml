@@ -187,6 +187,7 @@ stages:
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/protodune-sp/grappa_track/train_from_fragment_cache_260210.yaml
     stage: train
+    time: "12:00:00"
     source_list: ${workspace}/cache/train/cache_file_list.txt
     val_source_list: ${workspace}/cache/validation/cache_file_list.txt
     val_entry_fraction_range: [0.0, 0.5]
@@ -244,6 +245,7 @@ stages:
   - name: evaluate_full_chain
     depends_on: [export_full_chain_weights]
     config: test/protodune-sp/full_chain/evaluate_260210.yaml
+    time: "01:00:00"
     source_list: ${validation_source_list}
     entry_fraction_range: [0.5, 1.0]
     run_dir: ${workspace}/metrics/full_chain/raw
