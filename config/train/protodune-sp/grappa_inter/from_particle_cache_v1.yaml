@@ -18,6 +18,8 @@ override:
       - interaction_aggregation_node_type_valid
       - interaction_aggregation_node_primary_target
       - interaction_aggregation_node_primary_valid
+      - interaction_aggregation_node_orient_target
+      - interaction_aggregation_node_orient_valid
       - interaction_aggregation_edge_target
       - interaction_aggregation_edge_valid
 
@@ -31,6 +33,8 @@ override:
     node_type_valid: interaction_aggregation_node_type_valid
     node_primary_target: interaction_aggregation_node_primary_target
     node_primary_valid: interaction_aggregation_node_primary_valid
+    node_orient_target: interaction_aggregation_node_orient_target
+    node_orient_valid: interaction_aggregation_node_orient_valid
     edge_target: interaction_aggregation_edge_target
     edge_valid: interaction_aggregation_edge_valid
 

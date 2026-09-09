@@ -1343,6 +1343,32 @@ def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
     assert "interaction_aggregation_node_orient_target" in particle_keys
     assert "interaction_aggregation_node_orient_valid" in particle_keys
 
+    legacy_inter_train = load_config_with_includes(
+        CONFIG_ROOT
+        / "train/protodune-sp/grappa_inter/train_from_particle_cache_260210.yaml"
+    )
+    legacy_dataset_keys = legacy_inter_train["io"]["loader"]["dataset"]["keys"]
+    legacy_loss_input = legacy_inter_train["model"]["loss_input"]
+    assert "interaction_aggregation_node_orient_target" not in legacy_dataset_keys
+    assert "interaction_aggregation_node_orient_valid" not in legacy_dataset_keys
+    assert "node_orient_target" not in legacy_loss_input
+    assert "node_orient_valid" not in legacy_loss_input
+
+    inter_train = load_config_with_includes(
+        CONFIG_ROOT
+        / "train/protodune-sp/grappa_inter/train_from_particle_cache_260906.yaml"
+    )
+    dataset_keys = inter_train["io"]["loader"]["dataset"]["keys"]
+    loss_input = inter_train["model"]["loss_input"]
+    assert "interaction_aggregation_node_orient_target" in dataset_keys
+    assert "interaction_aggregation_node_orient_valid" in dataset_keys
+    assert loss_input["node_orient_target"] == (
+        "interaction_aggregation_node_orient_target"
+    )
+    assert loss_input["node_orient_valid"] == (
+        "interaction_aggregation_node_orient_valid"
+    )
+
     ppn_train = load_config_with_includes(
         CONFIG_ROOT
         / "train/protodune-sp/uresnet_ppn/train_from_deghost_cache_260906.yaml"
