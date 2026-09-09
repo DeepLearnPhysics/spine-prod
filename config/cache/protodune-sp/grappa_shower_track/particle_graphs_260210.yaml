@@ -12,9 +12,3 @@ model:
     grappa_track: !include model/protodune-sp/grappa_track/network_full_chain_260210.yaml
     grappa_inter: !include model/protodune-sp/grappa_inter/network_full_chain_260210.yaml
     grappa_inter_loss: !include model/protodune-sp/grappa_inter/loss_260210.yaml
-
-override:
-  # The legacy interaction objective did not supervise orientation.
-  io.writer.keys-:
-    - interaction_aggregation_node_orient_target
-    - interaction_aggregation_node_orient_valid

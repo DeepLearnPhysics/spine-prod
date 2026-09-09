@@ -1245,7 +1245,10 @@ def test_protodune_sp_260210_model_is_shared_and_preserves_deployed_choices():
         15,
     ]
     assert modules["grappa_inter"]["nodes"]["grouping_through_track"] is True
-    assert "orient" not in modules["grappa_inter_loss"]["node_loss"]
+    assert modules["grappa_inter_loss"]["node_loss"]["orient"] == {
+        "name": "orient",
+        "loss": "ce",
+    }
 
 
 def test_protodune_sp_260906_model_uses_updated_geometry_and_objectives():
@@ -1315,8 +1318,8 @@ def test_protodune_sp_cache_stages_own_only_new_products():
     assert fragmentation_dataset["hdf5"]["stage_map"] == {"data_calib": "deghosting"}
     assert "coord_label" in fragmentation_dataset["larcv"]["schema"]
     particle_keys = particles["io"]["writer"]["keys"]
-    assert "interaction_aggregation_node_orient_target" not in particle_keys
-    assert "interaction_aggregation_node_orient_valid" not in particle_keys
+    assert "interaction_aggregation_node_orient_target" in particle_keys
+    assert "interaction_aggregation_node_orient_valid" in particle_keys
 
 
 def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
@@ -1343,31 +1346,26 @@ def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
     assert "interaction_aggregation_node_orient_target" in particle_keys
     assert "interaction_aggregation_node_orient_valid" in particle_keys
 
-    legacy_inter_train = load_config_with_includes(
-        CONFIG_ROOT
-        / "train/protodune-sp/grappa_inter/train_from_particle_cache_260210.yaml"
-    )
-    legacy_dataset_keys = legacy_inter_train["io"]["loader"]["dataset"]["keys"]
-    legacy_loss_input = legacy_inter_train["model"]["loss_input"]
-    assert "interaction_aggregation_node_orient_target" not in legacy_dataset_keys
-    assert "interaction_aggregation_node_orient_valid" not in legacy_dataset_keys
-    assert "node_orient_target" not in legacy_loss_input
-    assert "node_orient_valid" not in legacy_loss_input
-
-    inter_train = load_config_with_includes(
-        CONFIG_ROOT
-        / "train/protodune-sp/grappa_inter/train_from_particle_cache_260906.yaml"
-    )
-    dataset_keys = inter_train["io"]["loader"]["dataset"]["keys"]
-    loss_input = inter_train["model"]["loss_input"]
-    assert "interaction_aggregation_node_orient_target" in dataset_keys
-    assert "interaction_aggregation_node_orient_valid" in dataset_keys
-    assert loss_input["node_orient_target"] == (
-        "interaction_aggregation_node_orient_target"
-    )
-    assert loss_input["node_orient_valid"] == (
-        "interaction_aggregation_node_orient_valid"
-    )
+    for version in ("260210", "260906"):
+        inter_train = load_config_with_includes(
+            CONFIG_ROOT
+            / (
+                "train/protodune-sp/grappa_inter/"
+                f"train_from_particle_cache_{version}.yaml"
+            )
+        )
+        dataset_keys = inter_train["io"]["loader"]["dataset"]["keys"]
+        loss_input = inter_train["model"]["loss_input"]
+        node_loss = inter_train["model"]["modules"]["grappa_loss"]["node_loss"]
+        assert "interaction_aggregation_node_orient_target" in dataset_keys
+        assert "interaction_aggregation_node_orient_valid" in dataset_keys
+        assert loss_input["node_orient_target"] == (
+            "interaction_aggregation_node_orient_target"
+        )
+        assert loss_input["node_orient_valid"] == (
+            "interaction_aggregation_node_orient_valid"
+        )
+        assert node_loss["orient"] == {"name": "orient", "loss": "ce"}
 
     ppn_train = load_config_with_includes(
         CONFIG_ROOT

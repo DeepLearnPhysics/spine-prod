@@ -7,14 +7,3 @@ __meta__:
 include:
   - model/protodune-sp/grappa_inter/model_260210.yaml
   - train/protodune-sp/grappa_inter/from_particle_cache_v1.yaml
-
-# The 260210 objective did not train particle orientation, so its cache does
-# not contain the corresponding supervision products.
-override:
-  io.loader.dataset.keys-:
-    - interaction_aggregation_node_orient_target
-    - interaction_aggregation_node_orient_valid
-
-remove:
-  - model.loss_input.node_orient_target
-  - model.loss_input.node_orient_valid

@@ -2,9 +2,6 @@ __meta__:
   kind: fragment
   version: "260210"
   date: "2026-02-10"
-  description: ProtoDUNE-SP 260210 interaction GrapPA loss without orientation supervision
+  description: ProtoDUNE-SP 260210 interaction GrapPA loss
 
 include: model/common/grappa_inter/loss_v1.yaml
-
-remove:
-  - node_loss.orient
