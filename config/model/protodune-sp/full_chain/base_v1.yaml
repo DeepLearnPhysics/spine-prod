@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  description: Shared ProtoDUNE-SP full-chain model dependencies
+
+include: model/common/full_chain/base_v1.yaml
+
+# Calibration is part of the ProtoDUNE-SP model and requires detector geometry
+# even when the model is instantiated without a Driver, as during weight export.
+geo:
+  detector: protodune-sp
+  tag: protodunev7

@@ -4,7 +4,7 @@ __meta__:
   date: "2026-02-10"
   description: ProtoDUNE-SP full chain composed from the February 2026 components
 
-include: model/common/full_chain/base_v1.yaml
+include: model/protodune-sp/full_chain/base_v1.yaml
 
 override:
   model.network_input.sources: sources

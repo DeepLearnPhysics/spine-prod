@@ -1216,12 +1216,25 @@ def load_config_with_includes(config_path):
 
 def test_protodune_sp_260210_model_is_shared_and_preserves_deployed_choices():
     """The inference wrapper adds weights to one reusable dated model."""
+    for version in ("260210", "260906"):
+        model_config = load_config_with_includes(
+            CONFIG_ROOT / f"model/protodune-sp/full_chain/model_{version}.yaml"
+        )
+        assert model_config["geo"] == {
+            "detector": "protodune-sp",
+            "tag": "protodunev7",
+        }
+
     shared = load_config_with_includes(
         CONFIG_ROOT / "model/protodune-sp/full_chain/model_260210.yaml"
-    )["model"]
-    deployed = load_config_with_includes(
+    )
+    deployed_config = load_config_with_includes(
         CONFIG_ROOT / "infer/protodune-sp/model/model_260210.yaml"
-    )["model"]
+    )
+
+    assert deployed_config["geo"] == shared["geo"]
+    shared = shared["model"]
+    deployed = deployed_config["model"]
 
     assert deployed.pop("weight_path") == "/fake/weights/checkpoint.ckpt"
     assert deployed == shared
