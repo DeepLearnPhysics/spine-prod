@@ -122,7 +122,9 @@ class RuntimeResolver(SubmissionComponent):
                     f"{option_name} does not provide spine.bin.report: {root}"
                 )
             src_dir = shlex.quote(str(root / "src"))
-            command = f"PYTHONPATH={src_dir}:$PYTHONPATH python3 -m spine.bin.report"
+            command = (
+                f"env PYTHONPATH={src_dir}:$PYTHONPATH " "python3 -m spine.bin.report"
+            )
             return command, str(root)
 
         local_report = shutil.which("spine-report")
@@ -155,7 +157,9 @@ class RuntimeResolver(SubmissionComponent):
                     f"{option_name} does not provide spine.bin.filter: {root}"
                 )
             src_dir = shlex.quote(str(root / "src"))
-            command = f"PYTHONPATH={src_dir}:$PYTHONPATH python3 -m spine.bin.filter"
+            command = (
+                f"env PYTHONPATH={src_dir}:$PYTHONPATH " "python3 -m spine.bin.filter"
+            )
             return command, str(root)
 
         local_filter = shutil.which("spine-filter")

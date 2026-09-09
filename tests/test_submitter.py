@@ -771,7 +771,7 @@ class TestSubmitterHelpers:
             str(checkout)
         )
 
-        assert command.startswith(f"PYTHONPATH={checkout / 'src'}:")
+        assert command.startswith(f"env PYTHONPATH={checkout / 'src'}:")
         assert command.endswith("python3 -m spine.bin.report")
         assert bind_root == str(checkout)
 
@@ -787,7 +787,7 @@ class TestSubmitterHelpers:
             str(checkout)
         )
 
-        assert command.startswith(f"PYTHONPATH={checkout / 'src'}:")
+        assert command.startswith(f"env PYTHONPATH={checkout / 'src'}:")
         assert command.endswith("python3 -m spine.bin.filter")
         assert bind_root == str(checkout)
 
