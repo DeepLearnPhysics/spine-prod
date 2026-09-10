@@ -25,7 +25,7 @@ Each main config includes modular YAML files:
 - **`io/io_common.yaml`**: Common IO settings
 
 **Model Components:**
-- **`model/model_260906.yaml`**: September 2026 mpvmpr v1 model; checkpoint pending publication
+- **`model/model_260906.yaml`**: September 2026 mpvmpr v1 model and published checkpoint
 - **`model/model_260210.yaml`**: Feb 2026 weights and model settings
 - **`config/model/protodune-sp/full_chain/model_260906.yaml`**: Shared mpvmpr v1 architecture
 - **`config/model/protodune-sp/full_chain/model_260210.yaml`**: Shared dated
@@ -79,4 +79,4 @@ full_chain_260906.yaml
 Description:
   - Full six-module chain trained through the staged mpvmpr v1 pipeline
   - Updated calibration, Graph-SPICE geometry, track aggregation and interaction objectives
-  - Model checkpoint path intentionally unset pending review and publication
+  - Published six-class PID checkpoint with charged-kaon support

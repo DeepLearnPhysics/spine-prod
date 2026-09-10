@@ -1322,7 +1322,7 @@ def test_protodune_sp_260906_inference_uses_trained_shared_model():
 
     assert deployed["geo"] == shared["geo"]
     deployed_model = deployed["model"]
-    assert deployed_model.pop("weight_path") is None
+    assert deployed_model.pop("weight_path") == "/fake/weights/checkpoint.ckpt"
     assert deployed_model == shared["model"]
     assert deployed["io"]["writer"]["name"] == "hdf5"
     assert deployed["post"]["match"]["ghost"] is True
