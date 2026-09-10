@@ -1,0 +1,14 @@
+# ProtoDUNE-SP full chain trained on the mpvmpr v1 dataset
+# Revision date: September 6, 2026
+
+__meta__:
+  kind: bundle
+  version: "260906"
+  date: "2026-09-06"
+  description: "ProtoDUNE-SP mpvmpr v1 full chain configuration"
+
+include:
+  - base/base_260210.yaml
+  - io/io_260210.yaml
+  - model/model_260906.yaml
+  - post/post_260210.yaml

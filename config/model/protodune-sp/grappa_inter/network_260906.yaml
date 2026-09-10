@@ -9,3 +9,7 @@ include: model/protodune-sp/grappa_inter/network_260210.yaml
 override:
   # Scale the generic 150/7.5 cm thresholds from 3 mm to 5 mm voxels.
   graph.max_length: [300, 300, 0, 0, 15, 15, 15, 0, 0, 0]
+
+  # The mpvmpr v1 sample includes charged kaons, unlike the v0 sample used by
+  # the 260210 model. Expose PID labels 0 through 5 to the type objective.
+  gnn_model.node_pred.type: 6

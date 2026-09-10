@@ -1266,14 +1266,19 @@ def test_protodune_sp_260210_model_is_shared_and_preserves_deployed_choices():
 
 def test_protodune_sp_260906_model_uses_updated_geometry_and_objectives():
     """The 260906 chain encodes the mpvmpr v1 geometry and loss policy."""
+    legacy = load_config_with_includes(
+        CONFIG_ROOT / "model/protodune-sp/full_chain/model_260210.yaml"
+    )["model"]
     model = load_config_with_includes(
         CONFIG_ROOT / "model/protodune-sp/full_chain/model_260906.yaml"
     )["model"]
     modules = model["modules"]
 
+    assert legacy["modules"]["grappa_inter"]["gnn_model"]["node_pred"]["type"] == 5
     assert modules["calibration"]["gain"]["gain"] == pytest.approx(1.0 / 1.0156e-3)
     assert modules["graph_spice"]["embedder"]["uresnet"]["spatial_size"] == 2368
     assert modules["grappa_track"]["graph"]["max_length"] == 60
+    assert modules["grappa_inter"]["gnn_model"]["node_pred"]["type"] == 6
     assert modules["grappa_inter"]["graph"]["max_length"] == [
         300,
         300,
@@ -1293,6 +1298,34 @@ def test_protodune_sp_260906_model_uses_updated_geometry_and_objectives():
     assert inter_loss["primary"]["use_closest"] is True
     assert inter_loss["primary"]["min_iou"] == 0.5
     assert inter_loss["primary"]["match_target"] == "group"
+
+    particle_cache = load_config_with_includes(
+        CONFIG_ROOT
+        / "cache/protodune-sp/grappa_shower_track/particle_graphs_260906.yaml"
+    )
+    assert (
+        particle_cache["model"]["modules"]["grappa_inter"]["gnn_model"]["node_pred"][
+            "type"
+        ]
+        == 6
+    )
+
+
+def test_protodune_sp_260906_inference_uses_trained_shared_model():
+    """The inference bundle must preserve the reviewed training architecture."""
+    shared = load_config_with_includes(
+        CONFIG_ROOT / "model/protodune-sp/full_chain/model_260906.yaml"
+    )
+    deployed = load_config_with_includes(
+        CONFIG_ROOT / "infer/protodune-sp/full_chain_260906.yaml"
+    )
+
+    assert deployed["geo"] == shared["geo"]
+    deployed_model = deployed["model"]
+    assert deployed_model.pop("weight_path") is None
+    assert deployed_model == shared["model"]
+    assert deployed["io"]["writer"]["name"] == "hdf5"
+    assert deployed["post"]["match"]["ghost"] is True
 
 
 def test_protodune_sp_cache_stages_own_only_new_products():
