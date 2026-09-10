@@ -30,6 +30,7 @@ Features that previously required separate config files (e.g., `*_data_*`) are n
 
 For example:
 - Data-only mode (no truth labels): Apply `modifier/data/mod_data_*.yaml` or use `--apply-mods data`
+- Data matched to the 250901 simulation gain: Use `--apply-mods data_sim_gain:260910`
 - Lite output: Use `--apply-mods lite`
 
 The May 2026 models apply calibration before semantic segmentation. Their
@@ -37,6 +38,12 @@ The May 2026 models apply calibration before semantic segmentation. Their
 from `SBND_DATA_DIR`; earlier data modifiers configure the post-processing
 calibration stage instead. Modifier compatibility metadata prevents either
 calibration style from being applied across this boundary.
+
+The `data_sim_gain:260910` modifier is a deliberate alternative to the
+standard 250901 data modifier. It scales data charge by `46.478 / 49.819`
+before semantic segmentation, then uses the simulation gain for calorimetry.
+It is restricted to the 250901 model and post-processing pair and therefore
+does not become the default data modifier for newer configurations.
 
 Legacy `.yaml` files have been moved to the `legacy/` directory.
 

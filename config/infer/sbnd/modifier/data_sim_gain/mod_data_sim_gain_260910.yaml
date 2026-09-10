@@ -1,0 +1,44 @@
+# SBND data-only modification matched to the 250901 simulation response
+# Revision date: September 10, 2026
+
+__meta__:
+  kind: mod
+  name: "data_sim_gain"
+  version: "260910"
+  date: "2026-09-10"
+  description: "SBND data-only configuration matched to the 250901 simulation gain"
+  applies_to: [data]
+  compatible_with:
+    model: "==250901"
+    post: "==250901"
+
+include: ../data/mod_data_common.yaml
+
+override:
+  ### Model overrides ###
+  # The applied response stage requires detector metadata.
+  model.network_input.meta: meta
+
+  # Match the charge seen by semantic segmentation to simulation. Data uses
+  # 46.478 e-/ADC while the 250901 simulation uses 49.819 e-/ADC.
+  model.modules.chain.calibration: apply
+  model.modules.calibration:
+    stage: segmentation
+    response:
+      priority: 10
+      response_func: 46.478/49.819*x
+
+  ### Post-processing overrides ###
+  # Calibrate the response-scaled charge with the simulation gain. Their
+  # product preserves the original 46.478 e-/ADC data normalization.
+  post.apply_calibrations:
+    depositions_source: depositions
+    gain:
+      gain: 49.819 # e-/ADC, matching the 250901 simulation
+    recombination:
+      model: mbox
+      efield: 0.5 # kV/cm
+    lifetime:
+      lifetime: 35000 # us
+      driftv: 0.1563 # cm/us
+    priority: 2

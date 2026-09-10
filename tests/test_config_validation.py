@@ -1431,6 +1431,57 @@ class TestConfigValidation:
             config["post"]["apply_calibrations"]["depositions_source"] == "depositions"
         )
 
+    def test_sbnd_250901_data_sim_gain_modifier(self, config_infer_root, tmp_path):
+        """The gain-matched data path preserves calorimetry normalization."""
+        sbnd_root = config_infer_root / "sbnd"
+        modifier = (
+            sbnd_root / "modifier" / "data_sim_gain" / "mod_data_sim_gain_260910.yaml"
+        )
+        modifier_config = yaml.safe_load(modifier.read_text(encoding="utf-8"))
+        assert modifier_config["__meta__"]["compatible_with"] == {
+            "model": "==250901",
+            "post": "==250901",
+        }
+
+        composite = tmp_path / "composite.yaml"
+        composite.write_text(
+            yaml.safe_dump(
+                {
+                    "include": [
+                        str(sbnd_root / "full_chain_co_250901.yaml"),
+                        str(modifier),
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        config = load_config_with_includes(composite)
+
+        assert config["model"]["modules"]["chain"]["calibration"] == "apply"
+        calibration = config["model"]["modules"]["calibration"]
+        assert calibration["stage"] == "segmentation"
+        assert calibration["response"]["priority"] == 10
+        assert calibration["response"]["response_func"] == "46.478/49.819*x"
+
+        post_calibration = config["post"]["apply_calibrations"]
+        assert post_calibration["depositions_source"] == "depositions"
+        assert post_calibration["gain"]["gain"] == pytest.approx(49.819)
+
+        incompatible = tmp_path / "incompatible.yaml"
+        incompatible.write_text(
+            yaml.safe_dump(
+                {
+                    "include": [
+                        str(sbnd_root / "full_chain_co_260501.yaml"),
+                        str(modifier),
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(Exception, match="compatible"):
+            load_config_with_includes(incompatible)
+
     def test_sbnd_smearing_25_percent_composes_with_supported_model(
         self, config_infer_root, tmp_path
     ):
