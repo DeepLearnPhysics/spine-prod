@@ -21,8 +21,8 @@ stages:
     # val_source / val_source_list are available for training stages
     # Composite datasets use named sources:
     # sources:
-    #   larcv: {source: /path/to/raw.root}
-    #   hdf5: {source: /path/to/cache.h5}
+    #   primary: {source: /path/to/raw.root}
+    #   cache: {source: /path/to/train/cache.spine-cache}
     # validation_sources: ...         # same shape for validation
     # val_entry_fraction_range: [0.0, 0.5]  # validation-only partition
     # entry_filter: /path/to/train-filter.yaml
@@ -30,6 +30,8 @@ stages:
     # module_weight: {module: /path/to/checkpoint.ckpt}
     # weight_path: /path/to/composed.ckpt  # complete-model checkpoint
     # export_weights: /path/to/composed.ckpt  # terminal model-only stage
+    # cache_repository: /path/to/train/cache.spine-cache
+    # cache_stage: segmentation
     # set: [nested.config.key=value]
     profile: s3df_hopper    # optional stage override of the default
     ntasks: 4               # target tasks, or array concurrency with files_per_task
@@ -71,7 +73,7 @@ its dependent build publishes a file-aware manifest and accepted-source list:
 
 SPINE stages consume these artifacts through `entry_filter` and
 `val_entry_filter`. Apply them whenever a stage reads the corresponding raw
-LArCV domain; do not reapply them to compact, pure-HDF5 caches.
+LArCV domain; do not reapply them to compact cache repositories.
 
 `ntasks` controls scheduler-array splitting and, when paired with
 `files_per_task`, caps concurrent array tasks. `workers` belongs specifically
@@ -143,12 +145,19 @@ transition:
 1. Train standalone UResNet-PPN and select `snapshot-best.ckpt`.
 2. Materialize its canonical `seg_pred` and adapted `clust_label_adapt`
    products, together with `ppn_points`, into separate training and validation
-   staged caches.
+   sharded cache repositories.
 3. Train standalone Graph-SPICE from raw LArCV truth plus the aligned cache.
 
-Each original source file has one staged cache. Later materialization jobs in
-the full-chain pipelines append named groups to that same HDF5 file rather
-than producing a new physical file for every transition.
+Each split has one logical `.spine-cache` repository. Every source and stage
+owns an immutable HDF5 V2 shard internally, while downstream jobs consume the
+repository as one input. This avoids copying prior stages or maintaining
+physical cache-file lists.
+
+Cache stages declare `cache_repository` and `cache_stage`. spine-prod generates
+one publication identity per submission, registers its fence inside the
+scheduled job after dependencies clear, and shares it across every array task
+and scheduler chunk. It derives SPINE's completion barrier from the number of
+source files assigned to the stage.
 
 The generic pipelines define their train and validation inputs once under
 `collections.splits`. A stage-level `for_each` expands cache templates into
@@ -197,18 +206,17 @@ points. It then trains binary UResNet deghosting,
 then materializes calibrated charge, the original-row mapping and raw
 supervision exactly once. UResNet-PPN trains on that cached point domain, so
 the expensive deghosting, calibration and LArCV parsing paths are not repeated
-each epoch. The remaining Graph-SPICE and GrapPA transitions append only their
-new products to the source-specific staged caches.
+each epoch. The remaining Graph-SPICE and GrapPA transitions publish only their
+new products to the split repositories.
 
 The `260210` pipeline intentionally preserves the deployed model choices. It
 is the reviewable baseline from which a new dated ProtoDUNE-SP revision can
 adopt selected decisions from the generic `260828` study.
 
-Because ProtoDUNE-SP inputs are file lists, the first cache stages publish
-deterministic `cache_file_list.txt` manifests. Dependent cache stages can then
-be submitted as file-parallel arrays before those HDF5 files physically exist;
-the scheduler dependency guarantees that each predicted path is valid before
-its consumer starts.
+ProtoDUNE-SP cache arrays partition only the authoritative `primary` LArCV
+source. Every task receives the same scalar `cache` repository path, and the
+cache reader projects its immutable source shards onto that task's raw-source
+subset.
 
 ### Recovering the PPN cache transition
 

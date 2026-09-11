@@ -124,6 +124,11 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (larcv_path ~ '/configur
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
+{% if cache_repository %}
+# Fence this logical cache stage before any task publishes a shard. Every
+# array task repeats the same idempotent registration with one shared ID.
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id_shell }}; {{ cache_begin_cmd }} begin {{ cache_repository_shell }} {{ cache_stage_shell }} --publication-id \"\$SPINE_CACHE_PUBLICATION_ID\"; "
+{% endif %}
 {% if custom_command %}
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ custom_command }}"
 {% else %}

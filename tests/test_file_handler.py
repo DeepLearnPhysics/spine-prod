@@ -77,6 +77,43 @@ def test_allow_missing_preserves_unresolved_glob(handler, tmp_path):
     assert handler.parse_files([pattern], allow_missing=True) == [pattern]
 
 
+def test_named_sources_allow_one_shared_cache_repository(handler, tmp_path):
+    """A scalar cache accompanies a partitionable primary source collection."""
+    first = tmp_path / "first.root"
+    second = tmp_path / "second.root"
+    cache = tmp_path / "train.spine-cache"
+    first.touch()
+    second.touch()
+    cache.mkdir()
+
+    assert handler.parse_named_sources(
+        {
+            "primary": {"source": [str(first), str(second)]},
+            "cache": {"source": str(cache)},
+        }
+    ) == {
+        "primary": [str(first), str(second)],
+        "cache": [str(cache)],
+    }
+
+
+def test_named_sources_reject_invalid_cache_cardinality(handler, tmp_path):
+    """A cache role always denotes exactly one logical repository."""
+    caches = [tmp_path / "first.spine-cache", tmp_path / "second.spine-cache"]
+    for cache in caches:
+        cache.mkdir()
+    with pytest.raises(ValueError, match="requires one repository"):
+        handler.parse_named_sources({"cache": {"source": list(map(str, caches))}})
+
+
+def test_named_sources_reject_cache_without_partition_driver(handler, tmp_path):
+    """A cache-only inference array has no raw target to divide into tasks."""
+    cache = tmp_path / "train.spine-cache"
+    cache.mkdir()
+    with pytest.raises(ValueError, match="require another target"):
+        handler.parse_named_sources({"cache": {"source": str(cache)}})
+
+
 def test_stage_cache_output_paths_follow_writer_naming(handler, tmp_path):
     """Predicted cache paths use each source basename and configured suffix."""
     assert handler.stage_cache_output_paths(

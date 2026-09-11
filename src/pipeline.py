@@ -68,6 +68,8 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "output_suffix",
         "output_source_list",
         "in_place",
+        "cache_repository",
+        "cache_stage",
         "no_writer",
         "ntasks",
         "files_per_task",
@@ -681,6 +683,8 @@ class PipelineDefinition:
             "entry_filter",
             "val_entry_filter",
             "cache_dir",
+            "cache_repository",
+            "cache_stage",
         ):
             value = stage.get(field)
             if value is not None and (not isinstance(value, str) or not value):
@@ -697,6 +701,15 @@ class PipelineDefinition:
         in_place = stage.get("in_place")
         if in_place is not None and not isinstance(in_place, bool):
             raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
+
+        cache_fields = PipelineDefinition._present(
+            stage, "cache_repository", "cache_stage"
+        )
+        if cache_fields and len(cache_fields) != 2:
+            raise ValueError(
+                f"Pipeline stage '{name}' must define cache_repository and "
+                "cache_stage together"
+            )
 
     @staticmethod
     def _validate_module_weights(name: str, module_weights: Mapping[Any, Any]) -> None:
@@ -780,6 +793,19 @@ class PipelineDefinition:
                 raise ValueError(
                     f"Pipeline stage '{name}' in_place cannot be combined with "
                     "writer output options"
+                )
+
+        if stage.get("cache_repository"):
+            if lifecycle != "inference":
+                raise ValueError(
+                    f"Pipeline stage '{name}' cache publication requires "
+                    "stage=inference"
+                )
+            if not (
+                stage.get("source") or stage.get("source_list") or stage.get("sources")
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{name}' cache publication requires inputs"
                 )
 
         if stage.get("export_weights"):
@@ -1288,6 +1314,8 @@ class PipelineRunner(SubmissionComponent):
                 "output_suffix": stage.get("output_suffix"),
                 "output_source_list": stage.get("output_source_list"),
                 "in_place": stage.get("in_place", False),
+                "cache_repository": stage.get("cache_repository"),
+                "cache_stage": stage.get("cache_stage"),
                 "ntasks": stage.get("ntasks"),
                 "files_per_task": stage.get("files_per_task"),
                 "dependency": dependency,

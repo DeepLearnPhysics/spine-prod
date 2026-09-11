@@ -347,12 +347,11 @@ def test_generic_graph_spice_can_train_from_segmentation_cache():
 
     dataset = config["io"]["loader"]["dataset"]
     assert dataset["name"] == "mixed"
-    assert set(dataset["larcv"]["schema"]) == {"data"}
-    assert dataset["hdf5"]["staged"] is True
-    assert dataset["hdf5"]["stage"] == "segmentation"
-    assert dataset["hdf5"]["keys"] == ["seg_pred", "clust_label_adapt"]
-    assert "schema" not in dataset["hdf5"]
-    assert set(config["validation"]["sources"]) == {"larcv", "hdf5"}
+    assert set(dataset["primary"]["schema"]) == {"data"}
+    assert dataset["cache"]["stage"] == "segmentation"
+    assert dataset["cache"]["keys"] == ["seg_pred", "clust_label_adapt"]
+    assert "schema" not in dataset["cache"]
+    assert set(config["validation"]["sources"]) == {"primary", "cache"}
     assert config["model"]["network_input"]["seg_label"] == "seg_pred"
     assert config["model"]["loss_input"]["seg_label"] == "seg_pred"
     assert config["model"]["loss_input"]["clust_label"] == "clust_label_adapt"
@@ -371,7 +370,7 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
 
     loader = config["io"]["loader"]
     assert loader["num_workers"] == 16
-    assert loader["dataset"]["hdf5"]["keep_open"] is True
+    assert loader["dataset"]["cache"]["keep_open"] is True
     assert config["io"]["writer"]["keep_open"] is True
     assert config["io"]["writer"]["overwrite_stage"] is True
     assert "ppn_points" not in config["io"]["writer"]["keys"]
@@ -464,8 +463,7 @@ def test_generic_particle_grappas_train_only_from_cached_graphs(
     )
 
     dataset = config["io"]["loader"]["dataset"]
-    assert dataset["name"] == "hdf5"
-    assert dataset["staged"] is True
+    assert dataset["name"] == "cache"
     assert dataset["stage"] == "fragmentation"
     assert config["model"]["network_input"] == {
         "edge_index": f"{prefix}_edge_index",
@@ -503,8 +501,8 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     loader = cache["io"]["loader"]
     assert loader["num_workers"] == 16
     assert loader["dataset"]["name"] == "mixed"
-    assert loader["dataset"]["hdf5"]["keep_open"] is True
-    assert loader["dataset"]["hdf5"]["stage_map"] == {
+    assert loader["dataset"]["cache"]["keep_open"] is True
+    assert loader["dataset"]["cache"]["stage_map"] == {
         "ppn_points": "segmentation",
         "clust_label_adapt": "segmentation",
     }
@@ -641,15 +639,13 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
             assert stage["ntasks"] == 2
     assert stages["evaluate_full_chain"]["ntasks"] == 4
 
-    # Every materialization stage extends one source-derived cache per split.
-    train_cache = "/path/to/workflow/cache/train/train_cache.h5"
-    validation_cache = "/path/to/workflow/cache/validation/test_cache.h5"
+    # Every materialization stage extends one logical repository per split.
+    train_cache = "/path/to/workflow/cache/train.spine-cache"
+    validation_cache = "/path/to/workflow/cache/validation.spine-cache"
     for name in ("cache_train_segmentation",):
-        assert stages[name]["output"] == "/path/to/workflow/cache/train"
-        assert stages[name]["output_suffix"] == "cache"
+        assert stages[name]["output"] == train_cache
     for name in ("cache_validation_segmentation",):
-        assert stages[name]["output"] == "/path/to/workflow/cache/validation"
-        assert stages[name]["output_suffix"] == "cache"
+        assert stages[name]["output"] == validation_cache
     for name in (
         "cache_train_fragment_graphs",
         "cache_validation_fragment_graphs",
@@ -659,11 +655,11 @@ def test_generic_full_chain_training_pipeline_has_expected_fan_out_and_join():
         assert stages[name]["in_place"] is True
         assert "output" not in stages[name]
         assert "output_suffix" not in stages[name]
-    assert stages["cache_train_particle_graphs"]["sources"]["hdf5"]["source"] == (
+    assert stages["cache_train_particle_graphs"]["sources"]["cache"]["source"] == (
         train_cache
     )
     assert (
-        stages["cache_validation_particle_graphs"]["sources"]["hdf5"]["source"]
+        stages["cache_validation_particle_graphs"]["sources"]["cache"]["source"]
         == validation_cache
     )
     assert stages["train_grappa_inter"]["source"] == train_cache
@@ -1361,8 +1357,8 @@ def test_protodune_sp_cache_stages_own_only_new_products():
     assert "data_calib" not in fragmentation["io"]["writer"]["keys"]
     fragmentation_dataset = fragmentation["io"]["loader"]["dataset"]
     assert fragmentation_dataset["name"] == "mixed"
-    assert fragmentation_dataset["hdf5"]["stage_map"] == {"data_calib": "deghosting"}
-    assert "coord_label" in fragmentation_dataset["larcv"]["schema"]
+    assert fragmentation_dataset["cache"]["stage_map"] == {"data_calib": "deghosting"}
+    assert "coord_label" in fragmentation_dataset["primary"]["schema"]
     particle_keys = particles["io"]["writer"]["keys"]
     assert "interaction_aggregation_node_orient_target" in particle_keys
     assert "interaction_aggregation_node_orient_valid" in particle_keys
@@ -1382,15 +1378,15 @@ def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
         segmentation_cache = load_config_with_includes(
             root / f"uresnet_ppn/segmentation_{version}.yaml"
         )
-        clust_parser = segmentation_cache["io"]["loader"]["dataset"]["larcv"]["schema"][
-            "clust_label"
-        ]
+        clust_parser = segmentation_cache["io"]["loader"]["dataset"]["primary"][
+            "schema"
+        ]["clust_label"]
         assert clust_parser["particle_info"] == expected_particle_info
 
     ppn_train = load_config_with_includes(
         CONFIG_ROOT / "train/protodune-sp/uresnet_ppn/from_deghost_cache_v1.yaml"
     )
-    ppn_schema = ppn_train["io"]["loader"]["dataset"]["larcv"]["schema"]
+    ppn_schema = ppn_train["io"]["loader"]["dataset"]["primary"]["schema"]
     assert ppn_schema["clust_label"]["particle_info"] == expected_particle_info
 
     particles = load_config_with_includes(
@@ -1556,9 +1552,11 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
             for stage in pipeline.stages
             if stage["name"] == f"cache_{split}_deghosting"
         )
-        assert deghost["output_source_list"] == (
-            f"/tmp/protodune-sp-260210/cache/{split}/cache_file_list.txt"
+        assert deghost["output"] == (
+            f"/tmp/protodune-sp-260210/cache/{split}.spine-cache"
         )
+        assert deghost["cache_repository"] == deghost["output"]
+        assert deghost["cache_stage"] == "deghosting"
         assert deghost["entry_filter"] == build["output"]
 
     train_deghost = next(
@@ -1606,10 +1604,10 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
     }
     for name in mixed_stages:
         stage = next(stage for stage in pipeline.stages if stage["name"] == name)
-        assert set(stage["sources"]) == {"larcv", "hdf5"}
+        assert set(stage["sources"]) == {"primary", "cache"}
         assert stage["entry_filter"].endswith("/filter/train/accepted.yaml")
         if name.startswith("train_"):
-            assert set(stage["validation_sources"]) == {"larcv", "hdf5"}
+            assert set(stage["validation_sources"]) == {"primary", "cache"}
             assert stage["val_entry_filter"].endswith(
                 "/filter/validation/accepted.yaml"
             )
@@ -1617,10 +1615,8 @@ def test_protodune_sp_pipeline_starts_with_deghosting_and_finishes_with_report()
     graph_spice = next(
         stage for stage in pipeline.stages if stage["name"] == "train_graph_spice"
     )
-    assert graph_spice["source_list"].endswith("/cache/train/cache_file_list.txt")
-    assert graph_spice["val_source_list"].endswith(
-        "/cache/validation/cache_file_list.txt"
-    )
+    assert graph_spice["source"].endswith("/cache/train.spine-cache")
+    assert graph_spice["val_source"].endswith("/cache/validation.spine-cache")
     assert "entry_filter" not in graph_spice
     assert "val_entry_filter" not in graph_spice
     evaluation = next(

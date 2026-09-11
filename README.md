@@ -713,12 +713,12 @@ checkpoints through SPINE's native CLI. A model-only `export_weights` stage
 composes those checkpoints into one inference artifact without initializing
 data I/O. An inference stage with `in_place: true` passes no `--output`,
 `--output-dir`, or `--output-suffix` override, leaving writer routing entirely
-to SPINE. This is the intended mode for extending a staged HDF5 cache through
-SPINE's transactional sidecar mechanism; it cannot be combined with explicit
+to SPINE. This is the intended mode for extending a sharded cache repository;
+it cannot be combined with explicit
 writer output fields. See
 `pipelines/generic/full_chain_240805.yaml` for a complete staged-training
-prototype with centralized paths. Its materialization jobs append successive
-stage groups to one source-derived HDF5 cache per training or validation file,
+prototype with centralized paths. Its materialization jobs publish successive
+immutable stages to one logical cache repository per data split,
 then compose the independently trained modules into one full-chain checkpoint.
 The generic full-chain pipelines finally evaluate that assembled checkpoint
 with SPINE's metric analyzers and submit a CPU-only `kind: report` reduction.

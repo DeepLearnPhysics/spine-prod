@@ -21,7 +21,8 @@ io:
       seed: 0
     dataset:
       name: mixed
-      larcv:
+      primary:
+        name: larcv
         file_keys: null
         schema:
           seg_label:
@@ -43,9 +44,8 @@ io:
               type_include_secondary: false
               type_include_mpr: false
               primary_include_mpr: false
-      hdf5:
-        file_keys: null
-        staged: true
+      cache:
+        path: null
         stage: deghosting
         keep_open: true
         keys: [data_calib, orig_index]

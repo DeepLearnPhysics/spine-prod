@@ -3,6 +3,7 @@
 import math
 import shlex
 import sys
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
@@ -135,6 +136,8 @@ class BatchRunner(SubmissionComponent):
         output_suffix: Optional[str] = None,
         output_source_list: Optional[str] = None,
         in_place: bool = False,
+        cache_repository: Optional[str] = None,
+        cache_stage: Optional[str] = None,
         no_writer: bool = False,
         ntasks: Optional[int] = None,
         files_per_task: Optional[int] = None,
@@ -211,6 +214,9 @@ class BatchRunner(SubmissionComponent):
             Leave the writer destination entirely config-defined. This suppresses
             all automatic ``--output*`` arguments so SPINE can extend staged
             caches through its transactional sidecar mechanism.
+        cache_repository, cache_stage : str, optional
+            Logical cache destination and stage. Together these enable fenced
+            parallel publication across scheduler-array tasks.
         no_writer : bool, optional
             Deprecated and ignored. SPINE v0.15.3+ safely ignores output options
             when the configuration has no writer.
@@ -300,6 +306,12 @@ class BatchRunner(SubmissionComponent):
             raise ValueError(
                 "--in-place cannot be combined with --output or --output-suffix"
             )
+        if bool(cache_repository) != bool(cache_stage):
+            raise ValueError(
+                "cache_repository and cache_stage must be provided together"
+            )
+        if cache_repository and stage != "inference":
+            raise ValueError("Cache publication is valid only for inference jobs")
         if output_source_list and (
             in_place
             or not files
@@ -466,6 +478,12 @@ class BatchRunner(SubmissionComponent):
         spine_cmd, extra_bind_root = self.context.runtime.resolve_spine_command(
             spine_path
         )
+        cache_cmd = None
+        cache_bind_root = None
+        if cache_repository:
+            cache_cmd, cache_bind_root = (
+                self.context.runtime.resolve_spine_cache_command(spine_path)
+            )
         _, larcv_bind_root = self.context.runtime.resolve_setup_path(
             larcv_path, "--larcv-path"
         )
@@ -505,7 +523,12 @@ class BatchRunner(SubmissionComponent):
         )
         extra_bind_roots = [
             root
-            for root in [larcv_bind_root, flashmatch_bind_root, extra_bind_root]
+            for root in [
+                larcv_bind_root,
+                flashmatch_bind_root,
+                extra_bind_root,
+                cache_bind_root,
+            ]
             if root
         ]
         if extra_bind_roots:
@@ -612,23 +635,43 @@ class BatchRunner(SubmissionComponent):
                 )
 
         if stage != "inference" and file_list:
-            input_manifest = attempt_dir / "inputs.txt"
-            with open(input_manifest, "w", encoding="utf-8") as stream:
-                for file_path in file_list:
-                    stream.write(f"{file_path}\n")
-            lifecycle_args.extend(["--source-list", shlex.quote(str(input_manifest))])
+            cache_input = (
+                source_type == "source"
+                and len(file_list) == 1
+                and Path(file_list[0]).suffix == ".spine-cache"
+            )
+            if cache_input:
+                lifecycle_args.extend(["--source", shlex.quote(file_list[0])])
+            else:
+                input_manifest = attempt_dir / "inputs.txt"
+                with open(input_manifest, "w", encoding="utf-8") as stream:
+                    for file_path in file_list:
+                        stream.write(f"{file_path}\n")
+                lifecycle_args.extend(
+                    ["--source-list", shlex.quote(str(input_manifest))]
+                )
 
         if validation_file_list:
-            validation_input_manifest = attempt_dir / "validation_inputs.txt"
-            with open(validation_input_manifest, "w", encoding="utf-8") as stream:
-                for file_path in validation_file_list:
-                    stream.write(f"{file_path}\n")
-            lifecycle_args.extend(
-                [
-                    "--val-source-list",
-                    shlex.quote(str(validation_input_manifest)),
-                ]
+            cache_validation_input = (
+                validation_source_type == "source"
+                and len(validation_file_list) == 1
+                and Path(validation_file_list[0]).suffix == ".spine-cache"
             )
+            if cache_validation_input:
+                lifecycle_args.extend(
+                    ["--val-source", shlex.quote(validation_file_list[0])]
+                )
+            else:
+                validation_input_manifest = attempt_dir / "validation_inputs.txt"
+                with open(validation_input_manifest, "w", encoding="utf-8") as stream:
+                    for file_path in validation_file_list:
+                        stream.write(f"{file_path}\n")
+                lifecycle_args.extend(
+                    [
+                        "--val-source-list",
+                        shlex.quote(str(validation_input_manifest)),
+                    ]
+                )
 
         extra_args = " ".join(lifecycle_args)
         spine_cli_overrides = " ".join(
@@ -698,7 +741,12 @@ class BatchRunner(SubmissionComponent):
                 named_sources,
                 allow_missing=allow_missing_inputs,
             )
-            source_count = len(next(iter(resolved_named_sources.values())))
+            partitioned_sources = {
+                target: paths
+                for target, paths in resolved_named_sources.items()
+                if target != "cache"
+            }
+            source_count = len(next(iter(partitioned_sources.values())))
             inference_source_count = source_count
             max_array_size = self.profiles["defaults"]["max_array_size"]
             effective_files_per_task = self.resolve_files_per_task(
@@ -712,6 +760,20 @@ class BatchRunner(SubmissionComponent):
 
         task_count = sum(len(chunk) for chunk in file_chunks)
         has_array = stage == "inference" and task_count > 1
+        publication_id = None
+        if cache_repository:
+            if inference_source_count < 1:
+                raise ValueError("Parallel cache publication requires input sources")
+            publication_id = uuid.uuid4().hex
+            cache_overrides = " ".join(
+                [
+                    "--set io.writer.parallel=true",
+                    f"--set io.writer.expected_sources={inference_source_count}",
+                ]
+            )
+            spine_cli_overrides = " ".join(
+                part for part in (spine_cli_overrides, cache_overrides) if part
+            )
         RunManager.expose_attempt_logs(job_dir, has_array)
         print(f"Splitting into {len(file_chunks)} scheduler job(s)")
 
@@ -776,21 +838,29 @@ class BatchRunner(SubmissionComponent):
             elif stage == "inference" and resolved_named_sources:
                 # Each task receives aligned manifests for every mixed-dataset
                 # target. The first manifest also drives template diagnostics.
-                target_names = list(resolved_named_sources)
+                target_names = list(partitioned_sources)
                 task_dir_pattern = str(attempt_dir / "tasks" / f"{chunk_idx:03d}_*")
                 file_list_pattern = f"{task_dir_pattern}/{target_names[0]}.txt"
                 for task_idx, index_group in enumerate(chunk, start=1):
                     task_dir = attempt_dir / "tasks" / f"{chunk_idx:03d}_{task_idx}"
                     task_dir.mkdir(parents=True, exist_ok=True)
-                    for target, source_files in resolved_named_sources.items():
+                    for target, source_files in partitioned_sources.items():
                         manifest = task_dir / f"{target}.txt"
                         with manifest.open("w", encoding="utf-8") as stream:
                             for index in index_group:
                                 stream.write(f"{source_files[index]}\n")
-                named_source_args = " ".join(
+                task_list_args = " ".join(
                     f"{target}=$TASK_DIR/{target}.txt" for target in target_names
                 )
-                named_source_args = f"--source-list {named_source_args}"
+                named_source_args = f"--source-list {task_list_args}"
+                if "cache" in resolved_named_sources:
+                    cache_path = resolved_named_sources["cache"][0]
+                    named_source_args = " ".join(
+                        [
+                            f"--source {shlex.quote(f'cache={cache_path}')}",
+                            named_source_args,
+                        ]
+                    )
                 # Replace the global full-list overrides with task-local lists.
                 chunk_spine_overrides = spine_cli_overrides.replace(
                     named_source_overrides, named_source_args, 1
@@ -850,6 +920,17 @@ class BatchRunner(SubmissionComponent):
                 flashmatch=flashmatch,
                 cvmfs=cvmfs,
                 spine_cmd=spine_cmd or "spine",
+                cache_begin_cmd=cache_cmd or "spine-cache",
+                cache_repository=cache_repository,
+                cache_stage=cache_stage,
+                cache_publication_id=publication_id,
+                cache_repository_shell=(
+                    shlex.quote(cache_repository) if cache_repository else None
+                ),
+                cache_stage_shell=shlex.quote(cache_stage) if cache_stage else None,
+                cache_publication_id_shell=(
+                    shlex.quote(publication_id) if publication_id else None
+                ),
                 spine_cli_overrides=chunk_spine_overrides,
                 graceful_stop_file=(
                     str(graceful_stop_file) if graceful_stop_file else None
@@ -936,16 +1017,15 @@ class BatchRunner(SubmissionComponent):
             "cvmfs": cvmfs,
             "no_writer": no_writer,
             "in_place": in_place,
+            "cache_repository": cache_repository,
+            "cache_stage": cache_stage,
+            "cache_publication_id": publication_id,
             "profile": profile,
             "profile_config": profile_config,
             "num_files": (
-                len(file_list)
-                if file_list
-                else (
-                    len(next(iter(resolved_named_sources.values())))
-                    if resolved_named_sources
-                    else None
-                )
+                inference_source_count
+                if stage == "inference" and (file_list or resolved_named_sources)
+                else len(file_list) if file_list else None
             ),
             "num_chunks": len(file_chunks),
             "files_per_task": files_per_task,

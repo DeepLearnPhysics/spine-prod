@@ -80,9 +80,9 @@ class FileHandler:
     ) -> Dict[str, List[str]]:
         """Resolve every target in a composite dataset source mapping.
 
-        All targets must resolve to the same number of files. This lets an
-        inference array preserve the one-to-one correspondence between, for
-        example, a LArCV file and its stage-cache sidecar.
+        Ordinary targets must resolve to the same number of files. The
+        canonical ``cache`` role is one shared repository and may resolve to
+        one path while the ``primary`` source is partitioned across tasks.
         """
         resolved = {}
         expected_count = None
@@ -104,7 +104,12 @@ class FileHandler:
             )
             if not files:
                 raise ValueError(f"Named source '{target}' contains no input files")
-            if expected_count is None:
+            if target == "cache":
+                if len(files) != 1:
+                    raise ValueError(
+                        "Named source 'cache' requires one repository path"
+                    )
+            elif expected_count is None:
                 expected_count = len(files)
             elif len(files) != expected_count:
                 raise ValueError(
@@ -112,6 +117,11 @@ class FileHandler:
                     f"'{target}' has {len(files)}, expected {expected_count}"
                 )
             resolved[target] = files
+
+        if expected_count is None:
+            raise ValueError(
+                "Named cache sources require another target to drive task splitting"
+            )
 
         return resolved
 

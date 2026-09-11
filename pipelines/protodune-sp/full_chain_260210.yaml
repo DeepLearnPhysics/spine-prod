@@ -1,6 +1,6 @@
 # Staged training of every learned component used by the ProtoDUNE-SP 260210
 # full chain. Supply its destination with CLI --workspace.
-# Each source file owns one cache file; later stages append named groups.
+# Each split owns one sharded cache repository; stages publish immutable shards.
 
 workspace: null
 
@@ -15,14 +15,14 @@ collections:
       source_list: ${train_source_list}
       cache_tasks: 4
       cache_dir: ${workspace}/cache/train
-      cache_source_list: ${workspace}/cache/train/cache_file_list.txt
+      cache_repository: ${workspace}/cache/train.spine-cache
       entry_filter: ${workspace}/filter/train/accepted.yaml
       filtered_source_list: ${workspace}/filter/train/accepted_files.txt
     - name: validation
       source_list: ${validation_source_list}
       cache_tasks: 1
       cache_dir: ${workspace}/cache/validation
-      cache_source_list: ${workspace}/cache/validation/cache_file_list.txt
+      cache_repository: ${workspace}/cache/validation.spine-cache
       entry_filter: ${workspace}/filter/validation/accepted.yaml
       filtered_source_list: ${workspace}/filter/validation/accepted_files.txt
 
@@ -87,9 +87,9 @@ stages:
     source_list: ${split.source_list}
     entry_filter: ${split.entry_filter}
     run_dir: ${split.cache_dir}/deghosting
-    output: ${split.cache_dir}
-    output_suffix: cache
-    output_source_list: ${split.cache_source_list}
+    output: ${split.cache_repository}
+    cache_repository: ${split.cache_repository}
+    cache_stage: deghosting
     # Group each split into a small number of long-lived cache processes.
     ntasks: ${split.cache_tasks}
     module_weight:
@@ -105,15 +105,15 @@ stages:
     run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
     sources:
-      larcv:
+      primary:
         source_list: ${train_source_list}
-      hdf5:
-        source_list: ${workspace}/cache/train/cache_file_list.txt
+      cache:
+        source: ${workspace}/cache/train.spine-cache
     validation_sources:
-      larcv:
+      primary:
         source_list: ${validation_source_list}
-      hdf5:
-        source_list: ${workspace}/cache/validation/cache_file_list.txt
+      cache:
+        source: ${workspace}/cache/validation.spine-cache
     entry_filter: ${workspace}/filter/train/accepted.yaml
     val_entry_filter: ${workspace}/filter/validation/accepted.yaml
     val_entry_fraction_range: [0.0, 0.5]
@@ -127,11 +127,13 @@ stages:
     config: cache/protodune-sp/uresnet_ppn/segmentation_260210.yaml
     run_dir: ${split.cache_dir}/segmentation
     in_place: true
+    cache_repository: ${split.cache_repository}
+    cache_stage: segmentation
     sources:
-      larcv:
+      primary:
         source_list: ${split.source_list}
-      hdf5:
-        source_list: ${split.cache_source_list}
+      cache:
+        source: ${split.cache_repository}
     entry_filter: ${split.entry_filter}
     ntasks: ${split.cache_tasks}
     module_weight:
@@ -144,8 +146,8 @@ stages:
     stage: train
     profile: s3df_ampere_full
     time: "2-00:00:00"
-    source_list: ${workspace}/cache/train/cache_file_list.txt
-    val_source_list: ${workspace}/cache/validation/cache_file_list.txt
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/graph_spice
     tensorboard: true
@@ -159,11 +161,13 @@ stages:
     config: cache/protodune-sp/graph_spice/fragment_graphs_260210.yaml
     run_dir: ${split.cache_dir}/fragmentation
     in_place: true
+    cache_repository: ${split.cache_repository}
+    cache_stage: fragmentation
     sources:
-      larcv:
+      primary:
         source_list: ${split.source_list}
-      hdf5:
-        source_list: ${split.cache_source_list}
+      cache:
+        source: ${split.cache_repository}
     entry_filter: ${split.entry_filter}
     ntasks: ${split.cache_tasks}
     module_weight:
@@ -176,8 +180,8 @@ stages:
     stage: train
     profile: s3df_ampere_full
     time: "1-00:00:00"
-    source_list: ${workspace}/cache/train/cache_file_list.txt
-    val_source_list: ${workspace}/cache/validation/cache_file_list.txt
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/grappa_shower
     tensorboard: true
@@ -188,8 +192,8 @@ stages:
     config: train/protodune-sp/grappa_track/train_from_fragment_cache_260210.yaml
     stage: train
     time: "12:00:00"
-    source_list: ${workspace}/cache/train/cache_file_list.txt
-    val_source_list: ${workspace}/cache/validation/cache_file_list.txt
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/grappa_track
     tensorboard: true
@@ -203,11 +207,13 @@ stages:
     config: cache/protodune-sp/grappa_shower_track/particle_graphs_260210.yaml
     run_dir: ${split.cache_dir}/particle_aggregation
     in_place: true
+    cache_repository: ${split.cache_repository}
+    cache_stage: particle_aggregation
     sources:
-      larcv:
+      primary:
         source_list: ${split.source_list}
-      hdf5:
-        source_list: ${split.cache_source_list}
+      cache:
+        source: ${split.cache_repository}
     entry_filter: ${split.entry_filter}
     ntasks: ${split.cache_tasks}
     module_weight:
@@ -219,8 +225,8 @@ stages:
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
     config: train/protodune-sp/grappa_inter/train_from_particle_cache_260210.yaml
     stage: train
-    source_list: ${workspace}/cache/train/cache_file_list.txt
-    val_source_list: ${workspace}/cache/validation/cache_file_list.txt
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/grappa_inter
     tensorboard: true

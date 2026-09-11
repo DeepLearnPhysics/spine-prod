@@ -6,9 +6,8 @@ include: train/protodune-sp/grappa_inter/base_v1.yaml
 
 override:
   io.loader.dataset:
-    name: hdf5
-    file_keys: null
-    staged: true
+    name: cache
+    path: null
     stage: particle_aggregation
     keys:
       - particle_edge_index

@@ -18,7 +18,8 @@ io:
     collate_fn: all
     dataset:
       name: mixed
-      larcv:
+      primary:
+        name: larcv
         file_keys: null
         schema:
           data:
@@ -28,9 +29,8 @@ io:
             parser: particle_coords
             particle_event: particle_corrected
             cluster_event: cluster3d_pcluster
-      hdf5:
-        file_keys: null
-        staged: true
+      cache:
+        path: null
         stage: fragmentation
         stage_map:
           ppn_points: segmentation
@@ -42,8 +42,7 @@ io:
           - fragment_clusts
           - fragment_shapes
   writer:
-    name: stage_hdf5
-    file_name: null
+    name: cache
     stage: particle_aggregation
     keep_open: true
     overwrite_stage: true

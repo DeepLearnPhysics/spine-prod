@@ -6,9 +6,8 @@ include: train/protodune-sp/graph_spice/base_v1.yaml
 
 override:
   io.loader.dataset:
-    name: hdf5
-    file_keys: null
-    staged: true
+    name: cache
+    path: null
     stage: segmentation
     stage_map:
       data_calib: deghosting

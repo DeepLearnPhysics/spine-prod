@@ -6,9 +6,8 @@ include: train/generic/grappa_track/base_v1.yaml
 
 override:
   io.loader.dataset:
-    name: hdf5
-    file_keys: null
-    staged: true
+    name: cache
+    path: null
     stage: fragmentation
     keys:
       - track_fragment_edge_index

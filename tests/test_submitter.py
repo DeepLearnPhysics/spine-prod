@@ -17,7 +17,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 import yaml
@@ -808,6 +808,40 @@ class TestSubmitterHelpers:
             )
         with patch("src.runtime.shutil.which", return_value=None):
             assert mock_submitter.runtime.resolve_spine_filter_command() == (None, None)
+
+    def test_resolve_spine_cache_command_uses_checkout_module(
+        self, mock_submitter, tmp_path
+    ):
+        """Cache maintenance must follow the selected SPINE checkout."""
+        checkout = tmp_path / "checkout"
+        cache_module = checkout / "src" / "spine" / "bin" / "cache.py"
+        cache_module.parent.mkdir(parents=True)
+        cache_module.touch()
+
+        command, bind_root = mock_submitter.runtime.resolve_spine_cache_command(
+            str(checkout)
+        )
+        assert command.startswith(f"env PYTHONPATH={checkout / 'src'}:")
+        assert command.endswith("python3 -m spine.bin.cache")
+        assert bind_root == str(checkout)
+
+        for configured in (checkout / "bin" / "spine", checkout / "custom"):
+            command, bind_root = mock_submitter.runtime.resolve_spine_cache_command(
+                str(configured)
+            )
+            assert command.endswith("python3 -m spine.bin.cache")
+            assert bind_root == str(checkout)
+
+        with pytest.raises(RuntimeError, match="does not provide spine.bin.cache"):
+            mock_submitter.runtime.resolve_spine_cache_command(str(tmp_path / "bad"))
+
+        with patch("src.runtime.shutil.which", return_value="/usr/bin/spine-cache"):
+            assert mock_submitter.runtime.resolve_spine_cache_command() == (
+                "/usr/bin/spine-cache",
+                None,
+            )
+        with patch("src.runtime.shutil.which", return_value=None):
+            assert mock_submitter.runtime.resolve_spine_cache_command() == (None, None)
 
     def test_submit_filter_scan_builds_persistent_scheduler_job(
         self, mock_submitter, tmp_path
@@ -2268,16 +2302,17 @@ class TestBatchSpineOverride:
     ):
         """Mixed inference arrays create one aligned manifest per target."""
         run_dir = tmp_path / "run"
-        source_lists = {}
-        expected = {}
-        for target, suffix in (("larcv", ".root"), ("hdf5", ".h5")):
-            paths = [tmp_path / f"input_{index}{suffix}" for index in range(2)]
-            for path in paths:
-                path.touch()
-            manifest = tmp_path / f"{target}.txt"
-            manifest.write_text("\n".join(map(str, paths)), encoding="utf-8")
-            source_lists[target] = {"source_list": str(manifest)}
-            expected[target] = paths
+        paths = [tmp_path / f"input_{index}.root" for index in range(2)]
+        for path in paths:
+            path.touch()
+        manifest = tmp_path / "primary.txt"
+        manifest.write_text("\n".join(map(str, paths)), encoding="utf-8")
+        cache = tmp_path / "cache.spine-cache"
+        cache.mkdir()
+        source_lists = {
+            "primary": {"source_list": str(manifest)},
+            "cache": {"source": str(cache)},
+        }
 
         with (
             patch.object(
@@ -2300,14 +2335,14 @@ class TestBatchSpineOverride:
         script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
         assert "#SBATCH --array=1-2" in script
         assert " -S $TASK_FILE_LIST" not in script
-        assert "--source-list larcv=$TASK_DIR/larcv.txt" in script
-        assert "hdf5=$TASK_DIR/hdf5.txt" in script
+        assert f"--source cache={cache}" in script
+        assert "--source-list primary=$TASK_DIR/primary.txt" in script
         for index in (1, 2):
             task_dir = attempt / "tasks" / f"000_{index}"
-            for target in expected:
-                assert (task_dir / f"{target}.txt").read_text().strip() == str(
-                    expected[target][index - 1]
-                )
+            assert (task_dir / "primary.txt").read_text().strip() == str(
+                paths[index - 1]
+            )
+            assert not (task_dir / "cache.txt").exists()
 
         metadata = json.loads((attempt / "job_metadata.json").read_text())
         assert metadata["num_files"] == 2
@@ -2347,6 +2382,110 @@ class TestBatchSpineOverride:
             next(mock_submitter.jobs_dir.glob("**/job_metadata.json")).read_text()
         )
         assert metadata["output_source_list"] == str(source_list)
+
+    def test_submit_job_fences_parallel_cache_publication(
+        self, mock_submitter, tmp_path
+    ):
+        """One publication ID and source-count barrier span an entire array."""
+        sources = [tmp_path / "first.root", tmp_path / "second.root"]
+        for source in sources:
+            source.touch()
+        repository = tmp_path / "cache" / "train.spine-cache"
+        run_dir = tmp_path / "cache" / "segmentation"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="cache"),
+            patch("src.batch.uuid.uuid4", return_value=Mock(hex="attempt-id")),
+        ):
+            assert mock_submitter.submit_job(
+                config="cache/generic/uresnet_ppn/segmentation_240805.yaml",
+                files=[str(path) for path in sources],
+                output=str(repository),
+                run_dir=str(run_dir),
+                files_per_task=1,
+                cache_repository=str(repository),
+                cache_stage="segmentation",
+            ) == ["cache"]
+
+        script = (run_dir / "latest" / "submit.sbatch").read_text()
+        assert "export SPINE_CACHE_PUBLICATION_ID=attempt-id" in script
+        assert (
+            f"spine-cache begin {repository} segmentation "
+            '--publication-id \\"\\$SPINE_CACHE_PUBLICATION_ID\\"'
+        ) in script
+        assert "--set io.writer.parallel=true" in script
+        assert "--set io.writer.expected_sources=2" in script
+        metadata = json.loads((run_dir / "latest" / "job_metadata.json").read_text())
+        assert metadata["cache_repository"] == str(repository)
+        assert metadata["cache_stage"] == "segmentation"
+        assert metadata["cache_publication_id"] == "attempt-id"
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"cache_repository": "/tmp/cache.spine-cache"},
+            {"cache_stage": "segmentation"},
+            {
+                "cache_repository": "/tmp/cache.spine-cache",
+                "cache_stage": "segmentation",
+                "stage": "train",
+                "run_dir": "/tmp/train",
+            },
+        ],
+    )
+    def test_submit_job_rejects_invalid_cache_publication(
+        self, mock_submitter, options
+    ):
+        """Fenced cache publication requires a complete inference contract."""
+        with pytest.raises(ValueError, match="cache|Cache"):
+            mock_submitter.submit_job(config="config.yaml", **options)
+
+    def test_submit_job_rejects_cache_publication_without_sources(
+        self, mock_submitter, tmp_path
+    ):
+        """A parallel cache barrier cannot be inferred without source files."""
+        with pytest.raises(ValueError, match="requires input sources"):
+            mock_submitter.submit_job(
+                config="cache/generic/uresnet_ppn/segmentation_240805.yaml",
+                run_dir=str(tmp_path / "cache"),
+                cache_repository=str(tmp_path / "train.spine-cache"),
+                cache_stage="segmentation",
+            )
+
+    def test_cache_training_uses_scalar_source_overrides(
+        self, mock_submitter, tmp_path
+    ):
+        """Logical cache repositories must not be converted to source lists."""
+        run_dir = tmp_path / "train"
+        train_cache = tmp_path / "train.spine-cache"
+        validation_cache = tmp_path / "validation.spine-cache"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            mock_submitter.submit_job(
+                config="train/generic/grappa_inter/train_from_particle_cache_260828.yaml",
+                files=[str(train_cache)],
+                validation_files=[str(validation_cache)],
+                stage="train",
+                run_dir=str(run_dir),
+                allow_missing_inputs=True,
+            )
+
+        script = (run_dir / "latest" / "submit.sbatch").read_text()
+        assert f"--source {train_cache}" in script
+        assert f"--val-source {validation_cache}" in script
+        assert "--source-list" not in script
+        assert "--val-source-list" not in script
 
     def test_submit_job_rejects_incomplete_output_source_list_contract(
         self, mock_submitter, tmp_path
@@ -3833,8 +3972,10 @@ class TestPipelineSubmission:
                         {
                             "name": "append",
                             "config": "cache.yaml",
-                            "source": "cache.h5",
+                            "source": "cache.spine-cache",
                             "in_place": True,
+                            "cache_repository": "cache.spine-cache",
+                            "cache_stage": "fragmentation",
                         }
                     ]
                 }
@@ -3846,6 +3987,8 @@ class TestPipelineSubmission:
 
         assert result == {"append": ["10"]}
         assert submit.call_args.kwargs["in_place"] is True
+        assert submit.call_args.kwargs["cache_repository"] == "cache.spine-cache"
+        assert submit.call_args.kwargs["cache_stage"] == "fragmentation"
 
     @pytest.mark.parametrize(
         ("stage_fields", "message"),
@@ -3855,6 +3998,24 @@ class TestPipelineSubmission:
             (
                 {"in_place": True, "stage": "train", "run_dir": "/tmp/train"},
                 "in_place requires stage=inference",
+            ),
+            ({"cache_repository": "cache.spine-cache"}, "must define"),
+            (
+                {
+                    "cache_repository": "cache.spine-cache",
+                    "cache_stage": "fragmentation",
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "source": "input.root",
+                },
+                "cache publication requires stage=inference",
+            ),
+            (
+                {
+                    "cache_repository": "cache.spine-cache",
+                    "cache_stage": "fragmentation",
+                },
+                "cache publication requires inputs",
             ),
         ],
     )

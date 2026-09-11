@@ -8,16 +8,16 @@ override:
   io.loader.minibatch_size: 16
   io.loader.dataset:
     name: mixed
-    larcv:
+    primary:
+      name: larcv
       file_keys: null
       schema:
         coord_label:
           parser: particle_coords
           particle_event: particle_corrected
           cluster_event: cluster3d_pcluster
-    hdf5:
-      file_keys: null
-      staged: true
+    cache:
+      path: null
       stage: segmentation
       keep_open: true
       stage_map:

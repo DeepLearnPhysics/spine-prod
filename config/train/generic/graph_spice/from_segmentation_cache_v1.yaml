@@ -10,20 +10,20 @@ remove:
 override:
   io.loader.dataset:
     name: mixed
-    larcv:
+    primary:
+      name: larcv
       file_keys: null
       schema:
         data:
           parser: sparse3d
           sparse_event: sparse3d_pcluster
-    hdf5:
-      file_keys: null
-      staged: true
+    cache:
+      path: null
       stage: segmentation
       keys: [seg_pred, clust_label_adapt]
 
   validation.sources:
-    larcv:
+    primary:
       file_keys: null
-    hdf5:
-      file_keys: null
+    cache:
+      path: null

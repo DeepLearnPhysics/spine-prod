@@ -40,8 +40,7 @@ io:
             type_include_mpr: false
             primary_include_mpr: false
   writer:
-    name: stage_hdf5
-    file_name: null
+    name: cache
     stage: segmentation
     overwrite_stage: true
     # PPN points are canonical GrapPA inputs for reconstructed fragments.

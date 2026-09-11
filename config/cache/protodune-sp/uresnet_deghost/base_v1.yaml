@@ -39,8 +39,7 @@ io:
           parser: meta
           sparse_event: sparse3d_pcluster
   writer:
-    name: stage_hdf5
-    file_name: null
+    name: cache
     stage: deghosting
     overwrite_stage: true
     # Persist only products which cannot be reconstructed from the LArCV file.
