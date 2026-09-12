@@ -47,6 +47,7 @@ io:
           parser: neutrino
           neutrino_event: neutrino_mc_truth
           cluster_event: cluster3d_pcluster
+          interaction_scheme: genie
         meta:
           parser: meta
           sparse_event: sparse3d_pcluster

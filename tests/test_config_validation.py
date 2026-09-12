@@ -1786,6 +1786,23 @@ def test_nd_lar_inference_models_are_thin_shared_model_wrappers():
     assert models["260310"]["modules"]["grappa_shower"]["graph"]["max_length"][-3] == 20
 
 
+def test_nd_lar_neutrino_parser_uses_genie_interaction_codes():
+    """ND-LAr truth products must interpret interaction codes as GENIE enums."""
+    io_config = load_config_with_includes(
+        CONFIG_ROOT / "infer/nd-lar/io/io_240819.yaml"
+    )
+    neutrino = io_config["io"]["loader"]["dataset"]["schema"]["neutrinos"]
+
+    assert neutrino["parser"] == "neutrino"
+    assert neutrino["interaction_scheme"] == "genie"
+
+    conversion = load_config_with_includes(
+        CONFIG_ROOT / "convert/nd-lar/truth_240819.yaml"
+    )
+    converted = conversion["io"]["loader"]["dataset"]["schema"]["neutrinos"]
+    assert converted["interaction_scheme"] == "genie"
+
+
 def test_nd_lar_cache_stages_append_only_transition_products():
     """ND-LAr caches do not duplicate tensors retained in raw LArCV."""
     root = CONFIG_ROOT / "cache/nd-lar"
