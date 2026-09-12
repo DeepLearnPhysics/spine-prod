@@ -1,0 +1,29 @@
+__meta__:
+  kind: bundle
+  version: "260906"
+  date: "2026-09-06"
+  description: Materialize ProtoDUNE-SP 260906 deghosting and calibration products
+
+include: cache/protodune-sp/uresnet_deghost/base_v1.yaml
+
+geo:
+  detector: protodune-sp
+  tag: protodunev7
+
+model:
+  modules:
+    uresnet_deghost: !include model/protodune-sp/uresnet_deghost/network_260210.yaml
+
+override:
+  model.modules.chain.stages:
+    - name: deghosting
+      provider: deghost
+      uses: uresnet_deghost
+      config:
+        mode: uresnet
+        charge_rescaling: collection
+    - name: calibration
+      provider: calibration
+      config:
+        mode: apply
+        calibration: !include model/protodune-sp/calibration/calibration_260906.yaml

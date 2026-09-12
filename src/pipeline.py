@@ -66,7 +66,10 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "job_name",
         "output",
         "output_suffix",
+        "output_source_list",
         "in_place",
+        "cache_repository",
+        "cache_stage",
         "no_writer",
         "ntasks",
         "files_per_task",
@@ -83,6 +86,12 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "tensorboard",
         "entry_fraction_range",
         "val_entry_fraction_range",
+        "entry_filter",
+        "val_entry_filter",
+        "operation",
+        "cache_dir",
+        "workers",
+        "force",
     }
 )
 
@@ -146,12 +155,14 @@ class PipelineDefinition:
         pipeline_path: str,
         overrides: Optional[Mapping[str, Any]] = None,
         workspace_override: Optional[str] = None,
+        stage_module_weights: Optional[Mapping[str, Mapping[str, str]]] = None,
     ) -> "PipelineDefinition":
         """Load and validate a pipeline without contacting a scheduler.
 
-        Configuration precedence is ``defaults < stage < CLI overrides``.
-        Every stage is validated before the definition is returned, preventing
-        a malformed later stage from leaving a partially submitted workflow.
+        Configuration precedence is ``defaults < stage < global CLI overrides
+        < stage-specific module weights``. Every stage is validated before the
+        definition is returned, preventing a malformed later stage from
+        leaving a partially submitted workflow.
         """
         with Path(pipeline_path).open("r", encoding="utf-8") as stream:
             document = yaml.safe_load(stream)
@@ -214,7 +225,88 @@ class PipelineDefinition:
             stages.append(stage)
             prior_names.add(stage["name"])
 
+        cls._apply_stage_module_weights(stages, stage_module_weights or {})
         return cls(tuple(stages), workspace)
+
+    @staticmethod
+    def parse_stage_module_weights(
+        values: Optional[Sequence[Sequence[str]]],
+    ) -> Dict[str, Dict[str, str]]:
+        """Parse repeated ``STAGE MODULE=PATH`` command-line assignments.
+
+        Parameters
+        ----------
+        values : sequence of two-string sequences, optional
+            Raw values collected by ``argparse`` for repeated
+            ``--stage-module-weight`` options.
+
+        Returns
+        -------
+        dict
+            Stage names mapped to destination modules and checkpoint paths.
+        """
+        result: Dict[str, Dict[str, str]] = {}
+        for value in values or ():
+            if isinstance(value, (str, bytes)) or len(value) != 2:
+                raise ValueError("--stage-module-weight requires STAGE and MODULE=PATH")
+            stage, assignment = value
+            if not isinstance(stage, str) or not STAGE_NAME_PATTERN.match(stage):
+                raise ValueError(
+                    "--stage-module-weight STAGE must be a valid pipeline stage name"
+                )
+            if not isinstance(assignment, str) or "=" not in assignment:
+                raise ValueError(
+                    "--stage-module-weight assignment must use MODULE=PATH"
+                )
+            module, path = assignment.split("=", 1)
+            if not module or not VARIABLE_NAME_PATTERN.match(module):
+                raise ValueError(
+                    "--stage-module-weight MODULE must be a valid identifier"
+                )
+            if not path:
+                raise ValueError("--stage-module-weight PATH must not be empty")
+            stage_weights = result.setdefault(stage, {})
+            if module in stage_weights:
+                raise ValueError(
+                    "Duplicate --stage-module-weight assignment for "
+                    f"{stage}:{module}"
+                )
+            stage_weights[module] = path
+        return result
+
+    @classmethod
+    def _apply_stage_module_weights(
+        cls,
+        stages: Sequence[Dict[str, Any]],
+        overrides: Mapping[str, Mapping[str, str]],
+    ) -> None:
+        """Merge validated launch-time weights into named SPINE stages."""
+        stage_map = {stage["name"]: stage for stage in stages}
+        unknown = set(overrides) - set(stage_map)
+        if unknown:
+            raise ValueError(
+                "Unknown pipeline stage module-weight override(s): "
+                + ", ".join(sorted(unknown))
+            )
+
+        # Validate every target before mutating any resolved stage.
+        for name, module_weights in overrides.items():
+            stage = stage_map[name]
+            if stage.get("kind", "spine") != "spine":
+                raise ValueError(
+                    f"Pipeline stage '{name}' cannot receive module weights"
+                )
+            if not isinstance(module_weights, Mapping):
+                raise TypeError(
+                    f"Pipeline stage '{name}' module-weight override must be a mapping"
+                )
+            cls._validate_module_weights(name, module_weights)
+
+        for name, module_weights in overrides.items():
+            stage = stage_map[name]
+            merged = dict(stage.get("module_weight") or {})
+            merged.update(module_weights)
+            stage["module_weight"] = merged
 
     @staticmethod
     def _resolve_workspace(
@@ -299,15 +391,15 @@ class PipelineDefinition:
     @classmethod
     def _resolve_collections(
         cls, raw_collections: Any, variables: Mapping[str, str]
-    ) -> Dict[str, Tuple[Mapping[str, str], ...]]:
+    ) -> Dict[str, Tuple[Mapping[str, Any], ...]]:
         """Validate reusable collections used by stage ``for_each`` blocks.
 
         Collections are deliberately small data tables: each is a non-empty
-        list of flat string mappings. Global pipeline variables are expanded
-        in their values before the entries become iteration-local variables.
+        list of flat scalar mappings. Global pipeline variables are expanded
+        in string values before entries become iteration-local variables.
         """
         collections = cls._require_mapping(raw_collections, "Pipeline collections")
-        resolved: Dict[str, Tuple[Mapping[str, str], ...]] = {}
+        resolved: Dict[str, Tuple[Mapping[str, Any], ...]] = {}
         for name, raw_items in collections.items():
             if not isinstance(name, str) or not VARIABLE_NAME_PATTERN.match(name):
                 raise ValueError(
@@ -329,8 +421,8 @@ class PipelineDefinition:
                         raise ValueError(
                             f"{context} keys must be valid identifiers: {key!r}"
                         )
-                    if not isinstance(value, str):
-                        raise TypeError(f"{context} value '{key}' must be a string")
+                    if not isinstance(value, (str, int, float, bool)):
+                        raise TypeError(f"{context} value '{key}' must be a scalar")
                 items.append(cls._expand_variables(item, variables, context))
             resolved[name] = tuple(items)
         return resolved
@@ -340,7 +432,7 @@ class PipelineDefinition:
         cls,
         raw_stages: Any,
         variables: Mapping[str, str],
-        collections: Mapping[str, Sequence[Mapping[str, str]]],
+        collections: Mapping[str, Sequence[Mapping[str, Any]]],
     ) -> List[Any]:
         """Expand ``for_each`` templates into ordinary concrete stages."""
         if not isinstance(raw_stages, list) or not raw_stages:
@@ -405,13 +497,28 @@ class PipelineDefinition:
         """Recursively expand pipeline variables in strings and containers."""
         if isinstance(value, str):
 
+            exact = VARIABLE_PATTERN.fullmatch(value)
+            if exact:
+                name = exact.group(1)
+                if name not in variables:
+                    raise ValueError(
+                        f"Undefined pipeline variable '{name}' in {context}"
+                    )
+                return variables[name]
+
             def replace(match):
                 name = match.group(1)
                 if name not in variables:
                     raise ValueError(
                         f"Undefined pipeline variable '{name}' in {context}"
                     )
-                return variables[name]
+                replacement = variables[name]
+                if not isinstance(replacement, str):
+                    raise TypeError(
+                        f"Non-string pipeline variable '{name}' cannot be embedded "
+                        f"in a larger string in {context}"
+                    )
+                return replacement
 
             return VARIABLE_PATTERN.sub(replace, value)
         if isinstance(value, Mapping):
@@ -554,6 +661,9 @@ class PipelineDefinition:
             value = stage.get(field)
             if value is not None and not isinstance(value, Mapping):
                 raise TypeError(f"Pipeline stage '{name}' {field} must be a mapping")
+        module_weights = stage.get("module_weight")
+        if module_weights is not None:
+            PipelineDefinition._validate_module_weights(name, module_weights)
         export_weights = stage.get("export_weights")
         if export_weights is not None:
             if not isinstance(export_weights, str):
@@ -570,6 +680,11 @@ class PipelineDefinition:
             "output_dir",
             "checkpoint",
             "dataset",
+            "entry_filter",
+            "val_entry_filter",
+            "cache_dir",
+            "cache_repository",
+            "cache_stage",
         ):
             value = stage.get(field)
             if value is not None and (not isinstance(value, str) or not value):
@@ -587,10 +702,37 @@ class PipelineDefinition:
         if in_place is not None and not isinstance(in_place, bool):
             raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
 
+        cache_fields = PipelineDefinition._present(
+            stage, "cache_repository", "cache_stage"
+        )
+        if cache_fields and len(cache_fields) != 2:
+            raise ValueError(
+                f"Pipeline stage '{name}' must define cache_repository and "
+                "cache_stage together"
+            )
+
+    @staticmethod
+    def _validate_module_weights(name: str, module_weights: Mapping[Any, Any]) -> None:
+        """Require scalar destination-module checkpoint assignments."""
+        for module, path in module_weights.items():
+            if not isinstance(module, str) or not VARIABLE_NAME_PATTERN.match(module):
+                raise ValueError(
+                    f"Pipeline stage '{name}' module_weight keys must be "
+                    "valid identifiers"
+                )
+            if not isinstance(path, str) or not path:
+                raise ValueError(
+                    f"Pipeline stage '{name}' module_weight path for "
+                    f"'{module}' must be a non-empty string"
+                )
+
     @classmethod
     def _validate_lifecycle(cls, name: str, stage: Mapping[str, Any]) -> None:
         """Validate train, validation, and inference-only controls."""
         kind = stage.get("kind", "spine")
+        if kind == "filter":
+            cls._validate_filter(name, stage)
+            return
         if kind == "report":
             cls._validate_report(name, stage)
             return
@@ -629,6 +771,10 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' validation entry range requires stage=train"
             )
+        if lifecycle != "train" and stage.get("val_entry_filter") is not None:
+            raise ValueError(
+                f"Pipeline stage '{name}' validation entry filter requires stage=train"
+            )
         if lifecycle != "inference" and (
             stage.get("ntasks") is not None or stage.get("files_per_task") is not None
         ):
@@ -649,6 +795,19 @@ class PipelineDefinition:
                     "writer output options"
                 )
 
+        if stage.get("cache_repository"):
+            if lifecycle != "inference":
+                raise ValueError(
+                    f"Pipeline stage '{name}' cache publication requires "
+                    "stage=inference"
+                )
+            if not (
+                stage.get("source") or stage.get("source_list") or stage.get("sources")
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{name}' cache publication requires inputs"
+                )
+
         if stage.get("export_weights"):
             if lifecycle != "inference":
                 raise ValueError(
@@ -666,6 +825,8 @@ class PipelineDefinition:
                 "validation_sources",
                 "entry_fraction_range",
                 "val_entry_fraction_range",
+                "entry_filter",
+                "val_entry_filter",
             )
             if source_inputs:
                 raise ValueError(
@@ -680,6 +841,97 @@ class PipelineDefinition:
                     f"Pipeline stage '{name}' export_weights cannot be combined "
                     "with writer output options"
                 )
+
+    @classmethod
+    def _validate_filter(cls, name: str, stage: Mapping[str, Any]) -> None:
+        """Require one standalone scan or manifest-build operation."""
+        required = ("run_dir", "cache_dir", "operation")
+        missing = [field for field in required if not stage.get(field)]
+        if missing:
+            raise ValueError(
+                f"Pipeline filter stage '{name}' requires: " + ", ".join(missing)
+            )
+
+        operation = stage["operation"]
+        if operation not in ("scan", "build"):
+            raise ValueError(
+                f"Pipeline filter stage '{name}' operation must be scan or build"
+            )
+        source_fields = cls._present(stage, "source", "source_list")
+        if len(source_fields) != 1:
+            raise ValueError(
+                f"Pipeline filter stage '{name}' requires exactly one of: "
+                "source, source_list"
+            )
+
+        workers = stage.get("workers")
+        if workers is not None and (
+            isinstance(workers, bool) or not isinstance(workers, int) or workers < 1
+        ):
+            raise ValueError(
+                f"Pipeline filter stage '{name}' workers must be a positive integer"
+            )
+        force = stage.get("force")
+        if force is not None and not isinstance(force, bool):
+            raise TypeError(f"Pipeline filter stage '{name}' force must be a boolean")
+
+        if operation == "scan":
+            outputs = cls._present(stage, "output", "output_source_list")
+            if outputs:
+                raise ValueError(
+                    f"Pipeline filter scan stage '{name}' cannot define build outputs"
+                )
+        else:
+            missing_outputs = [
+                field
+                for field in ("output", "output_source_list")
+                if not stage.get(field)
+            ]
+            if missing_outputs:
+                raise ValueError(
+                    f"Pipeline filter build stage '{name}' requires: "
+                    + ", ".join(missing_outputs)
+                )
+            if workers is not None or force:
+                raise ValueError(
+                    f"Pipeline filter build stage '{name}' cannot define workers or force"
+                )
+
+        forbidden = cls._present(
+            stage,
+            "files",
+            "val_source",
+            "val_source_list",
+            "sources",
+            "validation_sources",
+            "entry_fraction_range",
+            "val_entry_fraction_range",
+            "entry_filter",
+            "val_entry_filter",
+            "module_weight",
+            "weight_path",
+            "export_weights",
+            "input_dir",
+            "output_dir",
+            "checkpoint",
+            "dataset",
+            "dataset_selection",
+            "in_place",
+            "ntasks",
+            "files_per_task",
+            "set",
+            "stage",
+            "resume",
+            "resume_from",
+            "validation_name",
+            "rerun_validation",
+            "tensorboard",
+        )
+        if forbidden:
+            raise ValueError(
+                f"Pipeline filter stage '{name}' cannot use SPINE/report field(s): "
+                + ", ".join(forbidden)
+            )
 
     @classmethod
     def _validate_report(cls, name: str, stage: Mapping[str, Any]) -> None:
@@ -708,6 +960,8 @@ class PipelineDefinition:
             "validation_sources",
             "entry_fraction_range",
             "val_entry_fraction_range",
+            "entry_filter",
+            "val_entry_filter",
             "module_weight",
             "weight_path",
             "export_weights",
@@ -723,6 +977,10 @@ class PipelineDefinition:
             "validation_name",
             "rerun_validation",
             "tensorboard",
+            "operation",
+            "cache_dir",
+            "workers",
+            "force",
         )
         if forbidden:
             raise ValueError(
@@ -748,6 +1006,8 @@ class PipelineRunner(SubmissionComponent):
         workspace: Optional[str] = None,
         from_stage: Optional[str] = None,
         to_stage: Optional[str] = None,
+        select_stages: Optional[Sequence[str]] = None,
+        stage_module_weights: Optional[Sequence[Sequence[str]]] = None,
     ) -> Dict[str, List[str]]:
         """Submit an ordered multi-stage production pipeline.
 
@@ -776,31 +1036,51 @@ class PipelineRunner(SubmissionComponent):
         to_stage : str, optional
             Stop after this stage in pipeline order. This can bound a restart
             to the stages that must be regenerated.
+        select_stages : sequence of str, optional
+            Submit only these named stages. Their pipeline order is retained,
+            and dependencies are contracted through omitted stages.
+        stage_module_weights : sequence, optional
+            Repeated launch-time ``STAGE MODULE=PATH`` assignments. These
+            override matching module weights in the pipeline document.
 
         Returns
         -------
         dict
             Mapping from stage names to scheduler job IDs.
         """
+        parsed_stage_weights = PipelineDefinition.parse_stage_module_weights(
+            stage_module_weights
+        )
         definition = PipelineDefinition.load(
             pipeline_path,
             overrides,
             workspace_override=workspace,
+            stage_module_weights=parsed_stage_weights,
         )
         all_stages = definition.stages
         stages, skipped, deferred = self._select_stages(
             all_stages,
             from_stage,
             to_stage,
+            select_stages,
         )
+        selected_names = {stage["name"] for stage in stages}
+        inactive_weight_stages = set(parsed_stage_weights) - selected_names
         print(f"Loading pipeline: {pipeline_path}")
         if definition.workspace is not None:
             print(f"Workspace: {definition.workspace}")
         print(f"Stages: {len(stages)}")
-        if skipped:
+        if skipped and select_stages is None:
             print(f"Skipped as completed: {', '.join(skipped)}")
+        elif skipped:
+            print(f"Not selected: {', '.join(skipped)}")
         if deferred:
             print(f"Not selected after stop: {', '.join(deferred)}")
+        if inactive_weight_stages:
+            print(
+                "Inactive module-weight overrides: "
+                + ", ".join(sorted(inactive_weight_stages))
+            )
         print()
 
         if definition.workspace is not None:
@@ -826,9 +1106,15 @@ class PipelineRunner(SubmissionComponent):
             options = self._submission_options(
                 stage,
                 dependency,
-                retry=from_stage is not None,
+                retry=from_stage is not None or select_stages is not None,
             )
-            if stage.get("kind", "spine") == "report":
+            kind = stage.get("kind", "spine")
+            if kind == "filter":
+                job_map[name] = self.context.submit_filter(
+                    dry_run=dry_run,
+                    **options,
+                )
+            elif kind == "report":
                 job_map[name] = self.context.submit_report(
                     dry_run=dry_run,
                     **options,
@@ -878,9 +1164,57 @@ class PipelineRunner(SubmissionComponent):
         stages: Sequence[Mapping[str, Any]],
         from_stage: Optional[str],
         to_stage: Optional[str],
+        select_stages: Optional[Sequence[str]] = None,
     ) -> Tuple[Sequence[Mapping[str, Any]], List[str], List[str]]:
-        """Select an inclusive ordered range and describe omitted stages."""
+        """Select an ordered range or dependency-aware sparse stage set."""
         names = [stage["name"] for stage in stages]
+        if select_stages is not None:
+            if from_stage is not None or to_stage is not None:
+                raise ValueError(
+                    "Pipeline select_stages cannot be combined with stage boundaries"
+                )
+            if not select_stages:
+                raise ValueError("Pipeline select_stages must not be empty")
+            if any(not isinstance(name, str) or not name for name in select_stages):
+                raise ValueError(
+                    "Pipeline select_stages must contain non-empty strings"
+                )
+            if len(set(select_stages)) != len(select_stages):
+                raise ValueError("Pipeline select_stages must not contain duplicates")
+            unknown = set(select_stages) - set(names)
+            if unknown:
+                raise ValueError(
+                    "Unknown selected pipeline stage(s): " + ", ".join(sorted(unknown))
+                )
+
+            selected_names = set(select_stages)
+            stage_map = {stage["name"]: stage for stage in stages}
+
+            def selected_dependencies(name: str) -> List[str]:
+                """Find the nearest selected ancestors of one selected stage."""
+                result: List[str] = []
+
+                def visit(dependency: str) -> None:
+                    if dependency in selected_names:
+                        if dependency not in result:
+                            result.append(dependency)
+                        return
+                    for ancestor in stage_map[dependency].get("depends_on", []):
+                        visit(ancestor)
+
+                for dependency in stage_map[name].get("depends_on", []):
+                    visit(dependency)
+                return result
+
+            selected = []
+            for stage in stages:
+                if stage["name"] in selected_names:
+                    resolved = dict(stage)
+                    resolved["depends_on"] = selected_dependencies(stage["name"])
+                    selected.append(resolved)
+            omitted = [name for name in names if name not in selected_names]
+            return selected, omitted, []
+
         start = 0
         stop = len(stages)
         if from_stage is not None:
@@ -928,6 +1262,30 @@ class PipelineRunner(SubmissionComponent):
             )
             return options
 
+        if stage.get("kind", "spine") == "filter":
+            options = {key: stage[key] for key in PROFILE_FIELDS if key in stage}
+            options.update(
+                {
+                    "config": stage["config"],
+                    "operation": stage["operation"],
+                    "run_dir": stage["run_dir"],
+                    "sources": cls._as_list(stage.get("source")),
+                    "source_list": stage.get("source_list"),
+                    "cache_dir": stage["cache_dir"],
+                    "output": stage.get("output"),
+                    "output_source_list": stage.get("output_source_list"),
+                    "workers": stage.get("workers"),
+                    "force": stage.get("force", False),
+                    "profile": stage.get("profile", "s3df_milano"),
+                    "job_name": stage.get("job_name", stage["name"]),
+                    "dependency": dependency,
+                    "spine_path": stage.get("spine_path"),
+                    "cvmfs": stage.get("cvmfs", False),
+                    "retry": retry,
+                }
+            )
+            return options
+
         source_key, files = cls._source(stage, "files", "source", "source_list")
         val_key, val_files = cls._source(stage, "val_source", "val_source_list")
 
@@ -954,7 +1312,10 @@ class PipelineRunner(SubmissionComponent):
                 "job_name": stage.get("job_name", stage["name"]),
                 "output": stage.get("output"),
                 "output_suffix": stage.get("output_suffix"),
+                "output_source_list": stage.get("output_source_list"),
                 "in_place": stage.get("in_place", False),
+                "cache_repository": stage.get("cache_repository"),
+                "cache_stage": stage.get("cache_stage"),
                 "ntasks": stage.get("ntasks"),
                 "files_per_task": stage.get("files_per_task"),
                 "dependency": dependency,
@@ -985,6 +1346,8 @@ class PipelineRunner(SubmissionComponent):
                 "iterations": stage.get("iterations"),
                 "entry_fraction_range": stage.get("entry_fraction_range"),
                 "val_entry_fraction_range": stage.get("val_entry_fraction_range"),
+                "entry_filter": stage.get("entry_filter"),
+                "val_entry_filter": stage.get("val_entry_filter"),
             }
         )
         return options

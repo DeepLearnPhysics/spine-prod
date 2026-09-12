@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  version: "260210"
+  date: "2026-02-10"
+  description: ProtoDUNE-SP 260210 standalone track GrapPA network
+
+include: model/common/grappa_track/network_v1.yaml
+
+remove:
+  - nodes.min_size

@@ -17,7 +17,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 import yaml
@@ -497,6 +497,58 @@ class TestFileChunking:
         with pytest.raises(ValueError, match=message):
             mock_submitter.batch.resolve_files_per_task(10, **kwargs)
 
+    def test_parse_named_sources_preserves_aligned_file_order(
+        self, mock_submitter, tmp_path
+    ):
+        """Composite source lists resolve into aligned target sequences."""
+        larcv = [tmp_path / f"input_{index}.root" for index in range(2)]
+        hdf5 = [tmp_path / f"input_{index}_cache.h5" for index in range(2)]
+        for path in [*larcv, *hdf5]:
+            path.touch()
+        larcv_list = tmp_path / "larcv.txt"
+        hdf5_list = tmp_path / "hdf5.txt"
+        larcv_list.write_text("\n".join(map(str, larcv)), encoding="utf-8")
+        hdf5_list.write_text("\n".join(map(str, hdf5)), encoding="utf-8")
+
+        resolved = mock_submitter.file_handler.parse_named_sources(
+            {
+                "larcv": {"source_list": str(larcv_list)},
+                "hdf5": {"source_list": str(hdf5_list)},
+            }
+        )
+        assert resolved == {
+            "larcv": [str(path) for path in larcv],
+            "hdf5": [str(path) for path in hdf5],
+        }
+
+    @pytest.mark.parametrize(
+        ("sources", "message"),
+        [
+            ({"larcv": {}}, "must specify exactly one"),
+            ({"larcv": {"source": []}}, "contains no input files"),
+        ],
+    )
+    def test_parse_named_sources_rejects_invalid_targets(
+        self, mock_submitter, sources, message
+    ):
+        with pytest.raises(ValueError, match=message):
+            mock_submitter.file_handler.parse_named_sources(sources)
+
+    def test_parse_named_sources_rejects_unaligned_counts(
+        self, mock_submitter, tmp_path
+    ):
+        """Every mixed source target must contribute one file per pair."""
+        paths = [tmp_path / f"input_{index}.root" for index in range(2)]
+        for path in paths:
+            path.touch()
+        with pytest.raises(ValueError, match="aligned file counts"):
+            mock_submitter.file_handler.parse_named_sources(
+                {
+                    "larcv": {"source": [str(path) for path in paths]},
+                    "hdf5": {"source": str(paths[0])},
+                }
+            )
+
 
 class TestSubmitterHelpers:
     """Tests for scheduler, path, and template selection helpers."""
@@ -529,6 +581,18 @@ class TestSubmitterHelpers:
             mock_submitter.spine_cli.format_entry_fraction_ranges(
                 entry_fraction_range=(0.5, 0.5)
             )
+
+    def test_format_spine_entry_filters(self, mock_submitter):
+        """Eligibility manifests are quoted independently for train and val."""
+        assert mock_submitter.spine_cli.format_entry_filters(
+            "/filters/train accepted.yaml", "/filters/validation.yaml"
+        ) == (
+            "--entry-filter '/filters/train accepted.yaml' "
+            "--val-entry-filter /filters/validation.yaml"
+        )
+        assert mock_submitter.spine_cli.format_entry_filters() == ""
+        with pytest.raises(ValueError, match="non-empty path"):
+            mock_submitter.spine_cli.format_entry_filters("")
 
     def test_format_spine_named_sources_and_module_weights(self, mock_submitter):
         sources = {
@@ -707,9 +771,285 @@ class TestSubmitterHelpers:
             str(checkout)
         )
 
-        assert command.startswith(f"PYTHONPATH={checkout / 'src'}:")
+        assert command.startswith(f"env PYTHONPATH={checkout / 'src'}:")
         assert command.endswith("python3 -m spine.bin.report")
         assert bind_root == str(checkout)
+
+    def test_resolve_spine_filter_command_uses_checkout_module(
+        self, mock_submitter, tmp_path
+    ):
+        checkout = tmp_path / "checkout"
+        filter_module = checkout / "src" / "spine" / "bin" / "filter.py"
+        filter_module.parent.mkdir(parents=True)
+        filter_module.touch()
+
+        command, bind_root = mock_submitter.runtime.resolve_spine_filter_command(
+            str(checkout)
+        )
+
+        assert command.startswith(f"env PYTHONPATH={checkout / 'src'}:")
+        assert command.endswith("python3 -m spine.bin.filter")
+        assert bind_root == str(checkout)
+
+        for configured in (checkout / "bin" / "spine", checkout / "custom"):
+            command, bind_root = mock_submitter.runtime.resolve_spine_filter_command(
+                str(configured)
+            )
+            assert command.endswith("python3 -m spine.bin.filter")
+            assert bind_root == str(checkout)
+
+        with pytest.raises(RuntimeError, match="does not provide spine.bin.filter"):
+            mock_submitter.runtime.resolve_spine_filter_command(str(tmp_path / "bad"))
+
+        with patch("src.runtime.shutil.which", return_value="/usr/bin/spine-filter"):
+            assert mock_submitter.runtime.resolve_spine_filter_command() == (
+                "/usr/bin/spine-filter",
+                None,
+            )
+        with patch("src.runtime.shutil.which", return_value=None):
+            assert mock_submitter.runtime.resolve_spine_filter_command() == (None, None)
+
+    def test_resolve_spine_cache_command_uses_checkout_module(
+        self, mock_submitter, tmp_path
+    ):
+        """Cache maintenance must follow the selected SPINE checkout."""
+        checkout = tmp_path / "checkout"
+        cache_module = checkout / "src" / "spine" / "bin" / "cache.py"
+        cache_module.parent.mkdir(parents=True)
+        cache_module.touch()
+
+        command, bind_root = mock_submitter.runtime.resolve_spine_cache_command(
+            str(checkout)
+        )
+        assert command.startswith(f"env PYTHONPATH={checkout / 'src'}:")
+        assert command.endswith("python3 -m spine.bin.cache")
+        assert bind_root == str(checkout)
+
+        for configured in (checkout / "bin" / "spine", checkout / "custom"):
+            command, bind_root = mock_submitter.runtime.resolve_spine_cache_command(
+                str(configured)
+            )
+            assert command.endswith("python3 -m spine.bin.cache")
+            assert bind_root == str(checkout)
+
+        with pytest.raises(RuntimeError, match="does not provide spine.bin.cache"):
+            mock_submitter.runtime.resolve_spine_cache_command(str(tmp_path / "bad"))
+
+        with patch("src.runtime.shutil.which", return_value="/usr/bin/spine-cache"):
+            assert mock_submitter.runtime.resolve_spine_cache_command() == (
+                "/usr/bin/spine-cache",
+                None,
+            )
+        with patch("src.runtime.shutil.which", return_value=None):
+            assert mock_submitter.runtime.resolve_spine_cache_command() == (None, None)
+
+    def test_submit_filter_scan_builds_persistent_scheduler_job(
+        self, mock_submitter, tmp_path
+    ):
+        """A scan job records its exact reusable counter-cache invocation."""
+        run_dir = tmp_path / "filter-scan"
+        cache_dir = tmp_path / "counts"
+        config = "filter/protodune-sp/space_points_260210.yaml"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_filter_command",
+                return_value=("spine-filter", "/checkout"),
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="41"),
+        ):
+            job_ids = mock_submitter.submit_filter(
+                config=config,
+                operation="scan",
+                sources=["/data/input one.root", "/data/input-two.root"],
+                cache_dir=str(cache_dir),
+                run_dir=str(run_dir),
+                workers=16,
+                force=True,
+                dependency="afterok:40",
+            )
+
+        assert job_ids == ["41"]
+        attempt = (run_dir / "latest").resolve()
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "spine-filter scan" in script
+        assert "--source '/data/input one.root' /data/input-two.root" in script
+        assert "--workers 16 --force" in script
+        assert "#SBATCH --dependency=afterok:40" in script
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["kind"] == "filter"
+        assert metadata["operation"] == "scan"
+        assert metadata["workers"] == 16
+        assert metadata["force"] is True
+
+    def test_submit_filter_build_publishes_manifest_paths(
+        self, mock_submitter, tmp_path
+    ):
+        """A build job owns both final filter artifacts and supports dry runs."""
+        run_dir = tmp_path / "filter-build"
+        output = tmp_path / "artifacts" / "accepted.yaml"
+        source_output = tmp_path / "artifacts" / "accepted.txt"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_filter_command",
+                return_value=(None, None),
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value=None),
+        ):
+            job_ids = mock_submitter.submit_filter(
+                config="filter/protodune-sp/space_points_260210.yaml",
+                operation="build",
+                source_list="/data/files.txt",
+                cache_dir=str(tmp_path / "counts"),
+                output=str(output),
+                output_source_list=str(source_output),
+                run_dir=str(run_dir),
+                dry_run=True,
+            )
+
+        assert job_ids == []
+        script = ((run_dir / "latest").resolve() / "submit.sbatch").read_text()
+        assert "spine-filter build" in script
+        assert "--source-list /data/files.txt" in script
+        assert f"--output {output}" in script
+        assert f"--output-source-list {source_output}" in script
+        assert output.parent.is_dir()
+
+    def test_submit_filter_uses_detector_account_fallback(
+        self, mock_submitter, tmp_path
+    ):
+        """Filter jobs inherit the detector account when a profile omits it."""
+        detector_account = mock_submitter.profiles["detectors"]["protodune-sp"][
+            "account"
+        ]
+        profile = {
+            "site": "s3df",
+            "scheduler": "slurm",
+            "description": "Account fallback test",
+        }
+        with (
+            patch.object(
+                mock_submitter.config_mgr,
+                "get_profile",
+                return_value=profile,
+            ),
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_filter_command",
+                return_value=("spine-filter", None),
+            ),
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value=None),
+        ):
+            mock_submitter.submit_filter(
+                config="filter/protodune-sp/space_points_260210.yaml",
+                operation="scan",
+                sources=["/data/input.root"],
+                cache_dir=str(tmp_path / "counts"),
+                run_dir=str(tmp_path / "run"),
+                dry_run=True,
+            )
+
+        metadata = json.loads(
+            ((tmp_path / "run" / "latest").resolve() / "job_metadata.json").read_text()
+        )
+        assert metadata["profile_config"]["account"] == detector_account
+
+    @pytest.mark.parametrize(
+        ("kwargs", "error", "message"),
+        [
+            ({"operation": "other"}, ValueError, "one of: scan, build"),
+            ({"sources": None}, ValueError, "exactly one"),
+            (
+                {"sources": ["input.root"], "source_list": "files.txt"},
+                ValueError,
+                "exactly one",
+            ),
+            ({"cache_dir": None}, ValueError, "require cache_dir"),
+            ({"workers": 0}, ValueError, "at least one"),
+            ({"force": "yes"}, TypeError, "must be a boolean"),
+            ({"output": "filter.yaml"}, ValueError, "cannot define build outputs"),
+            (
+                {"operation": "build"},
+                ValueError,
+                "requires output and output_source_list",
+            ),
+            (
+                {
+                    "operation": "build",
+                    "output": "filter.yaml",
+                    "output_source_list": "files.txt",
+                    "workers": 2,
+                },
+                ValueError,
+                "cannot define workers or force",
+            ),
+        ],
+    )
+    def test_filter_runner_rejects_invalid_operations(
+        self, mock_submitter, kwargs, error, message
+    ):
+        """Standalone validation rejects ambiguous or cross-operation fields."""
+        values = {
+            "operation": "scan",
+            "sources": ["input.root"],
+            "source_list": None,
+            "cache_dir": "/tmp/counts",
+            "output": None,
+            "output_source_list": None,
+            "workers": None,
+            "force": False,
+        }
+        values.update(kwargs)
+        with pytest.raises(error, match=message):
+            mock_submitter.filter._validate_operation(**values)
+
+    def test_filter_runner_rejects_existing_run_and_pbs_exclusion(
+        self, mock_submitter, tmp_path
+    ):
+        """Persistent filter attempts and scheduler controls fail explicitly."""
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        (run_dir / "existing").touch()
+        base = {
+            "config": "filter/protodune-sp/space_points_260210.yaml",
+            "operation": "scan",
+            "sources": ["input.root"],
+            "cache_dir": str(tmp_path / "counts"),
+            "run_dir": str(run_dir),
+        }
+        with pytest.raises(ValueError, match="run directory is not empty"):
+            mock_submitter.submit_filter(**base)
+
+        base["run_dir"] = str(tmp_path / "pbs-run")
+        with (
+            patch.object(
+                mock_submitter.config_mgr,
+                "get_profile",
+                return_value={
+                    "site": "anl",
+                    "scheduler": "pbs",
+                    "description": "PBS test",
+                },
+            ),
+            pytest.raises(ValueError, match="only supported by Slurm"),
+        ):
+            mock_submitter.submit_filter(**base, exclude="node01")
 
     def test_submit_report_materializes_provenance_and_scheduler_job(
         self, mock_submitter, tmp_path
@@ -718,6 +1058,7 @@ class TestSubmitterHelpers:
         source_config.write_text(
             yaml.safe_dump(
                 {
+                    "include": "test/common/full_chain/report_v1.yaml",
                     "metadata": {"dataset": None, "checkpoint": None},
                     "metrics": {
                         "segmentation": {
@@ -763,6 +1104,7 @@ class TestSubmitterHelpers:
             "checkpoint": "/weights/full.ckpt",
             "dataset_selection": {"entry_fraction_range": [0.5, 1.0]},
         }
+        assert resolved["include"] == "test/common/full_chain/report_v1.yaml"
         script = (attempt / "submit.sbatch").read_text()
         assert "spine-report --config" in script
         assert f"--input-dir {input_dir}" in script
@@ -1173,6 +1515,7 @@ class TestInteractiveExecution:
                 files=[str(input_file)],
                 no_writer=True,
                 output_suffix="custom_reco",
+                entry_filter="/filters/accepted.yaml",
                 interactive_runtime="local",
             )
 
@@ -1524,12 +1867,14 @@ class TestInteractiveExecution:
                 config="config/infer/sbnd/full_chain_co_260316.yaml",
                 files=[str(input_file)],
                 output_suffix="custom_reco",
+                entry_filter="/filters/accepted.yaml",
                 interactive_runtime="local",
             )
 
         assert exit_code == 0
         command = run.call_args.args[0]
         assert "--output-suffix custom_reco" in command
+        assert "--entry-filter /filters/accepted.yaml" in command
 
     def test_run_interactive_in_place_omits_output_overrides(
         self, mock_submitter, tmp_path
@@ -1705,6 +2050,7 @@ class TestBatchSpineOverride:
             ({"stage": "train"}, "--run-dir is required"),
             ({"resume": True}, "valid only for training"),
             ({"validation_name": "data"}, "valid only for validation"),
+            ({"val_entry_filter": "/filters/val.yaml"}, "valid only for training"),
             (
                 {"validation_named_sources": {"larcv": {"source": "val.root"}}},
                 "Named validation sources are valid only for training",
@@ -1790,6 +2136,8 @@ class TestBatchSpineOverride:
                 validation_files=[str(validation_source)],
                 entry_fraction_range=(0.0, 1.0),
                 val_entry_fraction_range=(0.0, 0.5),
+                entry_filter="/filters/train.yaml",
+                val_entry_filter="/filters/validation.yaml",
                 stage="train",
                 run_dir=str(run_dir),
             ) == ["train"]
@@ -1816,6 +2164,12 @@ class TestBatchSpineOverride:
         assert f"--val-source-list {validation_manifest.resolve()}" in script
         assert "--entry-fraction-range 0.0 1.0" in script
         assert "--val-entry-fraction-range 0.0 0.5" in script
+        assert "--entry-filter /filters/train.yaml" in script
+        assert "--val-entry-filter /filters/validation.yaml" in script
+        marker = submission.resolve() / "graceful_stop"
+        assert f"--graceful-stop-file {marker}" in script
+        assert f'SPINE_PROD_GRACEFUL_STOP_FILE="{marker}"' in script
+        assert not marker.exists()
         assert "#SBATCH --array=" not in script
         assert not (run_dir / "tasks").exists()
 
@@ -1826,6 +2180,9 @@ class TestBatchSpineOverride:
         )
         assert metadata["entry_fraction_range"] == [0.0, 1.0]
         assert metadata["val_entry_fraction_range"] == [0.0, 0.5]
+        assert metadata["entry_filter"] == "/filters/train.yaml"
+        assert metadata["val_entry_filter"] == "/filters/validation.yaml"
+        assert metadata["graceful_stop_file"] == str(marker)
 
     def test_submit_job_preserves_future_pipeline_training_sources(
         self, mock_submitter, tmp_path, capsys
@@ -1930,6 +2287,7 @@ class TestBatchSpineOverride:
                 named_sources=named_sources,
                 output=str(output),
                 output_suffix="cache",
+                allow_missing_inputs=True,
             ) == ["cache"]
 
         script = next(
@@ -1938,6 +2296,210 @@ class TestBatchSpineOverride:
         assert f"--output-dir {output}" in script
         assert "--output-suffix cache" in script
         assert output.is_dir()
+
+    def test_submit_job_arrays_aligned_named_source_lists(
+        self, mock_submitter, tmp_path
+    ):
+        """Mixed inference arrays create one aligned manifest per target."""
+        run_dir = tmp_path / "run"
+        paths = [tmp_path / f"input_{index}.root" for index in range(2)]
+        for path in paths:
+            path.touch()
+        manifest = tmp_path / "primary.txt"
+        manifest.write_text("\n".join(map(str, paths)), encoding="utf-8")
+        cache = tmp_path / "cache.spine-cache"
+        cache.mkdir()
+        source_lists = {
+            "primary": {"source_list": str(manifest)},
+            "cache": {"source": str(cache)},
+        }
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="cache"),
+        ):
+            assert mock_submitter.submit_job(
+                config="cache/generic/graph_spice/fragment_graphs_240805.yaml",
+                named_sources=source_lists,
+                run_dir=str(run_dir),
+                in_place=True,
+                files_per_task=1,
+                ntasks=2,
+            ) == ["cache"]
+
+        attempt = run_dir / "latest"
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "#SBATCH --array=1-2" in script
+        assert " -S $TASK_FILE_LIST" not in script
+        assert f"--source cache={cache}" in script
+        assert "--source-list primary=$TASK_DIR/primary.txt" in script
+        for index in (1, 2):
+            task_dir = attempt / "tasks" / f"000_{index}"
+            assert (task_dir / "primary.txt").read_text().strip() == str(
+                paths[index - 1]
+            )
+            assert not (task_dir / "cache.txt").exists()
+
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["num_files"] == 2
+        assert metadata["resolved_files_per_task"] == 1
+
+    def test_submit_job_writes_expected_stage_cache_source_list(
+        self, mock_submitter, tmp_path
+    ):
+        """A first cache stage can publish paths for dependent array jobs."""
+        sources = [tmp_path / "first.root", tmp_path / "second.root"]
+        for source in sources:
+            source.touch()
+        output = tmp_path / "cache"
+        source_list = output / "cache_file_list.txt"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="cache"),
+        ):
+            assert mock_submitter.submit_job(
+                config="cache/generic/uresnet_ppn/segmentation_240805.yaml",
+                files=[str(source) for source in sources],
+                output=str(output),
+                output_suffix="cache",
+                output_source_list=str(source_list),
+            ) == ["cache"]
+
+        assert source_list.read_text(encoding="utf-8").splitlines() == [
+            str(output / "first_cache.h5"),
+            str(output / "second_cache.h5"),
+        ]
+        metadata = json.loads(
+            next(mock_submitter.jobs_dir.glob("**/job_metadata.json")).read_text()
+        )
+        assert metadata["output_source_list"] == str(source_list)
+
+    def test_submit_job_fences_parallel_cache_publication(
+        self, mock_submitter, tmp_path
+    ):
+        """One publication ID and source-count barrier span an entire array."""
+        sources = [tmp_path / "first.root", tmp_path / "second.root"]
+        for source in sources:
+            source.touch()
+        repository = tmp_path / "cache" / "train.spine-cache"
+        run_dir = tmp_path / "cache" / "segmentation"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="cache"),
+            patch("src.batch.uuid.uuid4", return_value=Mock(hex="attempt-id")),
+        ):
+            assert mock_submitter.submit_job(
+                config="cache/generic/uresnet_ppn/segmentation_240805.yaml",
+                files=[str(path) for path in sources],
+                output=str(repository),
+                run_dir=str(run_dir),
+                files_per_task=1,
+                cache_repository=str(repository),
+                cache_stage="segmentation",
+            ) == ["cache"]
+
+        script = (run_dir / "latest" / "submit.sbatch").read_text()
+        assert "export SPINE_CACHE_PUBLICATION_ID=attempt-id" in script
+        assert (
+            f"spine-cache begin {repository} segmentation "
+            '--publication-id \\"\\$SPINE_CACHE_PUBLICATION_ID\\"'
+        ) in script
+        assert "--set io.writer.parallel=true" in script
+        assert "--set io.writer.expected_sources=2" in script
+        metadata = json.loads((run_dir / "latest" / "job_metadata.json").read_text())
+        assert metadata["cache_repository"] == str(repository)
+        assert metadata["cache_stage"] == "segmentation"
+        assert metadata["cache_publication_id"] == "attempt-id"
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"cache_repository": "/tmp/cache.spine-cache"},
+            {"cache_stage": "segmentation"},
+            {
+                "cache_repository": "/tmp/cache.spine-cache",
+                "cache_stage": "segmentation",
+                "stage": "train",
+                "run_dir": "/tmp/train",
+            },
+        ],
+    )
+    def test_submit_job_rejects_invalid_cache_publication(
+        self, mock_submitter, options
+    ):
+        """Fenced cache publication requires a complete inference contract."""
+        with pytest.raises(ValueError, match="cache|Cache"):
+            mock_submitter.submit_job(config="config.yaml", **options)
+
+    def test_submit_job_rejects_cache_publication_without_sources(
+        self, mock_submitter, tmp_path
+    ):
+        """A parallel cache barrier cannot be inferred without source files."""
+        with pytest.raises(ValueError, match="requires input sources"):
+            mock_submitter.submit_job(
+                config="cache/generic/uresnet_ppn/segmentation_240805.yaml",
+                run_dir=str(tmp_path / "cache"),
+                cache_repository=str(tmp_path / "train.spine-cache"),
+                cache_stage="segmentation",
+            )
+
+    def test_cache_training_uses_scalar_source_overrides(
+        self, mock_submitter, tmp_path
+    ):
+        """Logical cache repositories must not be converted to source lists."""
+        run_dir = tmp_path / "train"
+        train_cache = tmp_path / "train.spine-cache"
+        validation_cache = tmp_path / "validation.spine-cache"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            mock_submitter.submit_job(
+                config="train/generic/grappa_inter/train_from_particle_cache_260828.yaml",
+                files=[str(train_cache)],
+                validation_files=[str(validation_cache)],
+                stage="train",
+                run_dir=str(run_dir),
+                allow_missing_inputs=True,
+            )
+
+        script = (run_dir / "latest" / "submit.sbatch").read_text()
+        assert f"--source {train_cache}" in script
+        assert f"--val-source {validation_cache}" in script
+        assert "--source-list" not in script
+        assert "--val-source-list" not in script
+
+    def test_submit_job_rejects_incomplete_output_source_list_contract(
+        self, mock_submitter, tmp_path
+    ):
+        """Publishing future cache paths requires deterministic output naming."""
+        source = tmp_path / "input.root"
+        source.touch()
+
+        with pytest.raises(ValueError, match="explicit output directory and suffix"):
+            mock_submitter.submit_job(
+                config="cache/generic/uresnet_ppn/segmentation_240805.yaml",
+                files=[str(source)],
+                output_source_list=str(tmp_path / "cache_files.txt"),
+            )
 
     def test_submit_job_exports_composed_module_weights(self, mock_submitter, tmp_path):
         """A model-only batch job should forward composition options to SPINE."""
@@ -2831,6 +3393,7 @@ class TestCVMFSOption:
             "bind_paths": None,
             "spine_cmd": "spine",
             "spine_cli_overrides": "",
+            "graceful_stop_file": None,
         }
         defaults.update(kwargs)
         return template.render(**defaults)
@@ -3064,14 +3627,21 @@ class TestCVMFSOption:
             "job_template_anl.pbs",
         ],
     )
-    def test_templates_forward_graceful_stop_to_execed_workload(
+    def test_training_templates_translate_graceful_stop_to_marker(
         self, mock_submitter, template_name
     ):
-        """Every scheduler wrapper should relay USR1 across its container."""
-        script = self._render_template(mock_submitter, template_name)
+        """Training wrappers should translate USR1 without signaling children."""
+        marker = "/tmp/attempt/graceful_stop"
+        script = self._render_template(
+            mock_submitter,
+            template_name,
+            graceful_stop_file=marker,
+        )
 
-        assert "trap forward_graceful_stop USR1" in script
-        assert 'kill -USR1 "$SPINE_PROD_WORKLOAD_PID"' in script
+        assert "trap request_graceful_stop USR1" in script
+        assert f'SPINE_PROD_GRACEFUL_STOP_FILE="{marker}"' in script
+        assert 'touch -- "$SPINE_PROD_GRACEFUL_STOP_FILE"' in script
+        assert 'kill -USR1 "$SPINE_PROD_WORKLOAD_PID"' not in script
         assert 'eval "exec $RUN_CMD" &' in script
         assert "exec spine -S $TASK_FILE_LIST" in script
         syntax = subprocess.run(
@@ -3084,8 +3654,22 @@ class TestCVMFSOption:
         )
         assert syntax.returncode == 0, syntax.stderr
 
-        if template_name == "job_template_nersc.sbatch":
-            assert 'scancel --signal=USR1 "${SLURM_JOB_ID}.0"' in script
+    @pytest.mark.parametrize(
+        "template_name",
+        [
+            "job_template_s3df.sbatch",
+            "job_template_nersc.sbatch",
+            "job_template_anl.pbs",
+        ],
+    )
+    def test_nontraining_templates_do_not_install_graceful_stop(
+        self, mock_submitter, template_name
+    ):
+        """Nontraining wrappers should not expose graceful-stop machinery."""
+        script = self._render_template(mock_submitter, template_name)
+
+        assert "trap request_graceful_stop USR1" not in script
+        assert "SPINE_PROD_GRACEFUL_STOP_FILE" not in script
 
 
 class TestBatchClientSelection:
@@ -3210,7 +3794,13 @@ class TestPipelineSubmission:
         with patch.object(
             mock_submitter, "submit_job", side_effect=[["10"], ["20"], ["30"]]
         ) as submit_job:
-            result = mock_submitter.submit_pipeline(str(pipeline_path))
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                stage_module_weights=[
+                    ["configured_inputs", "uresnet_ppn=/tmp/cli-seed.ckpt"],
+                    ["configured_inputs", "graph_spice=/tmp/graph-seed.ckpt"],
+                ],
+            )
 
         assert result == {
             "train": ["10"],
@@ -3237,7 +3827,8 @@ class TestPipelineSubmission:
             "hdf5": {"source": "validation.h5"},
         }
         assert configured["module_weights"] == {
-            "uresnet_ppn": "/tmp/snapshot-best.ckpt"
+            "uresnet_ppn": "/tmp/cli-seed.ckpt",
+            "graph_spice": "/tmp/graph-seed.ckpt",
         }
         assert configured["weight_path"] == "/tmp/full-seed.ckpt"
 
@@ -3293,6 +3884,56 @@ class TestPipelineSubmission:
         assert report["checkpoint"] == "/tmp/full-chain.ckpt"
         assert report["dataset_selection"] == {"entry_fraction_range": [0.5, 1.0]}
 
+    def test_submit_pipeline_dispatches_filter_stage(self, mock_submitter, tmp_path):
+        """Standalone filter stages preserve dependencies and operation fields."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "scan",
+                            "kind": "filter",
+                            "operation": "scan",
+                            "config": "filter.yaml",
+                            "source": ["one.root", "two.root"],
+                            "cache_dir": "/tmp/counts",
+                            "run_dir": "/tmp/filter/scan",
+                            "workers": 4,
+                        },
+                        {
+                            "name": "build",
+                            "kind": "filter",
+                            "operation": "build",
+                            "depends_on": ["scan"],
+                            "config": "filter.yaml",
+                            "source": ["one.root", "two.root"],
+                            "cache_dir": "/tmp/counts",
+                            "output": "/tmp/accepted.yaml",
+                            "output_source_list": "/tmp/accepted.txt",
+                            "run_dir": "/tmp/filter/build",
+                        },
+                    ]
+                }
+            )
+        )
+
+        with patch.object(
+            mock_submitter, "submit_filter", side_effect=[["10"], ["20"]]
+        ) as submit_filter:
+            result = mock_submitter.submit_pipeline(str(pipeline_path))
+
+        assert result == {"scan": ["10"], "build": ["20"]}
+        assert submit_filter.call_args_list[0].kwargs["sources"] == [
+            "one.root",
+            "two.root",
+        ]
+        assert submit_filter.call_args_list[0].kwargs["workers"] == 4
+        assert submit_filter.call_args_list[1].kwargs["dependency"] == "afterok:10"
+        assert submit_filter.call_args_list[1].kwargs["output"] == (
+            "/tmp/accepted.yaml"
+        )
+
     def test_submit_pipeline_rejects_invalid_report_dataset_selection(
         self, mock_submitter, tmp_path
     ):
@@ -3331,8 +3972,10 @@ class TestPipelineSubmission:
                         {
                             "name": "append",
                             "config": "cache.yaml",
-                            "source": "cache.h5",
+                            "source": "cache.spine-cache",
                             "in_place": True,
+                            "cache_repository": "cache.spine-cache",
+                            "cache_stage": "fragmentation",
                         }
                     ]
                 }
@@ -3344,6 +3987,8 @@ class TestPipelineSubmission:
 
         assert result == {"append": ["10"]}
         assert submit.call_args.kwargs["in_place"] is True
+        assert submit.call_args.kwargs["cache_repository"] == "cache.spine-cache"
+        assert submit.call_args.kwargs["cache_stage"] == "fragmentation"
 
     @pytest.mark.parametrize(
         ("stage_fields", "message"),
@@ -3353,6 +3998,24 @@ class TestPipelineSubmission:
             (
                 {"in_place": True, "stage": "train", "run_dir": "/tmp/train"},
                 "in_place requires stage=inference",
+            ),
+            ({"cache_repository": "cache.spine-cache"}, "must define"),
+            (
+                {
+                    "cache_repository": "cache.spine-cache",
+                    "cache_stage": "fragmentation",
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "source": "input.root",
+                },
+                "cache publication requires stage=inference",
+            ),
+            (
+                {
+                    "cache_repository": "cache.spine-cache",
+                    "cache_stage": "fragmentation",
+                },
+                "cache publication requires inputs",
             ),
         ],
     )
@@ -3500,6 +4163,75 @@ class TestPipelineSubmission:
                 mock_submitter.submit_pipeline(str(pipeline_path), from_stage="missing")
 
         submit_job.assert_not_called()
+
+    def test_submit_pipeline_selects_sparse_stages_and_contracts_dependencies(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        """Sparse retries retain order and nearest selected dependencies."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {"name": "source", "config": "source.yaml"},
+                        {
+                            "name": "cache_train",
+                            "config": "cache.yaml",
+                            "depends_on": ["source"],
+                        },
+                        {
+                            "name": "cache_validation",
+                            "config": "cache.yaml",
+                            "depends_on": ["source"],
+                        },
+                        {
+                            "name": "train",
+                            "config": "train.yaml",
+                            "depends_on": ["cache_train", "cache_validation"],
+                        },
+                        {
+                            "name": "particle_train",
+                            "config": "particle.yaml",
+                            "depends_on": ["train"],
+                        },
+                        {
+                            "name": "particle_validation",
+                            "config": "particle.yaml",
+                            "depends_on": ["train"],
+                        },
+                    ]
+                }
+            )
+        )
+
+        with patch.object(
+            mock_submitter,
+            "submit_job",
+            side_effect=[["20"], ["21"], ["30"], ["31"]],
+        ) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                select_stages=[
+                    "particle_validation",
+                    "cache_validation",
+                    "particle_train",
+                    "cache_train",
+                ],
+            )
+
+        assert list(result) == [
+            "cache_train",
+            "cache_validation",
+            "particle_train",
+            "particle_validation",
+        ]
+        assert submit_job.call_args_list[0].kwargs["dependency"] is None
+        assert submit_job.call_args_list[1].kwargs["dependency"] is None
+        assert submit_job.call_args_list[2].kwargs["dependency"] == "afterok:20:21"
+        assert submit_job.call_args_list[3].kwargs["dependency"] == "afterok:20:21"
+        assert all(call.kwargs["retry"] for call in submit_job.call_args_list)
+        output = capsys.readouterr().out
+        assert "Not selected: source, train" in output
 
     def test_report_rejects_non_mapping_configuration(self, tmp_path):
         """Report recipes must be mappings before provenance is injected."""
@@ -3697,6 +4429,60 @@ class TestPipelineSubmission:
                 from_stage="second",
                 to_stage="first",
             )
+
+    def test_submit_pipeline_allows_weight_override_for_skipped_stage(
+        self, mock_submitter, tmp_path
+    ):
+        """A reusable restart command may retain seeds for earlier stages."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {"name": "train", "config": "train.yaml"},
+                        {"name": "cache", "config": "cache.yaml"},
+                    ]
+                }
+            )
+        )
+
+        with patch.object(mock_submitter, "submit_job", return_value=[]) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                from_stage="cache",
+                stage_module_weights=[["train", "model=/weights/model.ckpt"]],
+            )
+
+        assert result == {"cache": []}
+        assert submit_job.call_count == 1
+
+    def test_submit_pipeline_allows_weight_override_for_deferred_stage(
+        self, mock_submitter, tmp_path
+    ):
+        """A reusable bounded command may retain seeds for later stages."""
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {"name": "first", "config": "first.yaml"},
+                        {"name": "later", "config": "later.yaml"},
+                    ]
+                }
+            )
+        )
+
+        with patch.object(mock_submitter, "submit_job", return_value=[]) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path),
+                to_stage="first",
+                stage_module_weights=[
+                    ["later", "model=/weights/later.ckpt"],
+                ],
+            )
+
+        assert result == {"first": []}
+        assert submit_job.call_count == 1
 
     @pytest.mark.parametrize(
         ("pipeline", "message"),

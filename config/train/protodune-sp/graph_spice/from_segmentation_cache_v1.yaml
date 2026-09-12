@@ -1,0 +1,15 @@
+__meta__:
+  kind: fragment
+  description: ProtoDUNE-SP Graph-SPICE training from cached segmentation products
+
+include: train/protodune-sp/graph_spice/base_v1.yaml
+
+override:
+  io.loader.dataset:
+    name: cache
+    path: null
+    stage: segmentation
+    stage_map:
+      data_calib: deghosting
+    keep_open: true
+    keys: [data_calib, seg_pred, clust_label_adapt]

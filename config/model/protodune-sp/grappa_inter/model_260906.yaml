@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260906"
+  date: "2026-09-06"
+  description: ProtoDUNE-SP 260906 standalone interaction GrapPA model
+
+include: model/common/grappa_inter/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/protodune-sp/grappa_inter/network_260906.yaml
+  model.modules.grappa_loss: !include model/protodune-sp/grappa_inter/loss_260906.yaml

@@ -1,0 +1,28 @@
+# ProtoDUNE-SP model trained on the mpvmpr v1 dataset
+# Revision date: September 6, 2026
+
+__meta__:
+  kind: bundle
+  version: "260906"
+  date: "2026-09-06"
+  description: "ProtoDUNE-SP collection-only model trained on mpvmpr v1"
+  compatible_with:
+    base: ">=260210"
+    io: ">=260210"
+  tags:
+    [
+      collection-only,
+      pre-calibration,
+      ppn-restrict,
+      grappa-use-closest,
+      grouping-through-track,
+    ]
+  training_set: "v1"
+
+include: model/protodune-sp/full_chain/model_260906.yaml
+
+override:
+  # Path to the first full chain model weights
+  model.weight_path: !download
+    url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/protodune-sp/protodune-sp_snapshot_260906.ckpt
+    hash: 754b45de7d03e868153fde1fc260d2be65d181e82ab232c64e302c83e4850c66

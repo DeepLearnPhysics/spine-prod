@@ -1,6 +1,6 @@
-# Prototype staged training of every learned component used by the generic
+# Staged training of every learned component used by the generic
 # 260828 full chain. Supply its destination with CLI --workspace.
-# Each split owns one cache file; materialization stages append named groups.
+# Each split owns one sharded cache repository; stages publish immutable shards.
 
 workspace: null
 
@@ -13,11 +13,11 @@ collections:
     - name: train
       source: ${train_source}
       cache_dir: ${workspace}/cache/train
-      cache_file: ${workspace}/cache/train/train_cache.h5
+      cache_repository: ${workspace}/cache/train.spine-cache
     - name: validation
       source: ${validation_source}
       cache_dir: ${workspace}/cache/validation
-      cache_file: ${workspace}/cache/validation/test_cache.h5
+      cache_repository: ${workspace}/cache/validation.spine-cache
 
 defaults:
   profile: s3df_ampere
@@ -44,10 +44,12 @@ stages:
     config: cache/generic/uresnet_ppn/segmentation_240805.yaml
     source: ${split.source}
     run_dir: ${split.cache_dir}/segmentation
-    output: ${split.cache_dir}
-    output_suffix: cache
+    output: ${split.cache_repository}
+    cache_repository: ${split.cache_repository}
+    cache_stage: segmentation
     files_per_task: 1
-    ntasks: 50
+    # Train and validation arrays run together: two tasks each cap total GPUs at 4.
+    ntasks: 2
     module_weight:
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
@@ -60,15 +62,15 @@ stages:
     run_dir: ${workspace}/train/graph_spice
     tensorboard: true
     sources:
-      larcv:
+      primary:
         source: ${train_source}
-      hdf5:
-        source: ${workspace}/cache/train/train_cache.h5
+      cache:
+        source: ${workspace}/cache/train.spine-cache
     validation_sources:
-      larcv:
+      primary:
         source: ${validation_source}
-      hdf5:
-        source: ${workspace}/cache/validation/test_cache.h5
+      cache:
+        source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
 
   # Append fragment graphs and GrapPA supervision for both particle branches.
@@ -80,13 +82,15 @@ stages:
     config: cache/generic/graph_spice/fragment_graphs_260828.yaml
     run_dir: ${split.cache_dir}/fragmentation
     in_place: true
+    cache_repository: ${split.cache_repository}
+    cache_stage: fragmentation
     files_per_task: 1
-    ntasks: 50
+    ntasks: 2
     sources:
-      larcv:
+      primary:
         source: ${split.source}
-      hdf5:
-        source: ${split.cache_file}
+      cache:
+        source: ${split.cache_repository}
     module_weight:
       graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
 
@@ -95,8 +99,8 @@ stages:
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/generic/grappa_shower/train_from_fragment_cache_260828.yaml
     stage: train
-    source: ${workspace}/cache/train/train_cache.h5
-    val_source: ${workspace}/cache/validation/test_cache.h5
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/grappa_shower
     tensorboard: true
@@ -106,8 +110,8 @@ stages:
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/generic/grappa_track/train_from_fragment_cache_260828.yaml
     stage: train
-    source: ${workspace}/cache/train/train_cache.h5
-    val_source: ${workspace}/cache/validation/test_cache.h5
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/grappa_track
     tensorboard: true
@@ -119,11 +123,17 @@ stages:
       as: split
     depends_on: [train_grappa_shower, train_grappa_track]
     config: cache/generic/grappa_shower_track/particle_graphs_260828.yaml
-    source: ${split.cache_file}
     run_dir: ${split.cache_dir}/particle_aggregation
     in_place: true
+    cache_repository: ${split.cache_repository}
+    cache_stage: particle_aggregation
     files_per_task: 1
-    ntasks: 50
+    ntasks: 2
+    sources:
+      primary:
+        source: ${split.source}
+      cache:
+        source: ${split.cache_repository}
     module_weight:
       grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
       grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
@@ -133,8 +143,8 @@ stages:
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
     config: train/generic/grappa_inter/train_from_particle_cache_260828.yaml
     stage: train
-    source: ${workspace}/cache/train/train_cache.h5
-    val_source: ${workspace}/cache/validation/test_cache.h5
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
     run_dir: ${workspace}/train/grappa_inter
     tensorboard: true
@@ -166,13 +176,13 @@ stages:
     weight_path: ${workspace}/weights/full_chain_260828.ckpt
     num_workers: 16
     files_per_task: 1
-    ntasks: 50
+    ntasks: 4
 
   # Reduce all completed metric shards into checksummed JSON and plots.
   - name: report_full_chain
     kind: report
     depends_on: [evaluate_full_chain]
-    config: test/common/full_chain/report_v1.yaml
+    config: test/generic/full_chain/report_240718.yaml
     input_dir: ${workspace}/metrics/full_chain/raw/latest
     output_dir: ${workspace}/metrics/full_chain/report/artifacts
     run_dir: ${workspace}/metrics/full_chain/report

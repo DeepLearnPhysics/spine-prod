@@ -1,0 +1,32 @@
+__meta__:
+  kind: fragment
+  description: Append ProtoDUNE-SP particle graphs and interaction supervision
+
+include: cache/generic/grappa_shower_track/base_v1.yaml
+
+override:
+  io.loader.dataset:
+    name: mixed
+    primary:
+      name: larcv
+      file_keys: null
+      schema:
+        coord_label:
+          parser: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+    cache:
+      path: null
+      stage: fragmentation
+      stage_map:
+        data_calib: deghosting
+        ppn_points: segmentation
+        clust_label_adapt: segmentation
+      keep_open: true
+      keys:
+        - data_calib
+        - ppn_points
+        - clust_label_adapt
+        - fragment_clusts
+        - fragment_shapes
+  model.network_input.data: data_calib

@@ -37,6 +37,9 @@ io:
           break_clusters: true
           particle_info:
             particle_event: particle_pcluster
+            type_include_secondary: false
+            type_include_mpr: false
+            primary_include_mpr: false
 
 train:
   weight_prefix: null

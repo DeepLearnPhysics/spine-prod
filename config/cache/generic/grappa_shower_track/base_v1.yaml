@@ -17,31 +17,36 @@ io:
     num_workers: 16
     collate_fn: all
     dataset:
-      name: hdf5
-      file_keys: null
-      staged: true
-      stage: fragmentation
-      # Canonical segmentation products remain owned by that stage; avoid
-      # copying voxel-aligned tensors into every downstream stage.
-      stage_map:
-        ppn_points: segmentation
-        clust_label_adapt: segmentation
-      keep_open: true
-      keys:
-        - data
-        - ppn_points
-        - coord_label
-        - clust_label_adapt
-        - fragment_clusts
-        - fragment_shapes
+      name: mixed
+      primary:
+        name: larcv
+        file_keys: null
+        schema:
+          data:
+            parser: sparse3d
+            sparse_event: sparse3d_pcluster
+          coord_label:
+            parser: particle_coords
+            particle_event: particle_corrected
+            cluster_event: cluster3d_pcluster
+      cache:
+        path: null
+        stage: fragmentation
+        stage_map:
+          ppn_points: segmentation
+          clust_label_adapt: segmentation
+        keep_open: true
+        keys:
+          - ppn_points
+          - clust_label_adapt
+          - fragment_clusts
+          - fragment_shapes
   writer:
-    name: stage_hdf5
-    file_name: null
+    name: cache
     stage: particle_aggregation
     keep_open: true
     overwrite_stage: true
     keys:
-      - particle_clusts
       - particle_edge_index
       - particle_node_features
       - particle_edge_features

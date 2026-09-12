@@ -1,0 +1,12 @@
+__meta__:
+  kind: bundle
+  version: "260906"
+  date: "2026-09-06"
+  description: ProtoDUNE-SP 260906 UResNet-PPN training from deghosted cache
+
+include: train/protodune-sp/uresnet_ppn/from_deghost_cache_v1.yaml
+
+model:
+  modules:
+    uresnet_ppn: !include model/protodune-sp/uresnet_ppn/network_260210.yaml
+    uresnet_ppn_loss: !include model/protodune-sp/uresnet_ppn/loss_260210.yaml

@@ -29,8 +29,8 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v1.1.0. Maintained configurations require SPINE
-v1.1.0 or later.
+The current default is SPINE v1.2.0. Maintained configurations require SPINE
+v1.2.0 or later.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
@@ -480,10 +480,12 @@ scheduler clients are available on the submit host, select one explicitly:
 ```
 
 On Slurm, spine-prod signals only the batch shell with ``SIGUSR1``; on PBS it
-uses ``qsig``. All maintained templates trap and forward that request through
-the Singularity, Shifter, or Apptainer runtime. The inner shell then ``exec``s
-SPINE so that the training process receives the signal directly. Once SPINE
-returns status zero, normal ``afterok`` dependencies may proceed.
+uses ``qsig``. For training submissions, the shell translates that signal into
+a marker file scoped to the immutable submission attempt. SPINE rank zero polls
+the marker at minibatch boundaries and shares the request with other ranks.
+Signals therefore never cross the Singularity, Shifter, or Apptainer boundary
+or reach auxiliary processes. Once SPINE returns status zero, normal
+``afterok`` dependencies may proceed.
 
 This is an intentional successful completion, unlike ``scancel JOB_ID`` or a
 ``SIGTERM`` caused by timeout or machine failure. Do not use it with a SPINE
@@ -674,6 +676,21 @@ on skipped stages are considered satisfied by their existing artifacts.
 Use `--to-stage NAME` to stop at an inclusive boundary when only a bounded
 range should be regenerated.
 
+For a sparse repair, select multiple stages in one option:
+
+```bash
+./submit.py \
+  --pipeline pipelines/my_pipeline.yaml \
+  --workspace /path/to/production \
+  --select-stage cache_train_segmentation cache_validation_segmentation \
+                 cache_train_particle_graphs cache_validation_particle_graphs
+```
+
+Selected stages run in pipeline order, regardless of their CLI order. Direct
+dependencies are contracted through omitted stages, so selected downstream
+stages still wait for the nearest selected ancestors. `--select-stage` cannot
+be combined with `--from-stage` or `--to-stage`.
+
 On Slurm, dependent stages are submitted with
 `--kill-on-invalid-dep=yes`, so a stage is canceled automatically when an
 upstream `afterok` dependency can no longer succeed. PBS Professional provides
@@ -696,12 +713,12 @@ checkpoints through SPINE's native CLI. A model-only `export_weights` stage
 composes those checkpoints into one inference artifact without initializing
 data I/O. An inference stage with `in_place: true` passes no `--output`,
 `--output-dir`, or `--output-suffix` override, leaving writer routing entirely
-to SPINE. This is the intended mode for extending a staged HDF5 cache through
-SPINE's transactional sidecar mechanism; it cannot be combined with explicit
+to SPINE. This is the intended mode for extending a sharded cache repository;
+it cannot be combined with explicit
 writer output fields. See
 `pipelines/generic/full_chain_240805.yaml` for a complete staged-training
-prototype with centralized paths. Its materialization jobs append successive
-stage groups to one source-derived HDF5 cache per training or validation file,
+workflow with centralized paths. Its materialization jobs publish successive
+immutable stages to one logical cache repository per data split,
 then compose the independently trained modules into one full-chain checkpoint.
 The generic full-chain pipelines finally evaluate that assembled checkpoint
 with SPINE's metric analyzers and submit a CPU-only `kind: report` reduction.

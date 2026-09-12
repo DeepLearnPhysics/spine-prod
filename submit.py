@@ -206,11 +206,19 @@ Examples:
         help="Half-open fractional range of input entries to process",
     )
     parser.add_argument(
+        "--entry-filter",
+        help="File-aware eligibility manifest for the input dataset",
+    )
+    parser.add_argument(
         "--val-entry-fraction-range",
         type=float,
         nargs=2,
         metavar=("START", "STOP"),
         help="Half-open fractional range of validation entries to process",
+    )
+    parser.add_argument(
+        "--val-entry-filter",
+        help="File-aware eligibility manifest for the validation dataset",
     )
     duration_group = parser.add_mutually_exclusive_group()
     duration_group.add_argument(
@@ -256,6 +264,14 @@ Examples:
         "--to-stage",
         help="Stop a pipeline submission after this stage (inclusive).",
     )
+    parser.add_argument(
+        "--select-stage",
+        nargs="+",
+        help=(
+            "Submit only these pipeline stages, in pipeline order. Dependencies "
+            "are contracted through omitted stages."
+        ),
+    )
     resume_group = parser.add_mutually_exclusive_group()
     resume_group.add_argument(
         "--resume",
@@ -283,6 +299,16 @@ Examples:
     parser.add_argument(
         "--weight-path",
         help="Complete-model checkpoint override forwarded to SPINE",
+    )
+    parser.add_argument(
+        "--stage-module-weight",
+        action="append",
+        nargs=2,
+        metavar=("STAGE", "MODULE=PATH"),
+        help=(
+            "Initialize one module in a named pipeline stage from a checkpoint. "
+            "May be specified multiple times."
+        ),
     )
     parser.add_argument(
         "--output",
@@ -440,8 +466,16 @@ Examples:
         parser.error("--from-stage is only supported with --pipeline")
     if args.to_stage is not None and not args.pipeline:
         parser.error("--to-stage is only supported with --pipeline")
+    if args.select_stage is not None and not args.pipeline:
+        parser.error("--select-stage is only supported with --pipeline")
+    if args.select_stage is not None and (
+        args.from_stage is not None or args.to_stage is not None
+    ):
+        parser.error("--select-stage cannot be combined with --from-stage/--to-stage")
     if args.weight_path is not None and args.pipeline:
         parser.error("--weight-path is stage-specific and cannot override a pipeline")
+    if args.stage_module_weight is not None and not args.pipeline:
+        parser.error("--stage-module-weight is only supported with --pipeline")
 
     # Handle deprecated --local-output flag
     if getattr(args, "local_output", False):
@@ -530,7 +564,10 @@ Examples:
     if args.interactive and lifecycle_options:
         parser.error("run lifecycle options are currently supported in batch mode only")
     if args.interactive and (
-        args.val_source or args.val_source_list or args.val_entry_fraction_range
+        args.val_source
+        or args.val_source_list
+        or args.val_entry_fraction_range
+        or args.val_entry_filter
     ):
         parser.error(
             "validation source options are currently supported in batch mode only"
@@ -542,6 +579,8 @@ Examples:
             ("--val-source/--val-source-list", args.val_source or args.val_source_list),
             ("--entry-fraction-range", args.entry_fraction_range),
             ("--val-entry-fraction-range", args.val_entry_fraction_range),
+            ("--entry-filter", args.entry_filter),
+            ("--val-entry-filter", args.val_entry_filter),
             ("--apply-mods", args.apply_mods),
             ("--set", args.set_overrides),
             ("--ntasks", args.ntasks is not None),
@@ -622,6 +661,8 @@ Examples:
                 workspace=args.workspace,
                 from_stage=args.from_stage,
                 to_stage=args.to_stage,
+                select_stages=args.select_stage,
+                stage_module_weights=args.stage_module_weight,
             )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():
@@ -660,6 +701,7 @@ Examples:
                 spine_path=args.spine_path,
                 weight_path=args.weight_path,
                 entry_fraction_range=args.entry_fraction_range,
+                entry_filter=args.entry_filter,
             )
             return exit_code
 
@@ -705,6 +747,8 @@ Examples:
                 iterations=args.iterations,
                 entry_fraction_range=args.entry_fraction_range,
                 val_entry_fraction_range=args.val_entry_fraction_range,
+                entry_filter=args.entry_filter,
+                val_entry_filter=args.val_entry_filter,
                 spine_path=args.spine_path,
                 stage=args.stage or "inference",
                 run_dir=args.run_dir,

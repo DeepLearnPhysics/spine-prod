@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260906"
+  date: "2026-09-06"
+  description: ProtoDUNE-SP 260906 Monte Carlo detector calibration
+
+include: model/protodune-sp/calibration/calibration_260210.yaml
+
+override:
+  # Invert the collection-plane MC calibration constant (ADC/electron).
+  gain.gain: 984.6396218983853 # e-/ADC

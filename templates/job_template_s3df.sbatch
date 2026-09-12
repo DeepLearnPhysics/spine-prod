@@ -124,42 +124,57 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (larcv_path ~ '/configur
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
+{% if cache_repository %}
+# Fence this logical cache stage before any task publishes a shard. Every
+# array task repeats the same idempotent registration with one shared ID.
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id_shell }}; {{ cache_begin_cmd }} begin {{ cache_repository_shell }} {{ cache_stage_shell }} --publication-id \"\$SPINE_CACHE_PUBLICATION_ID\"; "
+{% endif %}
 {% if custom_command %}
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ custom_command }}"
 {% else %}
-SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ spine_cmd|default('spine') }}{% if file_list_pattern %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ spine_cmd|default('spine') }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 {% endif %}
 SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
 RUN_CMD="$SINGULARITY_CMD"
 
-# Relay an intentional completion request through the container boundary.
+{% if graceful_stop_file %}
+# Translate the scheduler signal into a filesystem request. SPINE rank zero
+# polls this marker at safe minibatch boundaries; no signal crosses the
+# container boundary or reaches DDP/DataLoader children.
+SPINE_PROD_GRACEFUL_STOP_FILE={{ graceful_stop_file|tojson }}
 SPINE_PROD_WORKLOAD_PID=""
-SPINE_PROD_STOP_FORWARDED=0
-forward_graceful_stop() {
-    SPINE_PROD_STOP_FORWARDED=1
-    if [[ -n "$SPINE_PROD_WORKLOAD_PID" ]] && \
-            kill -0 "$SPINE_PROD_WORKLOAD_PID" 2>/dev/null; then
-        echo "Forwarding SIGUSR1 to SPINE workload $SPINE_PROD_WORKLOAD_PID"
-        kill -USR1 "$SPINE_PROD_WORKLOAD_PID" 2>/dev/null || true
+SPINE_PROD_STOP_REQUESTED=0
+request_graceful_stop() {
+    SPINE_PROD_STOP_REQUESTED=1
+    if touch -- "$SPINE_PROD_GRACEFUL_STOP_FILE"; then
+        echo "Requested graceful SPINE completion through $SPINE_PROD_GRACEFUL_STOP_FILE"
+    else
+        echo "ERROR: Could not create graceful-stop marker: $SPINE_PROD_GRACEFUL_STOP_FILE" >&2
     fi
 }
-trap forward_graceful_stop USR1
+trap request_graceful_stop USR1
 
-# Run in the background so the batch shell can process and forward SIGUSR1.
+# Run in the background so the batch shell can process SIGUSR1.
 echo "Running: $RUN_CMD"
 echo
 eval "exec $RUN_CMD" &
 SPINE_PROD_WORKLOAD_PID=$!
 while true; do
-    SPINE_PROD_STOP_FORWARDED=0
+    SPINE_PROD_STOP_REQUESTED=0
     wait "$SPINE_PROD_WORKLOAD_PID"
     EXIT_STATUS=$?
-    if [[ $SPINE_PROD_STOP_FORWARDED -eq 1 && $EXIT_STATUS -gt 128 ]]; then
+    if [[ $SPINE_PROD_STOP_REQUESTED -eq 1 && $EXIT_STATUS -gt 128 ]]; then
         continue
     fi
     break
 done
 trap - USR1
+{% else %}
+echo "Running: $RUN_CMD"
+echo
+eval "$RUN_CMD"
+EXIT_STATUS=$?
+{% endif %}
 
 echo
 echo "=================================="

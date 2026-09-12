@@ -1,0 +1,27 @@
+__meta__:
+  kind: fragment
+  description: Append ProtoDUNE-SP fragment graphs and GrapPA supervision
+
+include: cache/generic/graph_spice/base_v1.yaml
+
+override:
+  io.loader.minibatch_size: 16
+  io.loader.dataset:
+    name: mixed
+    primary:
+      name: larcv
+      file_keys: null
+      schema:
+        coord_label:
+          parser: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+    cache:
+      path: null
+      stage: segmentation
+      keep_open: true
+      stage_map:
+        data_calib: deghosting
+      keys: [data_calib, seg_pred, ppn_points, clust_label_adapt]
+
+  model.network_input.data: data_calib

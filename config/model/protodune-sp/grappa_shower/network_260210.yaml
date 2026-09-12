@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  version: "260210"
+  date: "2026-02-10"
+  description: ProtoDUNE-SP 260210 shower GrapPA network
+
+include: model/common/grappa_shower/network_v1.yaml
+
+override:
+  graph.max_length: [300, 0, 300, 300, 0, 0, 0, 15, 0, 15]

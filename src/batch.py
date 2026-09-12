@@ -3,6 +3,7 @@
 import math
 import shlex
 import sys
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
@@ -133,7 +134,10 @@ class BatchRunner(SubmissionComponent):
         job_name: Optional[str] = None,
         output: Optional[str] = None,
         output_suffix: Optional[str] = None,
+        output_source_list: Optional[str] = None,
         in_place: bool = False,
+        cache_repository: Optional[str] = None,
+        cache_stage: Optional[str] = None,
         no_writer: bool = False,
         ntasks: Optional[int] = None,
         files_per_task: Optional[int] = None,
@@ -154,6 +158,8 @@ class BatchRunner(SubmissionComponent):
         iterations: Optional[int] = None,
         entry_fraction_range: Optional[Tuple[float, float]] = None,
         val_entry_fraction_range: Optional[Tuple[float, float]] = None,
+        entry_filter: Optional[str] = None,
+        val_entry_filter: Optional[str] = None,
         spine_path: Optional[str] = None,
         stage: str = "inference",
         run_dir: Optional[str] = None,
@@ -201,10 +207,16 @@ class BatchRunner(SubmissionComponent):
         output_suffix : str, optional
             Output HDF5 suffix when output names are derived from input files,
             by default None
+        output_source_list : str, optional
+            Write the deterministic source-routed output paths to this text
+            file for dependent pipeline stages.
         in_place : bool, optional
             Leave the writer destination entirely config-defined. This suppresses
             all automatic ``--output*`` arguments so SPINE can extend staged
             caches through its transactional sidecar mechanism.
+        cache_repository, cache_stage : str, optional
+            Logical cache destination and stage. Together these enable fenced
+            parallel publication across scheduler-array tasks.
         no_writer : bool, optional
             Deprecated and ignored. SPINE v0.15.3+ safely ignores output options
             when the configuration has no writer.
@@ -249,6 +261,10 @@ class BatchRunner(SubmissionComponent):
             Half-open fractional range of main-dataset entries to process.
         val_entry_fraction_range : tuple[float, float], optional
             Half-open fractional range of validation entries to process.
+        entry_filter : str, optional
+            File-aware eligibility manifest for the input dataset.
+        val_entry_filter : str, optional
+            File-aware eligibility manifest for the validation dataset.
         spine_path : str, optional
             Override the SPINE executable with a checkout directory or an
             explicit executable path.
@@ -267,9 +283,9 @@ class BatchRunner(SubmissionComponent):
         tensorboard : bool, optional
             Enable stage-specific TensorBoard event logging.
         allow_missing_inputs : bool, optional
-            Preserve exact direct input paths expected from an upstream
-            pipeline stage. This internal pipeline option does not relax glob
-            or source-list resolution.
+            Preserve direct paths and glob patterns expected from an upstream
+            pipeline stage. This internal pipeline option does not relax
+            source-list resolution.
         retry : bool, optional
             Reuse an existing pipeline stage directory while preserving prior
             submissions. Training resumes its latest checkpoint when present.
@@ -289,6 +305,23 @@ class BatchRunner(SubmissionComponent):
         if in_place and (output is not None or output_suffix is not None):
             raise ValueError(
                 "--in-place cannot be combined with --output or --output-suffix"
+            )
+        if bool(cache_repository) != bool(cache_stage):
+            raise ValueError(
+                "cache_repository and cache_stage must be provided together"
+            )
+        if cache_repository and stage != "inference":
+            raise ValueError("Cache publication is valid only for inference jobs")
+        if output_source_list and (
+            in_place
+            or not files
+            or named_sources
+            or not output
+            or not output_suffix
+            or Path(output).suffix.lower() in {".h5", ".hdf5"}
+        ):
+            raise ValueError(
+                "output_source_list requires an explicit output directory and suffix"
             )
 
         if stage not in ("inference", "train", "validation"):
@@ -311,6 +344,8 @@ class BatchRunner(SubmissionComponent):
             raise ValueError("Named validation sources are valid only for training")
         if val_entry_fraction_range is not None and stage != "train":
             raise ValueError("--val-entry-fraction-range is valid only for training")
+        if val_entry_filter is not None and stage != "train":
+            raise ValueError("--val-entry-filter is valid only for training")
         if export_weights:
             if stage != "inference":
                 raise ValueError("--export-weights requires stage=inference")
@@ -443,6 +478,12 @@ class BatchRunner(SubmissionComponent):
         spine_cmd, extra_bind_root = self.context.runtime.resolve_spine_command(
             spine_path
         )
+        cache_cmd = None
+        cache_bind_root = None
+        if cache_repository:
+            cache_cmd, cache_bind_root = (
+                self.context.runtime.resolve_spine_cache_command(spine_path)
+            )
         _, larcv_bind_root = self.context.runtime.resolve_setup_path(
             larcv_path, "--larcv-path"
         )
@@ -476,9 +517,18 @@ class BatchRunner(SubmissionComponent):
             entry_fraction_range,
             val_entry_fraction_range,
         )
+        entry_filter_options = self.context.spine_cli.format_entry_filters(
+            entry_filter,
+            val_entry_filter,
+        )
         extra_bind_roots = [
             root
-            for root in [larcv_bind_root, flashmatch_bind_root, extra_bind_root]
+            for root in [
+                larcv_bind_root,
+                flashmatch_bind_root,
+                extra_bind_root,
+                cache_bind_root,
+            ]
             if root
         ]
         if extra_bind_roots:
@@ -542,6 +592,17 @@ class BatchRunner(SubmissionComponent):
         # Every scheduler submission gets the same immutable attempt layout,
         # including the first inference attempt. This keeps retries uniform.
         attempt_dir = RunManager.create_attempt_dir(job_dir)
+        graceful_stop_file = None
+        if stage == "train":
+            # Keep the request marker scoped to one immutable submission. A
+            # retry therefore cannot inherit a completed attempt's request.
+            graceful_stop_file = attempt_dir / "graceful_stop"
+            lifecycle_args.extend(
+                [
+                    "--graceful-stop-file",
+                    shlex.quote(str(graceful_stop_file)),
+                ]
+            )
         if stage == "inference":
             spine_log_dir = str(attempt_dir)
         elif stage == "validation":
@@ -574,23 +635,43 @@ class BatchRunner(SubmissionComponent):
                 )
 
         if stage != "inference" and file_list:
-            input_manifest = attempt_dir / "inputs.txt"
-            with open(input_manifest, "w", encoding="utf-8") as stream:
-                for file_path in file_list:
-                    stream.write(f"{file_path}\n")
-            lifecycle_args.extend(["--source-list", shlex.quote(str(input_manifest))])
+            cache_input = (
+                source_type == "source"
+                and len(file_list) == 1
+                and Path(file_list[0]).suffix == ".spine-cache"
+            )
+            if cache_input:
+                lifecycle_args.extend(["--source", shlex.quote(file_list[0])])
+            else:
+                input_manifest = attempt_dir / "inputs.txt"
+                with open(input_manifest, "w", encoding="utf-8") as stream:
+                    for file_path in file_list:
+                        stream.write(f"{file_path}\n")
+                lifecycle_args.extend(
+                    ["--source-list", shlex.quote(str(input_manifest))]
+                )
 
         if validation_file_list:
-            validation_input_manifest = attempt_dir / "validation_inputs.txt"
-            with open(validation_input_manifest, "w", encoding="utf-8") as stream:
-                for file_path in validation_file_list:
-                    stream.write(f"{file_path}\n")
-            lifecycle_args.extend(
-                [
-                    "--val-source-list",
-                    shlex.quote(str(validation_input_manifest)),
-                ]
+            cache_validation_input = (
+                validation_source_type == "source"
+                and len(validation_file_list) == 1
+                and Path(validation_file_list[0]).suffix == ".spine-cache"
             )
+            if cache_validation_input:
+                lifecycle_args.extend(
+                    ["--val-source", shlex.quote(validation_file_list[0])]
+                )
+            else:
+                validation_input_manifest = attempt_dir / "validation_inputs.txt"
+                with open(validation_input_manifest, "w", encoding="utf-8") as stream:
+                    for file_path in validation_file_list:
+                        stream.write(f"{file_path}\n")
+                lifecycle_args.extend(
+                    [
+                        "--val-source-list",
+                        shlex.quote(str(validation_input_manifest)),
+                    ]
+                )
 
         extra_args = " ".join(lifecycle_args)
         spine_cli_overrides = " ".join(
@@ -598,6 +679,7 @@ class BatchRunner(SubmissionComponent):
             for part in [
                 spine_runtime_options,
                 entry_fraction_options,
+                entry_filter_options,
                 spine_cli_overrides,
                 named_source_overrides,
                 validation_named_source_overrides,
@@ -624,6 +706,16 @@ class BatchRunner(SubmissionComponent):
                 output_path.parent.mkdir(parents=True, exist_ok=True)
             else:
                 output_path.mkdir(parents=True, exist_ok=True)
+        if output_source_list:
+            assert output is not None and output_suffix is not None
+            output_manifest_path = Path(output_source_list)
+            output_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_paths = self.file_handler.stage_cache_output_paths(
+                file_list, output, output_suffix
+            )
+            with output_manifest_path.open("w", encoding="utf-8") as stream:
+                for cache_path in cache_paths:
+                    stream.write(f"{cache_path}\n")
         output_args = (
             self.context.spine_cli.format_output_args(output, output_dir, output_suffix)
             if not in_place and (file_list or named_sources) and output
@@ -631,6 +723,8 @@ class BatchRunner(SubmissionComponent):
         )
 
         file_chunks = [[]]
+        resolved_named_sources = None
+        inference_source_count = len(file_list)
         concurrent_task_limit = None
         if stage == "inference" and file_list:
             max_array_size = self.profiles["defaults"]["max_array_size"]
@@ -642,9 +736,44 @@ class BatchRunner(SubmissionComponent):
             )
             if files_per_task is not None and ntasks is not None:
                 concurrent_task_limit = ntasks
+        elif stage == "inference" and named_sources:
+            resolved_named_sources = self.file_handler.parse_named_sources(
+                named_sources,
+                allow_missing=allow_missing_inputs,
+            )
+            partitioned_sources = {
+                target: paths
+                for target, paths in resolved_named_sources.items()
+                if target != "cache"
+            }
+            source_count = len(next(iter(partitioned_sources.values())))
+            inference_source_count = source_count
+            max_array_size = self.profiles["defaults"]["max_array_size"]
+            effective_files_per_task = self.resolve_files_per_task(
+                source_count, ntasks=ntasks, files_per_task=files_per_task
+            )
+            file_chunks = self.file_handler.chunk_files(
+                list(range(source_count)), max_array_size, effective_files_per_task
+            )
+            if files_per_task is not None and ntasks is not None:
+                concurrent_task_limit = ntasks
 
         task_count = sum(len(chunk) for chunk in file_chunks)
-        has_array = stage == "inference" and bool(file_list) and task_count > 1
+        has_array = stage == "inference" and task_count > 1
+        publication_id = None
+        if cache_repository:
+            if inference_source_count < 1:
+                raise ValueError("Parallel cache publication requires input sources")
+            publication_id = uuid.uuid4().hex
+            cache_overrides = " ".join(
+                [
+                    "--set io.writer.parallel=true",
+                    f"--set io.writer.expected_sources={inference_source_count}",
+                ]
+            )
+            spine_cli_overrides = " ".join(
+                part for part in (spine_cli_overrides, cache_overrides) if part
+            )
         RunManager.expose_attempt_logs(job_dir, has_array)
         print(f"Splitting into {len(file_chunks)} scheduler job(s)")
 
@@ -654,6 +783,7 @@ class BatchRunner(SubmissionComponent):
         for chunk_idx, chunk in enumerate(file_chunks):
             task_dir_pattern = None
             file_list_pattern = None
+            named_source_args = None
             chunk_output_args = output_args
             chunk_spine_log_dir = spine_log_dir
 
@@ -705,6 +835,42 @@ class BatchRunner(SubmissionComponent):
                             ]
                         )
                         default_output_location = str(scalar_output)
+            elif stage == "inference" and resolved_named_sources:
+                # Each task receives aligned manifests for every mixed-dataset
+                # target. The first manifest also drives template diagnostics.
+                target_names = list(partitioned_sources)
+                task_dir_pattern = str(attempt_dir / "tasks" / f"{chunk_idx:03d}_*")
+                file_list_pattern = f"{task_dir_pattern}/{target_names[0]}.txt"
+                for task_idx, index_group in enumerate(chunk, start=1):
+                    task_dir = attempt_dir / "tasks" / f"{chunk_idx:03d}_{task_idx}"
+                    task_dir.mkdir(parents=True, exist_ok=True)
+                    for target, source_files in partitioned_sources.items():
+                        manifest = task_dir / f"{target}.txt"
+                        with manifest.open("w", encoding="utf-8") as stream:
+                            for index in index_group:
+                                stream.write(f"{source_files[index]}\n")
+                task_list_args = " ".join(
+                    f"{target}=$TASK_DIR/{target}.txt" for target in target_names
+                )
+                named_source_args = f"--source-list {task_list_args}"
+                if "cache" in resolved_named_sources:
+                    cache_path = resolved_named_sources["cache"][0]
+                    named_source_args = " ".join(
+                        [
+                            f"--source {shlex.quote(f'cache={cache_path}')}",
+                            named_source_args,
+                        ]
+                    )
+                # Replace the global full-list overrides with task-local lists.
+                chunk_spine_overrides = spine_cli_overrides.replace(
+                    named_source_overrides, named_source_args, 1
+                )
+                chunk_spine_log_dir = "$TASK_DIR"
+            else:
+                chunk_spine_overrides = spine_cli_overrides
+
+            if not (stage == "inference" and resolved_named_sources):
+                chunk_spine_overrides = spine_cli_overrides
 
             batch_client = self.get_batch_client(profile_config)
             template = batch_client.load_template(
@@ -736,6 +902,7 @@ class BatchRunner(SubmissionComponent):
                 dependency=chunk_dependency,
                 basedir=str(self.basedir),
                 file_list_pattern=file_list_pattern,
+                named_source_args=named_source_args,
                 input_manifest=(str(input_manifest) if input_manifest else None),
                 task_dir_pattern=task_dir_pattern,
                 spine_log_dir=chunk_spine_log_dir,
@@ -753,7 +920,21 @@ class BatchRunner(SubmissionComponent):
                 flashmatch=flashmatch,
                 cvmfs=cvmfs,
                 spine_cmd=spine_cmd or "spine",
-                spine_cli_overrides=spine_cli_overrides,
+                cache_begin_cmd=cache_cmd or "spine-cache",
+                cache_repository=cache_repository,
+                cache_stage=cache_stage,
+                cache_publication_id=publication_id,
+                cache_repository_shell=(
+                    shlex.quote(cache_repository) if cache_repository else None
+                ),
+                cache_stage_shell=shlex.quote(cache_stage) if cache_stage else None,
+                cache_publication_id_shell=(
+                    shlex.quote(publication_id) if publication_id else None
+                ),
+                spine_cli_overrides=chunk_spine_overrides,
+                graceful_stop_file=(
+                    str(graceful_stop_file) if graceful_stop_file else None
+                ),
                 **profile_config,
             )
 
@@ -775,6 +956,8 @@ class BatchRunner(SubmissionComponent):
                     else len(file_list)
                 )
                 print(f"  Files: {num_chunk_files}")
+            elif resolved_named_sources:
+                print(f"  Files: {sum(len(group) for group in chunk)} aligned sets")
             else:
                 print("  Files: config-defined input list")
             print(f"  Profile: {profile} ({profile_config['description']})")
@@ -816,6 +999,8 @@ class BatchRunner(SubmissionComponent):
             "iterations": iterations,
             "entry_fraction_range": entry_fraction_range,
             "val_entry_fraction_range": val_entry_fraction_range,
+            "entry_filter": entry_filter,
+            "val_entry_filter": val_entry_filter,
             "source_type": source_type if files else None,
             "source_inputs": files or [],
             "source_manifest": str(input_manifest) if input_manifest else None,
@@ -832,16 +1017,25 @@ class BatchRunner(SubmissionComponent):
             "cvmfs": cvmfs,
             "no_writer": no_writer,
             "in_place": in_place,
+            "cache_repository": cache_repository,
+            "cache_stage": cache_stage,
+            "cache_publication_id": publication_id,
             "profile": profile,
             "profile_config": profile_config,
-            "num_files": len(file_list) if file_list else None,
+            "num_files": (
+                inference_source_count
+                if stage == "inference" and (file_list or resolved_named_sources)
+                else len(file_list) if file_list else None
+            ),
             "num_chunks": len(file_chunks),
             "files_per_task": files_per_task,
             "resolved_files_per_task": (
                 self.resolve_files_per_task(
-                    len(file_list), ntasks=ntasks, files_per_task=files_per_task
+                    inference_source_count,
+                    ntasks=ntasks,
+                    files_per_task=files_per_task,
                 )
-                if stage == "inference" and file_list
+                if stage == "inference" and (file_list or resolved_named_sources)
                 else None
             ),
             "ntasks": ntasks,
@@ -851,12 +1045,16 @@ class BatchRunner(SubmissionComponent):
                 None if in_place else output_dir if output else default_output_location
             ),
             "output_suffix": output_suffix,
+            "output_source_list": output_source_list,
             "resume_checkpoint": (
                 str(resume_checkpoint) if resume_checkpoint is not None else None
             ),
             "validation_name": validation_name,
             "selected_checkpoints": [str(path) for path in selected_checkpoints],
             "tensorboard": tensorboard,
+            "graceful_stop_file": (
+                str(graceful_stop_file) if graceful_stop_file else None
+            ),
             "submitted": datetime.now().isoformat(),
             "command": " ".join(sys.argv),
         }

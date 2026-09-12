@@ -1,0 +1,15 @@
+__meta__:
+  kind: bundle
+  version: "260210"
+  date: "2026-02-10"
+  description: ProtoDUNE-SP full-chain metric report with deghosting performance
+
+include: test/common/full_chain/report_v1.yaml
+
+metrics:
+  deghosting:
+    name: segment_confusion
+    source: "**/*segment_eval_summary.csv"
+    class_mapping:
+      Non-ghost: [shower, track, michel, delta, low_energy]
+      Ghost: [ghost]

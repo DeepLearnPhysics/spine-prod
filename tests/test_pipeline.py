@@ -98,6 +98,28 @@ def test_workspace_override_resolves_portable_pipeline(tmp_path):
     assert definition.stages[0]["output"] == "/runs/benchmark/cache/train"
 
 
+def test_collection_exact_substitution_preserves_scalar_type(tmp_path):
+    """Typed collection fields remain typed in their expanded stages."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "collections": {"splits": [{"name": "train", "tasks": 4}]},
+            "stages": [
+                {
+                    "name": "cache_${split.name}",
+                    "for_each": {"collection": "splits", "as": "split"},
+                    "config": "cache.yaml",
+                    "ntasks": "${split.tasks}",
+                }
+            ],
+        },
+    )
+
+    definition = PipelineDefinition.load(str(path))
+
+    assert definition.stages[0]["ntasks"] == 4
+
+
 def test_workspace_override_replaces_yaml_default(tmp_path):
     """The launch value should take precedence over a concrete YAML workspace."""
     path = write_pipeline(
@@ -131,6 +153,105 @@ def test_pipeline_may_omit_unused_workspace(tmp_path):
 
     assert definition.workspace is None
     assert definition.stages[0]["name"] == "job"
+
+
+def test_stage_module_weights_override_yaml_by_stage(tmp_path):
+    """Launch-time seeds should merge into only their named SPINE stage."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "train",
+                    "config": "train.yaml",
+                    "stage": "train",
+                    "run_dir": "/run",
+                    "module_weight": {
+                        "backbone": "/weights/yaml.ckpt",
+                        "head": "/weights/head.ckpt",
+                    },
+                },
+                {"name": "cache", "config": "cache.yaml"},
+            ]
+        },
+    )
+    overrides = PipelineDefinition.parse_stage_module_weights(
+        [
+            ["train", "backbone=/weights/cli.ckpt"],
+            ["train", "extra=/weights/extra=best.ckpt"],
+        ]
+    )
+
+    definition = PipelineDefinition.load(str(path), stage_module_weights=overrides)
+
+    assert definition.stages[0]["module_weight"] == {
+        "backbone": "/weights/cli.ckpt",
+        "head": "/weights/head.ckpt",
+        "extra": "/weights/extra=best.ckpt",
+    }
+    assert "module_weight" not in definition.stages[1]
+
+
+@pytest.mark.parametrize(
+    ("values", "error", "message"),
+    [
+        (["train=model.ckpt"], ValueError, "requires STAGE and MODULE=PATH"),
+        (
+            [["bad stage", "model=/weights/model.ckpt"]],
+            ValueError,
+            "valid pipeline stage",
+        ),
+        ([["train", "model"]], ValueError, "must use MODULE=PATH"),
+        ([["train", "bad.module=/weights/model.ckpt"]], ValueError, "valid identifier"),
+        ([["train", "model="]], ValueError, "PATH must not be empty"),
+        (
+            [
+                ["train", "model=/weights/first.ckpt"],
+                ["train", "model=/weights/second.ckpt"],
+            ],
+            ValueError,
+            "Duplicate",
+        ),
+    ],
+)
+def test_stage_module_weight_parser_rejects_malformed_values(values, error, message):
+    """Malformed stage-qualified seeds should fail before pipeline loading."""
+    with pytest.raises(error, match=message):
+        PipelineDefinition.parse_stage_module_weights(values)
+
+
+def test_empty_stage_module_weight_input_is_a_noop():
+    """An omitted repeatable CLI option should produce no overrides."""
+    assert PipelineDefinition.parse_stage_module_weights(None) == {}
+
+
+@pytest.mark.parametrize(
+    ("stages", "overrides", "error", "message"),
+    [
+        (
+            [{"name": "train", "config": "train.yaml"}],
+            {"missing": {"model": "/weights/model.ckpt"}},
+            ValueError,
+            "Unknown pipeline stage",
+        ),
+        (
+            [{"name": "report", "config": "report.yaml", "kind": "report"}],
+            {"report": {"model": "/weights/model.ckpt"}},
+            ValueError,
+            "cannot receive module weights",
+        ),
+        (
+            [{"name": "train", "config": "train.yaml"}],
+            {"train": ["not-a-mapping"]},
+            TypeError,
+            "must be a mapping",
+        ),
+    ],
+)
+def test_stage_module_weight_targets_are_validated(stages, overrides, error, message):
+    """Every override target must be valid before any stage is mutated."""
+    with pytest.raises(error, match=message):
+        PipelineDefinition._apply_stage_module_weights(stages, overrides)
 
 
 def test_pipeline_expands_collection_stage_templates(tmp_path):
@@ -226,11 +347,11 @@ def test_pipeline_expands_collection_stage_templates(tmp_path):
         ),
         (
             {
-                "collections": {"splits": [{"name": 1}]},
+                "collections": {"splits": [{"name": ["train"]}]},
                 "stages": [{"name": "job", "config": "x.yaml"}],
             },
             TypeError,
-            "value 'name' must be a string",
+            "value 'name' must be a scalar",
         ),
         (
             {
@@ -492,6 +613,9 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
         ("${value}",), {"value": "expanded"}, "test"
     ) == ("expanded",)
 
+    with pytest.raises(TypeError, match="cannot be embedded"):
+        PipelineDefinition._expand_variables("prefix-${count}", {"count": 2}, "test")
+
     with pytest.raises(ValueError, match="both larcv_path and larcv_basedir"):
         PipelineDefinition._normalize_aliases(
             {"larcv_path": "/new", "larcv_basedir": "/legacy"}, "test"
@@ -518,6 +642,24 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             {"name": "job", "config": "x.yaml", "weight_path": ""},
             ValueError,
             "weight_path must be a non-empty string",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "module_weight": {"bad.module": "/weights/model.ckpt"},
+            },
+            ValueError,
+            "module_weight keys must be valid identifiers",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "module_weight": {"model": ""},
+            },
+            ValueError,
+            "module_weight path.*must be a non-empty string",
         ),
         (
             {"name": "job", "config": "x.yaml", "kind": "other"},
@@ -557,6 +699,15 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             },
             ValueError,
             "validation entry range requires stage=train",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "val_entry_filter": "/filters/validation.yaml",
+            },
+            ValueError,
+            "validation entry filter requires stage=train",
         ),
         (
             {
@@ -622,6 +773,78 @@ def test_pipeline_log_index_rejects_existing_regular_path(tmp_path):
         PipelineRunner._prepare_log_index(str(workspace), [{"name": "stage"}])
 
 
+def test_filter_stage_contract_and_submission_options():
+    """Filter stages map onto the standalone scanner without SPINE fields."""
+    scan = {
+        "name": "scan",
+        "kind": "filter",
+        "operation": "scan",
+        "config": "filter.yaml",
+        "source_list": "files.txt",
+        "cache_dir": "/filter/counts",
+        "run_dir": "/filter/scan",
+        "workers": 16,
+        "force": True,
+    }
+    resolved = PipelineDefinition._resolve_stage(scan, 1, {}, {}, set())
+    options = PipelineRunner._submission_options(
+        resolved, dependency="afterok:10", retry=True
+    )
+
+    assert options["operation"] == "scan"
+    assert options["source_list"] == "files.txt"
+    assert options["sources"] is None
+    assert options["workers"] == 16
+    assert options["force"] is True
+    assert options["dependency"] == "afterok:10"
+    assert options["retry"] is True
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"operation": "other"}, "operation must be scan or build"),
+        ({"source_list": None}, "exactly one of"),
+        ({"source": "input.root"}, "only one of"),
+        ({"cache_dir": None}, "requires: cache_dir"),
+        ({"workers": 0}, "workers must be a positive integer"),
+        ({"force": "yes"}, "force must be a boolean"),
+        ({"output": "/tmp/filter.yaml"}, "cannot define build outputs"),
+        (
+            {"operation": "build", "workers": 2},
+            "requires: output, output_source_list",
+        ),
+        (
+            {
+                "operation": "build",
+                "output": "/tmp/filter.yaml",
+                "output_source_list": "/tmp/files.txt",
+                "workers": 2,
+            },
+            "cannot define workers or force",
+        ),
+        ({"entry_filter": "/tmp/filter.yaml"}, "cannot use SPINE/report field"),
+    ],
+)
+def test_filter_stage_rejects_invalid_contracts(change, message):
+    """Operation-specific filter fields fail during whole-pipeline validation."""
+    stage = {
+        "name": "filter",
+        "kind": "filter",
+        "operation": "scan",
+        "config": "filter.yaml",
+        "source_list": "files.txt",
+        "cache_dir": "/tmp/counts",
+        "run_dir": "/tmp/scan",
+    }
+    stage.update(change)
+    if change.get("source_list") is None and "source_list" in change:
+        stage.pop("source_list")
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        PipelineDefinition._resolve_stage(stage, 1, {}, {}, set())
+
+
 @pytest.mark.parametrize(
     ("from_stage", "to_stage", "message"),
     [
@@ -637,4 +860,35 @@ def test_pipeline_stage_selection_rejects_invalid_boundaries(
     with pytest.raises(ValueError, match=message):
         PipelineRunner._select_stages(
             [{"name": "stage"}], from_stage=from_stage, to_stage=to_stage
+        )
+
+
+@pytest.mark.parametrize(
+    ("selection", "message"),
+    [
+        ([], "must not be empty"),
+        ([""], "must contain non-empty strings"),
+        (["stage", "stage"], "must not contain duplicates"),
+        (["missing"], "Unknown selected pipeline stage"),
+    ],
+)
+def test_sparse_pipeline_stage_selection_rejects_invalid_names(selection, message):
+    """Sparse selection must be explicit, unique, and resolvable."""
+    with pytest.raises(ValueError, match=message):
+        PipelineRunner._select_stages(
+            [{"name": "stage"}],
+            from_stage=None,
+            to_stage=None,
+            select_stages=selection,
+        )
+
+
+def test_sparse_pipeline_stage_selection_rejects_boundaries():
+    """The internal selection API also rejects ambiguous selection modes."""
+    with pytest.raises(ValueError, match="cannot be combined"):
+        PipelineRunner._select_stages(
+            [{"name": "stage"}],
+            from_stage="stage",
+            to_stage=None,
+            select_stages=["stage"],
         )

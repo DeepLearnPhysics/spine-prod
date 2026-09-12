@@ -155,6 +155,23 @@ class SpineCLI:
         return " ".join(options)
 
     @staticmethod
+    def format_entry_filters(
+        entry_filter: Optional[str] = None,
+        val_entry_filter: Optional[str] = None,
+    ) -> str:
+        """Format file-aware input and validation eligibility manifests."""
+        options = []
+        for flag, value in (
+            ("--entry-filter", entry_filter),
+            ("--val-entry-filter", val_entry_filter),
+        ):
+            if value is not None:
+                if not isinstance(value, str) or not value:
+                    raise ValueError(f"{flag} requires a non-empty path")
+                options.append(f"{flag} {shlex.quote(value)}")
+        return " ".join(options)
+
+    @staticmethod
     def validate_fraction_range(
         flag: str, value: Tuple[float, float]
     ) -> Tuple[float, float]:

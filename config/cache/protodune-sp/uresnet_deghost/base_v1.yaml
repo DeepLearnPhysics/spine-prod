@@ -1,0 +1,77 @@
+__meta__:
+  kind: fragment
+  description: Materialize deghosted and calibrated ProtoDUNE-SP point data
+
+base:
+  world_size: 1
+  iterations: -1
+  seed: 0
+  unwrap: true
+  split_output: true
+  log_step: 1
+
+io:
+  loader:
+    minibatch_size: 4
+    shuffle: false
+    num_workers: 16
+    collate_fn: all
+    dataset:
+      name: larcv
+      file_keys: null
+      schema:
+        data:
+          parser: sparse3d
+          sparse_event_list:
+            - sparse3d_reco
+            - sparse3d_reco_chi2
+            - sparse3d_reco_hit_charge0
+            - sparse3d_reco_hit_charge1
+            - sparse3d_reco_hit_charge2
+            - sparse3d_reco_hit_key0
+            - sparse3d_reco_hit_key1
+            - sparse3d_reco_hit_key2
+        sources:
+          parser: sparse3d
+          sparse_event_list: [sparse3d_reco_cryo, sparse3d_reco_tpc]
+          feature_only: true
+        meta:
+          parser: meta
+          sparse_event: sparse3d_pcluster
+  writer:
+    name: cache
+    stage: deghosting
+    overwrite_stage: true
+    # Persist only products which cannot be reconstructed from the LArCV file.
+    keys:
+      - data_calib
+      - orig_index
+
+model:
+  name: full_chain
+  to_numpy: true
+
+  network_input:
+    data: data
+    sources: sources
+    meta: meta
+
+  modules:
+    chain:
+      stages:
+        - name: deghosting
+          provider: deghost
+          uses: uresnet_deghost
+          config:
+            mode: uresnet
+            charge_rescaling: collection
+
+        - name: calibration
+          provider: calibration
+          config:
+            mode: apply
+
+override:
+  # Strip the full-chain prefix while loading the standalone checkpoint.
+  model.modules.uresnet_deghost.model_name: ""
+  model.modules.uresnet_deghost.weight_path: ""

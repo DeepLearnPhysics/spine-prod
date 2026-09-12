@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260906"
+  date: "2026-09-06"
+  description: ProtoDUNE-SP 260906 standalone deghosting training
+
+include:
+  - model/protodune-sp/uresnet_deghost/model_260210.yaml
+  - train/protodune-sp/uresnet_deghost/base_v1.yaml

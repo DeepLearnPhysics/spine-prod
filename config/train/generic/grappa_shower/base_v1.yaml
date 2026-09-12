@@ -31,6 +31,9 @@ io:
           break_clusters: true
           particle_info:
             particle_event: particle_corrected
+            type_include_secondary: false
+            type_include_mpr: false
+            primary_include_mpr: false
         coord_label:
           parser: particle_coords
           particle_event: particle_corrected

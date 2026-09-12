@@ -1,7 +1,7 @@
-# Prototype transition: train UResNet-PPN, cache its predictions and adapted
+# Staged transition: train UResNet-PPN, cache its predictions and adapted
 # cluster truth, then train standalone Graph-SPICE from those stage products.
 # Supply the workflow destination with CLI --workspace.
-# The cache naming matches the appendable full-chain workflow.
+# The cache repository matches the appendable full-chain workflow.
 
 workspace: null
 
@@ -14,11 +14,11 @@ collections:
     - name: train
       source: ${train_source}
       cache_dir: ${workspace}/cache/train
-      cache_file: ${workspace}/cache/train/train_cache.h5
+      cache_repository: ${workspace}/cache/train.spine-cache
     - name: validation
       source: ${validation_source}
       cache_dir: ${workspace}/cache/validation
-      cache_file: ${workspace}/cache/validation/test_cache.h5
+      cache_repository: ${workspace}/cache/validation.spine-cache
 
 defaults:
   profile: s3df_ampere
@@ -41,10 +41,12 @@ stages:
     config: cache/generic/uresnet_ppn/segmentation_240805.yaml
     source: ${split.source}
     run_dir: ${split.cache_dir}/segmentation
-    output: ${split.cache_dir}
-    output_suffix: cache
+    output: ${split.cache_repository}
+    cache_repository: ${split.cache_repository}
+    cache_stage: segmentation
     files_per_task: 1
-    ntasks: 50
+    # Train and validation arrays run together: two tasks each cap total GPUs at 4.
+    ntasks: 2
     module_weight:
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
@@ -55,12 +57,12 @@ stages:
     run_dir: ${workspace}/train/graph_spice
     tensorboard: true
     sources:
-      larcv:
+      primary:
         source: ${train_source}
-      hdf5:
-        source: ${workspace}/cache/train/train_cache.h5
+      cache:
+        source: ${workspace}/cache/train.spine-cache
     validation_sources:
-      larcv:
+      primary:
         source: ${validation_source}
-      hdf5:
-        source: ${workspace}/cache/validation/test_cache.h5
+      cache:
+        source: ${workspace}/cache/validation.spine-cache

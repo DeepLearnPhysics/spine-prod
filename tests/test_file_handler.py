@@ -20,6 +20,14 @@ def test_parse_source_list_ignores_blank_lines(handler, tmp_path):
     ]
 
 
+def test_parse_source_list_rejects_repeated_paths(handler, tmp_path):
+    source_list = tmp_path / "files.txt"
+    source_list.write_text("first.root\nsecond.root\nfirst.root\n")
+
+    with pytest.raises(ValueError, match="repeated file paths.*first.root"):
+        handler.parse_files([str(source_list)], "source_list")
+
+
 def test_parse_source_list_requires_one_path(handler):
     with pytest.raises(ValueError, match="exactly one"):
         handler.parse_files(["one.txt", "two.txt"], "source_list")
@@ -62,11 +70,70 @@ def test_parse_direct_sources_preserves_expected_pipeline_output(handler, tmp_pa
     assert handler.parse_files([str(future)], allow_missing=True) == [str(future)]
 
 
-def test_allow_missing_does_not_preserve_unresolved_glob(handler, tmp_path):
-    """Future inputs must be exact because an unmatched glob is indeterminate."""
+def test_allow_missing_preserves_unresolved_glob(handler, tmp_path):
+    """A dependent job may expand its upstream cache glob at runtime."""
     pattern = str(tmp_path / "*.h5")
 
-    assert handler.parse_files([pattern], allow_missing=True) == []
+    assert handler.parse_files([pattern], allow_missing=True) == [pattern]
+
+
+def test_named_sources_allow_one_shared_cache_repository(handler, tmp_path):
+    """A scalar cache accompanies a partitionable primary source collection."""
+    first = tmp_path / "first.root"
+    second = tmp_path / "second.root"
+    cache = tmp_path / "train.spine-cache"
+    first.touch()
+    second.touch()
+    cache.mkdir()
+
+    assert handler.parse_named_sources(
+        {
+            "primary": {"source": [str(first), str(second)]},
+            "cache": {"source": str(cache)},
+        }
+    ) == {
+        "primary": [str(first), str(second)],
+        "cache": [str(cache)],
+    }
+
+
+def test_named_sources_reject_invalid_cache_cardinality(handler, tmp_path):
+    """A cache role always denotes exactly one logical repository."""
+    caches = [tmp_path / "first.spine-cache", tmp_path / "second.spine-cache"]
+    for cache in caches:
+        cache.mkdir()
+    with pytest.raises(ValueError, match="requires one repository"):
+        handler.parse_named_sources({"cache": {"source": list(map(str, caches))}})
+
+
+def test_named_sources_reject_cache_without_partition_driver(handler, tmp_path):
+    """A cache-only inference array has no raw target to divide into tasks."""
+    cache = tmp_path / "train.spine-cache"
+    cache.mkdir()
+    with pytest.raises(ValueError, match="require another target"):
+        handler.parse_named_sources({"cache": {"source": str(cache)}})
+
+
+def test_stage_cache_output_paths_follow_writer_naming(handler, tmp_path):
+    """Predicted cache paths use each source basename and configured suffix."""
+    assert handler.stage_cache_output_paths(
+        ["/input/a.root", "/other/b.larcv.root"], str(tmp_path), "cache"
+    ) == [
+        str(tmp_path / "a_cache.h5"),
+        str(tmp_path / "b.larcv_cache.h5"),
+    ]
+
+
+def test_stage_cache_output_paths_reject_duplicate_basenames(handler, tmp_path):
+    """Two source directories cannot silently claim one output cache path."""
+    with pytest.raises(ValueError, match="globally unique source basenames"):
+        handler.stage_cache_output_paths(
+            ["/first/data.root", "/second/data.root"], str(tmp_path), "cache"
+        )
+
+
+def test_duplicates_preserves_first_duplicate_order(handler):
+    assert handler._duplicates(["a", "b", "a", "c", "b", "a"]) == ["a", "b"]
 
 
 @pytest.mark.parametrize(

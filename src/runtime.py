@@ -122,7 +122,9 @@ class RuntimeResolver(SubmissionComponent):
                     f"{option_name} does not provide spine.bin.report: {root}"
                 )
             src_dir = shlex.quote(str(root / "src"))
-            command = f"PYTHONPATH={src_dir}:$PYTHONPATH python3 -m spine.bin.report"
+            command = (
+                f"env PYTHONPATH={src_dir}:$PYTHONPATH " "python3 -m spine.bin.report"
+            )
             return command, str(root)
 
         local_report = shutil.which("spine-report")
@@ -131,6 +133,73 @@ class RuntimeResolver(SubmissionComponent):
 
         # Batch execution occurs inside the configured SPINE container, where
         # the release entry point is expected even if it is absent on the host.
+        return None, None
+
+    @staticmethod
+    def resolve_spine_filter_command(
+        spine_path: Optional[str] = None,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Resolve ``spine-filter`` against an install or source checkout."""
+        configured = spine_path or os.environ.get("SPINE_LOCAL_PATH")
+        if configured:
+            configured_path = Path(configured).expanduser()
+            if configured_path.is_dir():
+                root = configured_path
+            elif configured_path.parent.name == "bin":
+                root = configured_path.parent.parent
+            else:
+                root = configured_path.parent
+
+            filter_module = root / "src" / "spine" / "bin" / "filter.py"
+            if not filter_module.is_file():
+                option_name = "--spine-path" if spine_path else "SPINE_LOCAL_PATH"
+                raise RuntimeError(
+                    f"{option_name} does not provide spine.bin.filter: {root}"
+                )
+            src_dir = shlex.quote(str(root / "src"))
+            command = (
+                f"env PYTHONPATH={src_dir}:$PYTHONPATH " "python3 -m spine.bin.filter"
+            )
+            return command, str(root)
+
+        local_filter = shutil.which("spine-filter")
+        if local_filter:
+            return shlex.quote(local_filter), None
+
+        return None, None
+
+    @staticmethod
+    def resolve_spine_cache_command(
+        spine_path: Optional[str] = None,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Resolve ``spine-cache`` against an install or source checkout."""
+        configured = spine_path or os.environ.get("SPINE_LOCAL_PATH")
+        if configured:
+            configured_path = Path(configured).expanduser()
+            if configured_path.is_dir():
+                root = configured_path
+            elif configured_path.parent.name == "bin":
+                root = configured_path.parent.parent
+            else:
+                root = configured_path.parent
+
+            cache_module = root / "src" / "spine" / "bin" / "cache.py"
+            if not cache_module.is_file():
+                option_name = "--spine-path" if spine_path else "SPINE_LOCAL_PATH"
+                raise RuntimeError(
+                    f"{option_name} does not provide spine.bin.cache: {root}"
+                )
+            src_dir = shlex.quote(str(root / "src"))
+            command = (
+                f"env PYTHONPATH={src_dir}:$PYTHONPATH " "python3 -m spine.bin.cache"
+            )
+            return command, str(root)
+
+        local_cache = shutil.which("spine-cache")
+        if local_cache:
+            return shlex.quote(local_cache), None
+
+        # Scheduled execution uses the entry point in the release container.
         return None, None
 
     @staticmethod

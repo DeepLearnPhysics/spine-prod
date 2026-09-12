@@ -150,6 +150,8 @@ def test_interactive_mode_forwards_runtime_options():
         "25",
         "--weight-path",
         "/weights/full.ckpt",
+        "--entry-filter",
+        "/filters/accepted.yaml",
         "--set",
         "model.detect_anomaly=true",
         submitter=submitter,
@@ -167,6 +169,7 @@ def test_interactive_mode_forwards_runtime_options():
     assert kwargs["num_workers"] == 8
     assert kwargs["epochs"] == 25
     assert kwargs["weight_path"] == "/weights/full.ckpt"
+    assert kwargs["entry_filter"] == "/filters/accepted.yaml"
     assert kwargs["set_overrides"] == ["model.detect_anomaly=true"]
 
 
@@ -255,6 +258,10 @@ def test_batch_mode_forwards_training_and_validation_sources():
         "train.txt",
         "--val-source-list",
         "validation.txt",
+        "--entry-filter",
+        "/filters/train.yaml",
+        "--val-entry-filter",
+        "/filters/validation.yaml",
         submitter=submitter,
     )
 
@@ -264,6 +271,8 @@ def test_batch_mode_forwards_training_and_validation_sources():
     assert kwargs["source_type"] == "source_list"
     assert kwargs["validation_files"] == ["validation.txt"]
     assert kwargs["validation_source_type"] == "source_list"
+    assert kwargs["entry_filter"] == "/filters/train.yaml"
+    assert kwargs["val_entry_filter"] == "/filters/validation.yaml"
 
 
 def test_pipeline_mode_prints_stage_jobs(capsys):
@@ -288,6 +297,8 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         workspace="/runs/benchmark",
         from_stage=None,
         to_stage=None,
+        select_stages=None,
+        stage_module_weights=None,
     )
     output = capsys.readouterr().out
     assert "reco: 42" in output
@@ -329,6 +340,42 @@ def test_pipeline_rejects_stage_specific_weight_path():
             "pipeline.yaml",
             "--weight-path",
             "/weights/model.ckpt",
+        )
+
+
+def test_pipeline_forwards_stage_module_weights():
+    """Stage-qualified module seeds should reach pipeline validation intact."""
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--stage-module-weight",
+        "train_uresnet_ppn",
+        "uresnet_ppn=/weights/ppn.ckpt",
+        "--stage-module-weight",
+        "train_graph_spice",
+        "graph_spice=/weights/graph.ckpt",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert submitter.submit_pipeline.call_args.kwargs["stage_module_weights"] == [
+        ["train_uresnet_ppn", "uresnet_ppn=/weights/ppn.ckpt"],
+        ["train_graph_spice", "graph_spice=/weights/graph.ckpt"],
+    ]
+
+
+def test_stage_module_weight_requires_pipeline():
+    """A stage name has no meaning for an ordinary single-job submission."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--config",
+            "train.yaml",
+            "--stage-module-weight",
+            "train",
+            "model=/weights/model.ckpt",
         )
 
 
@@ -390,6 +437,27 @@ def test_pipeline_mode_forwards_restart_stage():
     assert submitter.submit_pipeline.call_args.kwargs["to_stage"] is None
 
 
+def test_pipeline_mode_forwards_selected_stages():
+    """One compact option should forward the requested sparse stage set."""
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--select-stage",
+        "cache_train",
+        "cache_validation",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert submitter.submit_pipeline.call_args.kwargs["select_stages"] == [
+        "cache_train",
+        "cache_validation",
+    ]
+
+
 def test_workspace_is_rejected_outside_pipeline_mode():
     """A pipeline workspace must not silently behave like a job run directory."""
     with pytest.raises(SystemExit, match="2"):
@@ -408,6 +476,25 @@ def test_to_stage_is_rejected_outside_pipeline_mode():
         run_main("--config", "config.yaml", "--to-stage", "train")
 
 
+def test_select_stage_is_rejected_outside_pipeline_mode():
+    """Sparse pipeline selection has no meaning for a single job."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main("--config", "config.yaml", "--select-stage", "train")
+
+
+def test_select_stage_rejects_range_boundaries():
+    """Sparse and contiguous selection modes must remain unambiguous."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--pipeline",
+            "pipeline.yaml",
+            "--select-stage",
+            "train",
+            "--from-stage",
+            "train",
+        )
+
+
 def test_cli_rejects_undeclared_long_option_abbreviations():
     with pytest.raises(SystemExit, match="2"):
         run_main("--pipeline", "pipeline.yaml", "--spin", "/software/spine-dev")
@@ -417,6 +504,7 @@ def test_cli_rejects_undeclared_long_option_abbreviations():
     "stage_args",
     [
         ("--source", "input.root"),
+        ("--entry-filter", "accepted.yaml"),
         ("--apply-mods", "data"),
         ("--set", "base.seed=7"),
         ("--ntasks", "4"),

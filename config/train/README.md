@@ -15,10 +15,11 @@ The configurations in this directory are used to:
 The currently populated configuration tree is:
 
 - **`generic/`**: YAML benchmark recipes for the generic dataset
+- **`protodune-sp/`**: staged recipes for the ProtoDUNE-SP `260210` chain,
+  including its separately trained deghosting model
 
-Detector-specific training trees will be added as their historical recipes are
-reviewed and migrated to the composed configuration structure demonstrated by
-the generic benchmark.
+Additional detector-specific trees will be added as their historical recipes
+are reviewed and migrated to this composed configuration structure.
 
 ## Configuration Structure
 

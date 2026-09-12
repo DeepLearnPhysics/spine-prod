@@ -18,7 +18,8 @@ io:
     collate_fn: all
     dataset:
       name: mixed
-      larcv:
+      primary:
+        name: larcv
         file_keys: null
         schema:
           data:
@@ -28,31 +29,25 @@ io:
             parser: particle_coords
             particle_event: particle_corrected
             cluster_event: cluster3d_pcluster
-      hdf5:
-        file_keys: null
-        staged: true
+      cache:
+        path: null
         stage: segmentation
         keep_open: true
         keys: [seg_pred, ppn_points, clust_label_adapt]
   writer:
-    name: stage_hdf5
-    file_name: null
+    name: cache
     stage: fragmentation
     keep_open: true
     overwrite_stage: true
     keys:
-      # Inputs needed to build particles after the standalone GrapPAs train.
-      - data
-      - coord_label
+      # Fragment assignments are model outputs needed to build particles.
       - fragment_clusts
       - fragment_shapes
 
       # Precomputed graph inputs consumed by the concurrent training jobs.
-      - shower_fragment_clusts
       - shower_fragment_edge_index
       - shower_fragment_node_features
       - shower_fragment_edge_features
-      - track_fragment_clusts
       - track_fragment_edge_index
       - track_fragment_node_features
       - track_fragment_edge_features

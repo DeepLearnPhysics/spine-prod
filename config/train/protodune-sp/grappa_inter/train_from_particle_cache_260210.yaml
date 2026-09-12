@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260210"
+  date: "2026-02-10"
+  description: ProtoDUNE-SP 260210 interaction GrapPA training from particle cache
+
+include:
+  - model/protodune-sp/grappa_inter/model_260210.yaml
+  - train/protodune-sp/grappa_inter/from_particle_cache_v1.yaml
