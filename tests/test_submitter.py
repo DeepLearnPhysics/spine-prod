@@ -699,6 +699,10 @@ class TestSubmitterHelpers:
         assert mock_submitter.batch.classify_config_request(
             "convert/dune-vd-10kt-1x8x6"
         ) == (True, "latest")
+        assert mock_submitter.batch.classify_config_request("convert/protodune-hd") == (
+            True,
+            "latest",
+        )
         assert mock_submitter.batch.classify_config_request(
             "convert/icarus/latest"
         ) == (True, "latest")

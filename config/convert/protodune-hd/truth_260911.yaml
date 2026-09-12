@@ -1,0 +1,16 @@
+# ProtoDUNE-HD truth conversion configuration
+# Revision date: September 11, 2026
+
+__meta__:
+  kind: bundle
+  version: "260911"
+  date: "2026-09-11"
+  description: "ProtoDUNE-HD LArCV-to-SPINE truth conversion configuration"
+
+# ProtoDUNE-HD currently uses the same LArCV truth products and output contract
+# as ProtoDUNE-SP. Pin that recipe, then replace only the geometry.
+include: convert/protodune-sp/truth_260210.yaml
+
+override:
+  geo.detector: protodune-hd
+  geo.tag: protodunehdv6

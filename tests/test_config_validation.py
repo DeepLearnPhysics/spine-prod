@@ -1922,6 +1922,19 @@ class TestConfigValidation:
         assert config["build"]["mode"] == "truth"
         assert "model" not in config
 
+    def test_protodune_hd_truth_conversion_uses_canonical_geometry(self):
+        """ProtoDUNE-HD reuses the SP truth schema, but not its geometry."""
+        config = load_config_with_includes(
+            CONFIG_CONVERT_ROOT / "protodune-hd/truth_260911.yaml"
+        )
+
+        assert config["geo"] == {
+            "detector": "protodune-hd",
+            "tag": "protodunehdv6",
+        }
+        assert config["build"]["mode"] == "truth"
+        assert "model" not in config
+
     def test_sbnd_charge_scale_continues_from_varied_depositions(
         self, config_infer_root, tmp_path
     ):

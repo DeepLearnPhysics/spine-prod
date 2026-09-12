@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added a DUNE vertical-drift 10 kt module 1x8x6 truth conversion bundle using
   the shared DUNE LArCV truth-product contract and canonical VD geometry.
+- Added a ProtoDUNE-HD truth conversion bundle based on the pinned
+  ProtoDUNE-SP truth-product contract and canonical HD geometry.
 
 ## [0.9.0] - 2026-09-05
 

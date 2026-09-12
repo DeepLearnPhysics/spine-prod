@@ -320,6 +320,10 @@ detectors:
     configs_dir: infer/protodune-sp
     account: "neutrino:dune-ml"
 
+  protodune-hd:
+    default_profile: s3df_ampere
+    account: "neutrino:dune-ml"
+
   protodune-vd:
     default_profile: s3df_ampere
     configs_dir: infer/protodune-vd
