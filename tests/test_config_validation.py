@@ -1704,19 +1704,25 @@ def test_protodune_sp_260906_pipeline_uses_mpvmpr_v1_and_dated_configs():
     assert report["config"] == "test/protodune-sp/full_chain/report_260210.yaml"
 
 
-def test_nd_lar_260409_model_is_shared_and_preserves_deployed_choices():
-    """ND-LAr inference adds weights to the reusable 260409 composition."""
-    shared = load_config_with_includes(
-        CONFIG_ROOT / "model/nd-lar/full_chain/model_260409.yaml"
-    )["model"]
-    deployed = load_config_with_includes(
-        CONFIG_ROOT / "infer/nd-lar/model/model_260409.yaml"
-    )["model"]
+def test_nd_lar_inference_models_are_thin_shared_model_wrappers():
+    """Every ND-LAr inference revision adds weights to a canonical model."""
+    versions = ("240819", "250505", "250515", "250806", "260310", "260409")
+    models = {}
+    for version in versions:
+        shared = load_config_with_includes(
+            CONFIG_ROOT / f"model/nd-lar/full_chain/model_{version}.yaml"
+        )["model"]
+        deployed = load_config_with_includes(
+            CONFIG_ROOT / f"infer/nd-lar/model/model_{version}.yaml"
+        )["model"]
+        assert deployed.pop("weight_path") == "/fake/weights/checkpoint.ckpt"
+        assert deployed == shared
+        models[version] = shared
 
-    assert deployed.pop("weight_path") == "/fake/weights/checkpoint.ckpt"
-    assert deployed == shared
+    # The overlay release changed training provenance but not architecture.
+    assert models["250806"] == models["250515"]
 
-    modules = shared["modules"]
+    modules = models["260409"]["modules"]
     assert modules["chain"]["deghosting"] is None
     assert modules["graph_spice"]["embedder"]["uresnet"]["spatial_size"] == 6144
     assert modules["graph_spice"]["constructor"]["graph"] == {
@@ -1739,12 +1745,22 @@ def test_nd_lar_260409_model_is_shared_and_preserves_deployed_choices():
     assert modules["grappa_inter"]["gnn_model"]["node_pred"]["type"] == 6
     assert modules["grappa_inter"]["gnn_model"]["edge_layer"]["mlp"]["width"] == 128
 
+    assert (
+        models["240819"]["modules"]["graph_spice"]["embedder"]["uresnet"][
+            "spatial_size"
+        ]
+        == 31231
+    )
+    assert models["250505"]["modules"]["grappa_track"]["graph"]["max_length"] == 100
+    assert models["250515"]["modules"]["grappa_track"]["graph"]["max_length"] == 300
+    assert models["260310"]["modules"]["grappa_shower"]["graph"]["max_length"][-3] == 20
+
 
 def test_nd_lar_cache_stages_append_only_transition_products():
     """ND-LAr caches do not duplicate tensors retained in raw LArCV."""
     root = CONFIG_ROOT / "cache/nd-lar"
     segmentation = load_config_with_includes(
-        root / "uresnet_ppn/segmentation_260409.yaml"
+        root / "uresnet_ppn/segmentation_240819.yaml"
     )
     fragmentation = load_config_with_includes(
         root / "graph_spice/fragment_graphs_260409.yaml"
@@ -1859,6 +1875,45 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
 
     report = pipeline.stages[-1]
     assert report["config"] == "test/nd-lar/full_chain/report_240819.yaml"
+
+    # Every non-overlay ND-LAr production has an end-to-end staged workflow.
+    for version in ("250505", "250515", "260310", "260409"):
+        dated = PipelineDefinition.load(
+            Path(__file__).parent.parent
+            / f"pipelines/nd-lar/full_chain_{version}.yaml",
+            workspace_override=f"/tmp/nd-lar-{version}",
+        )
+        export = next(
+            stage
+            for stage in dated.stages
+            if stage["name"] == "export_full_chain_weights"
+        )
+        evaluation = next(
+            stage for stage in dated.stages if stage["name"] == "evaluate_full_chain"
+        )
+        assert export["config"] == f"model/nd-lar/full_chain/model_{version}.yaml"
+        assert evaluation["config"] == (
+            f"test/nd-lar/full_chain/evaluate_{version}.yaml"
+        )
+
+    pipeline_root = Path(__file__).parent.parent / "pipelines/nd-lar"
+    assert not (pipeline_root / "full_chain_240819.yaml").exists()
+    assert not (pipeline_root / "full_chain_250806.yaml").exists()
+
+    overlay_expected = {
+        "graph_spice": (4, 16),
+        "grappa_shower": (3, 3),
+        "grappa_track": (4, 16),
+        "grappa_inter": (4, 16),
+    }
+    for component, (multiplicity, minibatch_size) in overlay_expected.items():
+        overlay = load_config_with_includes(
+            CONFIG_ROOT / f"train/nd-lar/{component}/train_250806.yaml"
+        )
+        assert overlay["io"]["loader"]["collate_fn"]["overlay"] == {
+            "multiplicity": multiplicity
+        }
+        assert overlay["io"]["loader"]["minibatch_size"] == minibatch_size
 
 
 def write_composite_config(tmp_path, base_config, modifier_config):

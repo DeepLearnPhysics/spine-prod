@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260310"
+  date: "2026-03-10"
+  description: ND-LAr 260310 track GrapPA network for full-chain aggregation
+
+include: model/nd-lar/grappa_track/network_260310.yaml
+
+override:
+  nodes.make_groups: true
+  nodes.grouping_method: score

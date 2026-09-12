@@ -1,0 +1,16 @@
+__meta__:
+  kind: bundle
+  version: "250806"
+  date: "2025-08-06"
+  description: Evaluate the ND-LAr 250806 overlay-trained full chain
+
+include:
+  - infer/nd-lar/base/base_240819.yaml
+  - infer/nd-lar/io/io_240819.yaml
+  - model/nd-lar/full_chain/model_250806.yaml
+  - infer/nd-lar/post/post_240819.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+
+override:
+  io.writer: null
+  model.network_input.clust_label: clust_label

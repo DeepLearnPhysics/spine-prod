@@ -20,8 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the shared DUNE LArCV truth-product contract and canonical VD geometry.
 - Added a ProtoDUNE-HD truth conversion bundle based on the pinned
   ProtoDUNE-SP truth-product contract and canonical HD geometry.
-- Added composed ND-LAr 260409 model, training, staged-cache, evaluation, and
-  reporting configurations together with an end-to-end full-chain pipeline.
+- Added canonical composed models and evaluation bundles for all six ND-LAr
+  inference revisions, dated historical component-training recipes, and
+  staged end-to-end pipelines for the four non-overlay ND-LAr productions.
 
 ## [0.9.0] - 2026-09-05
 

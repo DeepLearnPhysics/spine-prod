@@ -1,0 +1,17 @@
+__meta__:
+  kind: bundle
+  version: "250806"
+  date: "2025-08-06"
+  description: ND-LAr v0 interaction GrapPA training with stochastic event overlay
+
+include:
+  - model/nd-lar/grappa_inter/model_250515.yaml
+  - train/nd-lar/grappa_inter/base_v1.yaml
+
+override:
+  base.epochs: 100.0
+  io.loader.minibatch_size: 16
+  io.loader.collate_fn:
+    name: all
+    overlay:
+      multiplicity: 4

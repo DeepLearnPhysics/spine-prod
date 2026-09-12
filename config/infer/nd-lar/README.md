@@ -34,7 +34,8 @@ Each main config includes modular YAML files:
 - **`model/model_250806.yaml`**: August 6 2025 ND-LAr weights (v0, overlay training)
 - **`model/model_260310.yaml`**: March 10 2026 ND-LAr weights (v1)
 - **`model/model_260409.yaml`**: April 9 2026 ND-LAr weights (v1, longer training)
-- **`model/model_common.yaml`**: Common model architecture
+- **`../../model/nd-lar/`**: Canonical dated model compositions shared with
+  training, caching, and evaluation
 
 **Post-processing Components:**
 - **`post/post_240819.yaml`**: Post-processing configuration

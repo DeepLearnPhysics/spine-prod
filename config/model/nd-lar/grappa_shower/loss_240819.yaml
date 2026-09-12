@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: ND-LAr 240819 shower GrapPA loss
+
+include: model/common/grappa_shower/loss_v1.yaml
+
+override:
+  node_loss.use_closest: false

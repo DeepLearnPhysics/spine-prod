@@ -1,8 +1,8 @@
 __meta__:
   kind: fragment
-  version: "260409"
-  date: "2026-04-09"
-  description: ND-LAr 260409 interaction GrapPA network
+  version: "260310"
+  date: "2026-03-10"
+  description: ND-LAr 260310 interaction GrapPA network
 
 include: model/common/grappa_inter/network_v1.yaml
 

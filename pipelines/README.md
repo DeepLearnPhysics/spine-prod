@@ -215,16 +215,21 @@ adopt selected decisions from the generic `260828` study.
 
 ## ND-LAr staged training
 
-`nd-lar/full_chain_260409.yaml` applies the same five-model cached workflow to
-the busy ND-LAr images. Unlike ProtoDUNE-SP, it requires neither deghosting nor
-an entry-size filter. The model configuration preserves the deployed 260409
-architecture while moving its detector-specific spatial scale, graph limits,
-PID width and loss choices into independently auditable shared model files.
+The ND-LAr `250505`, `250515`, `260310`, and `260409` pipelines apply the same
+five-model cached workflow to its busy images. Unlike ProtoDUNE-SP, they require
+neither deghosting nor an entry-size filter. Each pipeline selects the exact
+dated component composition used by its inference counterpart.
 
 The first two training jobs use four GPUs with per-rank minibatches selected to
 match the historical global A100 batch sizes. The three cached GrapPA jobs run
 on one GPU and retain their historical global update sizes without repeatedly
 loading the raw sparse images.
+
+The two remaining inference releases still have canonical shared models and
+appropriate component recipes but deliberately no stage-cache pipeline. The
+`240819` release deploys 2x2 debug weights, while `250806` used stochastic event
+overlay whose changing event identity is incompatible with aligned per-source
+cache provenance.
 
 ProtoDUNE-SP cache arrays partition only the authoritative `primary` LArCV
 source. Every task receives the same scalar `cache` repository path, and the

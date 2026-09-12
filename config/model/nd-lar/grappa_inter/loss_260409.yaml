@@ -1,7 +1,0 @@
-__meta__:
-  kind: fragment
-  version: "260409"
-  date: "2026-04-09"
-  description: ND-LAr 260409 standalone interaction GrapPA loss
-
-include: model/common/grappa_inter/loss_v1.yaml

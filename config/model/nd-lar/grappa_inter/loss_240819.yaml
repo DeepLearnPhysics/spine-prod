@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: ND-LAr 240819 interaction GrapPA loss
+
+include: model/common/grappa_inter/loss_v1.yaml

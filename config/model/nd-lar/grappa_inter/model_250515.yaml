@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "250515"
+  date: "2025-05-15"
+  description: ND-LAr 250515 standalone interaction GrapPA model
+
+include: model/common/grappa_inter/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/nd-lar/grappa_inter/network_250515.yaml
+  model.modules.grappa_loss: !include model/nd-lar/grappa_inter/loss_240819.yaml

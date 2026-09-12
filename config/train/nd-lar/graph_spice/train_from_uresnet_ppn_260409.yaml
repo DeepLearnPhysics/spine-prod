@@ -5,7 +5,7 @@ __meta__:
   description: ND-LAr 260409 Graph-SPICE training from cached UResNet-PPN products
 
 include:
-  - model/nd-lar/graph_spice/model_260409.yaml
+  - model/nd-lar/graph_spice/model_250505.yaml
   - train/nd-lar/graph_spice/from_segmentation_cache_v1.yaml
 
 override:

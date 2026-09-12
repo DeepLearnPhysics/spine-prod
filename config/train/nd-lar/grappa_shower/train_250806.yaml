@@ -1,0 +1,17 @@
+__meta__:
+  kind: bundle
+  version: "250806"
+  date: "2025-08-06"
+  description: ND-LAr v0 shower GrapPA training with stochastic event overlay
+
+include:
+  - model/nd-lar/grappa_shower/model_250505.yaml
+  - train/nd-lar/grappa_shower/base_v1.yaml
+
+override:
+  base.epochs: 100.0
+  io.loader.minibatch_size: 3
+  io.loader.collate_fn:
+    name: all
+    overlay:
+      multiplicity: 3

@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "250505"
+  date: "2025-05-05"
+  description: ND-LAr 250505 standalone shower GrapPA model
+
+include: model/common/grappa_shower/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/nd-lar/grappa_shower/network_250505.yaml
+  model.modules.grappa_loss: !include model/nd-lar/grappa_shower/loss_250505.yaml

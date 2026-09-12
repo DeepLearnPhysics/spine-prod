@@ -5,5 +5,5 @@ __meta__:
   description: ND-LAr 260409 interaction GrapPA training from cached particle graphs
 
 include:
-  - model/nd-lar/grappa_inter/model_260409.yaml
+  - model/nd-lar/grappa_inter/model_260310.yaml
   - train/nd-lar/grappa_inter/from_particle_cache_v1.yaml

@@ -54,6 +54,9 @@ deployed full-chain definition exactly; proposed migrations to newer SPINE
 defaults belong in a new dated model revision.
 
 ND-LAr uses the five learned stages of the generic chain without deghosting.
-Its `260409` composition records the much larger Graph-SPICE spatial extent,
-ND-specific graph-distance limits, six-class interaction PID head, and wider
-interaction GrapPA layers used by the deployed model.
+All six deployed revisions from `240819` through `260409` have canonical full
+chain compositions here. They reuse dated component leaves when the network is
+unchanged and record changes to spatial extent, graph-distance limits, local
+feature radii, the six-class interaction PID head, and interaction-layer width.
+The `250806` model deliberately repeats the `250515` component selection: its
+distinction is stochastic-overlay training rather than architecture.

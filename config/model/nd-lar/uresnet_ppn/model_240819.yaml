@@ -1,8 +1,8 @@
 __meta__:
   kind: fragment
-  version: "260409"
-  date: "2026-04-09"
-  description: ND-LAr 260409 standalone UResNet-PPN model
+  version: "240819"
+  date: "2024-08-19"
+  description: ND-LAr 240819 standalone UResNet-PPN model
 
 include: model/common/uresnet_ppn/base_v1.yaml
 

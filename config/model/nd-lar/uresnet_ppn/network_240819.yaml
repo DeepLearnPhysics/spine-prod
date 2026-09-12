@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: ND-LAr 240819 UResNet-PPN network
+
+include: model/common/uresnet_ppn/network_v1.yaml

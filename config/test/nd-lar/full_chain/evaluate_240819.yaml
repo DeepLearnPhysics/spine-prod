@@ -1,0 +1,16 @@
+__meta__:
+  kind: bundle
+  version: "240819"
+  date: "2024-08-19"
+  description: Evaluate the ND-LAr 240819 debug full chain
+
+include:
+  - infer/nd-lar/base/base_240819.yaml
+  - infer/nd-lar/io/io_240819.yaml
+  - model/nd-lar/full_chain/model_240819.yaml
+  - infer/nd-lar/post/post_240819.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+
+override:
+  io.writer: null
+  model.network_input.clust_label: clust_label
