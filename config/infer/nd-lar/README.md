@@ -15,7 +15,6 @@ All ND-LAr configs now use a **hierarchical YAML include system** with composabl
 - **`full_chain_250806.yaml`**: August 2025 trained on overlays
 - **`full_chain_260310.yaml`**: March 2026 with MPV/MPR v01 weights
 - **`full_chain_260409.yaml`**: April 2026 with longer-trained MPV/MPR v01 weights
-- **`config/convert/nd-lar/truth_240819.yaml`**: LArCV-to-SPINE truth conversion
 
 ### Component Structure
 Each main config includes modular YAML files:

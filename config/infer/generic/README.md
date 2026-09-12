@@ -12,7 +12,6 @@ All generic configs now use a **hierarchical YAML include system** with composab
 ### Main Configurations
 - **`full_chain_240718.yaml`**: July 2024, MPV/MPR v04 weights
 - **`full_chain_240805.yaml`**: August 2024, updated architecture and training
-- **`config/convert/generic/truth_240805.yaml`**: August 2024 LArCV-to-SPINE truth conversion
 
 ### Component Structure
 Each main config includes modular YAML files:

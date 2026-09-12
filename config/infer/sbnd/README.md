@@ -18,8 +18,6 @@ Each top-level configuration file (e.g., `full_chain_co_250901.yaml`) includes t
 - Update individual parts without duplicating settings
 - Maintain consistency across similar configurations
 
-Truth conversion is available as `config/convert/sbnd/truth_260501.yaml`, which writes SPINE truth objects to HDF5 without running reconstruction.
-
 ### Configuration Composition
 
 Features that previously required separate config files (e.g., `*_data_*`) are now handled through:
