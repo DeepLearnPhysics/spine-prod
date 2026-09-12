@@ -291,6 +291,13 @@ def test_detector_uresnet_training_owns_canonical_backbone(detector, version):
         f"train/{detector}/uresnet/base_v1.yaml",
     ]
 
+    resolved = load_config_with_includes(train_root / f"train_{version}.yaml")
+    expected_tags = {"nd-lar": "up4-1", "protodune-sp": "protodunev7"}
+    assert resolved["geo"] == {
+        "detector": detector,
+        "tag": expected_tags[detector],
+    }
+
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 @pytest.mark.parametrize("version", ["240718", "240805"])
