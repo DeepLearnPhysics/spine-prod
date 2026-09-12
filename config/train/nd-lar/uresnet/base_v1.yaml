@@ -4,6 +4,10 @@ __meta__:
 
 include: train/generic/uresnet/base_v1.yaml
 
+geo:
+  detector: nd-lar
+  tag: up4-1
+
 remove:
   - io.loader.minibatch_size
 
