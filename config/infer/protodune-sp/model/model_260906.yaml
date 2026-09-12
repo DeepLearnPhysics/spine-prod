@@ -17,7 +17,7 @@ __meta__:
       grappa-use-closest,
       grouping-through-track,
     ]
-  training_set: "mpvmpr_v1"
+  training_set: "v1"
 
 include: model/protodune-sp/full_chain/model_260906.yaml
 

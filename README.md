@@ -29,8 +29,8 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v1.1.0. Maintained configurations require SPINE
-v1.1.0 or later.
+The current default is SPINE v1.2.0. Maintained configurations require SPINE
+v1.2.0 or later.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
@@ -717,7 +717,7 @@ to SPINE. This is the intended mode for extending a sharded cache repository;
 it cannot be combined with explicit
 writer output fields. See
 `pipelines/generic/full_chain_240805.yaml` for a complete staged-training
-prototype with centralized paths. Its materialization jobs publish successive
+workflow with centralized paths. Its materialization jobs publish successive
 immutable stages to one logical cache repository per data split,
 then compose the independently trained modules into one full-chain checkpoint.
 The generic full-chain pipelines finally evaluate that assembled checkpoint
