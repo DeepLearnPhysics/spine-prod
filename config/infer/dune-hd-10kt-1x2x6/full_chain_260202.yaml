@@ -1,11 +1,11 @@
-# DUNE10kt-1x2x6 full chain configuration
+# DUNE-HD 10 kt module 1x2x6 full-chain configuration
 # Revision date: February 2, 2026
 
 __meta__:
   kind: bundle
   version: "260202"
   date: "2026-02-02"
-  description: "DUNE10kt-1x2x6 full chain configuration"
+  description: "DUNE-HD 10 kt module 1x2x6 full-chain configuration"
 
 include:
   - base/base_260202.yaml

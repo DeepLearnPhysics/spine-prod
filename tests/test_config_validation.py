@@ -1898,7 +1898,7 @@ class TestConfigValidation:
     @pytest.mark.parametrize(
         "relative_path",
         [
-            "dune10kt-1x2x6/full_chain_260626.yaml",
+            "dune-hd-10kt-1x2x6/full_chain_260626.yaml",
             "protodune-vd/full_chain_260128.yaml",
         ],
     )

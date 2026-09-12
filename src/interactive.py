@@ -119,6 +119,8 @@ class InteractiveRunner(SubmissionComponent):
         int
             Exit code from SPINE execution
         """
+        config = self.config_mgr.normalize_config_request(config)
+
         if flashmatch and not flashmatch_path:
             self.context.batch.warn_flashmatch_noop()
         if no_writer:

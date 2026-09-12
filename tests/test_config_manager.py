@@ -20,7 +20,13 @@ def manager(tmp_path):
             "default": {"partition": "cpu"},
             "gpu": {"partition": "gpu"},
         },
-        "detectors": {"icarus": {"default_profile": "gpu"}},
+        "detectors": {
+            "icarus": {"default_profile": "gpu"},
+            "dune-hd-10kt-1x2x6": {
+                "aliases": ["dune10kt-1x2x6"],
+                "default_profile": "gpu",
+            },
+        },
     }
     (templates / "profiles.yaml").write_text(yaml.safe_dump(profiles))
     return ConfigManager(tmp_path)
@@ -53,6 +59,44 @@ def test_get_profile_rejects_unknown_name(manager):
 def test_detect_detector_returns_unknown_for_unrecognized_path(manager):
     assert manager.detect_detector("infer/icarus/base.yaml") == "icarus"
     assert manager.detect_detector("infer/other/base.yaml") == "unknown_detector"
+
+
+def test_deprecated_detector_aliases_are_normalized_with_warning(manager):
+    with pytest.warns(FutureWarning, match="dune10kt-1x2x6.*deprecated"):
+        detector = manager.normalize_detector_name("dune10kt-1x2x6")
+    assert detector == "dune-hd-10kt-1x2x6"
+
+    with pytest.warns(FutureWarning, match="dune10kt-1x2x6.*deprecated"):
+        config = manager.normalize_config_request(
+            "infer/dune10kt-1x2x6/full_chain_260510.yaml"
+        )
+    assert config == "infer/dune-hd-10kt-1x2x6/full_chain_260510.yaml"
+
+
+def test_canonical_detector_names_are_unchanged(manager):
+    detector = "dune-hd-10kt-1x2x6"
+    assert manager.normalize_detector_name(detector) == detector
+    assert manager.normalize_config_request(f"infer/{detector}") == f"infer/{detector}"
+
+
+def test_deprecated_detector_paths_resolve_to_canonical_tree(manager, tmp_path):
+    canonical = (
+        tmp_path / "config" / "convert" / "dune-hd-10kt-1x2x6" / "truth_260202.yaml"
+    )
+    canonical.parent.mkdir(parents=True)
+    canonical.touch()
+
+    with pytest.warns(FutureWarning, match="dune10kt-1x2x6.*deprecated"):
+        resolved = manager.resolve_config_path(
+            "convert/dune10kt-1x2x6/truth_260202.yaml"
+        )
+    assert resolved == canonical
+
+
+def test_deprecated_detector_alias_selects_canonical_profile(manager):
+    with pytest.warns(FutureWarning, match="dune10kt-1x2x6.*deprecated"):
+        profile = manager.get_profile("auto", "dune10kt-1x2x6")
+    assert profile["partition"] == "gpu"
 
 
 def test_detect_config_family_supports_conversion_and_historical_default(manager):

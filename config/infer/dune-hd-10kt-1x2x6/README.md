@@ -1,17 +1,17 @@
-# Summary of DUNE10kt-1x2x6 full chain configurations and their characteristics
+# DUNE-HD 10 kt module 1x2x6 inference configurations
 
 **NOTE: These configurations use a modular YAML include system. See the "Configuration Structure" section below for details.**
 
-The configurations below are for DUNE10kt-1x2x6 datasets. This summary is divided by training/validation dataset and configuration version.
+The configurations below are for DUNE-HD 10 kt module 1x2x6 datasets. This summary is divided by training/validation dataset and configuration version.
 
 ## Configuration Structure
 
-All DUNE10kt-1x2x6 configs use a **hierarchical YAML include system** with composable components:
+All DUNE-HD 10 kt module 1x2x6 configurations use a **hierarchical YAML include system** with composable components:
 
 ### Main Configurations
-- **`full_chain_260626.yaml`**: June 2026, latest DUNE10kt-1x2x6 full chain config
-- **`full_chain_260510.yaml`**: May 2026, previous DUNE10kt-1x2x6 full chain config
-- **`full_chain_260202.yaml`**: February 2026, older DUNE10kt-1x2x6 full chain config
+- **`full_chain_260626.yaml`**: June 2026, latest DUNE-HD 10 kt module 1x2x6 full-chain configuration
+- **`full_chain_260510.yaml`**: May 2026, previous DUNE-HD 10 kt module 1x2x6 full-chain configuration
+- **`full_chain_260202.yaml`**: February 2026, older DUNE-HD 10 kt module 1x2x6 full-chain configuration
 
 ### Component Structure
 Each main config includes modular YAML files:

@@ -30,6 +30,7 @@ class BatchRunner(SubmissionComponent):
             A tuple of ``(is_latest, config_name)`` where ``config_name`` is the
             normalized user-facing name for job naming.
         """
+        config = self.config_mgr.normalize_config_request(config)
         config_path = Path(config)
         config_name = config_path.stem
 
@@ -298,6 +299,8 @@ class BatchRunner(SubmissionComponent):
         List[str]
             List of submitted job IDs
         """
+        config = self.config_mgr.normalize_config_request(config)
+
         if flashmatch and not flashmatch_path:
             self.warn_flashmatch_noop()
         if no_writer:

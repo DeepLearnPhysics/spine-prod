@@ -2,6 +2,7 @@
 
 import os
 import re
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -24,6 +25,46 @@ class ConfigManager:
         """
         self.basedir = basedir
         self.profiles = self._load_profiles()
+
+    @property
+    def detector_aliases(self) -> Dict[str, str]:
+        """Map deprecated detector identifiers to their canonical names."""
+        aliases = {}
+        for detector, config in self.profiles.get("detectors", {}).items():
+            for alias in config.get("aliases", []):
+                aliases[alias.lower()] = detector
+        return aliases
+
+    def normalize_detector_name(self, detector: str) -> str:
+        """Return the canonical detector name and warn for a deprecated alias."""
+        canonical = self.detector_aliases.get(detector.lower())
+        if canonical is None:
+            return detector
+
+        warnings.warn(
+            f"Detector name '{detector}' is deprecated; use '{canonical}' instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        return canonical
+
+    def normalize_config_request(self, config: str) -> str:
+        """Rewrite deprecated detector path segments to their canonical names."""
+        config_path = Path(config)
+        parts = list(config_path.parts)
+
+        for index, part in enumerate(parts):
+            canonical = self.detector_aliases.get(part.lower())
+            if canonical is not None:
+                warnings.warn(
+                    f"Detector name '{part}' is deprecated; use "
+                    f"'{canonical}' instead.",
+                    FutureWarning,
+                    stacklevel=2,
+                )
+                parts[index] = canonical
+
+        return str(Path(*parts))
 
     def _load_profiles(self) -> Dict:
         """Load resource profiles from YAML.
@@ -53,7 +94,7 @@ class ConfigManager:
         str
             Detector name or 'unknown_detector'
         """
-        config_path = Path(config)
+        config_path = Path(self.normalize_config_request(config))
         for detector in self.profiles["detectors"]:
             if detector in str(config_path):
                 return detector
@@ -65,7 +106,7 @@ class ConfigManager:
         Ordinary and absolute paths are both supported. Requests without a
         recognized family retain the historical inference behavior.
         """
-        config_parts = Path(config).parts
+        config_parts = Path(self.normalize_config_request(config)).parts
         for family in self.LATEST_CONFIG_FAMILIES:
             if family in config_parts:
                 return family
@@ -80,6 +121,7 @@ class ConfigManager:
         ``config/train/generic/uresnet/train_240718.yaml`` and SPINE-style
         forms such as ``train/generic/uresnet/train_240718.yaml`` equivalent.
         """
+        config = self.normalize_config_request(config)
         config_path = Path(config).expanduser()
         if config_path.is_absolute():
             candidates = [config_path]
@@ -128,6 +170,9 @@ class ConfigManager:
         ValueError
             If profile not found
         """
+        if detector:
+            detector = self.normalize_detector_name(detector)
+
         if profile_name == "auto":
             # Auto-select based on detector
             if detector and detector in self.profiles["detectors"]:
@@ -166,6 +211,7 @@ class ConfigManager:
             (excluding *_common.yaml).
             Example: {'data': [Path('mod_data_240719.yaml'), Path('mod_data_250625.yaml')]}
         """
+        config = self.normalize_config_request(config)
         config_path = Path(config).resolve()
         # If path is a directory, use it directly; if file, use its parent
         if config_path.is_dir():
@@ -335,6 +381,10 @@ class ConfigManager:
         str
             Path to the generated composite config file
         """
+        base_config = self.normalize_config_request(base_config)
+        if detector:
+            detector = self.normalize_detector_name(detector)
+
         # Resolve base config path
         # First try relative to cwd, then try SPINE_CONFIG_PATH
         config_dir = self.basedir / "config"
@@ -542,6 +592,8 @@ class ConfigManager:
         str
             Path to the generated latest config file
         """
+        detector = self.normalize_detector_name(detector)
+
         if family not in self.LATEST_CONFIG_FAMILIES:
             raise ValueError(f"Latest configuration is not supported for '{family}'")
 
@@ -669,6 +721,7 @@ class ConfigManager:
             Dictionary with 'base_version', 'config_name', and 'modifiers' keys.
             Each modifier contains 'selected', 'available', and 'paths' information.
         """
+        config_path = self.normalize_config_request(config_path)
         config_path_obj = Path(config_path)
         base_version = self.extract_version(config_path_obj)
 

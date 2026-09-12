@@ -298,7 +298,7 @@ class TestConfigPathHandling:
             "icarus/latest.yaml",
             "infer/icarus/latest",
             "infer/icarus",
-            "infer/dune10kt-1x2x6",
+            "infer/dune-hd-10kt-1x2x6",
         ]
 
         for config_path in test_cases:
@@ -344,10 +344,16 @@ class TestDetectorDetection:
         result = mock_submitter.config_mgr.detect_detector("some/random/config.yaml")
         assert result == "unknown_detector"
 
-    def test_detect_detector_dune10kt_1x2x6(self, mock_submitter):
-        """Test auto-detecting DUNE10kt-1x2x6 from config path."""
-        result = mock_submitter.config_mgr.detect_detector("infer/dune10kt-1x2x6")
-        assert result == "dune10kt-1x2x6"
+    def test_detect_detector_dune_hd_10kt_1x2x6(self, mock_submitter):
+        """Test auto-detecting DUNE-HD 10 kt module 1x2x6."""
+        result = mock_submitter.config_mgr.detect_detector("infer/dune-hd-10kt-1x2x6")
+        assert result == "dune-hd-10kt-1x2x6"
+
+    def test_detect_detector_accepts_deprecated_dune_hd_alias(self, mock_submitter):
+        """Test that the former DUNE-HD name resolves with a visible warning."""
+        with pytest.warns(FutureWarning, match="dune10kt-1x2x6.*deprecated"):
+            result = mock_submitter.config_mgr.detect_detector("infer/dune10kt-1x2x6")
+        assert result == "dune-hd-10kt-1x2x6"
 
 
 class TestVersionExtraction:
@@ -695,6 +701,10 @@ class TestSubmitterHelpers:
         assert mock_submitter.batch.classify_config_request(
             "config/convert/icarus"
         ) == (True, "latest")
+        with pytest.warns(FutureWarning, match="dune10kt-1x2x6.*deprecated"):
+            assert mock_submitter.batch.classify_config_request(
+                "infer/dune10kt-1x2x6"
+            ) == (True, "latest")
         assert mock_submitter.batch.classify_config_request("custom.yaml") == (
             False,
             "custom",
@@ -3000,7 +3010,7 @@ class TestBatchSpineOverride:
             ),
         ):
             job_ids = mock_submitter.submit_job(
-                config="config/infer/dune10kt-1x2x6/full_chain_260510.yaml",
+                config="config/infer/dune-hd-10kt-1x2x6/full_chain_260510.yaml",
                 files=[str(input_file)],
                 profile="s3df_ampere",
                 spine_path=str(spine_checkout),

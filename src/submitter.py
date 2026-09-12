@@ -78,6 +78,7 @@ class Submitter:
 
     def preload_downloads(self, config: str):
         """Materialize SPINE download directives before execution."""
+        config = self.config_mgr.normalize_config_request(config)
         print("\nPreloading !download assets:")
         print(f"  Config: {config}")
         preload_downloads(config, self.basedir)

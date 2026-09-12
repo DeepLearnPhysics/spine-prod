@@ -169,7 +169,7 @@ spine-prod/
 │   ├── convert/             # Source-to-SPINE conversion bundles
 │   ├── infer/               # Inference configs (referenced as infer/...)
 │   │   ├── 2x2/             # 2x2 detector configs
-│   │   ├── dune10kt-1x2x6/  # DUNE 10 kt module 1x2x6 configs
+│   │   ├── dune-hd-10kt-1x2x6/  # DUNE-HD 10 kt module 1x2x6 configs
 │   │   ├── generic/         # Generic (no detector) configs
 │   │   ├── icarus/          # ICARUS detector configs
 │   │   ├── nd-lar/          # ND-LAr detector configs

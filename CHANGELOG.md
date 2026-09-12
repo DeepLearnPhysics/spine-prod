@@ -5,6 +5,14 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Renamed the DUNE horizontal-drift 10 kt module configuration family from
+  `dune10kt-1x2x6` to the canonical `dune-hd-10kt-1x2x6` detector name and
+  migrated its public model-weight URLs. Deprecated configuration requests
+  using the former name continue to resolve with a warning.
+
 ## [0.9.0] - 2026-09-05
 
 ### Added

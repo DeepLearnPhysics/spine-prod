@@ -15,7 +15,7 @@ The configurations in this directory are used to:
 Each subdirectory contains detector-specific configurations:
 
 - **`2x2/`**: 2x2 demonstrator detector configurations
-- **`dune10kt-1x2x6/`**: DUNE 10 kt module 1x2x6 configurations
+- **`dune-hd-10kt-1x2x6/`**: DUNE-HD 10 kt module 1x2x6 configurations
 - **`generic/`**: Generic detector configurations for testing and development
 - **`icarus/`**: ICARUS detector configurations
 - **`nd-lar/`**: DUNE Near Detector Liquid Argon (ND-LAr) configurations

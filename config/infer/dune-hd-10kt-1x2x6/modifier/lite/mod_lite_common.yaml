@@ -1,4 +1,4 @@
-# Lite-output modification for DUNE10kt-1x2x6 configs
+# Common lite-output modification for DUNE-HD 10 kt module 1x2x6 configurations
 # Include this after the main config to transform to lite-output mode (no heavy data products)
 
 __meta__:
