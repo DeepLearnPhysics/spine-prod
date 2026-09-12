@@ -18,7 +18,7 @@ Each top-level configuration file (e.g., `full_chain_co_250625.yaml`) includes t
 - Update individual parts without duplicating settings
 - Maintain consistency across similar configurations
 
-Truth-only output configurations are also available as top-level composites, for example `save_truth_240812.yaml`, to write truth content to HDF5 without reconstructed outputs.
+Truth conversion is available as `config/convert/icarus/truth_240812.yaml`, which writes SPINE truth objects to HDF5 without running reconstruction.
 
 ### Configuration Composition
 

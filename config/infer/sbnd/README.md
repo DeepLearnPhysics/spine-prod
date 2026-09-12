@@ -18,7 +18,7 @@ Each top-level configuration file (e.g., `full_chain_co_250901.yaml`) includes t
 - Update individual parts without duplicating settings
 - Maintain consistency across similar configurations
 
-Truth-only output configurations are also available as top-level composites, for example `save_truth_260501.yaml`, to write truth content to HDF5 without reconstructed outputs.
+Truth conversion is available as `config/convert/sbnd/truth_260501.yaml`, which writes SPINE truth objects to HDF5 without running reconstruction.
 
 ### Configuration Composition
 

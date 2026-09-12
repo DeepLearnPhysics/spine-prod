@@ -1,15 +1,15 @@
-# ProtoDUNE-VD truth saving configuration
+# ProtoDUNE-VD truth conversion configuration
 # Revision date: January 18, 2026
 
 __meta__:
   kind: bundle
   version: "260118"
   date: "2026-01-18"
-  description: "ProtoDUNE-VD truth saving configuration"
+  description: "ProtoDUNE-VD LArCV-to-SPINE truth conversion configuration"
 
 include:
-  - base/base_260118.yaml
-  - io/io_260118.yaml
+  - infer/protodune-vd/base/base_260118.yaml
+  - infer/protodune-vd/io/io_260118.yaml
 
 # Overrides
 override:

@@ -1,15 +1,15 @@
-# ICARUS truth saving configuration
+# ICARUS truth conversion configuration
 # Revision date: August 12, 2024
 
 __meta__:
   kind: bundle
   version: "240812"
   date: "2024-08-12"
-  description: "ICARUS truth saving configuration"
+  description: "ICARUS LArCV-to-SPINE truth conversion configuration"
 
 include:
-  - base/base_240719.yaml
-  - io/io_240812.yaml
+  - infer/icarus/base/base_240719.yaml
+  - infer/icarus/io/io_240812.yaml
 
 # Overrides
 override:

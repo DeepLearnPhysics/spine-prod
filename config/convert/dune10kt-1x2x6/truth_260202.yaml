@@ -1,15 +1,15 @@
-# DUNE 10kt 1x2x6 truth saving configuration
+# DUNE 10kt 1x2x6 truth conversion configuration
 # Revision date: February 2, 2026
 
 __meta__:
   kind: bundle
   version: "260202"
   date: "2026-02-02"
-  description: "DUNE 10kt 1x2x6 truth saving configuration"
+  description: "DUNE 10kt 1x2x6 LArCV-to-SPINE truth conversion configuration"
 
 include:
-  - base/base_260202.yaml
-  - io/io_260202.yaml
+  - infer/dune10kt-1x2x6/base/base_260202.yaml
+  - infer/dune10kt-1x2x6/io/io_260202.yaml
 
 # Overrides
 override:

@@ -37,21 +37,22 @@ class BatchRunner(SubmissionComponent):
             return True, "latest"
 
         config_str = config_path.as_posix().rstrip("/")
-        for detector_config in self.profiles.get("detectors", {}).values():
+        for detector, detector_config in self.profiles.get("detectors", {}).items():
             configs_dir = detector_config.get("configs_dir")
-            if not configs_dir:
-                continue
+            config_dirs = [configs_dir] if configs_dir else []
+            config_dirs.append(f"convert/{detector}")
 
-            rel_configs_dir = configs_dir.rstrip("/")
-            if config_str == rel_configs_dir:
-                return True, "latest"
+            for candidate_dir in config_dirs:
+                rel_configs_dir = candidate_dir.rstrip("/")
+                if config_str in (rel_configs_dir, f"config/{rel_configs_dir}"):
+                    return True, "latest"
 
-            if (
-                config_path.is_absolute()
-                and config_path.resolve()
-                == (self.basedir / "config" / rel_configs_dir).resolve()
-            ):
-                return True, "latest"
+                if (
+                    config_path.is_absolute()
+                    and config_path.resolve()
+                    == (self.basedir / "config" / rel_configs_dir).resolve()
+                ):
+                    return True, "latest"
 
         return False, config_name
 
@@ -413,6 +414,7 @@ class BatchRunner(SubmissionComponent):
 
         # Detect detector first
         detector = self.config_mgr.detect_detector(config)
+        config_family = self.config_mgr.detect_config_family(config)
 
         # Classify before resolving because latest may be a directory shorthand
         # or a virtual path that is materialized in the job workspace below.
@@ -443,8 +445,10 @@ class BatchRunner(SubmissionComponent):
 
         # Handle "latest" config generation
         if is_latest:
-            print(f"\nDetected 'latest' config request for {detector}")
-            config = self.config_mgr.create_latest_config(detector, config_workspace)
+            print(f"\nDetected 'latest' {config_family} config request for {detector}")
+            config = self.config_mgr.create_latest_config(
+                detector, config_workspace, family=config_family
+            )
             config_name = Path(config).stem
 
         # Apply modifiers if specified

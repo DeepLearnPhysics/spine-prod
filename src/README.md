@@ -105,6 +105,9 @@ spine-prod/
 # Basic usage
 ./submit.py --config infer/icarus/latest --source-list files.txt
 
+# Convert LArCV simulation into SPINE truth objects
+./submit.py --config convert/icarus --source simulation.root
+
 # Additional modes
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
 ./submit.py --interactive --config ... --source test.root

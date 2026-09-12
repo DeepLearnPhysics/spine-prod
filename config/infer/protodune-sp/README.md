@@ -11,7 +11,7 @@ All ProtoDUNE-SP configs use a **hierarchical YAML include system** with composa
 ### Main Configurations
 - **`full_chain_260906.yaml`**: September 2026 full chain trained on mpvmpr v1
 - **`full_chain_260210.yaml`**: February 2026 full chain trained on mpvmpr v0
-- **`save_truth_260210.yaml`**: February 2026, truth-only output configuration writing truth content to HDF5
+- **`config/convert/protodune-sp/truth_260210.yaml`**: February 2026 LArCV-to-SPINE truth conversion
 
 ### Component Structure
 Each main config includes modular YAML files:

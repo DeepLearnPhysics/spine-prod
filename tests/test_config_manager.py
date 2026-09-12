@@ -55,6 +55,12 @@ def test_detect_detector_returns_unknown_for_unrecognized_path(manager):
     assert manager.detect_detector("infer/other/base.yaml") == "unknown_detector"
 
 
+def test_detect_config_family_supports_conversion_and_historical_default(manager):
+    assert manager.detect_config_family("convert/icarus/latest") == "convert"
+    assert manager.detect_config_family("config/infer/icarus/latest") == "infer"
+    assert manager.detect_config_family("custom.yaml") == "infer"
+
+
 def test_resolve_config_path_supports_spine_and_repository_relative_paths(
     manager, tmp_path, monkeypatch
 ):
@@ -406,6 +412,32 @@ def test_create_latest_config_reports_missing_or_empty_detector(manager, tmp_pat
     empty_component.mkdir(parents=True)
     with pytest.raises(ValueError, match="No versioned components found"):
         manager.create_latest_config("empty_component", tmp_path)
+
+
+def test_create_latest_config_snapshots_complete_conversion_bundle(manager, tmp_path):
+    conversion_dir = tmp_path / "config" / "convert" / "icarus"
+    conversion_dir.mkdir(parents=True)
+    (conversion_dir / "truth_custom.yaml").write_text("custom\n")
+    (conversion_dir / "truth_240101.yaml").write_text("old\n")
+    (conversion_dir / "truth_250101.yaml").write_text("new\n")
+
+    result = Path(manager.create_latest_config("icarus", tmp_path, family="convert"))
+
+    assert result.name == "icarus_truth_latest_250101.yaml"
+    assert result.read_text() == "new\n"
+
+
+def test_create_latest_config_rejects_invalid_or_empty_conversion_family(
+    manager, tmp_path
+):
+    with pytest.raises(ValueError, match="not supported for 'train'"):
+        manager.create_latest_config("icarus", tmp_path, family="train")
+
+    conversion_dir = tmp_path / "config" / "convert" / "icarus"
+    conversion_dir.mkdir(parents=True)
+    (conversion_dir / "truth_custom.yaml").touch()
+    with pytest.raises(ValueError, match="No versioned truth conversion bundles"):
+        manager.create_latest_config("icarus", tmp_path, family="convert")
 
 
 def test_create_latest_config_supports_only_unversioned_component(manager, tmp_path):

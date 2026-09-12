@@ -62,6 +62,9 @@ source configure.sh
 # Run data-only processing on multiple files (glob)
 ./submit.py --config infer/icarus/latest --apply-mods data --source /path/to/data/*.root
 
+# Convert LArCV simulation into SPINE truth objects for spinal-tap
+./submit.py --config convert/icarus --source /path/to/simulation.root
+
 # Run from a file list (recommended)
 ./submit.py --config infer/2x2/latest --source-list file_list.txt
 ```
@@ -163,6 +166,7 @@ spine-prod/
 │
 ├── config/                  # All SPINE configs (inference & training)
 │   ├── cache/               # Stage-cache materialization configs
+│   ├── convert/             # Source-to-SPINE conversion bundles
 │   ├── infer/               # Inference configs (referenced as infer/...)
 │   │   ├── 2x2/             # 2x2 detector configs
 │   │   ├── dune10kt-1x2x6/  # DUNE 10 kt module 1x2x6 configs

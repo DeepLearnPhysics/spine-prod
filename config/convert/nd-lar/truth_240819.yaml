@@ -1,15 +1,15 @@
-# Generic truth saving configuration
-# Revision date: August 5, 2024
+# ND-LAr truth conversion configuration
+# Revision date: August 19, 2024
 
 __meta__:
   kind: bundle
-  version: "240805"
-  date: "2024-08-05"
-  description: "Generic truth saving configuration"
+  version: "240819"
+  date: "2024-08-19"
+  description: "ND-LAr LArCV-to-SPINE truth conversion configuration"
 
 include:
-  - base/base_240718.yaml
-  - io/io_240805.yaml
+  - infer/nd-lar/base/base_240819.yaml
+  - infer/nd-lar/io/io_240819.yaml
 
 # Overrides
 override:

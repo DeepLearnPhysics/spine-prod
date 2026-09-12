@@ -12,6 +12,8 @@ import yaml
 class ConfigManager:
     """Manages configuration files, profiles, and modifiers."""
 
+    LATEST_CONFIG_FAMILIES = ("convert", "infer")
+
     def __init__(self, basedir: Path):
         """Initialize ConfigManager.
 
@@ -56,6 +58,18 @@ class ConfigManager:
             if detector in str(config_path):
                 return detector
         return "unknown_detector"
+
+    def detect_config_family(self, config: str) -> str:
+        """Identify the top-level configuration family in a request.
+
+        Ordinary and absolute paths are both supported. Requests without a
+        recognized family retain the historical inference behavior.
+        """
+        config_parts = Path(config).parts
+        for family in self.LATEST_CONFIG_FAMILIES:
+            if family in config_parts:
+                return family
+        return "infer"
 
     def resolve_config_path(self, config: str) -> Path:
         """Resolve a configuration using the standard SPINE search roots.
@@ -507,8 +521,10 @@ class ConfigManager:
 
         return str(composite_path)
 
-    def create_latest_config(self, detector: str, job_dir: Path) -> str:
-        """Create a composite config from the latest versions of all components.
+    def create_latest_config(
+        self, detector: str, job_dir: Path, family: str = "infer"
+    ) -> str:
+        """Materialize the latest configuration for a detector and family.
 
         Parameters
         ----------
@@ -516,16 +532,28 @@ class ConfigManager:
             Detector name (e.g., 'icarus', 'sbnd')
         job_dir : Path
             Job directory to save the generated config
+        family : str, default "infer"
+            Top-level configuration family. Inference configurations compose
+            their latest component fragments, while conversion configurations
+            select and snapshot the latest complete conversion bundle.
 
         Returns
         -------
         str
             Path to the generated latest config file
         """
-        config_dir = self.basedir / "config" / "infer" / detector
+        if family not in self.LATEST_CONFIG_FAMILIES:
+            raise ValueError(f"Latest configuration is not supported for '{family}'")
+
+        config_dir = self.basedir / "config" / family / detector
 
         if not config_dir.exists():
             raise ValueError(f"Detector config directory not found: {config_dir}")
+
+        if family == "convert":
+            return self._create_latest_conversion_config(
+                detector, config_dir, Path(job_dir)
+            )
 
         # Component subdirectories to check (in order)
         component_dirs = ["base", "io", "model", "post"]
@@ -603,6 +631,29 @@ class ConfigManager:
 
         print(f"Created latest config: {composite_path}")
         return str(composite_path)
+
+    def _create_latest_conversion_config(
+        self, detector: str, config_dir: Path, job_dir: Path
+    ) -> str:
+        """Snapshot the newest complete truth-conversion bundle for a detector."""
+        candidates = list(config_dir.glob("truth_*.yaml"))
+        versioned = [
+            (self.extract_version(candidate), candidate) for candidate in candidates
+        ]
+        versioned = [item for item in versioned if item[0] is not None]
+        if not versioned:
+            raise ValueError(
+                f"No versioned truth conversion bundles found for {detector}. "
+                "Expected files like truth_YYMMDD.yaml."
+            )
+
+        version, selected = max(versioned, key=lambda item: item[0])
+        snapshot = job_dir / f"{detector}_truth_latest_{version}.yaml"
+        snapshot.write_text(selected.read_text(encoding="utf-8"), encoding="utf-8")
+
+        print(f"  truth    -> {version}")
+        print(f"Created latest config: {snapshot}")
+        return str(snapshot)
 
     def list_modifiers(self, config_path: str) -> Dict:
         """List available modifiers for a given configuration file.

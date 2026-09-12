@@ -155,6 +155,7 @@ class InteractiveRunner(SubmissionComponent):
 
         # Detect detector
         detector = self.config_mgr.detect_detector(config)
+        config_family = self.config_mgr.detect_config_family(config)
         is_latest, config_name = self.context.batch.classify_config_request(config)
 
         job_name = f"interactive_{detector}_{config_name}"
@@ -162,8 +163,10 @@ class InteractiveRunner(SubmissionComponent):
 
         # Handle "latest" config generation
         if is_latest:
-            print(f"\nDetected 'latest' config request for {detector}")
-            config = self.config_mgr.create_latest_config(detector, job_dir)
+            print(f"\nDetected 'latest' {config_family} config request for {detector}")
+            config = self.config_mgr.create_latest_config(
+                detector, job_dir, family=config_family
+            )
 
         # Apply modifiers if specified
         if apply_mods:

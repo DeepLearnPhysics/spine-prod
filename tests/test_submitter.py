@@ -682,6 +682,19 @@ class TestSubmitterHelpers:
             True,
             "latest",
         )
+        assert mock_submitter.batch.classify_config_request("convert/icarus") == (
+            True,
+            "latest",
+        )
+        assert mock_submitter.batch.classify_config_request(
+            "convert/icarus/latest"
+        ) == (True, "latest")
+        assert mock_submitter.batch.classify_config_request(
+            str(workspace_root / "config" / "convert" / "icarus")
+        ) == (True, "latest")
+        assert mock_submitter.batch.classify_config_request(
+            "config/convert/icarus"
+        ) == (True, "latest")
         assert mock_submitter.batch.classify_config_request("custom.yaml") == (
             False,
             "custom",
@@ -1399,6 +1412,34 @@ class TestInteractiveExecution:
             str(latest), ["data"], create_latest.call_args.args[1], detector="icarus"
         )
         preload.assert_called_once_with(str(composite))
+
+    def test_run_interactive_resolves_latest_conversion_bundle(
+        self, mock_submitter, tmp_path
+    ):
+        """Conversion shorthand must select from the conversion family."""
+        latest = tmp_path / "icarus_truth_latest_240812.yaml"
+        latest.touch()
+        completed = type("Completed", (), {"returncode": 0})()
+
+        with (
+            patch.object(
+                mock_submitter.config_mgr,
+                "create_latest_config",
+                return_value=str(latest),
+            ) as create_latest,
+            patch("src.runtime.shutil.which", return_value="/usr/bin/spine"),
+            patch("src.interactive.subprocess.run", return_value=completed),
+        ):
+            assert (
+                mock_submitter.run_interactive(
+                    "convert/icarus", interactive_runtime="local"
+                )
+                == 0
+            )
+
+        args = create_latest.call_args
+        assert args.args[0] == "icarus"
+        assert args.kwargs == {"family": "convert"}
 
     def test_run_interactive_uses_bash_for_source(self, mock_submitter, tmp_path):
         """Test interactive mode uses bash so source commands work."""

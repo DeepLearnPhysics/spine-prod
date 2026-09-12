@@ -11,7 +11,7 @@ All ProtoDUNE-VD configs use a **hierarchical YAML include system** with composa
 ### Main Configurations
 - **`full_chain_260128.yaml`**: January 2026, latest ProtoDUNE-VD full chain config
 - **`full_chain_260118.yaml`**: January 2026, main ProtoDUNE-VD full chain config
-- **`save_truth_260118.yaml`**: January 2026, truth-only output configuration writing truth content to HDF5
+- **`config/convert/protodune-vd/truth_260118.yaml`**: January 2026 LArCV-to-SPINE truth conversion
 
 ### Component Structure
 Each main config includes modular YAML files:

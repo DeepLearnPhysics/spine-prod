@@ -1,15 +1,15 @@
-# ProtoDUNE-SP truth saving configuration
-# Revision date: February 10, 2026
+# SBND truth conversion configuration
+# Revision date: May 1, 2026
 
 __meta__:
   kind: bundle
-  version: "260210"
-  date: "2026-02-10"
-  description: "ProtoDUNE-SP truth saving configuration"
+  version: "260501"
+  date: "2026-05-01"
+  description: "SBND LArCV-to-SPINE truth conversion configuration"
 
 include:
-  - base/base_260210.yaml
-  - io/io_260210.yaml
+  - infer/sbnd/base/base_260501.yaml
+  - infer/sbnd/io/io_260218.yaml
 
 # Overrides
 override:

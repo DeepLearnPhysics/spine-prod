@@ -34,7 +34,7 @@ All detector directories follow a modular structure:
 - **`post/`**: Post-processing including flash matching and analysis tools
 - **`legacy/`**: Archived configurations for backward compatibility
 
-Top-level configuration files (e.g., `full_chain_YYMMDD.yaml`) compose these modules into complete reconstruction chains. Detector-independent utility configurations, such as `common/litify.yaml`, live under `common/`.
+Top-level configuration files (e.g., `full_chain_YYMMDD.yaml`) compose these modules into complete reconstruction chains. Detector-independent utility configurations, such as `common/litify.yaml`, live under `common/`. LArCV-to-SPINE truth conversion bundles live separately under `config/convert/`.
 
 ## Metadata Contract
 

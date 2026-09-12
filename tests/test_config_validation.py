@@ -37,6 +37,7 @@ from src.pipeline import PipelineDefinition
 
 CONFIG_INFER_ROOT = Path(__file__).parent.parent / "config" / "infer"
 CONFIG_ROOT = CONFIG_INFER_ROOT.parent
+CONFIG_CONVERT_ROOT = CONFIG_ROOT / "convert"
 ACTIVE_CONFIGS = sorted(
     [
         config_path
@@ -50,10 +51,12 @@ GENERIC_TRAIN_BUNDLES = sorted(
 )
 COMMON_CONFIGS = sorted(CONFIG_INFER_ROOT.rglob("*_common.yaml"))
 COMPOSITE_CONFIGS = sorted(
-    config_path
-    for pattern in ("full_chain_*.yaml", "save_truth_*.yaml")
-    for config_path in CONFIG_INFER_ROOT.rglob(pattern)
-    if "legacy" not in config_path.parts
+    [
+        config_path
+        for config_path in CONFIG_INFER_ROOT.rglob("full_chain_*.yaml")
+        if "legacy" not in config_path.parts
+    ]
+    + list(CONFIG_CONVERT_ROOT.rglob("truth_*.yaml"))
 )
 VERSIONED_MODIFIER_CONFIGS = sorted(
     config_path
@@ -1104,7 +1107,7 @@ def test_graph_spice_uses_a_dedicated_uresnet_embedder():
 
 @pytest.mark.parametrize("config_path", COMPOSITE_CONFIGS, ids=lambda path: str(path))
 def test_composite_configs_are_bundles(config_path):
-    """Executable full-chain and truth-saving composites must be bundles."""
+    """Executable reconstruction and conversion composites must be bundles."""
     with open(config_path, "r", encoding="utf-8") as config_file:
         config = yaml.load(config_file, Loader=yaml.BaseLoader)
 

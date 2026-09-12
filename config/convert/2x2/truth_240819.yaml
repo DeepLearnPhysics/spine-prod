@@ -1,15 +1,15 @@
-# 2x2 truth saving configuration
+# 2x2 truth conversion configuration
 # Revision date: August 19, 2024
 
 __meta__:
   kind: bundle
   version: "240819"
   date: "2024-08-19"
-  description: "2x2 truth saving configuration"
+  description: "2x2 LArCV-to-SPINE truth conversion configuration"
 
 include:
-  - base/base_240719.yaml
-  - io/io_240819.yaml
+  - infer/2x2/base/base_240719.yaml
+  - infer/2x2/io/io_240819.yaml
 
 # Overrides
 override:
