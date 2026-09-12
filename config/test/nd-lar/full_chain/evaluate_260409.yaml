@@ -1,0 +1,19 @@
+__meta__:
+  kind: bundle
+  version: "260409"
+  date: "2026-04-09"
+  description: Evaluate the trained ND-LAr 260409 full chain
+
+include:
+  - infer/nd-lar/base/base_240819.yaml
+  - infer/nd-lar/io/io_240819.yaml
+  - model/nd-lar/full_chain/model_260409.yaml
+  - infer/nd-lar/post/post_240819.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+
+override:
+  # This stage emits analyzer CSVs only; reconstruction HDF5 is unnecessary.
+  io.writer: null
+
+  # Adapt cluster truth only for metric evaluation.
+  model.network_input.clust_label: clust_label

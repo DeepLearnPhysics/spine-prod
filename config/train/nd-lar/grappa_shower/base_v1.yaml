@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ND-LAr shower GrapPA training policy and data schema
+
+include: train/generic/grappa_shower/base_v1.yaml
+
+override:
+  # Preserve the historical global update size on one cached-training GPU.
+  io.loader.minibatch_size: 48
+  io.loader.dataset.schema.data.particle_info.particle_event: particle_pcluster

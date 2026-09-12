@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260409"
+  date: "2026-04-09"
+  description: ND-LAr 260409 standalone track GrapPA model
+
+include: model/common/grappa_track/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/nd-lar/grappa_track/network_260409.yaml
+  model.modules.grappa_loss: !include model/nd-lar/grappa_track/loss_260409.yaml

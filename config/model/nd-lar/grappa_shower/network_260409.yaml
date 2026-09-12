@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  version: "260409"
+  date: "2026-04-09"
+  description: ND-LAr 260409 shower GrapPA network
+
+include: model/common/grappa_shower/network_v1.yaml
+
+override:
+  graph.max_length: [400, 0, 400, 400, 0, 0, 0, 35, 0, 70]

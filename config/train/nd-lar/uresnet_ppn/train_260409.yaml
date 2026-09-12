@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260409"
+  date: "2026-04-09"
+  description: ND-LAr 260409 UResNet-PPN training
+
+include:
+  - model/nd-lar/uresnet_ppn/model_260409.yaml
+  - train/nd-lar/uresnet_ppn/base_v1.yaml

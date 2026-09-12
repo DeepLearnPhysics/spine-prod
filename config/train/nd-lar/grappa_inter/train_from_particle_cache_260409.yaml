@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260409"
+  date: "2026-04-09"
+  description: ND-LAr 260409 interaction GrapPA training from cached particle graphs
+
+include:
+  - model/nd-lar/grappa_inter/model_260409.yaml
+  - train/nd-lar/grappa_inter/from_particle_cache_v1.yaml

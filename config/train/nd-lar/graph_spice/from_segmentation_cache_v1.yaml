@@ -1,0 +1,29 @@
+__meta__:
+  kind: fragment
+  description: ND-LAr Graph-SPICE training from cached semantics and adapted truth
+
+include: train/nd-lar/graph_spice/base_v1.yaml
+
+remove:
+  - validation.file_keys
+
+override:
+  io.loader.dataset:
+    name: mixed
+    primary:
+      name: larcv
+      file_keys: null
+      schema:
+        data:
+          parser: sparse3d
+          sparse_event: sparse3d_pcluster
+    cache:
+      path: null
+      stage: segmentation
+      keys: [seg_pred, clust_label_adapt]
+
+  validation.sources:
+    primary:
+      file_keys: null
+    cache:
+      path: null

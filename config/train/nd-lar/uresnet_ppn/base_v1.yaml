@@ -1,0 +1,16 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ND-LAr UResNet-PPN training policy and data schema
+
+include: train/generic/uresnet_ppn/base_v1.yaml
+
+remove:
+  - io.loader.batch_size
+
+override:
+  # Four A100 processes reproduce the historical global batch of 16.
+  io.loader.minibatch_size: 4
+  io.loader.dataset.schema.ppn_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.ppn_label.include_point_tagging: false
+  io.loader.dataset.schema.clust_label.particle_info.particle_event: particle_pcluster
+  base.epochs: 150.0

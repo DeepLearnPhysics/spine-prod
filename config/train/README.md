@@ -15,6 +15,7 @@ The configurations in this directory are used to:
 The currently populated configuration tree is:
 
 - **`generic/`**: YAML benchmark recipes for the generic dataset
+- **`nd-lar/`**: cached five-stage recipes for the busy ND-LAr dataset
 - **`protodune-sp/`**: staged recipes for the ProtoDUNE-SP `260210` chain,
   including its separately trained deghosting model
 

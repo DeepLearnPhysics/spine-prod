@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  version: "260409"
+  date: "2026-04-09"
+  description: ND-LAr 260409 Graph-SPICE network
+
+include: model/common/graph_spice/network_v1.yaml
+
+override:
+  embedder.uresnet.spatial_size: 6144
+  constructor.graph:
+    name: radius
+    r: 1.9
