@@ -6,6 +6,10 @@ __meta__:
 
 include: train/nd-lar/uresnet/train_240819.yaml
 
+geo:
+  detector: nd-lar
+  tag: up4-1
+
 override:
   # Randomize the sparse-convolution lattice phase independently per image.
   # `auto` follows the total encoder stride if depth changes in later studies.
