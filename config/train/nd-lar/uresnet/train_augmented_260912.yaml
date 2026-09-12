@@ -1,0 +1,45 @@
+__meta__:
+  kind: bundle
+  version: "260912"
+  date: "2026-09-12"
+  description: ND-LAr UResNet training with lattice and detector-symmetry augmentation
+
+include: train/nd-lar/uresnet/train_240819.yaml
+
+geo:
+  detector: nd-lar
+  tag: up4-1
+
+override:
+  # Randomize the sparse-convolution lattice phase independently per image.
+  # `auto` follows the total encoder stride if depth changes in later studies.
+  model.modules.uresnet.lattice:
+    period: auto
+
+  # These transforms act on every coordinate-bearing input/label together.
+  # Validation derives an unaugmented loader from this training loader.
+  io.loader.dataset.augment:
+    rotate_half_turn:
+      name: rotate
+      axes: [0, 1]
+      k: [0, 2]
+      use_geo_center: true
+      keep_meta: true
+    flip_x:
+      name: flip
+      axis: 0
+      use_geo_center: true
+      keep_meta: true
+      p: 0.5
+    flip_y:
+      name: flip
+      axis: 1
+      use_geo_center: true
+      keep_meta: true
+      p: 0.5
+    flip_z:
+      name: flip
+      axis: 2
+      use_geo_center: true
+      keep_meta: true
+      p: 0.5

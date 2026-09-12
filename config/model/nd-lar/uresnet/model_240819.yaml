@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: ND-LAr 240819 standalone UResNet model
+
+include: model/common/uresnet/base_v1.yaml
+
+override:
+  model.modules.uresnet: !include model/nd-lar/uresnet/network_240819.yaml
+  model.modules.uresnet_loss: !include model/nd-lar/uresnet/loss_240819.yaml

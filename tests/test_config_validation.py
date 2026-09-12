@@ -262,6 +262,36 @@ def test_generic_models_and_cache_producers_name_dated_component_fragments():
         )
 
 
+@pytest.mark.parametrize(
+    ("detector", "version"),
+    (("nd-lar", "240819"), ("protodune-sp", "260210")),
+)
+def test_detector_uresnet_training_owns_canonical_backbone(detector, version):
+    """Detector UResNet-PPN and training reuse the standalone backbone."""
+    model_root = CONFIG_ROOT / "model" / detector
+    train_root = CONFIG_ROOT / "train" / detector / "uresnet"
+
+    network = yaml.load(
+        (model_root / "uresnet_ppn" / f"network_{version}.yaml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    loss = yaml.load(
+        (model_root / "uresnet_ppn" / f"loss_{version}.yaml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    training = yaml.load(
+        (train_root / f"train_{version}.yaml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+
+    assert network["uresnet"] == f"model/{detector}/uresnet/network_{version}.yaml"
+    assert loss["uresnet_loss"] == f"model/{detector}/uresnet/loss_{version}.yaml"
+    assert training["include"] == [
+        f"model/{detector}/uresnet/model_{version}.yaml",
+        f"train/{detector}/uresnet/base_v1.yaml",
+    ]
+
+
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 @pytest.mark.parametrize("version", ["240718", "240805"])
 def test_generic_segmentation_cache_reuses_uresnet_ppn_revision(version):
