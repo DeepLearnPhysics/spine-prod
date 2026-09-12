@@ -1,0 +1,32 @@
+# SBND truth conversion configuration
+# Revision date: March 28, 2025
+
+__meta__:
+  kind: bundle
+  version: "250328"
+  date: "2025-03-28"
+  description: "SBND LArCV-to-SPINE truth conversion with CRT and X-Arapuca"
+
+include:
+  - infer/sbnd/base/base_240720.yaml
+  - infer/sbnd/io/io_250328.yaml
+
+# Overrides
+override:
+  # Only build truth objects
+  build.mode: truth
+
+  # Force CPU execution for truth-only parsing
+  base.world_size: 0
+
+  # Temporary workaround until SPINE produces sources labels without reco
+  # No reconstructed information or wire-TPC-only source products to write
+  io.writer.keys-:
+    [
+      points,
+      depositions,
+      reco_particles,
+      reco_interactions,
+      sources,
+      sources_label,
+    ]

@@ -1330,6 +1330,27 @@ def test_protodune_sp_260906_inference_uses_trained_shared_model():
     assert deployed["post"]["match"]["ghost"] is True
 
 
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_sbnd_truth_conversions_track_material_geometry_and_io_revisions():
+    """SBND truth bundles distinguish every output-affecting base/IO pairing."""
+    expected = {
+        "240720": ("sbndv2-4", False, True),
+        "250328": ("sbndv2-4", True, True),
+        "260218": ("sbndv2-4", True, False),
+        "260501": ("sbndv2-6", True, False),
+    }
+
+    for version, (geometry, has_crt, has_xarapuca) in expected.items():
+        config = load_config_with_includes(
+            CONFIG_CONVERT_ROOT / f"sbnd/truth_{version}.yaml"
+        )
+        writer_keys = config["io"]["writer"]["keys"]
+
+        assert config["geo"]["tag"] == geometry
+        assert ("crthits" in writer_keys) is has_crt
+        assert ("flashes_xa" in writer_keys) is has_xarapuca
+
+
 def test_protodune_sp_cache_stages_own_only_new_products():
     """Each ProtoDUNE-SP transition appends products absent upstream."""
     root = CONFIG_ROOT / "cache/protodune-sp"

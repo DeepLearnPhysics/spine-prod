@@ -24,3 +24,8 @@ conversion bundle for convenience:
 
 `latest` selects a complete dated bundle. It does not independently combine the
 newest detector IO and base fragments, which could produce an unreviewed pairing.
+
+A detector has another dated truth bundle only when a base or IO revision changes
+the converted artifact—for example its geometry, truth parsing, built objects, or
+written products. Reco-only and otherwise irrelevant configuration changes reuse
+the existing conversion bundle.
