@@ -1,0 +1,12 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ProtoDUNE-SP standalone UResNet training policy and truth schema
+
+include: train/generic/uresnet/base_v1.yaml
+
+remove:
+  - io.loader.minibatch_size
+
+override:
+  # Match the per-GPU scale used by the corresponding UResNet-PPN training.
+  io.loader.minibatch_size: 32

@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ND-LAr standalone UResNet training policy and data schema
+
+include: train/generic/uresnet/base_v1.yaml
+
+remove:
+  - io.loader.minibatch_size
+
+override:
+  # ND-LAr images are busy; keep the conservative A100 per-GPU batch size.
+  io.loader.minibatch_size: 4
+  base.epochs: 150.0

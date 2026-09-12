@@ -2,6 +2,7 @@ __meta__:
   kind: fragment
   version: "240819"
   date: "2024-08-19"
-  description: ND-LAr 240819 UResNet-PPN loss
+  description: ND-LAr 240819 composed UResNet-PPN loss
 
-include: model/common/uresnet_ppn/loss_v1.yaml
+uresnet_loss: !include model/nd-lar/uresnet/loss_240819.yaml
+ppn_loss: !include model/common/uresnet_ppn/ppn_loss_v1.yaml
