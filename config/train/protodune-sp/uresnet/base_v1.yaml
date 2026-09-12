@@ -4,10 +4,6 @@ __meta__:
 
 include: train/generic/uresnet/base_v1.yaml
 
-geo:
-  detector: protodune-sp
-  tag: protodunev7
-
 remove:
   - io.loader.minibatch_size
 
