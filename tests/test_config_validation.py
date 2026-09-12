@@ -1182,6 +1182,9 @@ def load_config_with_includes(config_path):
 
     Note: Downloads are mocked to avoid downloading large checkpoint files.
     """
+    if not SPINE_AVAILABLE:
+        pytest.skip("SPINE not available")
+
     config_path = Path(config_path)
 
     # Mock download_from_url at the point where it's used in the loader
