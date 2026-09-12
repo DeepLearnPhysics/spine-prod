@@ -1704,6 +1704,163 @@ def test_protodune_sp_260906_pipeline_uses_mpvmpr_v1_and_dated_configs():
     assert report["config"] == "test/protodune-sp/full_chain/report_260210.yaml"
 
 
+def test_nd_lar_260409_model_is_shared_and_preserves_deployed_choices():
+    """ND-LAr inference adds weights to the reusable 260409 composition."""
+    shared = load_config_with_includes(
+        CONFIG_ROOT / "model/nd-lar/full_chain/model_260409.yaml"
+    )["model"]
+    deployed = load_config_with_includes(
+        CONFIG_ROOT / "infer/nd-lar/model/model_260409.yaml"
+    )["model"]
+
+    assert deployed.pop("weight_path") == "/fake/weights/checkpoint.ckpt"
+    assert deployed == shared
+
+    modules = shared["modules"]
+    assert modules["chain"]["deghosting"] is None
+    assert modules["graph_spice"]["embedder"]["uresnet"]["spatial_size"] == 6144
+    assert modules["graph_spice"]["constructor"]["graph"] == {
+        "name": "radius",
+        "r": 1.9,
+    }
+    assert modules["grappa_shower"]["graph"]["max_length"] == [
+        400,
+        0,
+        400,
+        400,
+        0,
+        0,
+        0,
+        35,
+        0,
+        70,
+    ]
+    assert modules["grappa_track"]["graph"]["max_length"] == 250
+    assert modules["grappa_inter"]["gnn_model"]["node_pred"]["type"] == 6
+    assert modules["grappa_inter"]["gnn_model"]["edge_layer"]["mlp"]["width"] == 128
+
+
+def test_nd_lar_cache_stages_append_only_transition_products():
+    """ND-LAr caches do not duplicate tensors retained in raw LArCV."""
+    root = CONFIG_ROOT / "cache/nd-lar"
+    segmentation = load_config_with_includes(
+        root / "uresnet_ppn/segmentation_260409.yaml"
+    )
+    fragmentation = load_config_with_includes(
+        root / "graph_spice/fragment_graphs_260409.yaml"
+    )
+    particles = load_config_with_includes(
+        root / "grappa_shower_track/particle_graphs_260409.yaml"
+    )
+
+    assert segmentation["io"]["writer"]["keys"] == [
+        "seg_pred",
+        "ppn_points",
+        "clust_label_adapt",
+    ]
+    assert segmentation["io"]["loader"]["dataset"]["schema"]["clust_label"][
+        "particle_info"
+    ] == {
+        "particle_event": "particle_pcluster",
+        "type_include_secondary": False,
+        "type_include_mpr": False,
+        "primary_include_mpr": False,
+    }
+
+    fragment_writer_keys = fragmentation["io"]["writer"]["keys"]
+    assert "data" not in fragment_writer_keys
+    assert "clust_label_adapt" not in fragment_writer_keys
+    assert "shower_fragment_node_features" in fragment_writer_keys
+    assert "track_fragment_edge_features" in fragment_writer_keys
+
+    particle_writer_keys = particles["io"]["writer"]["keys"]
+    assert "fragment_clusts" not in particle_writer_keys
+    assert "particle_node_features" in particle_writer_keys
+    assert "interaction_aggregation_node_orient_target" in particle_writer_keys
+    assert "interaction_aggregation_node_orient_valid" in particle_writer_keys
+
+
+def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
+    """The ND-LAr workflow preserves reviewed batches and bounded concurrency."""
+    expected_minibatches = {
+        "uresnet_ppn": 4,
+        "graph_spice": 16,
+        "grappa_shower": 48,
+        "grappa_track": 64,
+        "grappa_inter": 128,
+    }
+    for component, minibatch_size in expected_minibatches.items():
+        config = load_config_with_includes(
+            CONFIG_ROOT / f"train/nd-lar/{component}/base_v1.yaml"
+        )
+        loader = config["io"]["loader"]
+        assert loader["minibatch_size"] == minibatch_size
+        assert "batch_size" not in loader
+
+    pipeline = PipelineDefinition.load(
+        Path(__file__).parent.parent / "pipelines/nd-lar/full_chain_260409.yaml",
+        workspace_override="/tmp/nd-lar-260409",
+    )
+    names = [stage["name"] for stage in pipeline.stages]
+    assert len(names) == 14
+    assert names[:4] == [
+        "train_uresnet_ppn",
+        "cache_train_segmentation",
+        "cache_validation_segmentation",
+        "train_graph_spice",
+    ]
+    assert names[-3:] == [
+        "export_full_chain_weights",
+        "evaluate_full_chain",
+        "report_full_chain",
+    ]
+    assert not any("deghost" in name or "filter" in name for name in names)
+
+    source_root = "/sdf/data/neutrino/ndlar/sim/mpvmpr_v01"
+    first = pipeline.stages[0]
+    assert first["source_list"] == f"{source_root}/train_file_list.txt"
+    assert first["val_source_list"] == f"{source_root}/test_file_list.txt"
+    assert first["profile"] == "s3df_ampere_full"
+    assert first["time"] == "5-00:00:00"
+
+    graph_spice = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_graph_spice"
+    )
+    assert graph_spice["profile"] == "s3df_ampere_full"
+    assert graph_spice["time"] == "3-00:00:00"
+    assert set(graph_spice["sources"]) == {"primary", "cache"}
+
+    for stage in pipeline.stages:
+        if stage["name"].startswith("cache_"):
+            assert stage["ntasks"] == 2
+            assert stage["files_per_task"] == 1
+
+    shower = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_shower"
+    )
+    track = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_track"
+    )
+    assert shower["depends_on"] == track["depends_on"]
+    assert shower["profile"] == track["profile"] == "s3df_ampere"
+
+    export = next(
+        stage
+        for stage in pipeline.stages
+        if stage["name"] == "export_full_chain_weights"
+    )
+    assert set(export["module_weight"]) == set(expected_minibatches)
+
+    evaluation = next(
+        stage for stage in pipeline.stages if stage["name"] == "evaluate_full_chain"
+    )
+    assert evaluation["entry_fraction_range"] == [0.5, 1.0]
+    assert evaluation["ntasks"] == 4
+
+    report = pipeline.stages[-1]
+    assert report["config"] == "test/nd-lar/full_chain/report_240819.yaml"
+
+
 def write_composite_config(tmp_path, base_config, modifier_config):
     """Create a temporary bundle which applies a modifier to a base config."""
     composite_path = tmp_path / "composite.yaml"

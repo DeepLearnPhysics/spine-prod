@@ -1,0 +1,7 @@
+__meta__:
+  kind: bundle
+  version: "240819"
+  date: "2024-08-19"
+  description: ND-LAr full-chain metric report
+
+include: test/common/full_chain/report_v1.yaml

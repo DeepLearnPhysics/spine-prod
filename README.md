@@ -181,6 +181,7 @@ spine-prod/
 │   │   ├── sbnd/            # SBND detector configs
 │   │   └── common/          # Shared configs
 │   ├── model/               # Common structures and detector revisions
+│   ├── test/                # Evaluation analyzers and report recipes
 │   └── train/               # Training configs (referenced as train/...)
 ├── templates/               # Job templates
 │   ├── profiles.yaml        # Resource profiles
@@ -191,6 +192,8 @@ spine-prod/
 ├── pipelines/               # Multi-stage pipeline definitions
 │   ├── generic/              # Generic detector workflow revisions
 │   │   └── uresnet_ppn_to_graph_spice_240805.yaml
+│   ├── nd-lar/               # ND-LAr cached full-chain training
+│   ├── protodune-sp/         # ProtoDUNE-SP cached full-chain training
 │   └── icarus_production_example.yaml
 │
 ├── scripts/                 # Utility scripts
@@ -727,6 +730,8 @@ writer output fields. See
 workflow with centralized paths. Its materialization jobs publish successive
 immutable stages to one logical cache repository per data split,
 then compose the independently trained modules into one full-chain checkpoint.
+The ND-LAr and ProtoDUNE-SP pipelines apply the same production pattern with
+their detector-specific model and data contracts.
 The generic full-chain pipelines finally evaluate that assembled checkpoint
 with SPINE's metric analyzers and submit a CPU-only `kind: report` reduction.
 The report stage waits for all metric inference jobs, records dataset,

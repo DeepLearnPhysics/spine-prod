@@ -12,12 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dune10kt-1x2x6` to the canonical `dune-hd-10kt-1x2x6` detector name and
   migrated its public model-weight URLs. Deprecated configuration requests
   using the former name continue to resolve with a warning.
+- Migrated the ND-LAr 260409 inference model to the shared component
+  composition used by its training and cache-production configurations.
 
 ### Added
 - Added a DUNE vertical-drift 10 kt module 1x8x6 truth conversion bundle using
   the shared DUNE LArCV truth-product contract and canonical VD geometry.
 - Added a ProtoDUNE-HD truth conversion bundle based on the pinned
   ProtoDUNE-SP truth-product contract and canonical HD geometry.
+- Added composed ND-LAr 260409 model, training, staged-cache, evaluation, and
+  reporting configurations together with an end-to-end full-chain pipeline.
 
 ## [0.9.0] - 2026-09-05
 

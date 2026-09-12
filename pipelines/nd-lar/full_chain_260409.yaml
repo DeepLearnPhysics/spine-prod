@@ -1,0 +1,197 @@
+# Staged training of every learned component used by the ND-LAr 260409 full
+# chain. Supply its destination with CLI --workspace. Each split owns one
+# sharded cache repository; stages publish immutable shards.
+
+workspace: null
+
+variables:
+  train_source_list: /sdf/data/neutrino/ndlar/sim/mpvmpr_v01/train_file_list.txt
+  validation_source_list: /sdf/data/neutrino/ndlar/sim/mpvmpr_v01/test_file_list.txt
+
+collections:
+  splits:
+    - name: train
+      source_list: ${train_source_list}
+      cache_dir: ${workspace}/cache/train
+      cache_repository: ${workspace}/cache/train.spine-cache
+    - name: validation
+      source_list: ${validation_source_list}
+      cache_dir: ${workspace}/cache/validation
+      cache_repository: ${workspace}/cache/validation.spine-cache
+
+defaults:
+  profile: s3df_ampere
+  time: "08:00:00"
+
+stages:
+  # Train semantic segmentation and point proposal directly from LArCV truth.
+  - name: train_uresnet_ppn
+    config: train/nd-lar/uresnet_ppn/train_260409.yaml
+    stage: train
+    profile: s3df_ampere_full
+    time: "5-00:00:00"
+    source_list: ${train_source_list}
+    val_source_list: ${validation_source_list}
+    val_entry_fraction_range: [0.0, 0.5]
+    run_dir: ${workspace}/train/uresnet_ppn
+    tensorboard: true
+
+  # Append segmentation predictions and adapted cluster labels to each cache.
+  - name: cache_${split.name}_segmentation
+    for_each:
+      collection: splits
+      as: split
+    depends_on: [train_uresnet_ppn]
+    config: cache/nd-lar/uresnet_ppn/segmentation_260409.yaml
+    source_list: ${split.source_list}
+    run_dir: ${split.cache_dir}/segmentation
+    output: ${split.cache_repository}
+    cache_repository: ${split.cache_repository}
+    cache_stage: segmentation
+    files_per_task: 1
+    ntasks: 2
+    module_weight:
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
+
+  # Train Graph-SPICE from raw coordinates and cached segmentation products.
+  - name: train_graph_spice
+    depends_on: [cache_train_segmentation, cache_validation_segmentation]
+    config: train/nd-lar/graph_spice/train_from_uresnet_ppn_260409.yaml
+    stage: train
+    profile: s3df_ampere_full
+    time: "3-00:00:00"
+    run_dir: ${workspace}/train/graph_spice
+    tensorboard: true
+    sources:
+      primary:
+        source_list: ${train_source_list}
+      cache:
+        source: ${workspace}/cache/train.spine-cache
+    validation_sources:
+      primary:
+        source_list: ${validation_source_list}
+      cache:
+        source: ${workspace}/cache/validation.spine-cache
+    val_entry_fraction_range: [0.0, 0.5]
+
+  # Append fragment graphs and static supervision for both particle branches.
+  - name: cache_${split.name}_fragment_graphs
+    for_each:
+      collection: splits
+      as: split
+    depends_on: [train_graph_spice]
+    config: cache/nd-lar/graph_spice/fragment_graphs_260409.yaml
+    run_dir: ${split.cache_dir}/fragmentation
+    in_place: true
+    cache_repository: ${split.cache_repository}
+    cache_stage: fragmentation
+    files_per_task: 1
+    ntasks: 2
+    sources:
+      primary:
+        source_list: ${split.source_list}
+      cache:
+        source: ${split.cache_repository}
+    module_weight:
+      graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
+
+  # Train shower aggregation and shower-primary identification from cache.
+  - name: train_grappa_shower
+    depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
+    config: train/nd-lar/grappa_shower/train_from_fragment_cache_260409.yaml
+    stage: train
+    time: "1-00:00:00"
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
+    val_entry_fraction_range: [0.0, 0.5]
+    run_dir: ${workspace}/train/grappa_shower
+    tensorboard: true
+
+  # Train track aggregation concurrently from the same fragment cache.
+  - name: train_grappa_track
+    depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
+    config: train/nd-lar/grappa_track/train_from_fragment_cache_260409.yaml
+    stage: train
+    time: "1-00:00:00"
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
+    val_entry_fraction_range: [0.0, 0.5]
+    run_dir: ${workspace}/train/grappa_track
+    tensorboard: true
+
+  # Append particle graphs and static interaction supervision to each cache.
+  - name: cache_${split.name}_particle_graphs
+    for_each:
+      collection: splits
+      as: split
+    depends_on: [train_grappa_shower, train_grappa_track]
+    config: cache/nd-lar/grappa_shower_track/particle_graphs_260409.yaml
+    run_dir: ${split.cache_dir}/particle_aggregation
+    in_place: true
+    cache_repository: ${split.cache_repository}
+    cache_stage: particle_aggregation
+    files_per_task: 1
+    ntasks: 2
+    sources:
+      primary:
+        source_list: ${split.source_list}
+      cache:
+        source: ${split.cache_repository}
+    module_weight:
+      grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
+      grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
+
+  # Train interaction aggregation and particle classifiers from cached graphs.
+  - name: train_grappa_inter
+    depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
+    config: train/nd-lar/grappa_inter/train_from_particle_cache_260409.yaml
+    stage: train
+    time: "1-00:00:00"
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
+    val_entry_fraction_range: [0.0, 0.5]
+    run_dir: ${workspace}/train/grappa_inter
+    tensorboard: true
+
+  # Export all five learned modules as one inference checkpoint.
+  - name: export_full_chain_weights
+    depends_on: [train_grappa_inter]
+    config: model/nd-lar/full_chain/model_260409.yaml
+    profile: s3df_milano
+    time: "00:30:00"
+    run_dir: ${workspace}/weights/export
+    export_weights: ${workspace}/weights/full_chain_260409.ckpt
+    module_weight:
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
+      graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
+      grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
+      grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
+      grappa_inter: ${workspace}/train/grappa_inter/weights/snapshot-best.ckpt
+
+  # Evaluate the assembled checkpoint on the held-out half of the test split.
+  - name: evaluate_full_chain
+    depends_on: [export_full_chain_weights]
+    config: test/nd-lar/full_chain/evaluate_260409.yaml
+    source_list: ${validation_source_list}
+    entry_fraction_range: [0.5, 1.0]
+    run_dir: ${workspace}/metrics/full_chain/raw
+    in_place: true
+    weight_path: ${workspace}/weights/full_chain_260409.ckpt
+    num_workers: 16
+    files_per_task: 1
+    ntasks: 4
+
+  # Reduce completed metric shards into checksummed JSON and plots.
+  - name: report_full_chain
+    kind: report
+    depends_on: [evaluate_full_chain]
+    config: test/nd-lar/full_chain/report_240819.yaml
+    input_dir: ${workspace}/metrics/full_chain/raw/latest
+    output_dir: ${workspace}/metrics/full_chain/report/artifacts
+    run_dir: ${workspace}/metrics/full_chain/report
+    checkpoint: ${workspace}/weights/full_chain_260409.ckpt
+    dataset: ${validation_source_list}
+    dataset_selection:
+      entry_fraction_range: [0.5, 1.0]
+    profile: s3df_milano
+    time: "00:30:00"

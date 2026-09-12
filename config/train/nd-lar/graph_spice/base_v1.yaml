@@ -1,0 +1,14 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ND-LAr Graph-SPICE training policy and data schema
+
+include: train/generic/graph_spice/base_v1.yaml
+
+remove:
+  - io.loader.batch_size
+
+override:
+  # Four processes reproduce the historical global batch of 64.
+  io.loader.minibatch_size: 16
+  io.loader.dataset.schema.clust_label.particle_info.particle_event: particle_pcluster
+  base.epochs: 75.0

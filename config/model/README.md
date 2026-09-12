@@ -8,9 +8,9 @@ The tree separates two independent forms of versioning:
 
 - `common/` contains detector-independent model structures tied to a SPINE
   model-schema generation, such as `base_v1.yaml` and `network_v1.yaml`.
-- detector directories such as `generic/` and `protodune-sp/` contain immutable dated model
-  revisions which derive from a pinned common structure and supply all
-  detector-dependent parameters.
+- detector directories such as `generic/`, `nd-lar/`, and `protodune-sp/`
+  contain immutable dated model revisions which derive from a pinned common
+  structure and supply all detector-dependent parameters.
 
 For example:
 
@@ -52,3 +52,8 @@ ProtoDUNE-SP additionally composes a binary UResNet deghosting module and its
 detector calibration ahead of UResNet-PPN. Its `260210` leaves preserve the
 deployed full-chain definition exactly; proposed migrations to newer SPINE
 defaults belong in a new dated model revision.
+
+ND-LAr uses the five learned stages of the generic chain without deghosting.
+Its `260409` composition records the much larger Graph-SPICE spatial extent,
+ND-specific graph-distance limits, six-class interaction PID head, and wider
+interaction GrapPA layers used by the deployed model.

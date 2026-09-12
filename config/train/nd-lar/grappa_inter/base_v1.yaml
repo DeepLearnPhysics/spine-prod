@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ND-LAr interaction GrapPA training policy and data schema
+
+include: train/generic/grappa_inter/base_v1.yaml
+
+override:
+  # Preserve the historical global update size on one cached-training GPU.
+  io.loader.minibatch_size: 128
+  io.loader.dataset.schema.data.particle_info.particle_event: particle_pcluster
+  base.epochs: 75.0

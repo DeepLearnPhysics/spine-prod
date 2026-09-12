@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260409"
+  date: "2026-04-09"
+  description: ND-LAr 260409 standalone Graph-SPICE model
+
+include: model/common/graph_spice/base_v1.yaml
+
+override:
+  model.modules.graph_spice: !include model/nd-lar/graph_spice/network_260409.yaml
+  model.modules.graph_spice_loss: !include model/nd-lar/graph_spice/loss_260409.yaml

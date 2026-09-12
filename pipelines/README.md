@@ -213,6 +213,19 @@ The `260210` pipeline intentionally preserves the deployed model choices. It
 is the reviewable baseline from which a new dated ProtoDUNE-SP revision can
 adopt selected decisions from the generic `260828` study.
 
+## ND-LAr staged training
+
+`nd-lar/full_chain_260409.yaml` applies the same five-model cached workflow to
+the busy ND-LAr images. Unlike ProtoDUNE-SP, it requires neither deghosting nor
+an entry-size filter. The model configuration preserves the deployed 260409
+architecture while moving its detector-specific spatial scale, graph limits,
+PID width and loss choices into independently auditable shared model files.
+
+The first two training jobs use four GPUs with per-rank minibatches selected to
+match the historical global A100 batch sizes. The three cached GrapPA jobs run
+on one GPU and retain their historical global update sizes without repeatedly
+loading the raw sparse images.
+
 ProtoDUNE-SP cache arrays partition only the authoritative `primary` LArCV
 source. Every task receives the same scalar `cache` repository path, and the
 cache reader projects its immutable source shards onto that task's raw-source
