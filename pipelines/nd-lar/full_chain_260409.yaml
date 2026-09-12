@@ -42,7 +42,7 @@ stages:
       collection: splits
       as: split
     depends_on: [train_uresnet_ppn]
-    config: cache/nd-lar/uresnet_ppn/segmentation_260409.yaml
+    config: cache/nd-lar/uresnet_ppn/segmentation_240819.yaml
     source_list: ${split.source_list}
     run_dir: ${split.cache_dir}/segmentation
     output: ${split.cache_repository}

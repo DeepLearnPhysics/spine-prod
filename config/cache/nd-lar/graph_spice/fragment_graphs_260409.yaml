@@ -8,8 +8,8 @@ include: cache/nd-lar/graph_spice/base_v1.yaml
 
 model:
   modules:
-    graph_spice: !include model/nd-lar/graph_spice/network_260409.yaml
+    graph_spice: !include model/nd-lar/graph_spice/network_250505.yaml
     grappa_shower: !include model/nd-lar/grappa_shower/network_260409.yaml
-    grappa_shower_loss: !include model/nd-lar/grappa_shower/loss_260409.yaml
+    grappa_shower_loss: !include model/nd-lar/grappa_shower/loss_250505.yaml
     grappa_track: !include model/nd-lar/grappa_track/network_full_chain_260409.yaml
-    grappa_track_loss: !include model/nd-lar/grappa_track/loss_260409.yaml
+    grappa_track_loss: !include model/nd-lar/grappa_track/loss_240819.yaml

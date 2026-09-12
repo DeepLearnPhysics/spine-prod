@@ -1,0 +1,11 @@
+__meta__:
+  kind: bundle
+  version: "240819"
+  date: "2024-08-19"
+  description: Materialize ND-LAr UResNet-PPN stage products
+
+include: cache/nd-lar/uresnet_ppn/base_v1.yaml
+
+model:
+  modules:
+    uresnet_ppn: !include model/nd-lar/uresnet_ppn/network_240819.yaml

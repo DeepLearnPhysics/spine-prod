@@ -22,6 +22,13 @@ The currently populated configuration tree is:
 Additional detector-specific trees will be added as their historical recipes
 are reviewed and migrated to this composed configuration structure.
 
+ND-LAr additionally retains standalone `250806` overlay-training recipes.
+Those recipes are intentionally not presented as an aligned stage-cache
+pipeline: stochastic event overlay changes event identity at collation time and
+therefore cannot publish one cache entry per source event. The `240819` ND-LAr
+inference revision is a 2x2-checkpoint debug deployment and likewise is not
+represented as an ND-LAr training production.
+
 ## Configuration Structure
 
 Training configurations typically include:

@@ -1,0 +1,14 @@
+__meta__:
+  kind: bundle
+  version: "250505"
+  date: "2025-05-05"
+  description: Materialize ND-LAr May 2025 particle graphs and supervision
+
+include: cache/nd-lar/grappa_shower_track/base_v1.yaml
+
+model:
+  modules:
+    grappa_shower: !include model/nd-lar/grappa_shower/network_250505.yaml
+    grappa_track: !include model/nd-lar/grappa_track/network_full_chain_250505.yaml
+    grappa_inter: !include model/nd-lar/grappa_inter/network_250505.yaml
+    grappa_inter_loss: !include model/nd-lar/grappa_inter/loss_240819.yaml

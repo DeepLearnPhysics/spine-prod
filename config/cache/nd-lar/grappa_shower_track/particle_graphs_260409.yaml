@@ -10,5 +10,5 @@ model:
   modules:
     grappa_shower: !include model/nd-lar/grappa_shower/network_260409.yaml
     grappa_track: !include model/nd-lar/grappa_track/network_full_chain_260409.yaml
-    grappa_inter: !include model/nd-lar/grappa_inter/network_260409.yaml
-    grappa_inter_loss: !include model/nd-lar/grappa_inter/loss_260409.yaml
+    grappa_inter: !include model/nd-lar/grappa_inter/network_260310.yaml
+    grappa_inter_loss: !include model/nd-lar/grappa_inter/loss_240819.yaml
