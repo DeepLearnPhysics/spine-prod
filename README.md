@@ -167,6 +167,8 @@ spine-prod/
 ├── config/                  # All SPINE configs (inference & training)
 │   ├── cache/               # Stage-cache materialization configs
 │   ├── convert/             # Source-to-SPINE conversion bundles
+│   │   ├── dune-hd-10kt-1x2x6/  # DUNE-HD truth conversion
+│   │   └── dune-vd-10kt-1x8x6/  # DUNE-VD truth conversion
 │   ├── infer/               # Inference configs (referenced as infer/...)
 │   │   ├── 2x2/             # 2x2 detector configs
 │   │   ├── dune-hd-10kt-1x2x6/  # DUNE-HD 10 kt module 1x2x6 configs

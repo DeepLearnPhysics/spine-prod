@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migrated its public model-weight URLs. Deprecated configuration requests
   using the former name continue to resolve with a warning.
 
+### Added
+- Added a DUNE vertical-drift 10 kt module 1x8x6 truth conversion bundle using
+  the shared DUNE LArCV truth-product contract and canonical VD geometry.
+
 ## [0.9.0] - 2026-09-05
 
 ### Added

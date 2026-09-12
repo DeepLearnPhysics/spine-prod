@@ -331,6 +331,10 @@ detectors:
     configs_dir: infer/dune-hd-10kt-1x2x6
     account: "neutrino:dune-ml"
 
+  dune-vd-10kt-1x8x6:
+    default_profile: s3df_ampere
+    account: "neutrino:dune-ml"
+
   generic:
     default_profile: s3df_ampere
     configs_dir: infer/generic

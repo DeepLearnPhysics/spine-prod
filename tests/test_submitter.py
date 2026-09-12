@@ -202,8 +202,12 @@ class TestProfileLoading:
 
         detectors = submitter.profiles.get("detectors", {})
         for detector_name, detector_config in detectors.items():
-            configs_dir = detector_config.get("configs_dir", "")
-            # Should use infer/ not config/
+            configs_dir = detector_config.get("configs_dir")
+            if configs_dir is None:
+                # Conversion-only detectors do not need an inference tree.
+                continue
+
+            # Inference directories use SPINE_CONFIG_PATH-relative paths.
             assert "infer/" in configs_dir
             assert "config/" not in configs_dir
 
@@ -692,6 +696,9 @@ class TestSubmitterHelpers:
             True,
             "latest",
         )
+        assert mock_submitter.batch.classify_config_request(
+            "convert/dune-vd-10kt-1x8x6"
+        ) == (True, "latest")
         assert mock_submitter.batch.classify_config_request(
             "convert/icarus/latest"
         ) == (True, "latest")

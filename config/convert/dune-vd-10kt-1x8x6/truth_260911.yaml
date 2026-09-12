@@ -1,0 +1,16 @@
+# DUNE-VD 10 kt module 1x8x6 truth conversion configuration
+# Revision date: September 11, 2026
+
+__meta__:
+  kind: bundle
+  version: "260911"
+  date: "2026-09-11"
+  description: "DUNE-VD 10 kt module 1x8x6 LArCV-to-SPINE truth conversion configuration"
+
+# DUNE-HD and DUNE-VD use the same LArCV truth products and output contract.
+# Pin that established conversion recipe, then replace only the geometry.
+include: convert/dune-hd-10kt-1x2x6/truth_260202.yaml
+
+override:
+  geo.detector: dune-vd-10kt-1x8x6
+  geo.tag: dunevd10kt_3view_30deg_v3_refactored_1x8x6ref

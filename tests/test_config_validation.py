@@ -1909,6 +1909,19 @@ class TestConfigValidation:
         config = load_config_with_includes(config_infer_root / relative_path)
         assert config["post"]["calibration"]["depositions_source"] == "depositions"
 
+    def test_dune_vd_truth_conversion_uses_canonical_geometry(self):
+        """DUNE-VD conversion reuses the DUNE truth schema, but not its geometry."""
+        config = load_config_with_includes(
+            CONFIG_CONVERT_ROOT / "dune-vd-10kt-1x8x6/truth_260911.yaml"
+        )
+
+        assert config["geo"] == {
+            "detector": "dune-vd-10kt-1x8x6",
+            "tag": "dunevd10kt_3view_30deg_v3_refactored_1x8x6ref",
+        }
+        assert config["build"]["mode"] == "truth"
+        assert "model" not in config
+
     def test_sbnd_charge_scale_continues_from_varied_depositions(
         self, config_infer_root, tmp_path
     ):
