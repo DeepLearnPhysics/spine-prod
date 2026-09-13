@@ -10,21 +10,24 @@ geo:
   detector: nd-lar
   tag: up4-1
 
+remove:
+  - base.epochs
+  - train.save_epoch
+
 override:
+  # Compare restricted samples at a fixed optimizer-update budget, independent
+  # of how many batches each nominal dataset epoch contains.
+  base.iterations: 450000
+  train.save_step: 3000
+
   # Randomize the sparse-convolution lattice phase independently per image.
   # `auto` follows the total encoder stride if depth changes in later studies.
   model.modules.uresnet.lattice:
     period: auto
 
-  # These transforms act on every coordinate-bearing input/label together.
-  # Validation derives an unaugmented loader from this training loader.
+  # Reflect every coordinate-bearing input/label together within the fixed
+  # detector frame. Validation derives an unaugmented loader from this one.
   io.loader.dataset.augment:
-    rotate_half_turn:
-      name: rotate
-      axes: [0, 1]
-      k: [0, 2]
-      use_geo_center: true
-      keep_meta: true
     flip_x:
       name: flip
       axis: 0
