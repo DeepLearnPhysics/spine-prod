@@ -1873,6 +1873,24 @@ def test_nd_lar_cache_stages_append_only_transition_products():
 
 def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
     """The ND-LAr workflow preserves reviewed batches and bounded concurrency."""
+    uresnet = load_config_with_includes(
+        CONFIG_ROOT / "train/nd-lar/uresnet/train_240819.yaml"
+    )
+    assert uresnet["io"]["loader"]["minibatch_size"] == 8
+
+    augmented = load_config_with_includes(
+        CONFIG_ROOT / "train/nd-lar/uresnet/train_augmented_260912.yaml"
+    )
+    assert augmented["base"]["iterations"] == 450000
+    assert "epochs" not in augmented["base"]
+    assert augmented["train"]["save_step"] == 3000
+    assert "save_epoch" not in augmented["train"]
+    assert set(augmented["io"]["loader"]["dataset"]["augment"]) == {
+        "flip_x",
+        "flip_y",
+        "flip_z",
+    }
+
     expected_minibatches = {
         "uresnet_ppn": 4,
         "graph_spice": 16,
