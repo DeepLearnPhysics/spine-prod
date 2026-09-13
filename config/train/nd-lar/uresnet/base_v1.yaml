@@ -8,6 +8,6 @@ remove:
   - io.loader.minibatch_size
 
 override:
-  # ND-LAr images are busy; keep the conservative A100 per-GPU batch size.
-  io.loader.minibatch_size: 4
+  # Standalone UResNet fits a larger per-GPU batch than UResNet-PPN.
+  io.loader.minibatch_size: 8
   base.epochs: 150.0
