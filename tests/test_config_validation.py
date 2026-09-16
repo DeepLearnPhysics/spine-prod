@@ -1174,6 +1174,17 @@ def test_metadata_version_matches_filename(config_path):
     assert metadata["date"] == expected_date
 
 
+@pytest.mark.parametrize(
+    "config_path", sorted(CONFIG_ROOT.rglob("*.yaml")), ids=lambda path: str(path)
+)
+def test_metadata_does_not_declare_runtime_priority(config_path):
+    """Metadata must not imply that it controls runtime or include ordering."""
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = yaml.load(config_file, Loader=yaml.BaseLoader)
+
+    assert "priority" not in config.get("__meta__", {})
+
+
 def load_config_with_includes(config_path):
     """Load a YAML config using SPINE's load_config function.
 
