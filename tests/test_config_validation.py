@@ -2041,6 +2041,75 @@ class TestConfigValidation:
             config["post"]["apply_calibrations"]["depositions_source"] == "depositions"
         )
 
+    def test_sbnd_transparency_modifier_composes_with_postcalibrated_model(
+        self, config_infer_root, tmp_path
+    ):
+        """The legacy SBND modifier adds transparency alone before inference."""
+        sbnd_root = config_infer_root / "sbnd"
+        modifier = sbnd_root / "modifier" / "transp" / "mod_transp_240720.yaml"
+        modifier_config = yaml.safe_load(modifier.read_text(encoding="utf-8"))
+        assert modifier_config["__meta__"]["compatible_with"] == {"model": "<260501"}
+
+        composite = tmp_path / "composite.yaml"
+        composite.write_text(
+            yaml.safe_dump(
+                {
+                    "include": [
+                        str(sbnd_root / "full_chain_co_260316.yaml"),
+                        str(modifier),
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        config = load_config_with_includes(composite)
+        assert config["model"]["modules"]["chain"]["calibration"] == "apply"
+        calibration = config["model"]["modules"]["calibration"]
+        assert calibration == {
+            "stage": "segmentation",
+            "transparency": {
+                "transparency_file": "sbnd_MattMod_YZ.root",
+                "map_type": "correction",
+            },
+        }
+        assert (
+            config["post"]["apply_calibrations"]["depositions_source"] == "depositions"
+        )
+
+    def test_sbnd_transparency_modifier_composes_with_precalibrated_model(
+        self, config_infer_root, tmp_path
+    ):
+        """The SBND transparency variation installs the placeholder YZ map."""
+        sbnd_root = config_infer_root / "sbnd"
+        modifier = sbnd_root / "modifier" / "transp" / "mod_transp_260501.yaml"
+        modifier_config = yaml.safe_load(modifier.read_text(encoding="utf-8"))
+        assert modifier_config["__meta__"]["compatible_with"] == {"model": ">=260501"}
+        assert modifier_config["__meta__"]["conflicts_with"] == ["data"]
+
+        composite = tmp_path / "composite.yaml"
+        composite.write_text(
+            yaml.safe_dump(
+                {
+                    "include": [
+                        str(sbnd_root / "full_chain_co_260521.yaml"),
+                        str(modifier),
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        config = load_config_with_includes(composite)
+        calibration = config["model"]["modules"]["calibration"]
+        assert calibration["transparency"] == {
+            "transparency_file": "sbnd_MattMod_YZ.root",
+            "map_type": "correction",
+        }
+        assert "gain" in calibration
+        assert "recombination" in calibration
+        assert "lifetime" in calibration
+
     def test_icarus_charge_scale_only_adds_response_and_smearing(
         self, config_infer_root, tmp_path
     ):

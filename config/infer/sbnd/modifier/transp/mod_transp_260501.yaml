@@ -1,0 +1,20 @@
+# SBND transparency-map detector variation for pre-calibrated models
+# Revision date: May 1, 2026
+
+__meta__:
+  kind: mod
+  name: "transp"
+  version: "260501"
+  date: "2026-05-01"
+  description: "Transparency-map detector variation for pre-calibrated models"
+  priority: 25
+  applies_to: [mc]
+  compatible_with:
+    model: ">=260501"
+  conflicts_with: [data]
+
+override:
+  model.modules.calibration.transparency:
+    # Placeholder until the production transparency-map path is available.
+    transparency_file: sbnd_MattMod_YZ.root
+    map_type: correction

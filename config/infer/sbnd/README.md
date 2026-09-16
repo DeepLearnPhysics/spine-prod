@@ -30,6 +30,7 @@ For example:
 - Data-only mode (no truth labels): Apply `modifier/data/mod_data_*.yaml` or use `--apply-mods data`
 - Data matched to the 250901 simulation gain: Use `--apply-mods data_sim_gain:260910`
 - Lite output: Use `--apply-mods lite`
+- Transparency-map detector variation: Use `--apply-mods transp`
 
 The May 2026 models apply calibration before semantic segmentation. Their
 `data` modifier therefore configures the in-model lifetime and YZ corrections

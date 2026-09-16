@@ -1,0 +1,28 @@
+# SBND transparency-map detector variation for post-calibrated models
+# Revision date: July 20, 2024
+
+__meta__:
+  kind: mod
+  name: "transp"
+  version: "240720"
+  date: "2024-07-20"
+  description: "Transparency-map detector variation for post-calibrated models"
+  priority: 25
+  applies_to: [mc]
+  compatible_with:
+    model: "<260501"
+  conflicts_with: [data]
+
+override:
+  # Apply only the transparency correction before semantic segmentation. The
+  # remaining charge calibrations stay in post-processing for these models.
+  model.network_input.meta: meta
+  model.modules.chain.calibration: apply
+  model.modules.calibration:
+    stage: segmentation
+    transparency:
+      transparency_file: sbnd_MattMod_YZ.root
+      map_type: correction
+
+  # Continue post-processing from the transparency-corrected depositions.
+  post.apply_calibrations.depositions_source: depositions
