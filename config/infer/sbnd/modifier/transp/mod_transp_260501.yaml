@@ -7,7 +7,6 @@ __meta__:
   version: "260501"
   date: "2026-05-01"
   description: "Transparency-map detector variation for pre-calibrated models"
-  priority: 25
   applies_to: [mc]
   compatible_with:
     model: ">=260501"
