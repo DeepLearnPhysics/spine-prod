@@ -173,7 +173,11 @@ class InteractiveRunner(SubmissionComponent):
         # Apply modifiers if specified
         if apply_mods:
             config = self.config_mgr.create_composite_config(
-                config, apply_mods, job_dir, detector=detector if is_latest else None
+                config,
+                apply_mods,
+                job_dir,
+                detector=detector if is_latest else None,
+                family=config_family if is_latest else None,
             )
 
         if preload:

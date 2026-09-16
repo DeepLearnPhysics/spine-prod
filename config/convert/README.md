@@ -24,6 +24,11 @@ conversion bundle for convenience:
 ./submit.py --config convert/protodune-sp/latest --source input.root
 ```
 
+Conversion-specific named modifiers may be placed under
+`convert/<detector>/modifier/<name>/mod_<name>_YYMMDD.yaml` and applied with
+`--apply-mods <name>`. Modifier lookup stays within the `convert` family;
+inference modifiers are not selected implicitly.
+
 `latest` selects a complete dated bundle. It does not independently combine the
 newest detector IO and base fragments, which could produce an unreviewed pairing.
 

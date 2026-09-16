@@ -463,6 +463,7 @@ class BatchRunner(SubmissionComponent):
                 apply_mods,
                 config_workspace,
                 detector=detector if is_latest else None,
+                family=config_family if is_latest else None,
             )
 
         if preload:
