@@ -211,14 +211,16 @@ generate a composite YAML config at submission time.
 ### Config Organization
 
 ```
-infer/<detector>/
-├── full_chain_*.yaml             # Version-specific top-level configs
-├── base/                         # Base component YAMLs
-├── io/                           # IO component YAMLs
-├── model/                        # Model component YAMLs
-├── post/                         # Post-processing component YAMLs
-└── modifier/                     # Optional modifier YAMLs
+<family>/<detector-or-scope>/
+├── ...                           # Family-specific configs and components
+└── modifier/                     # Optional family-local modifier YAMLs
 ```
+
+Named modifiers are resolved within the base configuration's family and scope.
+For example, `convert/icarus/truth_*.yaml` uses modifiers under
+`convert/icarus/modifier/`, while `train/generic/uresnet/train_*.yaml` uses
+modifiers under `train/generic/modifier/`. Explicit modifier file paths remain
+available for intentional cross-family composition.
 
 ### Example: ICARUS Configurations
 

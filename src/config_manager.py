@@ -107,10 +107,61 @@ class ConfigManager:
         recognized family retain the historical inference behavior.
         """
         config_parts = Path(self.normalize_config_request(config)).parts
-        for family in self.LATEST_CONFIG_FAMILIES:
+        config_root = self.basedir / "config"
+        families = set(self.LATEST_CONFIG_FAMILIES)
+        if config_root.is_dir():
+            families.update(
+                path.name for path in config_root.iterdir() if path.is_dir()
+            )
+
+        for family in families:
             if family in config_parts:
                 return family
         return "infer"
+
+    def modifier_search_path(
+        self,
+        config: str,
+        family: Optional[str] = None,
+        detector: Optional[str] = None,
+    ) -> str:
+        """Return the family-local directory used to discover modifiers.
+
+        Repository configurations are scoped by their first two path components,
+        conventionally ``<family>/<detector>``. This lets nested configurations
+        such as ``train/generic/uresnet/train.yaml`` share modifiers from
+        ``train/generic/modifier`` while keeping modifiers from other families
+        isolated. Explicit ``family`` and ``detector`` values support generated
+        configs whose temporary path no longer identifies their original scope.
+        """
+        config = self.normalize_config_request(config)
+        config_root = (self.basedir / "config").resolve()
+
+        # ``detector`` predates family-aware lookup and historically meant an
+        # inference config generated in a temporary directory.
+        if detector and not family:
+            family = "infer"
+
+        if family and detector:
+            return str(config_root / family / self.normalize_detector_name(detector))
+
+        config_path = Path(config).expanduser()
+        try:
+            relative = config_path.resolve().relative_to(config_root)
+        except ValueError:
+            relative = config_path
+
+        if relative.is_absolute():
+            return config
+
+        parts = relative.parts
+        if parts and parts[0] == "config":
+            parts = parts[1:]
+
+        if len(parts) >= 2 and (config_root / parts[0]).is_dir():
+            return str(config_root / parts[0] / parts[1])
+
+        return config
 
     def resolve_config_path(self, config: str) -> Path:
         """Resolve a configuration using the standard SPINE search roots.
@@ -362,6 +413,7 @@ class ConfigManager:
         modifiers: List[str],
         job_dir: Path,
         detector: Optional[str] = None,
+        family: Optional[str] = None,
     ) -> str:
         """Create a composite config that includes base + modifiers.
 
@@ -375,6 +427,8 @@ class ConfigManager:
             Job directory to save the composite config
         detector : Optional[str], optional
             Detector name (for generated configs in job_dir), by default None
+        family : Optional[str], optional
+            Configuration family (for generated configs in job_dir), by default None
 
         Returns
         -------
@@ -422,20 +476,9 @@ class ConfigManager:
         base_name = config_path.stem
         base_version = self.extract_version(config_path)
 
-        # Always use the detector's config directory for modifier discovery if detector is known
-        if detector:
-            modifier_search_path = str(self.basedir / "config" / "infer" / detector)
-        else:
-            # Try to infer detector from base_config path if possible
-            config_path_parts = Path(base_config).parts
-            try:
-                infer_idx = config_path_parts.index("infer")
-                detector_guess = config_path_parts[infer_idx + 1]
-                modifier_search_path = str(
-                    self.basedir / "config" / "infer" / detector_guess
-                )
-            except (ValueError, IndexError):
-                modifier_search_path = base_config
+        modifier_search_path = self.modifier_search_path(
+            str(config_path), family=family, detector=detector
+        )
 
         available_mods = self.discover_modifiers(modifier_search_path)
 
@@ -725,17 +768,7 @@ class ConfigManager:
         config_path_obj = Path(config_path)
         base_version = self.extract_version(config_path_obj)
 
-        # Always use the detector's config directory for modifier discovery if possible
-        config_path_parts = config_path_obj.parts
-        modifier_search_path = config_path
-        try:
-            infer_idx = config_path_parts.index("infer")
-            detector_guess = config_path_parts[infer_idx + 1]
-            modifier_search_path = str(
-                self.basedir / "config" / "infer" / detector_guess
-            )
-        except (ValueError, IndexError):
-            pass
+        modifier_search_path = self.modifier_search_path(config_path)
 
         modifiers = self.discover_modifiers(modifier_search_path)
 

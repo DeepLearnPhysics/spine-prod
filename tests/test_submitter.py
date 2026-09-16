@@ -1430,7 +1430,11 @@ class TestInteractiveExecution:
 
         create_latest.assert_called_once()
         create_composite.assert_called_once_with(
-            str(latest), ["data"], create_latest.call_args.args[1], detector="icarus"
+            str(latest),
+            ["data"],
+            create_latest.call_args.args[1],
+            detector="icarus",
+            family="infer",
         )
         preload.assert_called_once_with(str(composite))
 
@@ -2086,7 +2090,11 @@ class TestBatchSpineOverride:
         assert output_dir.is_dir()
         job_dir = create_latest.call_args.args[1]
         create_composite.assert_called_once_with(
-            str(latest), ["data"], job_dir, detector="icarus"
+            str(latest),
+            ["data"],
+            job_dir,
+            detector="icarus",
+            family="infer",
         )
         preload.assert_called_once_with(str(composite))
         scripts = sorted(job_dir.glob("attempts/*/submit_*.sbatch"))
