@@ -81,12 +81,17 @@ source configure.sh
 # Process multiple files per task explicitly
 ./submit.py --config infer/icarus/latest --source data/*.root --files-per-task 5
 
+# Resolve the source, keep its first two files, then split those files into tasks
+./submit.py --config infer/icarus/latest --source-list files.txt --num-files 2 --files-per-task 1
+
 # Split the file list across 50 tasks as evenly as possible
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
 # Start a persistent training run using the loader defined in the config
 ./submit.py --config train/generic/uresnet/train_240718.yaml \
-  --stage train --run-dir /path/to/experiments/uresnet/default
+  --stage train --run-dir /path/to/experiments/uresnet/default \
+  --source-list train.txt --val-source-list validation.txt \
+  --num-files 2 --val-num-files 1
 
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml

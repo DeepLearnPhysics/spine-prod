@@ -158,6 +158,8 @@ class BatchRunner(SubmissionComponent):
         num_workers: Optional[int] = None,
         epochs: Optional[float] = None,
         iterations: Optional[int] = None,
+        num_files: Optional[int] = None,
+        val_num_files: Optional[int] = None,
         num_entries: Optional[int] = None,
         val_num_entries: Optional[int] = None,
         entry_fraction_range: Optional[Tuple[float, float]] = None,
@@ -261,6 +263,10 @@ class BatchRunner(SubmissionComponent):
             Number of SPINE training epochs.
         iterations : int, optional
             Number of SPINE driver iterations.
+        num_files : int, optional
+            Maximum number of resolved main-dataset files to use.
+        val_num_files : int, optional
+            Maximum number of resolved validation-dataset files to use.
         num_entries : int, optional
             Maximum number of main-dataset entries to process.
         val_num_entries : int, optional
@@ -358,6 +364,22 @@ class BatchRunner(SubmissionComponent):
             raise ValueError("--val-entry-filter is valid only for training")
         if val_num_entries is not None and stage != "train":
             raise ValueError("--val-num-entries is valid only for training")
+        if val_num_files is not None and stage != "train":
+            raise ValueError("--val-num-files is valid only for training")
+        # Validate limits independently of whether source resolution is needed.
+        self.file_handler.limit_files([], num_files)
+        self.file_handler.limit_files([], val_num_files)
+        if num_files is not None and not (files or named_sources):
+            raise ValueError(
+                "--num-files requires --source/--source-list or named sources"
+            )
+        if val_num_files is not None and not (
+            validation_files or validation_named_sources
+        ):
+            raise ValueError(
+                "--val-num-files requires --val-source/--val-source-list or "
+                "named validation sources"
+            )
         if num_entries is not None and entry_fraction_range is not None:
             raise ValueError(
                 "--num-entries cannot be combined with --entry-fraction-range"
@@ -379,6 +401,8 @@ class BatchRunner(SubmissionComponent):
                 or val_entry_fraction_range is not None
                 or num_entries is not None
                 or val_num_entries is not None
+                or num_files is not None
+                or val_num_files is not None
             ):
                 raise ValueError(
                     "--export-weights cannot be combined with dataset selections"
@@ -407,6 +431,7 @@ class BatchRunner(SubmissionComponent):
             )
             if not file_list:
                 raise ValueError("No input files found")
+            file_list = self.file_handler.limit_files(file_list, num_files)
             print(f"Found {len(file_list)} file(s) to process")
         elif not named_sources:
             if ntasks is not None or files_per_task is not None:
@@ -432,7 +457,38 @@ class BatchRunner(SubmissionComponent):
             )
             if not validation_file_list:
                 raise ValueError("No validation input files found")
+            validation_file_list = self.file_handler.limit_files(
+                validation_file_list, val_num_files
+            )
             print(f"Found {len(validation_file_list)} validation file(s)")
+
+        effective_named_sources = named_sources
+        named_source_file_count = None
+        if named_sources and num_files is not None:
+            resolved = self.file_handler.parse_named_sources(
+                named_sources, allow_missing=allow_missing_inputs
+            )
+            limited = self.file_handler.limit_named_sources(resolved, num_files)
+            effective_named_sources = {
+                target: {"source": paths} for target, paths in limited.items()
+            }
+            named_source_file_count = len(
+                next(paths for target, paths in limited.items() if target != "cache")
+            )
+
+        effective_validation_named_sources = validation_named_sources
+        validation_named_source_file_count = None
+        if validation_named_sources and val_num_files is not None:
+            resolved = self.file_handler.parse_named_sources(
+                validation_named_sources, allow_missing=allow_missing_inputs
+            )
+            limited = self.file_handler.limit_named_sources(resolved, val_num_files)
+            effective_validation_named_sources = {
+                target: {"source": paths} for target, paths in limited.items()
+            }
+            validation_named_source_file_count = len(
+                next(paths for target, paths in limited.items() if target != "cache")
+            )
 
         # Detect detector first
         detector = self.config_mgr.detect_detector(config)
@@ -490,10 +546,10 @@ class BatchRunner(SubmissionComponent):
 
         spine_cli_overrides = self.context.spine_cli.format_set_overrides(set_overrides)
         named_source_overrides = self.context.spine_cli.format_named_sources(
-            named_sources
+            effective_named_sources
         )
         validation_named_source_overrides = self.context.spine_cli.format_named_sources(
-            validation_named_sources, validation=True
+            effective_validation_named_sources, validation=True
         )
         module_weight_overrides = self.context.spine_cli.format_module_weights(
             module_weights
@@ -768,10 +824,13 @@ class BatchRunner(SubmissionComponent):
             )
             if files_per_task is not None and ntasks is not None:
                 concurrent_task_limit = ntasks
-        elif stage == "inference" and named_sources:
+        elif stage == "inference" and effective_named_sources:
             resolved_named_sources = self.file_handler.parse_named_sources(
-                named_sources,
+                effective_named_sources,
                 allow_missing=allow_missing_inputs,
+            )
+            resolved_named_sources = self.file_handler.limit_named_sources(
+                resolved_named_sources, num_files
             )
             partitioned_sources = {
                 target: paths
@@ -779,6 +838,7 @@ class BatchRunner(SubmissionComponent):
                 if target != "cache"
             }
             source_count = len(next(iter(partitioned_sources.values())))
+            named_source_file_count = source_count
             inference_source_count = source_count
             max_array_size = self.profiles["defaults"]["max_array_size"]
             effective_files_per_task = self.resolve_files_per_task(
@@ -1029,6 +1089,8 @@ class BatchRunner(SubmissionComponent):
             "num_workers": num_workers,
             "epochs": epochs,
             "iterations": iterations,
+            "num_file_limit": num_files,
+            "val_num_file_limit": val_num_files,
             "num_entries": num_entries,
             "val_num_entries": val_num_entries,
             "entry_fraction_range": entry_fraction_range,
@@ -1059,7 +1121,12 @@ class BatchRunner(SubmissionComponent):
             "num_files": (
                 inference_source_count
                 if stage == "inference" and (file_list or resolved_named_sources)
-                else len(file_list) if file_list else None
+                else len(file_list) if file_list else named_source_file_count
+            ),
+            "validation_num_files": (
+                len(validation_file_list)
+                if validation_file_list
+                else validation_named_source_file_count
             ),
             "num_chunks": len(file_chunks),
             "files_per_task": files_per_task,

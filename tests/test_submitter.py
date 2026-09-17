@@ -2264,6 +2264,52 @@ class TestBatchSpineOverride:
         assert metadata["val_entry_filter"] == "/filters/validation.yaml"
         assert metadata["graceful_stop_file"] == str(marker)
 
+    def test_submit_job_limits_training_files_before_writing_manifests(
+        self, mock_submitter, tmp_path
+    ):
+        train_files = [tmp_path / f"train-{index}.root" for index in range(3)]
+        validation_files = [tmp_path / f"validation-{index}.root" for index in range(2)]
+        for path in train_files + validation_files:
+            path.touch()
+        train_list = tmp_path / "train.txt"
+        validation_list = tmp_path / "validation.txt"
+        train_list.write_text("\n".join(map(str, train_files)))
+        validation_list.write_text("\n".join(map(str, validation_files)))
+        run_dir = tmp_path / "run"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            mock_submitter.submit_job(
+                config="train/generic/uresnet/train_240718.yaml",
+                files=[str(train_list)],
+                source_type="source_list",
+                validation_files=[str(validation_list)],
+                validation_source_type="source_list",
+                num_files=2,
+                val_num_files=1,
+                stage="train",
+                run_dir=str(run_dir),
+            )
+
+        submission = run_dir / "latest"
+        assert (submission / "inputs.txt").read_text().splitlines() == list(
+            map(str, train_files[:2])
+        )
+        assert (submission / "validation_inputs.txt").read_text().splitlines() == [
+            str(validation_files[0])
+        ]
+        metadata = json.loads((submission / "job_metadata.json").read_text())
+        assert metadata["num_file_limit"] == 2
+        assert metadata["val_num_file_limit"] == 1
+        assert metadata["num_files"] == 2
+        assert metadata["validation_num_files"] == 1
+
     def test_submit_job_preserves_future_pipeline_training_sources(
         self, mock_submitter, tmp_path, capsys
     ):
@@ -2427,6 +2473,46 @@ class TestBatchSpineOverride:
         metadata = json.loads((attempt / "job_metadata.json").read_text())
         assert metadata["num_files"] == 2
         assert metadata["resolved_files_per_task"] == 1
+
+    def test_submit_job_limits_named_sources_before_array_splitting(
+        self, mock_submitter, tmp_path
+    ):
+        run_dir = tmp_path / "run"
+        paths = [tmp_path / f"input_{index}.root" for index in range(3)]
+        for path in paths:
+            path.touch()
+        manifest = tmp_path / "primary.txt"
+        manifest.write_text("\n".join(map(str, paths)), encoding="utf-8")
+        cache = tmp_path / "cache.spine-cache"
+        cache.mkdir()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="cache"),
+        ):
+            mock_submitter.submit_job(
+                config="cache/generic/graph_spice/fragment_graphs_240805.yaml",
+                named_sources={
+                    "primary": {"source_list": str(manifest)},
+                    "cache": {"source": str(cache)},
+                },
+                run_dir=str(run_dir),
+                in_place=True,
+                num_files=2,
+                files_per_task=1,
+            )
+
+        attempt = run_dir / "latest"
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "#SBATCH --array=1-2" in script
+        assert not (attempt / "tasks" / "000_3").exists()
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["num_file_limit"] == 2
+        assert metadata["num_files"] == 2
 
     def test_submit_job_writes_expected_stage_cache_source_list(
         self, mock_submitter, tmp_path
@@ -3847,6 +3933,8 @@ class TestPipelineSubmission:
                             "config": "mixed.yaml",
                             "stage": "train",
                             "run_dir": "/tmp/configured-inputs",
+                            "num_files": 2,
+                            "val_num_files": 1,
                             "num_entries": 10000,
                             "val_num_entries": 1000,
                             "sources": {
@@ -3915,6 +4003,8 @@ class TestPipelineSubmission:
         assert configured["weight_path"] == "/tmp/full-seed.ckpt"
         assert configured["num_entries"] == 10000
         assert configured["val_num_entries"] == 1000
+        assert configured["num_files"] == 2
+        assert configured["val_num_files"] == 1
 
         export = submit_job.call_args_list[2].kwargs
         assert export["dependency"] == "afterok:20"
@@ -4687,6 +4777,7 @@ class TestPipelineSubmission:
                 "0 <= START < STOP <= 1",
             ),
             ({"num_entries": 0}, "positive integer"),
+            ({"num_files": 0}, "positive integer"),
             (
                 {
                     "num_entries": 10,

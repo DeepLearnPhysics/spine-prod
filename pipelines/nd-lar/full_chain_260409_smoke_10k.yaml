@@ -1,8 +1,8 @@
 # Bounded end-to-end validation of the ND-LAr 260409 training pipeline.
-# The training domain is restricted to 10,000 events. The validation cache
-# contains 2,000 events: the first 1,000 drive training validation and the
-# second 1,000 drive final evaluation. Training retains each model's standard
-# epoch ceiling and early-stopping policy.
+# The training domain is restricted to two source files (roughly 15,000 events)
+# and validation to one source file. The first 1,000 validation events drive
+# training validation and the next 1,000 drive final evaluation. Training
+# retains each model's standard epoch ceiling and early-stopping policy.
 
 workspace: null
 
@@ -16,12 +16,12 @@ collections:
       source_list: ${train_source_list}
       cache_dir: ${workspace}/cache/train
       cache_repository: ${workspace}/cache/train.spine-cache
-      num_entries: 10000
+      num_files: 2
     - name: validation
       source_list: ${validation_source_list}
       cache_dir: ${workspace}/cache/validation
       cache_repository: ${workspace}/cache/validation.spine-cache
-      num_entries: 2000
+      num_files: 1
 
 defaults:
   profile: s3df_ampere
@@ -37,7 +37,8 @@ stages:
     val_source_list: ${validation_source_list}
     run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
-    num_entries: 10000
+    num_files: 2
+    val_num_files: 1
     val_num_entries: 1000
     apply_mods: ["augment_uresnet:260912"]
     set:
@@ -56,8 +57,9 @@ stages:
     output: ${split.cache_repository}
     cache_repository: ${split.cache_repository}
     cache_stage: segmentation
-    ntasks: 1
-    num_entries: ${split.num_entries}
+    ntasks: 2
+    files_per_task: 1
+    num_files: ${split.num_files}
     module_weight:
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
 
@@ -69,7 +71,8 @@ stages:
     time: "1-00:00:00"
     run_dir: ${workspace}/train/graph_spice
     tensorboard: true
-    num_entries: 10000
+    num_files: 2
+    val_num_files: 1
     val_num_entries: 1000
     apply_mods: ["augment_graph_spice:260912"]
     sources:
@@ -93,8 +96,9 @@ stages:
     in_place: true
     cache_repository: ${split.cache_repository}
     cache_stage: fragmentation
-    ntasks: 1
-    num_entries: ${split.num_entries}
+    ntasks: 2
+    files_per_task: 1
+    num_files: ${split.num_files}
     sources:
       primary:
         source_list: ${split.source_list}
@@ -112,7 +116,6 @@ stages:
     val_source: ${workspace}/cache/validation.spine-cache
     run_dir: ${workspace}/train/grappa_shower
     tensorboard: true
-    num_entries: 10000
     val_num_entries: 1000
 
   - name: train_grappa_track
@@ -124,7 +127,6 @@ stages:
     val_source: ${workspace}/cache/validation.spine-cache
     run_dir: ${workspace}/train/grappa_track
     tensorboard: true
-    num_entries: 10000
     val_num_entries: 1000
 
   - name: cache_${split.name}_particle_graphs
@@ -137,8 +139,9 @@ stages:
     in_place: true
     cache_repository: ${split.cache_repository}
     cache_stage: particle_aggregation
-    ntasks: 1
-    num_entries: ${split.num_entries}
+    ntasks: 2
+    files_per_task: 1
+    num_files: ${split.num_files}
     sources:
       primary:
         source_list: ${split.source_list}
@@ -157,7 +160,6 @@ stages:
     val_source: ${workspace}/cache/validation.spine-cache
     run_dir: ${workspace}/train/grappa_inter
     tensorboard: true
-    num_entries: 10000
     val_num_entries: 1000
 
   - name: export_full_chain_weights
@@ -183,6 +185,7 @@ stages:
     weight_path: ${workspace}/weights/full_chain_260409.ckpt
     num_workers: 16
     ntasks: 1
+    num_files: 1
     num_entries: 1000
     set: [io.loader.dataset.n_skip=1000]
 
@@ -196,6 +199,7 @@ stages:
     checkpoint: ${workspace}/weights/full_chain_260409.ckpt
     dataset: ${validation_source_list}
     dataset_selection:
+      num_files: 1
       n_skip: 1000
       n_entry: 1000
     profile: s3df_milano

@@ -3,7 +3,7 @@
 import glob
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Optional
 
 
 class FileHandler:
@@ -124,6 +124,37 @@ class FileHandler:
             )
 
         return resolved
+
+    @staticmethod
+    def limit_files(files: List[str], num_files: Optional[int]) -> List[str]:
+        """Restrict an already-resolved source list to its first files."""
+        if num_files is None:
+            return files
+        if (
+            isinstance(num_files, bool)
+            or not isinstance(num_files, int)
+            or num_files < 1
+        ):
+            raise ValueError("num_files must be a positive integer")
+        return files[:num_files]
+
+    @staticmethod
+    def limit_named_sources(
+        sources: Mapping[str, List[str]], num_files: Optional[int]
+    ) -> Dict[str, List[str]]:
+        """Restrict aligned named sources while preserving a shared cache."""
+        if num_files is None:
+            return {target: list(paths) for target, paths in sources.items()}
+        if (
+            isinstance(num_files, bool)
+            or not isinstance(num_files, int)
+            or num_files < 1
+        ):
+            raise ValueError("num_files must be a positive integer")
+        return {
+            target: list(paths) if target == "cache" else list(paths[:num_files])
+            for target, paths in sources.items()
+        }
 
     @staticmethod
     def stage_cache_output_paths(

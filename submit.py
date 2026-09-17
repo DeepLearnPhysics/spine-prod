@@ -208,6 +208,11 @@ Examples:
         help="Maximum number of input dataset entries to process",
     )
     parser.add_argument(
+        "--num-files",
+        type=int,
+        help="Maximum number of resolved input files to use",
+    )
+    parser.add_argument(
         "--entry-fraction-range",
         type=float,
         nargs=2,
@@ -233,6 +238,11 @@ Examples:
         "--val-num-entries",
         type=int,
         help="Maximum number of validation dataset entries to process",
+    )
+    parser.add_argument(
+        "--val-num-files",
+        type=int,
+        help="Maximum number of resolved validation files to use",
     )
     duration_group = parser.add_mutually_exclusive_group()
     duration_group.add_argument(
@@ -583,6 +593,7 @@ Examples:
         or args.val_entry_fraction_range
         or args.val_entry_filter
         or args.val_num_entries is not None
+        or args.val_num_files is not None
     ):
         parser.error(
             "validation source options are currently supported in batch mode only"
@@ -596,6 +607,8 @@ Examples:
             ("--val-entry-fraction-range", args.val_entry_fraction_range),
             ("--num-entries", args.num_entries is not None),
             ("--val-num-entries", args.val_num_entries is not None),
+            ("--num-files", args.num_files is not None),
+            ("--val-num-files", args.val_num_files is not None),
             ("--entry-filter", args.entry_filter),
             ("--val-entry-filter", args.val_entry_filter),
             ("--apply-mods", args.apply_mods),
@@ -713,6 +726,7 @@ Examples:
                 num_workers=args.num_workers,
                 epochs=args.epochs,
                 iterations=args.iterations,
+                num_files=args.num_files,
                 interactive_runtime=args.interactive_runtime or "auto",
                 bind_paths=args.bind_paths,
                 spine_path=args.spine_path,
@@ -763,6 +777,8 @@ Examples:
                 num_workers=args.num_workers,
                 epochs=args.epochs,
                 iterations=args.iterations,
+                num_files=args.num_files,
+                val_num_files=args.val_num_files,
                 entry_fraction_range=args.entry_fraction_range,
                 val_entry_fraction_range=args.val_entry_fraction_range,
                 entry_filter=args.entry_filter,
