@@ -1,0 +1,12 @@
+__meta__:
+  kind: mod
+  name: joint
+  version: "240819"
+  date: "2024-08-19"
+  description: ND-LAr primary/secondary joint-dataset inference
+  applies_to: [mc]
+  conflicts_with: [data, ovl]
+  compatible_with:
+    io: ">=240819"
+
+include: mod_joint_common.yaml

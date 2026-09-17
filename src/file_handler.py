@@ -77,12 +77,15 @@ class FileHandler:
         self,
         sources: Mapping[str, Mapping[str, Any]],
         allow_missing: bool = False,
+        aligned: bool = True,
     ) -> Dict[str, List[str]]:
         """Resolve every target in a composite dataset source mapping.
 
-        Ordinary targets must resolve to the same number of files. The
+        Aligned targets must resolve to the same number of files. The
         canonical ``cache`` role is one shared repository and may resolve to
         one path while the ``primary`` source is partitioned across tasks.
+        Joint primary/secondary datasets set ``aligned=False`` because the
+        primary drives traversal while the secondary is sampled independently.
         """
         resolved = {}
         expected_count = None
@@ -111,7 +114,7 @@ class FileHandler:
                     )
             elif expected_count is None:
                 expected_count = len(files)
-            elif len(files) != expected_count:
+            elif aligned and len(files) != expected_count:
                 raise ValueError(
                     "Named sources must contain aligned file counts; "
                     f"'{target}' has {len(files)}, expected {expected_count}"
@@ -140,7 +143,9 @@ class FileHandler:
 
     @staticmethod
     def limit_named_sources(
-        sources: Mapping[str, List[str]], num_files: Optional[int]
+        sources: Mapping[str, List[str]],
+        num_files: Optional[int],
+        primary_only: bool = False,
     ) -> Dict[str, List[str]]:
         """Restrict aligned named sources while preserving a shared cache."""
         if num_files is None:
@@ -152,7 +157,11 @@ class FileHandler:
         ):
             raise ValueError("num_files must be a positive integer")
         return {
-            target: list(paths) if target == "cache" else list(paths[:num_files])
+            target: (
+                list(paths)
+                if target == "cache" or (primary_only and target != "primary")
+                else list(paths[:num_files])
+            )
             for target, paths in sources.items()
         }
 

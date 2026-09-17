@@ -84,6 +84,10 @@ source configure.sh
 # Resolve the source, keep its first two files, then split those files into tasks
 ./submit.py --config infer/icarus/latest --source-list files.txt --num-files 2 --files-per-task 1
 
+# Overlay independent ND-LAr primary and secondary samples during inference
+./submit.py --config infer/nd-lar/latest --apply-mods joint \
+  --source-list primary=primary.txt secondary=secondary.txt
+
 # Split the file list across 50 tasks as evenly as possible
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 

@@ -287,6 +287,30 @@ def test_batch_mode_forwards_training_and_validation_sources():
     assert kwargs["val_num_files"] == 1
 
 
+def test_batch_mode_forwards_target_qualified_sources():
+    submitter = Mock()
+    submitter.submit_job.return_value = []
+
+    result, _, _ = run_main(
+        "--config",
+        "infer/nd-lar/full_chain_260409.yaml",
+        "--apply-mods",
+        "joint:240819",
+        "--source-list",
+        "primary=primary.txt",
+        "secondary=secondary.txt",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    kwargs = submitter.submit_job.call_args.kwargs
+    assert kwargs["files"] is None
+    assert kwargs["named_sources"] == {
+        "primary": {"source_list": "primary.txt"},
+        "secondary": {"source_list": "secondary.txt"},
+    }
+
+
 def test_pipeline_mode_prints_stage_jobs(capsys):
     submitter = Mock()
     submitter.submit_pipeline.return_value = {"reco": ["42"], "post": ["43"]}
