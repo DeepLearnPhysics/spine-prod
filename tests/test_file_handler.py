@@ -114,6 +114,26 @@ def test_named_sources_reject_cache_without_partition_driver(handler, tmp_path):
         handler.parse_named_sources({"cache": {"source": str(cache)}})
 
 
+def test_limit_named_sources_preserves_alignment_and_shared_cache(handler):
+    sources = {
+        "primary": ["raw-1.root", "raw-2.root", "raw-3.root"],
+        "features": ["one.h5", "two.h5", "three.h5"],
+        "cache": ["train.spine-cache"],
+    }
+
+    assert handler.limit_named_sources(sources, 2) == {
+        "primary": ["raw-1.root", "raw-2.root"],
+        "features": ["one.h5", "two.h5"],
+        "cache": ["train.spine-cache"],
+    }
+
+
+@pytest.mark.parametrize("value", [0, -1, 1.5, True])
+def test_limit_files_requires_positive_integer(handler, value):
+    with pytest.raises(ValueError, match="positive integer"):
+        handler.limit_files(["one.root"], value)
+
+
 def test_stage_cache_output_paths_follow_writer_naming(handler, tmp_path):
     """Predicted cache paths use each source basename and configured suffix."""
     assert handler.stage_cache_output_paths(

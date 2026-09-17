@@ -266,6 +266,10 @@ def test_batch_mode_forwards_training_and_validation_sources():
         "10000",
         "--val-num-entries",
         "1000",
+        "--num-files",
+        "2",
+        "--val-num-files",
+        "1",
         submitter=submitter,
     )
 
@@ -279,6 +283,8 @@ def test_batch_mode_forwards_training_and_validation_sources():
     assert kwargs["val_entry_filter"] == "/filters/validation.yaml"
     assert kwargs["num_entries"] == 10000
     assert kwargs["val_num_entries"] == 1000
+    assert kwargs["num_files"] == 2
+    assert kwargs["val_num_files"] == 1
 
 
 def test_pipeline_mode_prints_stage_jobs(capsys):

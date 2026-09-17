@@ -34,6 +34,7 @@ class InteractiveRunner(SubmissionComponent):
         num_workers: Optional[int] = None,
         epochs: Optional[float] = None,
         iterations: Optional[int] = None,
+        num_files: Optional[int] = None,
         num_entries: Optional[int] = None,
         entry_fraction_range: Optional[Tuple[float, float]] = None,
         entry_filter: Optional[str] = None,
@@ -100,6 +101,8 @@ class InteractiveRunner(SubmissionComponent):
             Number of SPINE training epochs.
         iterations : int, optional
             Number of SPINE driver iterations.
+        num_files : int, optional
+            Maximum number of resolved input files to use.
         num_entries : int, optional
             Maximum number of input dataset entries to process.
         entry_fraction_range : tuple[float, float], optional
@@ -141,12 +144,16 @@ class InteractiveRunner(SubmissionComponent):
             raise ValueError(
                 "--num-entries cannot be combined with --entry-fraction-range"
             )
+        self.file_handler.limit_files([], num_files)
+        if num_files is not None and not files:
+            raise ValueError("--num-files requires --source/--source-list")
 
         file_list = []
         if files:
             file_list = self.file_handler.parse_files(files, source_type)
             if not file_list:
                 raise ValueError("No input files found")
+            file_list = self.file_handler.limit_files(file_list, num_files)
             print(f"Found {len(file_list)} file(s) to process")
         else:
             if files_per_task is not None:
