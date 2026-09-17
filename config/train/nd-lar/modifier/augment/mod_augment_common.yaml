@@ -2,6 +2,10 @@ __meta__:
   kind: fragment
   description: ND-LAr detector-symmetry training augmentation shared by image models
 
+geo:
+  detector: nd-lar
+  tag: up4-1
+
 override:
   # Mixed datasets apply this after merging the primary and cache products,
   # keeping every coordinate-bearing tensor aligned through each reflection.
