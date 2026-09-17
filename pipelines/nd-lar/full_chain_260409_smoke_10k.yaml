@@ -39,7 +39,7 @@ stages:
     tensorboard: true
     num_entries: 10000
     val_num_entries: 1000
-    apply_mods: [augment_uresnet:260912]
+    apply_mods: ["augment_uresnet:260912"]
     set:
       # Map the standalone destinations onto the full-chain checkpoint names.
       - model.modules.uresnet.model_name=uresnet_ppn.uresnet
@@ -71,7 +71,7 @@ stages:
     tensorboard: true
     num_entries: 10000
     val_num_entries: 1000
-    apply_mods: [augment_graph_spice:260912]
+    apply_mods: ["augment_graph_spice:260912"]
     sources:
       primary:
         source_list: ${train_source_list}
