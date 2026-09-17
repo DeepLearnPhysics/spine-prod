@@ -8,10 +8,6 @@ include:
   - train/nd-lar/uresnet/train_240819.yaml
   - train/nd-lar/modifier/augment_uresnet/mod_augment_uresnet_260912.yaml
 
-geo:
-  detector: nd-lar
-  tag: up4-1
-
 remove:
   - base.epochs
   - train.save_epoch
