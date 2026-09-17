@@ -158,6 +158,8 @@ class BatchRunner(SubmissionComponent):
         num_workers: Optional[int] = None,
         epochs: Optional[float] = None,
         iterations: Optional[int] = None,
+        num_entries: Optional[int] = None,
+        val_num_entries: Optional[int] = None,
         entry_fraction_range: Optional[Tuple[float, float]] = None,
         val_entry_fraction_range: Optional[Tuple[float, float]] = None,
         entry_filter: Optional[str] = None,
@@ -259,6 +261,10 @@ class BatchRunner(SubmissionComponent):
             Number of SPINE training epochs.
         iterations : int, optional
             Number of SPINE driver iterations.
+        num_entries : int, optional
+            Maximum number of main-dataset entries to process.
+        val_num_entries : int, optional
+            Maximum number of validation-dataset entries to process.
         entry_fraction_range : tuple[float, float], optional
             Half-open fractional range of main-dataset entries to process.
         val_entry_fraction_range : tuple[float, float], optional
@@ -350,6 +356,17 @@ class BatchRunner(SubmissionComponent):
             raise ValueError("--val-entry-fraction-range is valid only for training")
         if val_entry_filter is not None and stage != "train":
             raise ValueError("--val-entry-filter is valid only for training")
+        if val_num_entries is not None and stage != "train":
+            raise ValueError("--val-num-entries is valid only for training")
+        if num_entries is not None and entry_fraction_range is not None:
+            raise ValueError(
+                "--num-entries cannot be combined with --entry-fraction-range"
+            )
+        if val_num_entries is not None and val_entry_fraction_range is not None:
+            raise ValueError(
+                "--val-num-entries cannot be combined with "
+                "--val-entry-fraction-range"
+            )
         if export_weights:
             if stage != "inference":
                 raise ValueError("--export-weights requires stage=inference")
@@ -360,6 +377,8 @@ class BatchRunner(SubmissionComponent):
                 or validation_named_sources
                 or entry_fraction_range is not None
                 or val_entry_fraction_range is not None
+                or num_entries is not None
+                or val_num_entries is not None
             ):
                 raise ValueError(
                     "--export-weights cannot be combined with dataset selections"
@@ -525,6 +544,10 @@ class BatchRunner(SubmissionComponent):
             entry_fraction_range,
             val_entry_fraction_range,
         )
+        num_entry_options = self.context.spine_cli.format_num_entries(
+            num_entries,
+            val_num_entries,
+        )
         entry_filter_options = self.context.spine_cli.format_entry_filters(
             entry_filter,
             val_entry_filter,
@@ -686,6 +709,7 @@ class BatchRunner(SubmissionComponent):
             part
             for part in [
                 spine_runtime_options,
+                num_entry_options,
                 entry_fraction_options,
                 entry_filter_options,
                 spine_cli_overrides,
@@ -1005,6 +1029,8 @@ class BatchRunner(SubmissionComponent):
             "num_workers": num_workers,
             "epochs": epochs,
             "iterations": iterations,
+            "num_entries": num_entries,
+            "val_num_entries": val_num_entries,
             "entry_fraction_range": entry_fraction_range,
             "val_entry_fraction_range": val_entry_fraction_range,
             "entry_filter": entry_filter,

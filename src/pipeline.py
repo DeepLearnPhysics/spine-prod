@@ -84,6 +84,8 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "validation_name",
         "rerun_validation",
         "tensorboard",
+        "num_entries",
+        "val_num_entries",
         "entry_fraction_range",
         "val_entry_fraction_range",
         "entry_filter",
@@ -698,6 +700,29 @@ class PipelineDefinition:
                     SpineCLI.validate_fraction_range(f"Pipeline {field}", value)
                 except (TypeError, ValueError) as err:
                     raise type(err)(f"Pipeline stage '{name}': {err}") from err
+        for field in ("num_entries", "val_num_entries"):
+            value = stage.get(field)
+            if value is not None:
+                try:
+                    SpineCLI.format_num_entries(**{field: value})
+                except ValueError as err:
+                    raise ValueError(f"Pipeline stage '{name}': {err}") from err
+        if (
+            stage.get("num_entries") is not None
+            and stage.get("entry_fraction_range") is not None
+        ):
+            raise ValueError(
+                f"Pipeline stage '{name}' cannot combine num_entries with "
+                "entry_fraction_range"
+            )
+        if (
+            stage.get("val_num_entries") is not None
+            and stage.get("val_entry_fraction_range") is not None
+        ):
+            raise ValueError(
+                f"Pipeline stage '{name}' cannot combine val_num_entries with "
+                "val_entry_fraction_range"
+            )
         in_place = stage.get("in_place")
         if in_place is not None and not isinstance(in_place, bool):
             raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
@@ -775,6 +800,10 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' validation entry filter requires stage=train"
             )
+        if lifecycle != "train" and stage.get("val_num_entries") is not None:
+            raise ValueError(
+                f"Pipeline stage '{name}' validation entry count requires stage=train"
+            )
         if lifecycle != "inference" and (
             stage.get("ntasks") is not None or stage.get("files_per_task") is not None
         ):
@@ -825,6 +854,8 @@ class PipelineDefinition:
                 "validation_sources",
                 "entry_fraction_range",
                 "val_entry_fraction_range",
+                "num_entries",
+                "val_num_entries",
                 "entry_filter",
                 "val_entry_filter",
             )
@@ -906,6 +937,8 @@ class PipelineDefinition:
             "validation_sources",
             "entry_fraction_range",
             "val_entry_fraction_range",
+            "num_entries",
+            "val_num_entries",
             "entry_filter",
             "val_entry_filter",
             "module_weight",
@@ -960,6 +993,8 @@ class PipelineDefinition:
             "validation_sources",
             "entry_fraction_range",
             "val_entry_fraction_range",
+            "num_entries",
+            "val_num_entries",
             "entry_filter",
             "val_entry_filter",
             "module_weight",
@@ -1344,6 +1379,8 @@ class PipelineRunner(SubmissionComponent):
                 "num_workers": stage.get("num_workers"),
                 "epochs": stage.get("epochs"),
                 "iterations": stage.get("iterations"),
+                "num_entries": stage.get("num_entries"),
+                "val_num_entries": stage.get("val_num_entries"),
                 "entry_fraction_range": stage.get("entry_fraction_range"),
                 "val_entry_fraction_range": stage.get("val_entry_fraction_range"),
                 "entry_filter": stage.get("entry_filter"),

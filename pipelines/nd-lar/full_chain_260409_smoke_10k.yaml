@@ -1,0 +1,202 @@
+# Bounded end-to-end validation of the ND-LAr 260409 training pipeline.
+# The training domain is restricted to 10,000 events. The validation cache
+# contains 2,000 events: the first 1,000 drive training validation and the
+# second 1,000 drive final evaluation. Training retains each model's standard
+# epoch ceiling and early-stopping policy.
+
+workspace: null
+
+variables:
+  train_source_list: /sdf/data/neutrino/ndlar/sim/mpvmpr_v01/train_file_list.txt
+  validation_source_list: /sdf/data/neutrino/ndlar/sim/mpvmpr_v01/test_file_list.txt
+
+collections:
+  splits:
+    - name: train
+      source_list: ${train_source_list}
+      cache_dir: ${workspace}/cache/train
+      cache_repository: ${workspace}/cache/train.spine-cache
+      num_entries: 10000
+    - name: validation
+      source_list: ${validation_source_list}
+      cache_dir: ${workspace}/cache/validation
+      cache_repository: ${workspace}/cache/validation.spine-cache
+      num_entries: 2000
+
+defaults:
+  profile: s3df_ampere
+  time: "08:00:00"
+
+stages:
+  - name: train_uresnet_ppn
+    config: train/nd-lar/uresnet_ppn/train_260409.yaml
+    stage: train
+    profile: s3df_ampere_full
+    time: "1-00:00:00"
+    source_list: ${train_source_list}
+    val_source_list: ${validation_source_list}
+    run_dir: ${workspace}/train/uresnet_ppn
+    tensorboard: true
+    num_entries: 10000
+    val_num_entries: 1000
+    apply_mods: [augment_uresnet:260912]
+    set:
+      # Map the standalone destinations onto the full-chain checkpoint names.
+      - model.modules.uresnet.model_name=uresnet_ppn.uresnet
+      - model.modules.ppn.model_name=uresnet_ppn.ppn
+
+  - name: cache_${split.name}_segmentation
+    for_each:
+      collection: splits
+      as: split
+    depends_on: [train_uresnet_ppn]
+    config: cache/nd-lar/uresnet_ppn/segmentation_240819.yaml
+    source_list: ${split.source_list}
+    run_dir: ${split.cache_dir}/segmentation
+    output: ${split.cache_repository}
+    cache_repository: ${split.cache_repository}
+    cache_stage: segmentation
+    ntasks: 1
+    num_entries: ${split.num_entries}
+    module_weight:
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
+
+  - name: train_graph_spice
+    depends_on: [cache_train_segmentation, cache_validation_segmentation]
+    config: train/nd-lar/graph_spice/train_from_uresnet_ppn_260409.yaml
+    stage: train
+    profile: s3df_ampere_full
+    time: "1-00:00:00"
+    run_dir: ${workspace}/train/graph_spice
+    tensorboard: true
+    num_entries: 10000
+    val_num_entries: 1000
+    apply_mods: [augment_graph_spice:260912]
+    sources:
+      primary:
+        source_list: ${train_source_list}
+      cache:
+        source: ${workspace}/cache/train.spine-cache
+    validation_sources:
+      primary:
+        source_list: ${validation_source_list}
+      cache:
+        source: ${workspace}/cache/validation.spine-cache
+
+  - name: cache_${split.name}_fragment_graphs
+    for_each:
+      collection: splits
+      as: split
+    depends_on: [train_graph_spice]
+    config: cache/nd-lar/graph_spice/fragment_graphs_260409.yaml
+    run_dir: ${split.cache_dir}/fragmentation
+    in_place: true
+    cache_repository: ${split.cache_repository}
+    cache_stage: fragmentation
+    ntasks: 1
+    num_entries: ${split.num_entries}
+    sources:
+      primary:
+        source_list: ${split.source_list}
+      cache:
+        source: ${split.cache_repository}
+    module_weight:
+      graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
+
+  - name: train_grappa_shower
+    depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
+    config: train/nd-lar/grappa_shower/train_from_fragment_cache_260409.yaml
+    stage: train
+    time: "12:00:00"
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
+    run_dir: ${workspace}/train/grappa_shower
+    tensorboard: true
+    num_entries: 10000
+    val_num_entries: 1000
+
+  - name: train_grappa_track
+    depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
+    config: train/nd-lar/grappa_track/train_from_fragment_cache_260409.yaml
+    stage: train
+    time: "12:00:00"
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
+    run_dir: ${workspace}/train/grappa_track
+    tensorboard: true
+    num_entries: 10000
+    val_num_entries: 1000
+
+  - name: cache_${split.name}_particle_graphs
+    for_each:
+      collection: splits
+      as: split
+    depends_on: [train_grappa_shower, train_grappa_track]
+    config: cache/nd-lar/grappa_shower_track/particle_graphs_260409.yaml
+    run_dir: ${split.cache_dir}/particle_aggregation
+    in_place: true
+    cache_repository: ${split.cache_repository}
+    cache_stage: particle_aggregation
+    ntasks: 1
+    num_entries: ${split.num_entries}
+    sources:
+      primary:
+        source_list: ${split.source_list}
+      cache:
+        source: ${split.cache_repository}
+    module_weight:
+      grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
+      grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
+
+  - name: train_grappa_inter
+    depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
+    config: train/nd-lar/grappa_inter/train_from_particle_cache_260409.yaml
+    stage: train
+    time: "12:00:00"
+    source: ${workspace}/cache/train.spine-cache
+    val_source: ${workspace}/cache/validation.spine-cache
+    run_dir: ${workspace}/train/grappa_inter
+    tensorboard: true
+    num_entries: 10000
+    val_num_entries: 1000
+
+  - name: export_full_chain_weights
+    depends_on: [train_grappa_inter]
+    config: model/nd-lar/full_chain/model_260409.yaml
+    profile: s3df_milano
+    time: "00:30:00"
+    run_dir: ${workspace}/weights/export
+    export_weights: ${workspace}/weights/full_chain_260409.ckpt
+    module_weight:
+      uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
+      graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
+      grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
+      grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
+      grappa_inter: ${workspace}/train/grappa_inter/weights/snapshot-best.ckpt
+
+  - name: evaluate_full_chain
+    depends_on: [export_full_chain_weights]
+    config: test/nd-lar/full_chain/evaluate_260409.yaml
+    source_list: ${validation_source_list}
+    run_dir: ${workspace}/metrics/full_chain/raw
+    in_place: true
+    weight_path: ${workspace}/weights/full_chain_260409.ckpt
+    num_workers: 16
+    ntasks: 1
+    num_entries: 1000
+    set: [io.loader.dataset.n_skip=1000]
+
+  - name: report_full_chain
+    kind: report
+    depends_on: [evaluate_full_chain]
+    config: test/nd-lar/full_chain/report_240819.yaml
+    input_dir: ${workspace}/metrics/full_chain/raw/latest
+    output_dir: ${workspace}/metrics/full_chain/report/artifacts
+    run_dir: ${workspace}/metrics/full_chain/report
+    checkpoint: ${workspace}/weights/full_chain_260409.ckpt
+    dataset: ${validation_source_list}
+    dataset_selection:
+      n_skip: 1000
+      n_entry: 1000
+    profile: s3df_milano
+    time: "00:30:00"

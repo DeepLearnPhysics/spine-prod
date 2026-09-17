@@ -1,0 +1,14 @@
+__meta__:
+  kind: mod
+  name: augment_uresnet
+  version: "260912"
+  date: "2026-09-12"
+  description: ND-LAr detector-symmetry and lattice augmentation for UResNet models
+  applies_to: [mc]
+
+include: train/nd-lar/modifier/augment/mod_augment_common.yaml
+
+override:
+  # UResNet and standalone UResNet-PPN expose the backbone as this module.
+  model.modules.uresnet.lattice:
+    period: auto
