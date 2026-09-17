@@ -25,6 +25,8 @@ stages:
     #   cache: {source: /path/to/train/cache.spine-cache}
     # validation_sources: ...         # same shape for validation
     # val_entry_fraction_range: [0.0, 0.5]  # validation-only partition
+    # num_entries: 10000                     # exact main-dataset limit
+    # val_num_entries: 1000                  # exact validation-dataset limit
     # entry_filter: /path/to/train-filter.yaml
     # val_entry_filter: /path/to/validation-filter.yaml
     # module_weight: {module: /path/to/checkpoint.ckpt}
@@ -44,6 +46,8 @@ half-open fractional entry selectors. The generic full-chain pipelines retain
 the entire validation source in their caches, validate training against
 `[0.0, 0.5)`, and reserve `[0.5, 1.0)` for the final evaluation. Keeping the
 derived caches complete preserves positional alignment for mixed datasets.
+`num_entries` and `val_num_entries` forward SPINE's exact entry-count limits;
+they are mutually exclusive with the corresponding fractional selector.
 
 Standalone `kind: filter` stages run the reusable `spine-filter` workflow
 before raw data reaches the parser. A scan records per-source measurements;

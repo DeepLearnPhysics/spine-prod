@@ -710,6 +710,11 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             "validation entry filter requires stage=train",
         ),
         (
+            {"name": "job", "config": "x.yaml", "val_num_entries": 10},
+            ValueError,
+            "validation entry count requires stage=train",
+        ),
+        (
             {
                 "name": "job",
                 "config": "x.yaml",

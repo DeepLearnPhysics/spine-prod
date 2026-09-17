@@ -203,6 +203,11 @@ Examples:
         help="Number of SPINE data-loader worker processes",
     )
     parser.add_argument(
+        "--num-entries",
+        type=int,
+        help="Maximum number of input dataset entries to process",
+    )
+    parser.add_argument(
         "--entry-fraction-range",
         type=float,
         nargs=2,
@@ -223,6 +228,11 @@ Examples:
     parser.add_argument(
         "--val-entry-filter",
         help="File-aware eligibility manifest for the validation dataset",
+    )
+    parser.add_argument(
+        "--val-num-entries",
+        type=int,
+        help="Maximum number of validation dataset entries to process",
     )
     duration_group = parser.add_mutually_exclusive_group()
     duration_group.add_argument(
@@ -572,6 +582,7 @@ Examples:
         or args.val_source_list
         or args.val_entry_fraction_range
         or args.val_entry_filter
+        or args.val_num_entries is not None
     ):
         parser.error(
             "validation source options are currently supported in batch mode only"
@@ -583,6 +594,8 @@ Examples:
             ("--val-source/--val-source-list", args.val_source or args.val_source_list),
             ("--entry-fraction-range", args.entry_fraction_range),
             ("--val-entry-fraction-range", args.val_entry_fraction_range),
+            ("--num-entries", args.num_entries is not None),
+            ("--val-num-entries", args.val_num_entries is not None),
             ("--entry-filter", args.entry_filter),
             ("--val-entry-filter", args.val_entry_filter),
             ("--apply-mods", args.apply_mods),
@@ -706,6 +719,7 @@ Examples:
                 weight_path=args.weight_path,
                 entry_fraction_range=args.entry_fraction_range,
                 entry_filter=args.entry_filter,
+                num_entries=args.num_entries,
             )
             return exit_code
 
@@ -753,6 +767,8 @@ Examples:
                 val_entry_fraction_range=args.val_entry_fraction_range,
                 entry_filter=args.entry_filter,
                 val_entry_filter=args.val_entry_filter,
+                num_entries=args.num_entries,
+                val_num_entries=args.val_num_entries,
                 spine_path=args.spine_path,
                 stage=args.stage or "inference",
                 run_dir=args.run_dir,

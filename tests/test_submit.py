@@ -262,6 +262,10 @@ def test_batch_mode_forwards_training_and_validation_sources():
         "/filters/train.yaml",
         "--val-entry-filter",
         "/filters/validation.yaml",
+        "--num-entries",
+        "10000",
+        "--val-num-entries",
+        "1000",
         submitter=submitter,
     )
 
@@ -273,6 +277,8 @@ def test_batch_mode_forwards_training_and_validation_sources():
     assert kwargs["validation_source_type"] == "source_list"
     assert kwargs["entry_filter"] == "/filters/train.yaml"
     assert kwargs["val_entry_filter"] == "/filters/validation.yaml"
+    assert kwargs["num_entries"] == 10000
+    assert kwargs["val_num_entries"] == 1000
 
 
 def test_pipeline_mode_prints_stage_jobs(capsys):

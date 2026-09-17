@@ -34,6 +34,7 @@ class InteractiveRunner(SubmissionComponent):
         num_workers: Optional[int] = None,
         epochs: Optional[float] = None,
         iterations: Optional[int] = None,
+        num_entries: Optional[int] = None,
         entry_fraction_range: Optional[Tuple[float, float]] = None,
         entry_filter: Optional[str] = None,
         interactive_runtime: str = "auto",
@@ -99,6 +100,8 @@ class InteractiveRunner(SubmissionComponent):
             Number of SPINE training epochs.
         iterations : int, optional
             Number of SPINE driver iterations.
+        num_entries : int, optional
+            Maximum number of input dataset entries to process.
         entry_fraction_range : tuple[float, float], optional
             Half-open fractional range of input entries to process.
         entry_filter : str, optional
@@ -133,6 +136,10 @@ class InteractiveRunner(SubmissionComponent):
         if interactive_runtime not in ("auto", "local", "container"):
             raise ValueError(
                 "interactive_runtime must be one of: 'auto', 'local', 'container'"
+            )
+        if num_entries is not None and entry_fraction_range is not None:
+            raise ValueError(
+                "--num-entries cannot be combined with --entry-fraction-range"
             )
 
         file_list = []
@@ -272,6 +279,7 @@ class InteractiveRunner(SubmissionComponent):
         entry_fraction_options = self.context.spine_cli.format_entry_fraction_ranges(
             entry_fraction_range=entry_fraction_range
         )
+        num_entry_options = self.context.spine_cli.format_num_entries(num_entries)
         entry_filter_options = self.context.spine_cli.format_entry_filters(entry_filter)
         local_spine_cmd, extra_bind_root = self.context.runtime.resolve_spine_command(
             spine_path
@@ -296,6 +304,7 @@ class InteractiveRunner(SubmissionComponent):
             part
             for part in [
                 spine_runtime_options,
+                num_entry_options,
                 entry_fraction_options,
                 entry_filter_options,
                 spine_cli_overrides,

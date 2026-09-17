@@ -155,6 +155,24 @@ class SpineCLI:
         return " ".join(options)
 
     @staticmethod
+    def format_num_entries(
+        num_entries: Optional[int] = None,
+        val_num_entries: Optional[int] = None,
+    ) -> str:
+        """Format exact main and validation dataset-size limits."""
+        options = []
+        for flag, value in (
+            ("--num-entries", num_entries),
+            ("--val-num-entries", val_num_entries),
+        ):
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{flag} requires a positive integer")
+            options.append(f"{flag} {value}")
+        return " ".join(options)
+
+    @staticmethod
     def format_entry_filters(
         entry_filter: Optional[str] = None,
         val_entry_filter: Optional[str] = None,

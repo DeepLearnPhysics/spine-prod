@@ -1,0 +1,14 @@
+__meta__:
+  kind: mod
+  name: augment_graph_spice
+  version: "260912"
+  date: "2026-09-12"
+  description: ND-LAr detector-symmetry and lattice augmentation for Graph-SPICE
+  applies_to: [mc]
+
+include: train/nd-lar/modifier/augment/mod_augment_common.yaml
+
+override:
+  # Graph-SPICE owns its UResNet inside the embedding network.
+  model.modules.graph_spice.embedder.uresnet.lattice:
+    period: auto

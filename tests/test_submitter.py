@@ -592,6 +592,16 @@ class TestSubmitterHelpers:
                 entry_fraction_range=(0.5, 0.5)
             )
 
+    def test_format_spine_num_entries(self, mock_submitter):
+        """Exact dataset limits use SPINE's first-class CLI options."""
+        assert mock_submitter.spine_cli.format_num_entries(10000, 1000) == (
+            "--num-entries 10000 --val-num-entries 1000"
+        )
+        assert mock_submitter.spine_cli.format_num_entries() == ""
+        for value in (0, -1, 1.5, True):
+            with pytest.raises(ValueError, match="positive integer"):
+                mock_submitter.spine_cli.format_num_entries(value)
+
     def test_format_spine_entry_filters(self, mock_submitter):
         """Eligibility manifests are quoted independently for train and val."""
         assert mock_submitter.spine_cli.format_entry_filters(
@@ -2204,8 +2214,8 @@ class TestBatchSpineOverride:
                 config="train/generic/uresnet/train_240718.yaml",
                 files=[str(train_source)],
                 validation_files=[str(validation_source)],
-                entry_fraction_range=(0.0, 1.0),
-                val_entry_fraction_range=(0.0, 0.5),
+                num_entries=10000,
+                val_num_entries=1000,
                 entry_filter="/filters/train.yaml",
                 val_entry_filter="/filters/validation.yaml",
                 stage="train",
@@ -2232,8 +2242,8 @@ class TestBatchSpineOverride:
         )
         assert f"--source-list {train_manifest.resolve()}" in script
         assert f"--val-source-list {validation_manifest.resolve()}" in script
-        assert "--entry-fraction-range 0.0 1.0" in script
-        assert "--val-entry-fraction-range 0.0 0.5" in script
+        assert "--num-entries 10000" in script
+        assert "--val-num-entries 1000" in script
         assert "--entry-filter /filters/train.yaml" in script
         assert "--val-entry-filter /filters/validation.yaml" in script
         marker = submission.resolve() / "graceful_stop"
@@ -2248,8 +2258,8 @@ class TestBatchSpineOverride:
         assert metadata["validation_source_manifest"] == str(
             validation_manifest.resolve()
         )
-        assert metadata["entry_fraction_range"] == [0.0, 1.0]
-        assert metadata["val_entry_fraction_range"] == [0.0, 0.5]
+        assert metadata["num_entries"] == 10000
+        assert metadata["val_num_entries"] == 1000
         assert metadata["entry_filter"] == "/filters/train.yaml"
         assert metadata["val_entry_filter"] == "/filters/validation.yaml"
         assert metadata["graceful_stop_file"] == str(marker)
@@ -3837,6 +3847,8 @@ class TestPipelineSubmission:
                             "config": "mixed.yaml",
                             "stage": "train",
                             "run_dir": "/tmp/configured-inputs",
+                            "num_entries": 10000,
+                            "val_num_entries": 1000,
                             "sources": {
                                 "larcv": {"source": "raw.root"},
                                 "hdf5": {"source": "cache.h5"},
@@ -3901,6 +3913,8 @@ class TestPipelineSubmission:
             "graph_spice": "/tmp/graph-seed.ckpt",
         }
         assert configured["weight_path"] == "/tmp/full-seed.ckpt"
+        assert configured["num_entries"] == 10000
+        assert configured["val_num_entries"] == 1000
 
         export = submit_job.call_args_list[2].kwargs
         assert export["dependency"] == "afterok:20"
@@ -4465,6 +4479,14 @@ class TestPipelineSubmission:
                 "valid only for training",
             ),
             (
+                {"val_num_entries": 100},
+                "valid only for training",
+            ),
+            (
+                {"num_entries": 100, "entry_fraction_range": (0.0, 0.5)},
+                "cannot be combined",
+            ),
+            (
                 {"stage": "train", "run_dir": "/tmp/train", "in_place": True},
                 "in-place is valid only for inference",
             ),
@@ -4663,6 +4685,14 @@ class TestPipelineSubmission:
             (
                 {"entry_fraction_range": [0.8, 0.2]},
                 "0 <= START < STOP <= 1",
+            ),
+            ({"num_entries": 0}, "positive integer"),
+            (
+                {
+                    "num_entries": 10,
+                    "entry_fraction_range": [0.0, 0.5],
+                },
+                "cannot combine num_entries",
             ),
         ],
     )
