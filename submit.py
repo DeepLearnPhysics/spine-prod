@@ -20,6 +20,37 @@ from pathlib import Path
 from src import Submitter
 
 
+def normalize_source_arguments(parser, direct, source_lists, validation=False):
+    """Separate flat inputs from target-qualified composite inputs."""
+    values = direct if direct else source_lists
+    source_type = "source" if direct else "source_list"
+    if not values:
+        return None, source_type, None
+
+    qualified = ["=" in value for value in values]
+    option_prefix = "--val-source" if validation else "--source"
+    option = option_prefix if direct else f"{option_prefix}-list"
+    if any(qualified) and not all(qualified):
+        parser.error(f"{option} cannot mix qualified and unqualified values")
+    if not any(qualified):
+        return values, source_type, None
+
+    named_sources = {}
+    for value in values:
+        target, path = value.split("=", 1)
+        if not target or not path:
+            parser.error(f"Invalid {option} value '{value}'. Expected TARGET=PATH")
+        source_cfg = named_sources.setdefault(target, {})
+        if source_type == "source_list":
+            if source_cfg:
+                parser.error(f"Source target '{target}' has multiple {option} values")
+            source_cfg[source_type] = path
+        else:
+            source_cfg.setdefault(source_type, []).append(path)
+
+    return None, source_type, named_sources
+
+
 def main():
     """Main entry point for the batch submission system."""
     parser = argparse.ArgumentParser(
@@ -110,8 +141,11 @@ Examples:
     source_group.add_argument(
         "--source-list",
         "-S",
-        nargs=1,
-        help="Text file containing input file paths (one per line)",
+        nargs="+",
+        help=(
+            "Text file containing input paths, or target-qualified lists for "
+            "a composite dataset"
+        ),
     )
 
     # Validation inputs for checkpoint-bound validation during training
@@ -123,8 +157,8 @@ Examples:
     )
     val_source_group.add_argument(
         "--val-source-list",
-        nargs=1,
-        help="Text file containing validation input paths (one per line)",
+        nargs="+",
+        help="Validation input list, optionally written as TARGET=PATH",
     )
 
     # Configuration modifiers
@@ -700,8 +734,14 @@ Examples:
 
         elif args.interactive:
             # Interactive mode - run directly without SLURM
-            files = args.source if args.source else args.source_list
-            source_type = "source" if args.source else "source_list"
+            files, source_type, named_sources = normalize_source_arguments(
+                parser, args.source, args.source_list
+            )
+            if named_sources:
+                parser.error(
+                    "target-qualified composite sources are currently supported "
+                    "in batch and pipeline modes only"
+                )
 
             exit_code = submitter.run_interactive(
                 config=args.config,
@@ -739,13 +779,19 @@ Examples:
 
         else:
             # Single job mode (batch submission)
-            # Determine which source type was provided
-            files = args.source if args.source else args.source_list
-            source_type = "source" if args.source else "source_list"
-            validation_files = (
-                args.val_source if args.val_source else args.val_source_list
+            files, source_type, named_sources = normalize_source_arguments(
+                parser, args.source, args.source_list
             )
-            validation_source_type = "source" if args.val_source else "source_list"
+            (
+                validation_files,
+                validation_source_type,
+                validation_named_sources,
+            ) = normalize_source_arguments(
+                parser,
+                args.val_source,
+                args.val_source_list,
+                validation=True,
+            )
 
             job_ids = submitter.submit_job(
                 config=args.config,
@@ -753,6 +799,8 @@ Examples:
                 source_type=source_type,
                 validation_files=validation_files,
                 validation_source_type=validation_source_type,
+                named_sources=named_sources,
+                validation_named_sources=validation_named_sources,
                 weight_path=args.weight_path,
                 profile=args.profile or "auto",
                 job_name=args.job_name,

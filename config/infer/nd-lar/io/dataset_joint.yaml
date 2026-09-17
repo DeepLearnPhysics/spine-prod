@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  description: ND-LAr LArCV dataset restricted to overlay-compatible products
+
+include: dataset_common.yaml
+
+remove:
+  - schema.run_info
+  - schema.flashes
+  - schema.trigger

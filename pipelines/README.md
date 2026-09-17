@@ -23,6 +23,11 @@ stages:
     # sources:
     #   primary: {source: /path/to/raw.root}
     #   cache: {source: /path/to/train/cache.spine-cache}
+    # A joint dataset instead uses independent primary and secondary sources.
+    # The primary drives task splitting; the complete secondary is shared.
+    # sources:
+    #   primary: {source_list: /path/to/primary.txt}
+    #   secondary: {source_list: /path/to/secondary.txt}
     # validation_sources: ...         # same shape for validation
     # val_entry_fraction_range: [0.0, 0.5]  # validation-only partition
     # num_files: 2                           # resolved files, before task splitting
@@ -50,7 +55,8 @@ the entire validation source in their caches, validate training against
 derived caches complete preserves positional alignment for mixed datasets.
 `num_files` and `val_num_files` truncate resolved source lists before scheduler
 task splitting. For named mixed datasets, aligned targets are truncated together
-while a shared `cache` repository remains scalar. `num_entries` and
+while a shared `cache` repository remains scalar. For named joint datasets,
+`num_files` restricts only the traversal-driving primary source. `num_entries` and
 `val_num_entries` forward SPINE's exact entry-count limits;
 they are mutually exclusive with the corresponding fractional selector.
 

@@ -462,32 +462,65 @@ class BatchRunner(SubmissionComponent):
             )
             print(f"Found {len(validation_file_list)} validation file(s)")
 
+        joint_named_sources = bool(
+            named_sources
+            and "primary" in named_sources
+            and "secondary" in named_sources
+            and "cache" not in named_sources
+        )
+        validation_joint_named_sources = bool(
+            validation_named_sources
+            and "primary" in validation_named_sources
+            and "secondary" in validation_named_sources
+            and "cache" not in validation_named_sources
+        )
+
         effective_named_sources = named_sources
         named_source_file_count = None
         if named_sources and num_files is not None:
             resolved = self.file_handler.parse_named_sources(
-                named_sources, allow_missing=allow_missing_inputs
+                named_sources,
+                allow_missing=allow_missing_inputs,
+                aligned=not joint_named_sources,
             )
-            limited = self.file_handler.limit_named_sources(resolved, num_files)
+            limited = self.file_handler.limit_named_sources(
+                resolved,
+                num_files,
+                primary_only=joint_named_sources,
+            )
             effective_named_sources = {
                 target: {"source": paths} for target, paths in limited.items()
             }
             named_source_file_count = len(
-                next(paths for target, paths in limited.items() if target != "cache")
+                limited["primary"]
+                if joint_named_sources
+                else next(
+                    paths for target, paths in limited.items() if target != "cache"
+                )
             )
 
         effective_validation_named_sources = validation_named_sources
         validation_named_source_file_count = None
         if validation_named_sources and val_num_files is not None:
             resolved = self.file_handler.parse_named_sources(
-                validation_named_sources, allow_missing=allow_missing_inputs
+                validation_named_sources,
+                allow_missing=allow_missing_inputs,
+                aligned=not validation_joint_named_sources,
             )
-            limited = self.file_handler.limit_named_sources(resolved, val_num_files)
+            limited = self.file_handler.limit_named_sources(
+                resolved,
+                val_num_files,
+                primary_only=validation_joint_named_sources,
+            )
             effective_validation_named_sources = {
                 target: {"source": paths} for target, paths in limited.items()
             }
             validation_named_source_file_count = len(
-                next(paths for target, paths in limited.items() if target != "cache")
+                limited["primary"]
+                if validation_joint_named_sources
+                else next(
+                    paths for target, paths in limited.items() if target != "cache"
+                )
             )
 
         # Detect detector first
@@ -828,16 +861,23 @@ class BatchRunner(SubmissionComponent):
             resolved_named_sources = self.file_handler.parse_named_sources(
                 effective_named_sources,
                 allow_missing=allow_missing_inputs,
+                aligned=not joint_named_sources,
             )
             resolved_named_sources = self.file_handler.limit_named_sources(
-                resolved_named_sources, num_files
+                resolved_named_sources,
+                num_files,
+                primary_only=joint_named_sources,
             )
             partitioned_sources = {
                 target: paths
                 for target, paths in resolved_named_sources.items()
                 if target != "cache"
             }
-            source_count = len(next(iter(partitioned_sources.values())))
+            source_count = (
+                len(partitioned_sources["primary"])
+                if joint_named_sources
+                else len(next(iter(partitioned_sources.values())))
+            )
             named_source_file_count = source_count
             inference_source_count = source_count
             max_array_size = self.profiles["defaults"]["max_array_size"]
@@ -939,8 +979,13 @@ class BatchRunner(SubmissionComponent):
                     for target, source_files in partitioned_sources.items():
                         manifest = task_dir / f"{target}.txt"
                         with manifest.open("w", encoding="utf-8") as stream:
-                            for index in index_group:
-                                stream.write(f"{source_files[index]}\n")
+                            selected_files = (
+                                source_files
+                                if joint_named_sources and target == "secondary"
+                                else [source_files[index] for index in index_group]
+                            )
+                            for source_file in selected_files:
+                                stream.write(f"{source_file}\n")
                 task_list_args = " ".join(
                     f"{target}=$TASK_DIR/{target}.txt" for target in target_names
                 )

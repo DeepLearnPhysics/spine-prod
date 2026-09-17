@@ -26,6 +26,7 @@ Each main config includes modular YAML files:
 **IO Components:**
 - **`io/io_240819.yaml`**: IO configuration
 - **`io/io_common.yaml`**: Common IO settings
+- **`io/dataset_common.yaml`**: Reusable LArCV dataset schema
 
 **Model Components:**
 - **`model/model_240819.yaml`**: 2x2 weights (debug/benchmark only)
@@ -45,8 +46,19 @@ Each main config includes modular YAML files:
 Located in `modifier/` subdirectories:
 - **`data/mod_data_240819.yaml`**: Data-only mode (no truth labels)
 - **`ovl/mod_ovl_240819.yaml`**: Overlay mode (4x spills)
+- **`joint/mod_joint_240819.yaml`**: Overlay independent primary/secondary datasets
 - **`lite/mod_lite_240819.yaml`**: Lite mode (reduced output)
 - **`single/mod_single_240819.yaml`**: Switch to single-module mode
+
+The `joint` modifier leaves both source paths unset. Supply them as independent
+target-qualified inputs; the primary source controls traversal and scheduler
+splitting, while every task sees the complete secondary source:
+
+```bash
+./submit.py --config infer/nd-lar/latest --apply-mods joint \
+  --source-list primary=primary.txt secondary=secondary.txt \
+  --files-per-task 1
+```
 
 ### Legacy Configs
 Old legacy top-level configs moved to `legacy/` directory for backward compatibility
