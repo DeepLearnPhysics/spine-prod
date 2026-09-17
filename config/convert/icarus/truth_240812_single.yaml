@@ -1,0 +1,12 @@
+# ICARUS single-cryostat truth conversion configuration
+# Revision date: August 12, 2024
+
+__meta__:
+  kind: bundle
+  version: "240812"
+  date: "2024-08-12"
+  description: "ICARUS single-cryostat LArCV-to-SPINE truth conversion configuration"
+
+include:
+  - convert/icarus/truth_240812.yaml
+  - infer/icarus/modifier/single/io_single_common.yaml
