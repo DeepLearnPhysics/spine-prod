@@ -1,0 +1,15 @@
+__meta__:
+  kind: mod
+  name: joint
+  version: "240718"
+  date: "2024-07-18"
+  description: Generic primary/secondary joint-dataset inference
+  applies_to: [mc]
+  conflicts_with: [data, ovl]
+  compatible_with:
+    io: "240718"
+
+include: mod_joint_common.yaml
+
+override:
+  io.loader.dataset.base.schema.ppn_label.include_point_tagging: true

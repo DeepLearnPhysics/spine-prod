@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  description: sbnd LArCV dataset restricted to joint-overlay-compatible products
+
+include: dataset_common.yaml
+
+remove:
+  - schema.run_info
+  - schema.flashes
+  - schema.flashes_xa
+  - schema.crthits

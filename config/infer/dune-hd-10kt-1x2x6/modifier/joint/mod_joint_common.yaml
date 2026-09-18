@@ -1,0 +1,14 @@
+__meta__:
+  kind: fragment
+  description: Run DUNE-HD inference on a primary/secondary joint dataset
+
+override:
+  io.loader.dataset:
+    name: joint
+    base: !include infer/dune-hd-10kt-1x2x6/io/dataset_joint.yaml
+    primary:
+      file_keys: null
+    secondary:
+      file_keys: null
+
+  io.writer.keys-: run_info
