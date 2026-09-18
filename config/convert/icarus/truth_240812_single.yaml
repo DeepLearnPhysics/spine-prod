@@ -6,6 +6,7 @@ __meta__:
   version: "240812"
   date: "2024-08-12"
   description: "ICARUS single-cryostat LArCV-to-SPINE truth conversion configuration"
+  tags: [single-cryostat]
 
 include:
   - convert/icarus/truth_240812.yaml

@@ -6,6 +6,7 @@ __meta__:
   version: "240812"
   date: "2024-08-12"
   description: "ICARUS LArCV-to-SPINE truth conversion configuration"
+  tags: [two-cryostat]
 
 include:
   - infer/icarus/base/base_240719.yaml
