@@ -15,9 +15,11 @@ include:
 override:
   # Only build truth objects
   build.mode: truth
+  build.fragments: true
 
   # Force CPU execution for truth-only parsing
   base.world_size: 0
 
   # No reconstructed information to write
+  io.writer.keys+: [truth_fragments]
   io.writer.keys-: [points, depositions, reco_particles, reco_interactions]
