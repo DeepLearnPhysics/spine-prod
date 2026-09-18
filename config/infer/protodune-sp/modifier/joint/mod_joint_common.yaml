@@ -1,0 +1,14 @@
+__meta__:
+  kind: fragment
+  description: Run ProtoDUNE-SP inference on a primary/secondary joint dataset
+
+override:
+  io.loader.dataset:
+    name: joint
+    base: !include infer/protodune-sp/io/dataset_joint.yaml
+    primary:
+      file_keys: null
+    secondary:
+      file_keys: null
+
+  io.writer.keys-: run_info

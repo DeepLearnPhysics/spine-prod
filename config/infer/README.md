@@ -63,6 +63,16 @@ Configurations are used with the SPINE inference framework:
 
 # With modifiers (data-only mode, lite output, etc.)
 ./submit.py -c infer/<detector>/<config_file>.yaml -s <input_file> --apply-mods data lite
+
+# Overlay independent MC sources with any detector configuration
+./submit.py -c infer/<detector>/latest --apply-mods joint \
+  --source-list primary=primary.txt secondary=secondary.txt
 ```
+
+The MC-only `joint` modifier is available for every supported detector. The
+primary source controls traversal and scheduler splitting; each task receives
+the complete secondary source. Products without safe overlay semantics, such
+as run metadata, triggers, optical flashes, and CRT hits, are omitted where
+present.
 
 Refer to individual detector README files for detector-specific details, training datasets, and version-specific changes.

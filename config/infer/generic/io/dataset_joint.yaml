@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  description: generic simulation LArCV dataset restricted to joint-overlay-compatible products
+
+include: dataset_common.yaml
+
+remove:
+  - schema.run_info

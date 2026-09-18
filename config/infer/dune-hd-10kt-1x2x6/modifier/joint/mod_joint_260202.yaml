@@ -1,0 +1,12 @@
+__meta__:
+  kind: mod
+  name: joint
+  version: "260202"
+  date: "2026-02-02"
+  description: DUNE-HD primary/secondary joint-dataset inference
+  applies_to: [mc]
+  conflicts_with: [data]
+  compatible_with:
+    io: ">=260202"
+
+include: mod_joint_common.yaml

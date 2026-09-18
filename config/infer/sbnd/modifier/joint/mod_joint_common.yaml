@@ -1,0 +1,18 @@
+__meta__:
+  kind: fragment
+  description: Run SBND inference on a primary/secondary joint dataset
+
+override:
+  io.loader.dataset:
+    name: joint
+    base: !include infer/sbnd/io/dataset_joint.yaml
+    primary:
+      file_keys: null
+    secondary:
+      file_keys: null
+
+  io.writer.keys-:
+    - run_info
+    - flashes
+    - flashes_xa
+    - crthits
