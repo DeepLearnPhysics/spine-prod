@@ -151,11 +151,31 @@ def test_limit_joint_sources_only_truncates_primary(handler):
         "primary": ["primary-1.root", "primary-2.root"],
         "secondary": ["secondary-1.root", "secondary-2.root"],
     }
-
     assert handler.limit_named_sources(sources, 1, primary_only=True) == {
         "primary": ["primary-1.root"],
         "secondary": ["secondary-1.root", "secondary-2.root"],
     }
+
+
+def test_pair_joint_sources_uses_shorter_ordered_source(handler):
+    sources = {
+        "primary": ["primary-1.root", "primary-2.root", "primary-3.root"],
+        "secondary": ["secondary-1.root", "secondary-2.root"],
+    }
+
+    assert handler.pair_joint_sources(sources) == {
+        "primary": ["primary-1.root", "primary-2.root"],
+        "secondary": ["secondary-1.root", "secondary-2.root"],
+    }
+    assert handler.pair_joint_sources(sources, num_files=1) == {
+        "primary": ["primary-1.root"],
+        "secondary": ["secondary-1.root"],
+    }
+
+
+def test_pair_joint_sources_requires_both_roles(handler):
+    with pytest.raises(ValueError, match="primary and secondary"):
+        handler.pair_joint_sources({"primary": ["primary.root"]})
 
 
 @pytest.mark.parametrize("value", [0, -1, 1.5, True])

@@ -2560,6 +2560,58 @@ class TestBatchSpineOverride:
         metadata = json.loads((attempt / "job_metadata.json").read_text())
         assert metadata["num_files"] == 2
 
+    def test_submit_job_pairs_joint_files_up_to_shorter_list(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        run_dir = tmp_path / "run"
+        primary = [tmp_path / f"primary-{index}.root" for index in range(3)]
+        secondary = [tmp_path / f"secondary-{index}.root" for index in range(2)]
+        for path in primary + secondary:
+            path.touch()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="joint"),
+        ):
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                named_sources={
+                    "primary": {"source": list(map(str, primary))},
+                    "secondary": {"source": list(map(str, secondary))},
+                },
+                apply_mods=["joint:240819"],
+                run_dir=str(run_dir),
+                joint_file_mode="paired",
+                files_per_task=1,
+            )
+
+        attempt = run_dir / "latest"
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "#SBATCH --array=1-2" in script
+        for index in (1, 2):
+            task_dir = attempt / "tasks" / f"000_{index}"
+            assert (task_dir / "primary.txt").read_text().splitlines() == [
+                str(primary[index - 1])
+            ]
+            assert (task_dir / "secondary.txt").read_text().splitlines() == [
+                str(secondary[index - 1])
+            ]
+        assert not (attempt / "tasks" / "000_3").exists()
+
+        output = capsys.readouterr().out
+        assert "Primary files:   3" in output
+        assert "Secondary files: 2" in output
+        assert "File pairs:      2" in output
+        assert "Ignored primary: 1" in output
+
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["joint_file_mode"] == "paired"
+        assert metadata["num_files"] == 2
+
     def test_submit_job_writes_expected_stage_cache_source_list(
         self, mock_submitter, tmp_path
     ):

@@ -143,6 +143,7 @@ class BatchRunner(SubmissionComponent):
         no_writer: bool = False,
         ntasks: Optional[int] = None,
         files_per_task: Optional[int] = None,
+        joint_file_mode: str = "broadcast",
         dependency: Optional[str] = None,
         larcv_path: Optional[str] = None,
         flashmatch_path: Optional[str] = None,
@@ -232,6 +233,11 @@ class BatchRunner(SubmissionComponent):
         files_per_task : int, optional
             Files to process per task. If omitted, all explicit input files run
             in a single task unless ``ntasks`` requests an even split.
+        joint_file_mode : str, default "broadcast"
+            Joint-dataset file sharding policy. ``broadcast`` partitions primary
+            files and gives every task all secondary files. ``paired`` truncates
+            both ordered lists to the shorter length and partitions matching
+            primary/secondary file indexes together.
         dependency : str, optional
             Batch scheduler dependency string, by default None
         larcv_path : str, optional
@@ -317,6 +323,9 @@ class BatchRunner(SubmissionComponent):
             self.warn_flashmatch_noop()
         if no_writer:
             self.context.spine_cli.warn_no_writer_deprecated()
+
+        if joint_file_mode not in ("broadcast", "paired"):
+            raise ValueError("joint_file_mode must be either 'broadcast' or 'paired'")
 
         if in_place and (output is not None or output_suffix is not None):
             raise ValueError(
@@ -468,6 +477,13 @@ class BatchRunner(SubmissionComponent):
             and "secondary" in named_sources
             and "cache" not in named_sources
         )
+        if joint_file_mode == "paired" and not joint_named_sources:
+            raise ValueError(
+                "Paired joint files require named primary and secondary sources"
+            )
+        if joint_file_mode == "paired" and stage != "inference":
+            raise ValueError("Paired joint files are valid only for inference jobs")
+        broadcast_joint_sources = joint_named_sources and joint_file_mode == "broadcast"
         validation_joint_named_sources = bool(
             validation_named_sources
             and "primary" in validation_named_sources
@@ -477,17 +493,31 @@ class BatchRunner(SubmissionComponent):
 
         effective_named_sources = named_sources
         named_source_file_count = None
-        if named_sources and num_files is not None:
+        if named_sources and (num_files is not None or joint_file_mode == "paired"):
             resolved = self.file_handler.parse_named_sources(
                 named_sources,
                 allow_missing=allow_missing_inputs,
                 aligned=not joint_named_sources,
             )
-            limited = self.file_handler.limit_named_sources(
-                resolved,
-                num_files,
-                primary_only=joint_named_sources,
-            )
+            if joint_file_mode == "paired":
+                primary_count = len(resolved["primary"])
+                secondary_count = len(resolved["secondary"])
+                limited = self.file_handler.pair_joint_sources(resolved, num_files)
+                pair_count = len(limited["primary"])
+                print("Paired joint submission:")
+                print(f"  Primary files:   {primary_count}")
+                print(f"  Secondary files: {secondary_count}")
+                print(f"  File pairs:      {pair_count}")
+                if primary_count > pair_count:
+                    print(f"  Ignored primary: {primary_count - pair_count}")
+                if secondary_count > pair_count:
+                    print(f"  Ignored secondary: {secondary_count - pair_count}")
+            else:
+                limited = self.file_handler.limit_named_sources(
+                    resolved,
+                    num_files,
+                    primary_only=joint_named_sources,
+                )
             effective_named_sources = {
                 target: {"source": paths} for target, paths in limited.items()
             }
@@ -861,12 +891,12 @@ class BatchRunner(SubmissionComponent):
             resolved_named_sources = self.file_handler.parse_named_sources(
                 effective_named_sources,
                 allow_missing=allow_missing_inputs,
-                aligned=not joint_named_sources,
+                aligned=not broadcast_joint_sources,
             )
             resolved_named_sources = self.file_handler.limit_named_sources(
                 resolved_named_sources,
                 num_files,
-                primary_only=joint_named_sources,
+                primary_only=broadcast_joint_sources,
             )
             partitioned_sources = {
                 target: paths
@@ -981,7 +1011,7 @@ class BatchRunner(SubmissionComponent):
                         with manifest.open("w", encoding="utf-8") as stream:
                             selected_files = (
                                 source_files
-                                if joint_named_sources and target == "secondary"
+                                if broadcast_joint_sources and target == "secondary"
                                 else [source_files[index] for index in index_group]
                             )
                             for source_file in selected_files:
@@ -1125,6 +1155,7 @@ class BatchRunner(SubmissionComponent):
             "set_overrides": set_overrides or [],
             "named_sources": named_sources or {},
             "validation_named_sources": validation_named_sources or {},
+            "joint_file_mode": joint_file_mode,
             "module_weights": module_weights or {},
             "weight_path": weight_path,
             "export_weights": export_weights,
