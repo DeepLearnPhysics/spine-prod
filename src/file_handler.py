@@ -166,6 +166,46 @@ class FileHandler:
         }
 
     @staticmethod
+    def pair_joint_sources(
+        sources: Mapping[str, List[str]],
+        num_files: Optional[int] = None,
+    ) -> Dict[str, List[str]]:
+        """Pair ordered primary/secondary files up to the shorter source.
+
+        Parameters
+        ----------
+        sources : mapping
+            Resolved named sources containing ``primary`` and ``secondary``.
+        num_files : int, optional
+            Additional upper bound on the number of file pairs.
+
+        Returns
+        -------
+        dict
+            Source mapping with primary and secondary truncated symmetrically.
+        """
+        if "primary" not in sources or "secondary" not in sources:
+            raise ValueError("Paired joint files require primary and secondary sources")
+        if num_files is not None and (
+            isinstance(num_files, bool)
+            or not isinstance(num_files, int)
+            or num_files < 1
+        ):
+            raise ValueError("num_files must be a positive integer")
+
+        pair_count = min(len(sources["primary"]), len(sources["secondary"]))
+        if num_files is not None:
+            pair_count = min(pair_count, num_files)
+        return {
+            target: (
+                list(paths[:pair_count])
+                if target in ("primary", "secondary")
+                else list(paths)
+            )
+            for target, paths in sources.items()
+        }
+
+    @staticmethod
     def stage_cache_output_paths(
         source_files: List[str], output_dir: str, suffix: str
     ) -> List[str]:

@@ -73,6 +73,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "no_writer",
         "ntasks",
         "files_per_task",
+        "joint_file_mode",
         "depends_on",
         "cleanup",
         "apply_mods",
@@ -737,6 +738,13 @@ class PipelineDefinition:
         if in_place is not None and not isinstance(in_place, bool):
             raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
 
+        joint_file_mode = stage.get("joint_file_mode", "broadcast")
+        if joint_file_mode not in ("broadcast", "paired"):
+            raise ValueError(
+                f"Pipeline stage '{name}' joint_file_mode must be "
+                "broadcast or paired"
+            )
+
         cache_fields = PipelineDefinition._present(
             stage, "cache_repository", "cache_stage"
         )
@@ -833,6 +841,22 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' task splitting requires stage=inference"
             )
+        if stage.get("joint_file_mode", "broadcast") == "paired":
+            sources = stage.get("sources") or {}
+            if lifecycle != "inference":
+                raise ValueError(
+                    f"Pipeline stage '{name}' paired joint files require "
+                    "stage=inference"
+                )
+            if not (
+                "primary" in sources
+                and "secondary" in sources
+                and "cache" not in sources
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{name}' paired joint files require "
+                    "primary and secondary sources"
+                )
         if stage.get("in_place"):
             if lifecycle != "inference":
                 raise ValueError(
@@ -1382,6 +1406,7 @@ class PipelineRunner(SubmissionComponent):
                 "cache_stage": stage.get("cache_stage"),
                 "ntasks": stage.get("ntasks"),
                 "files_per_task": stage.get("files_per_task"),
+                "joint_file_mode": stage.get("joint_file_mode", "broadcast"),
                 "dependency": dependency,
                 "larcv_path": stage.get("larcv_path"),
                 "flashmatch_path": stage.get("flashmatch_path"),

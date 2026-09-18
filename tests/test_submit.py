@@ -311,6 +311,27 @@ def test_batch_mode_forwards_target_qualified_sources():
     }
 
 
+def test_batch_mode_forwards_paired_joint_file_mode():
+    submitter = Mock()
+    submitter.submit_job.return_value = []
+
+    result, _, _ = run_main(
+        "--config",
+        "infer/nd-lar/full_chain_260409.yaml",
+        "--apply-mods",
+        "joint:240819",
+        "--source-list",
+        "primary=primary.txt",
+        "secondary=secondary.txt",
+        "--joint-file-mode",
+        "paired",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert submitter.submit_job.call_args.kwargs["joint_file_mode"] == "paired"
+
+
 def test_pipeline_mode_prints_stage_jobs(capsys):
     submitter = Mock()
     submitter.submit_pipeline.return_value = {"reco": ["42"], "post": ["43"]}

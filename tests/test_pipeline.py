@@ -120,6 +120,48 @@ def test_collection_exact_substitution_preserves_scalar_type(tmp_path):
     assert definition.stages[0]["ntasks"] == 4
 
 
+def test_pipeline_forwards_paired_joint_file_mode(tmp_path):
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "joint",
+                    "config": "infer/nd-lar/latest",
+                    "sources": {
+                        "primary": {"source_list": "primary.txt"},
+                        "secondary": {"source_list": "secondary.txt"},
+                    },
+                    "joint_file_mode": "paired",
+                }
+            ]
+        },
+    )
+
+    stage = PipelineDefinition.load(str(path)).stages[0]
+    options = PipelineRunner._submission_options(stage, dependency=None)
+    assert options["joint_file_mode"] == "paired"
+
+
+def test_pipeline_rejects_paired_mode_without_joint_sources(tmp_path):
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "joint",
+                    "config": "infer/nd-lar/latest",
+                    "source_list": "primary.txt",
+                    "joint_file_mode": "paired",
+                }
+            ]
+        },
+    )
+
+    with pytest.raises(ValueError, match="primary and secondary sources"):
+        PipelineDefinition.load(str(path))
+
+
 def test_workspace_override_replaces_yaml_default(tmp_path):
     """The launch value should take precedence over a concrete YAML workspace."""
     path = write_pipeline(
