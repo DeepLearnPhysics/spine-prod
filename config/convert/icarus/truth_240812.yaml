@@ -6,6 +6,7 @@ __meta__:
   version: "240812"
   date: "2024-08-12"
   description: "ICARUS LArCV-to-SPINE truth conversion configuration"
+  tags: [two-cryostat]
 
 include:
   - infer/icarus/base/base_240719.yaml
@@ -15,12 +16,14 @@ include:
 override:
   # Only build truth objects
   build.mode: truth
+  build.fragments: true
 
   # Force CPU execution for truth-only parsing
   base.world_size: 0
 
   # Temporary workaround until SPINE produces sources labels without reco
   # No reconstructed information or wire-TPC-only source products to write
+  io.writer.keys+: [truth_fragments]
   io.writer.keys-:
     [
       points,

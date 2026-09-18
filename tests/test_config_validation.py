@@ -1114,6 +1114,21 @@ def test_composite_configs_are_bundles(config_path):
     assert config.get("__meta__", {}).get("kind") == "bundle"
 
 
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+@pytest.mark.parametrize(
+    "config_path",
+    sorted(CONFIG_CONVERT_ROOT.rglob("truth_*.yaml")),
+    ids=lambda path: str(path),
+)
+def test_truth_conversions_build_and_write_fragments(config_path):
+    """Every truth conversion should expose the LArCV-nearest object layer."""
+    config = load_config_with_includes(config_path)
+
+    assert config["build"]["mode"] == "truth"
+    assert config["build"]["fragments"] is True
+    assert "truth_fragments" in config["io"]["writer"]["keys"]
+
+
 @pytest.mark.parametrize("config_path", COMMON_CONFIGS, ids=lambda path: str(path))
 def test_common_configs_are_fragments(config_path):
     """Reusable common configurations must declare fragment metadata."""

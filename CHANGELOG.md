@@ -5,9 +5,12 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.1] - 2026-09-18
 
 ### Changed
+- Truth conversion bundles now build and write truth fragments in addition to
+  truth particles and interactions, preserving the object representation
+  closest to the input LArCV clusters.
 - Renamed the DUNE horizontal-drift 10 kt module configuration family from
   `dune10kt-1x2x6` to the canonical `dune-hd-10kt-1x2x6` detector name and
   migrated its public model-weight URLs. Deprecated configuration requests
