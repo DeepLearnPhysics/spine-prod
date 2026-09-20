@@ -69,6 +69,9 @@ stages:
     stage: train
     profile: s3df_ampere_full
     time: "1-00:00:00"
+    # Graph-SPICE memory scales strongly with event occupancy. Leave enough
+    # headroom for the largest images in this deliberately small sample.
+    minibatch_size: 8
     run_dir: ${workspace}/train/graph_spice
     tensorboard: true
     num_files: 2
