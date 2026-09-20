@@ -105,6 +105,14 @@ def test_retry_reuses_unstarted_run_or_latest_checkpoint(tmp_path):
 
     assert RunManager.prepare_training_run(run_dir, config, retry=True) is None
 
+    # An unstarted run has no model state to invalidate, so a regenerated
+    # wrapper may safely refresh its recorded configuration identity.
+    write_config(Path(config), "base:\n  epochs: 2\n")
+    assert RunManager.prepare_training_run(run_dir, config, retry=True) is None
+    metadata = json.loads((run_dir / "run_metadata.json").read_text())
+    assert metadata["training_config_sha256"] == RunManager.config_digest(config)
+    assert "config_refreshed" in metadata
+
     latest = checkpoint(run_dir, 100)
     assert RunManager.prepare_training_run(run_dir, config, retry=True) == latest
 

@@ -530,7 +530,11 @@ class ConfigManager:
         composite_content = "# Auto-generated composite configuration\n"
         composite_content += f"# Base: {base_config}\n"
         composite_content += f"# Modifiers: {', '.join(modifiers)}\n"
-        composite_content += f"# Generated: {datetime.now().isoformat()}\n\n"
+        # Keep generated wrappers byte-for-byte reproducible. Training retries
+        # use the configuration content as part of the run identity, so a
+        # wall-clock timestamp would make an unchanged composition appear to
+        # be a different training configuration.
+        composite_content += "\n"
         composite_content += self._bundle_metadata(
             f"Auto-generated composite configuration based on {config_path.name}",
             base_version,
@@ -692,7 +696,6 @@ class ConfigManager:
         # Create composite config with version in filename
         composite_content = "# Auto-generated 'latest' configuration\n"
         composite_content += f"# Detector: {detector}\n"
-        composite_content += f"# Generated: {datetime.now().isoformat()}\n"
         composite_content += f"# Components: {', '.join(latest_components.keys())}\n"
         if latest_version:
             composite_content += f"# Latest version: {latest_version}\n"

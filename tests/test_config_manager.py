@@ -262,6 +262,33 @@ def test_create_composite_config_resolves_named_and_custom_modifiers(manager, tm
     assert str(custom) in content
 
 
+def test_create_composite_config_is_deterministic(manager, tmp_path):
+    """Regenerating an unchanged wrapper must preserve its run identity."""
+    config_dir = tmp_path / "config" / "train" / "icarus"
+    modifier_dir = config_dir / "modifier" / "augment"
+    modifier_dir.mkdir(parents=True)
+    base = config_dir / "model_250101.yaml"
+    modifier = modifier_dir / "mod_augment_250101.yaml"
+    base.write_text("{}\n")
+    modifier.write_text("{}\n")
+    job_dir = tmp_path / "job"
+    job_dir.mkdir()
+
+    first = Path(
+        manager.create_composite_config(
+            "train/icarus/model_250101.yaml", ["augment:250101"], job_dir
+        )
+    ).read_bytes()
+    second = Path(
+        manager.create_composite_config(
+            "train/icarus/model_250101.yaml", ["augment:250101"], job_dir
+        )
+    ).read_bytes()
+
+    assert second == first
+    assert b"# Generated:" not in second
+
+
 @pytest.mark.parametrize(
     ("family", "base_path"),
     [
