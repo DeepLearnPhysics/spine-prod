@@ -457,6 +457,14 @@ Examples:
         help="Expose CVMFS inside the container. On S3DF this adds /cvmfs/ to "
         "Singularity binds; on NERSC this adds --module=cvmfs to Shifter.",
     )
+    parser.add_argument(
+        "--expandable-segments",
+        action="store_true",
+        help=(
+            "Enable PyTorch CUDA expandable memory segments before SPINE starts "
+            "(PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True)."
+        ),
+    )
     # Profile overrides
     partition_group = parser.add_mutually_exclusive_group()
     partition_group.add_argument("--partition", help="Override partition")
@@ -729,6 +737,8 @@ Examples:
                 pipeline_overrides["flashmatch"] = True
             if args.cvmfs:
                 pipeline_overrides["cvmfs"] = True
+            if args.expandable_segments:
+                pipeline_overrides["expandable_segments"] = True
             pipeline_overrides.update(profile_overrides)
             job_map = submitter.submit_pipeline(
                 args.pipeline,
@@ -770,6 +780,7 @@ Examples:
                 flashmatch_path=args.flashmatch_path,
                 flashmatch=args.flashmatch,
                 cvmfs=args.cvmfs,
+                expandable_segments=args.expandable_segments,
                 apply_mods=args.apply_mods,
                 preload=args.preload,
                 set_overrides=args.set_overrides,
@@ -829,6 +840,7 @@ Examples:
                 flashmatch_path=args.flashmatch_path,
                 flashmatch=args.flashmatch,
                 cvmfs=args.cvmfs,
+                expandable_segments=args.expandable_segments,
                 apply_mods=args.apply_mods,
                 dry_run=args.dry_run,
                 preload=args.preload,

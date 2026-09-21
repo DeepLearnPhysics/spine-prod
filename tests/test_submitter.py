@@ -1495,6 +1495,7 @@ class TestInteractiveExecution:
                 num_workers=4,
                 iterations=10,
                 set_overrides=["model.detect_anomaly=true"],
+                expandable_segments=True,
                 interactive_runtime="local",
             )
 
@@ -1504,6 +1505,7 @@ class TestInteractiveExecution:
         assert kwargs["shell"] is True
         assert kwargs["executable"] == "/bin/bash"
         assert "export NUMBA_NUM_THREADS=64" in run.call_args.args[0]
+        assert "expandable_segments:True" in run.call_args.args[0]
         assert "spine -S" in run.call_args.args[0]
         assert " -o " not in run.call_args.args[0]
         assert "--output-dir " in run.call_args.args[0]
@@ -3706,6 +3708,7 @@ class TestCVMFSOption:
             "flashmatch_path": None,
             "flashmatch": False,
             "cvmfs": False,
+            "expandable_segments": False,
             "bind_paths": None,
             "spine_cmd": "spine",
             "spine_cli_overrides": "",
@@ -3797,6 +3800,27 @@ class TestCVMFSOption:
         )
 
         assert 'SHIFTER_MODULES+=("--module=cvmfs")' in script
+
+    @pytest.mark.parametrize(
+        "template_name",
+        [
+            "job_template_s3df.sbatch",
+            "job_template_nersc.sbatch",
+            "job_template_anl.pbs",
+        ],
+    )
+    def test_expandable_segments_is_opt_in(self, mock_submitter, template_name):
+        """Allocator expansion is exported only when explicitly requested."""
+        default_script = self._render_template(mock_submitter, template_name)
+        enabled_script = self._render_template(
+            mock_submitter, template_name, expandable_segments=True
+        )
+
+        assert "PYTORCH_CUDA_ALLOC_CONF" not in default_script
+        assert (
+            'export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:+'
+            '${PYTORCH_CUDA_ALLOC_CONF},}expandable_segments:True"' in enabled_script
+        )
 
     @pytest.mark.parametrize(
         "template_name",

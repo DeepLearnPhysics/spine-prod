@@ -149,6 +149,7 @@ class BatchRunner(SubmissionComponent):
         flashmatch_path: Optional[str] = None,
         flashmatch: bool = False,
         cvmfs: bool = False,
+        expandable_segments: bool = False,
         apply_mods: Optional[List[str]] = None,
         dry_run: bool = False,
         preload: bool = False,
@@ -249,6 +250,9 @@ class BatchRunner(SubmissionComponent):
             container and no external setup is needed.
         cvmfs : bool, optional
             Expose CVMFS inside the container, by default False
+        expandable_segments : bool, optional
+            Enable PyTorch CUDA expandable memory segments before SPINE starts,
+            by default False.
         apply_mods : List[str], optional
             List of modifiers to apply (e.g., ['data', 'flash']), by default None
         dry_run : bool, optional
@@ -1114,6 +1118,7 @@ class BatchRunner(SubmissionComponent):
                 flashmatch_path=flashmatch_path,
                 flashmatch=flashmatch,
                 cvmfs=cvmfs,
+                expandable_segments=expandable_segments,
                 spine_cmd=spine_cmd or "spine",
                 cache_begin_cmd=cache_cmd or "spine-cache",
                 cache_repository=cache_repository,
@@ -1215,6 +1220,7 @@ class BatchRunner(SubmissionComponent):
             "flashmatch_path": flashmatch_path,
             "spine_path": spine_path,
             "cvmfs": cvmfs,
+            "expandable_segments": expandable_segments,
             "no_writer": no_writer,
             "in_place": in_place,
             "cache_repository": cache_repository,

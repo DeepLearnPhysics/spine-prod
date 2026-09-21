@@ -901,7 +901,16 @@ This is especially useful for large-scale production to save disk space by remov
 
 # Expose CVMFS inside the container
 ./submit.py --config infer/icarus/latest --source data.root --cvmfs
+
+# Let PyTorch grow CUDA allocator segments to reduce fragmentation
+./submit.py --config train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/run --expandable-segments
 ```
+
+`--expandable-segments` exports
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` before starting SPINE. It is
+available for batch, interactive, and pipeline submissions; pipelines may also
+set `expandable_segments: true` globally or on an individual stage.
 
 There is no need to pass `--flashmatch`. The flag is accepted only for backward
 compatibility and is ignored. Use `--flashmatch-path` to source a custom

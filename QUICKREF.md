@@ -101,6 +101,10 @@ require SPINE v1.1.0 or later.
 
 # Expose CVMFS inside the container
 ./submit.py --config infer/icarus/latest --source data.root --cvmfs
+
+# Reduce CUDA allocator fragmentation (opt in)
+./submit.py --config train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/run --expandable-segments
 ```
 
 ### Pipeline Mode

@@ -111,6 +111,10 @@ echo
 # Cap the number Numba threads to 64 (what OpenBLAS was compiled with)
 export NUMBA_NUM_THREADS=64
 echo "NUMBA_NUM_THREADS set to $NUMBA_NUM_THREADS"
+{% if expandable_segments %}
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:+${PYTORCH_CUDA_ALLOC_CONF},}expandable_segments:True"
+echo "PYTORCH_CUDA_ALLOC_CONF set to $PYTORCH_CUDA_ALLOC_CONF"
+{% endif %}
 
 # NERSC: Use Shifter
 INNER_CMD=""

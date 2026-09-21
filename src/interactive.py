@@ -25,6 +25,7 @@ class InteractiveRunner(SubmissionComponent):
         flashmatch_path: Optional[str] = None,
         flashmatch: bool = False,
         cvmfs: bool = False,
+        expandable_segments: bool = False,
         apply_mods: Optional[List[str]] = None,
         preload: bool = False,
         set_overrides: Optional[List[str]] = None,
@@ -83,6 +84,9 @@ class InteractiveRunner(SubmissionComponent):
             container and no external setup is needed.
         cvmfs : bool, optional
             Expose CVMFS inside the container, by default False
+        expandable_segments : bool, optional
+            Enable PyTorch CUDA expandable memory segments before SPINE starts,
+            by default False.
         apply_mods : List[str], optional
             List of modifiers to apply
         preload : bool, optional
@@ -235,6 +239,11 @@ class InteractiveRunner(SubmissionComponent):
 
         # Cap Numba threads to the OpenBLAS build limit used in batch templates.
         cmd_parts.append("export NUMBA_NUM_THREADS=64")
+        if expandable_segments:
+            cmd_parts.append(
+                'export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:+'
+                '${PYTORCH_CUDA_ALLOC_CONF},}expandable_segments:True"'
+            )
 
         larcv_setup_cmd, larcv_bind_root = self.context.runtime.resolve_setup_path(
             larcv_path, "--larcv-path"
