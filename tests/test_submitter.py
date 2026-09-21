@@ -2546,6 +2546,7 @@ class TestBatchSpineOverride:
         attempt = run_dir / "latest"
         script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
         assert "#SBATCH --array=1-2" in script
+        assert "--output-dir $TASK_DIR/output" in script
         assert "--source-list primary=$TASK_DIR/primary.txt" in script
         assert "secondary=$TASK_DIR/secondary.txt" in script
         for index in (1, 2):
@@ -2556,6 +2557,7 @@ class TestBatchSpineOverride:
             assert (task_dir / "secondary.txt").read_text().splitlines() == list(
                 map(str, secondary)
             )
+            assert (task_dir / "output").is_dir()
 
         metadata = json.loads((attempt / "job_metadata.json").read_text())
         assert metadata["num_files"] == 2
@@ -2592,6 +2594,9 @@ class TestBatchSpineOverride:
         attempt = run_dir / "latest"
         script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
         assert "#SBATCH --array=1-2" in script
+        assert "--output-dir $TASK_DIR/output" in script
+        assert 'SPINE_PROD_TASK_OUTPUT_DIR="$TASK_DIR/output"' in script
+        assert "flock -x 9" in script
         for index in (1, 2):
             task_dir = attempt / "tasks" / f"000_{index}"
             assert (task_dir / "primary.txt").read_text().splitlines() == [
@@ -2600,6 +2605,7 @@ class TestBatchSpineOverride:
             assert (task_dir / "secondary.txt").read_text().splitlines() == [
                 str(secondary[index - 1])
             ]
+            assert (task_dir / "output").is_dir()
         assert not (attempt / "tasks" / "000_3").exists()
 
         output = capsys.readouterr().out
@@ -2611,6 +2617,49 @@ class TestBatchSpineOverride:
         metadata = json.loads((attempt / "job_metadata.json").read_text())
         assert metadata["joint_file_mode"] == "paired"
         assert metadata["num_files"] == 2
+        output_manifest = attempt.resolve() / "outputs.txt"
+        assert output_manifest.is_file()
+        assert metadata["output_manifest"] == str(output_manifest)
+
+    def test_submit_job_places_single_task_joint_output_under_attempt(
+        self, mock_submitter, tmp_path
+    ):
+        run_dir = tmp_path / "run"
+        primary = [tmp_path / f"primary-{index}.root" for index in range(2)]
+        secondary = [tmp_path / f"secondary-{index}.root" for index in range(2)]
+        for path in primary + secondary:
+            path.touch()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="joint"),
+        ):
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                named_sources={
+                    "primary": {"source": list(map(str, primary))},
+                    "secondary": {"source": list(map(str, secondary))},
+                },
+                apply_mods=["joint:240819"],
+                run_dir=str(run_dir),
+                joint_file_mode="paired",
+            )
+
+        attempt = (run_dir / "latest").resolve()
+        task_dir = attempt / "tasks" / "000_1"
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "#SBATCH --array=" not in script
+        assert f'TASK_DIR="{task_dir}"' in script
+        assert "--output-dir $TASK_DIR/output" in script
+        assert (task_dir / "output").is_dir()
+
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["output"] == str(attempt / "tasks")
+        assert metadata["output_dir"] == str(attempt / "tasks")
 
     def test_submit_job_writes_expected_stage_cache_source_list(
         self, mock_submitter, tmp_path
@@ -3298,10 +3347,13 @@ class TestBatchSpineOverride:
         assert 'TASK_DIR="' not in script
         assert f"--output-dir {scripts[0].parent}/output" in script
         assert f"--log-dir {scripts[0].parent}" in script
+        assert f'SPINE_PROD_TASK_OUTPUT_DIR="{scripts[0].parent}/output"' in script
+        assert f'SPINE_PROD_OUTPUT_MANIFEST="{scripts[0].parent}/outputs.txt"' in script
 
         manifest = scripts[0].parent / "inputs.txt"
         assert manifest.read_text(encoding="utf-8").strip().splitlines() == input_files
         assert (scripts[0].parent / "output").is_dir()
+        assert (scripts[0].parent / "outputs.txt").is_file()
         assert not (scripts[0].parent / "logs").exists()
         assert not (scripts[0].parent / "tasks").exists()
 

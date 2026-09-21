@@ -770,13 +770,17 @@ runs/20260810_143022_spine_icarus_latest/
         ├── stdout.log
         ├── stderr.log
         ├── inference_log-*.csv
+        ├── outputs.txt
         └── output/
 ```
 
 `output/` is created only when spine-prod supplies the default writer output;
 it is omitted when `--output` selects an external destination or `--in-place`
 leaves the writer destination config-defined. There are no empty scheduler,
-task, or log directories.
+task, or log directories. For a managed default output, `outputs.txt` is
+initialized at submission and populated with absolute paths after each
+successful task. It is also available through `latest/outputs.txt` and its
+location is recorded as `output_manifest` in `job_metadata.json`.
 
 Only a real scheduler array creates task directories. Scheduler chunking is
 represented by numbered submit scripts instead of another directory layer:
@@ -784,6 +788,7 @@ represented by numbered submit scripts instead of another directory layer:
 ```
 attempts/TIMESTAMP/
 ├── job_metadata.json
+├── outputs.txt
 ├── submit_000.sbatch
 ├── submit_001.sbatch
 ├── JOB_*.out                   # Scheduler array logs
@@ -792,6 +797,7 @@ attempts/TIMESTAMP/
     ├── 000_1/
     │   ├── inputs.txt
     │   ├── inference_log-*.csv
+    │   ├── outputs.txt
     │   └── output/
     └── 000_2/
         └── ...

@@ -939,6 +939,11 @@ class BatchRunner(SubmissionComponent):
         RunManager.expose_attempt_logs(job_dir, has_array)
         print(f"Splitting into {len(file_chunks)} scheduler job(s)")
 
+        output_manifest = None
+        if stage == "inference" and not in_place and not output:
+            output_manifest = attempt_dir / "outputs.txt"
+            output_manifest.touch()
+
         job_ids = []
         chunk_dependency = dependency  # Track dependency for chunk chaining
         default_output_location = None
@@ -948,6 +953,8 @@ class BatchRunner(SubmissionComponent):
             named_source_args = None
             chunk_output_args = output_args
             chunk_spine_log_dir = spine_log_dir
+            task_output_dir = None
+            task_output_manifest = None
 
             array_spec = None
             if len(chunk) > 1:
@@ -981,6 +988,8 @@ class BatchRunner(SubmissionComponent):
                             ]
                         )
                         default_output_location = str(attempt_dir / "tasks")
+                        task_output_dir = "$TASK_DIR/output"
+                        task_output_manifest = "$TASK_DIR/outputs.txt"
                 else:
                     input_manifest = attempt_dir / "inputs.txt"
                     with open(input_manifest, "w", encoding="utf-8") as stream:
@@ -997,6 +1006,10 @@ class BatchRunner(SubmissionComponent):
                             ]
                         )
                         default_output_location = str(scalar_output)
+                        task_output_dir = str(scalar_output)
+                        task_output_manifest = str(
+                            attempt_dir / f"outputs_{chunk_idx:03d}.txt"
+                        )
             elif stage == "inference" and resolved_named_sources:
                 # Each task receives aligned manifests for every mixed-dataset
                 # target. The first manifest also drives template diagnostics.
@@ -1006,6 +1019,8 @@ class BatchRunner(SubmissionComponent):
                 for task_idx, index_group in enumerate(chunk, start=1):
                     task_dir = attempt_dir / "tasks" / f"{chunk_idx:03d}_{task_idx}"
                     task_dir.mkdir(parents=True, exist_ok=True)
+                    if not output and not in_place:
+                        (task_dir / "output").mkdir()
                     for target, source_files in partitioned_sources.items():
                         manifest = task_dir / f"{target}.txt"
                         with manifest.open("w", encoding="utf-8") as stream:
@@ -1033,6 +1048,16 @@ class BatchRunner(SubmissionComponent):
                     named_source_overrides, named_source_args, 1
                 )
                 chunk_spine_log_dir = "$TASK_DIR"
+                if not output and not in_place:
+                    chunk_output_args = " ".join(
+                        [
+                            "--output-dir $TASK_DIR/output",
+                            f"--output-suffix {shlex.quote(output_suffix)}",
+                        ]
+                    )
+                    default_output_location = str(attempt_dir / "tasks")
+                    task_output_dir = "$TASK_DIR/output"
+                    task_output_manifest = "$TASK_DIR/outputs.txt"
             else:
                 chunk_spine_overrides = spine_cli_overrides
 
@@ -1082,6 +1107,9 @@ class BatchRunner(SubmissionComponent):
                 ),
                 output_suffix=output_suffix,
                 output_args=chunk_output_args,
+                output_manifest=(str(output_manifest) if output_manifest else None),
+                task_output_dir=task_output_dir,
+                task_output_manifest=task_output_manifest,
                 larcv_path=larcv_path,
                 flashmatch_path=flashmatch_path,
                 flashmatch=flashmatch,
@@ -1223,6 +1251,7 @@ class BatchRunner(SubmissionComponent):
             ),
             "output_suffix": output_suffix,
             "output_source_list": output_source_list,
+            "output_manifest": str(output_manifest) if output_manifest else None,
             "resume_checkpoint": (
                 str(resume_checkpoint) if resume_checkpoint is not None else None
             ),
@@ -1242,5 +1271,7 @@ class BatchRunner(SubmissionComponent):
         print(f"\nRun directory: {job_dir}")
         print(f"Latest attempt: {job_dir}/latest")
         print(f"Submission metadata: {attempt_dir}/job_metadata.json")
+        if output_manifest:
+            print(f"Output manifest: {output_manifest}")
 
         return job_ids
