@@ -414,17 +414,18 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
     assert config["model"]["network_input"]["ppn_points"] == "ppn_points"
     assert [stage["name"] for stage in chain["stages"]] == [
         "fragmentation",
-        "particle_aggregation",
+        "fragment_graph",
     ]
+    assert chain["stages"][1]["provider"] == "fragment_graph"
     assert config["model"]["network_input"]["seg_pred"] == "seg_pred"
 
     modules = config["model"]["modules"]
     assert modules["graph_spice"]["model_name"] == ""
     assert modules["graph_spice"]["weight_path"] == ""
-    assert modules["grappa_shower"]["return_features"] is True
-    assert modules["grappa_track"]["return_features"] is True
-    assert modules["grappa_shower_loss"]["return_targets"] is True
-    assert modules["grappa_track_loss"]["return_targets"] is True
+    assert "return_features" not in modules["grappa_shower"]
+    assert "return_features" not in modules["grappa_track"]
+    assert "return_targets" not in modules["grappa_shower_loss"]
+    assert "return_targets" not in modules["grappa_track_loss"]
 
     # Cache-only controls aside, these are the authoritative standalone modules.
     revisions = {
@@ -447,12 +448,11 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
         assert cache_network == standalone_network
         if loss_key is not None:
             cache_loss = deepcopy(modules[f"{component}_loss"])
-            cache_loss.pop("return_targets")
             assert cache_loss == standalone[loss_key]
 
     keys = set(config["io"]["writer"]["keys"])
     for path in ("shower", "track"):
-        prefix = f"{path}_fragment"
+        prefix = f"fragment_graph_{path}"
         assert {
             f"{prefix}_edge_index",
             f"{prefix}_node_features",
@@ -460,12 +460,12 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
         }.issubset(keys)
         assert f"{prefix}_clusts" not in keys
     assert {
-        "particle_aggregation_shower_node_target",
-        "particle_aggregation_shower_node_valid",
-        "particle_aggregation_shower_edge_target",
-        "particle_aggregation_shower_edge_valid",
-        "particle_aggregation_track_edge_target",
-        "particle_aggregation_track_edge_valid",
+        "fragment_graph_shower_node_target",
+        "fragment_graph_shower_node_valid",
+        "fragment_graph_shower_edge_target",
+        "fragment_graph_shower_edge_valid",
+        "fragment_graph_track_edge_target",
+        "fragment_graph_track_edge_valid",
     }.issubset(keys)
 
 
@@ -476,13 +476,13 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
         (
             "grappa_shower",
             "train_from_fragment_cache_240718.yaml",
-            "shower_fragment",
+            "fragment_graph_shower",
             ("node", "edge"),
         ),
         (
             "grappa_track",
             "train_from_fragment_cache_240718.yaml",
-            "track_fragment",
+            "fragment_graph_track",
             ("edge",),
         ),
     ],
@@ -551,12 +551,13 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     assert cache["model"]["network_input"]["ppn_points"] == "ppn_points"
     assert [stage["name"] for stage in chain["stages"]] == [
         "particle_aggregation",
-        "interaction_aggregation",
+        "particle_graph",
     ]
+    assert chain["stages"][1]["provider"] == "particle_graph"
     assert cache["model"]["modules"]["grappa_shower"]["model_name"] == ""
     assert cache["model"]["modules"]["grappa_track"]["model_name"] == ""
-    assert cache["model"]["modules"]["grappa_inter"]["return_features"] is True
-    assert cache["model"]["modules"]["grappa_inter_loss"]["return_targets"] is True
+    assert "return_features" not in cache["model"]["modules"]["grappa_inter"]
+    assert "return_targets" not in cache["model"]["modules"]["grappa_inter_loss"]
 
     cache_modules = cache["model"]["modules"]
     revisions = {
@@ -579,7 +580,6 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
         assert cache_network == standalone_network
         if component == "grappa_inter":
             cache_loss = deepcopy(cache_modules["grappa_inter_loss"])
-            cache_loss.pop("return_targets")
             assert cache_loss == standalone["grappa_loss"]
 
     writer_keys = set(cache["io"]["writer"]["keys"])
@@ -590,9 +590,9 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     assert "data" not in reader_keys
     assert "particle_clusts" not in reader_keys
     assert training["model"]["network_input"] == {
-        "edge_index": "particle_edge_index",
-        "node_features": "particle_node_features",
-        "edge_features": "particle_edge_features",
+        "edge_index": "particle_graph_edge_index",
+        "node_features": "particle_graph_node_features",
+        "edge_features": "particle_graph_edge_features",
     }
     assert set(training["model"]["modules"]["grappa"]) == {"nodes", "gnn_model"}
 
@@ -630,8 +630,8 @@ def test_generic_cache_stages_have_disjoint_product_ownership():
     # Raw LArCV products are mixed back in and must never acquire a cache owner.
     assert "data" not in owners
     assert "coord_label" not in owners
-    assert "shower_fragment_clusts" not in owners
-    assert "track_fragment_clusts" not in owners
+    assert "fragment_graph_shower_clusts" not in owners
+    assert "fragment_graph_track_clusts" not in owners
     assert "particle_clusts" not in owners
 
 
@@ -1050,7 +1050,6 @@ def test_260828_interaction_grappa_uses_full_chain_target_policy():
     assert "use_closest" not in standalone["node_loss"]["primary"]
 
     assert training == full_chain
-    cache.pop("return_targets")
     assert cache == full_chain
     assert full_chain["node_loss"]["type"] == {
         **standalone["node_loss"]["type"],
@@ -1443,8 +1442,8 @@ def test_protodune_sp_cache_stages_own_only_new_products():
     assert fragmentation_dataset["cache"]["stage_map"] == {"data_calib": "deghosting"}
     assert "coord_label" in fragmentation_dataset["primary"]["schema"]
     particle_keys = particles["io"]["writer"]["keys"]
-    assert "interaction_aggregation_node_orient_target" in particle_keys
-    assert "interaction_aggregation_node_orient_valid" in particle_keys
+    assert "particle_graph_node_orient_target" in particle_keys
+    assert "particle_graph_node_orient_valid" in particle_keys
 
 
 def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
@@ -1476,8 +1475,8 @@ def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
         root / "grappa_shower_track/particle_graphs_260906.yaml"
     )
     particle_keys = particles["io"]["writer"]["keys"]
-    assert "interaction_aggregation_node_orient_target" in particle_keys
-    assert "interaction_aggregation_node_orient_valid" in particle_keys
+    assert "particle_graph_node_orient_target" in particle_keys
+    assert "particle_graph_node_orient_valid" in particle_keys
 
     for version in ("260210", "260906"):
         inter_train = load_config_with_includes(
@@ -1490,14 +1489,10 @@ def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
         dataset_keys = inter_train["io"]["loader"]["dataset"]["keys"]
         loss_input = inter_train["model"]["loss_input"]
         node_loss = inter_train["model"]["modules"]["grappa_loss"]["node_loss"]
-        assert "interaction_aggregation_node_orient_target" in dataset_keys
-        assert "interaction_aggregation_node_orient_valid" in dataset_keys
-        assert loss_input["node_orient_target"] == (
-            "interaction_aggregation_node_orient_target"
-        )
-        assert loss_input["node_orient_valid"] == (
-            "interaction_aggregation_node_orient_valid"
-        )
+        assert "particle_graph_node_orient_target" in dataset_keys
+        assert "particle_graph_node_orient_valid" in dataset_keys
+        assert loss_input["node_orient_target"] == ("particle_graph_node_orient_target")
+        assert loss_input["node_orient_valid"] == ("particle_graph_node_orient_valid")
         assert node_loss["orient"] == {"name": "orient", "loss": "ce"}
 
     ppn_train = load_config_with_includes(
@@ -1859,16 +1854,17 @@ def test_nd_lar_cache_stages_append_only_transition_products():
     }
 
     fragment_writer_keys = fragmentation["io"]["writer"]["keys"]
+    assert fragmentation["io"]["loader"]["minibatch_size"] == 16
     assert "data" not in fragment_writer_keys
     assert "clust_label_adapt" not in fragment_writer_keys
-    assert "shower_fragment_node_features" in fragment_writer_keys
-    assert "track_fragment_edge_features" in fragment_writer_keys
+    assert "fragment_graph_shower_node_features" in fragment_writer_keys
+    assert "fragment_graph_track_edge_features" in fragment_writer_keys
 
     particle_writer_keys = particles["io"]["writer"]["keys"]
     assert "fragment_clusts" not in particle_writer_keys
-    assert "particle_node_features" in particle_writer_keys
-    assert "interaction_aggregation_node_orient_target" in particle_writer_keys
-    assert "interaction_aggregation_node_orient_valid" in particle_writer_keys
+    assert "particle_graph_node_features" in particle_writer_keys
+    assert "particle_graph_node_orient_target" in particle_writer_keys
+    assert "particle_graph_node_orient_valid" in particle_writer_keys
 
 
 def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():

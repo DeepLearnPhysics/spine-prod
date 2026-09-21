@@ -1,0 +1,92 @@
+__meta__:
+  kind: fragment
+  description: Common fragment-graph cache materialization contract
+
+base:
+  world_size: 1
+  iterations: -1
+  seed: 0
+  unwrap: true
+  split_output: true
+  log_step: 1
+
+io:
+  loader:
+    minibatch_size: null
+    shuffle: false
+    num_workers: 16
+    collate_fn: all
+    dataset:
+      name: mixed
+      primary:
+        name: larcv
+        file_keys: null
+        schema:
+          data:
+            parser: sparse3d
+            sparse_event: sparse3d_pcluster
+          coord_label:
+            parser: particle_coords
+            particle_event: null
+            cluster_event: cluster3d_pcluster
+      cache:
+        path: null
+        stage: segmentation
+        keep_open: true
+        keys: [seg_pred, ppn_points, clust_label_adapt]
+  writer:
+    name: cache
+    stage: fragmentation
+    keep_open: true
+    overwrite_stage: true
+    keys:
+      - fragment_clusts
+      - fragment_shapes
+      - fragment_graph_shower_edge_index
+      - fragment_graph_shower_node_features
+      - fragment_graph_shower_edge_features
+      - fragment_graph_track_edge_index
+      - fragment_graph_track_node_features
+      - fragment_graph_track_edge_features
+      - fragment_graph_shower_node_target
+      - fragment_graph_shower_node_valid
+      - fragment_graph_shower_edge_target
+      - fragment_graph_shower_edge_valid
+      - fragment_graph_track_edge_target
+      - fragment_graph_track_edge_valid
+
+model:
+  name: full_chain
+  to_numpy: true
+
+  network_input:
+    data: data
+    seg_pred: seg_pred
+    ppn_points: ppn_points
+    clust_label: clust_label_adapt
+    coord_label: coord_label
+
+  loss_input:
+    clust_label: clust_label_adapt
+    coord_label: coord_label
+
+  modules:
+    chain:
+      inputs: [seg_pred, ppn_points]
+      stages:
+        - name: fragmentation
+          provider: fragmentation
+          uses: graph_spice
+          config:
+            mode: graph_spice
+
+        - name: fragment_graph
+          provider: fragment_graph
+          uses: [grappa_shower, grappa_track]
+          loss:
+            shower: grappa_shower_loss
+            track: grappa_track_loss
+
+override:
+  model.modules.graph_spice.model_name: ""
+  model.modules.graph_spice.weight_path: ""

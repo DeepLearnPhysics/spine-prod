@@ -2,9 +2,10 @@ __meta__:
   kind: fragment
   description: Append ProtoDUNE-SP particle graphs and interaction supervision
 
-include: cache/generic/grappa_shower_track/base_v1.yaml
+include: cache/common/grappa_shower_track/base_v1.yaml
 
 override:
+  io.loader.minibatch_size: 256
   io.loader.dataset:
     name: mixed
     primary:
