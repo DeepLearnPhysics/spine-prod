@@ -1826,6 +1826,34 @@ def test_nd_lar_family_neutrino_parsers_use_genie_interaction_codes(config_path)
     assert neutrino["interaction_scheme"] == "genie"
 
 
+def test_dlpgen_opt_conversion_uses_native_truth_products():
+    """dlpgen-opt conversion keeps Supera labels and propagates neutrino truth."""
+    config = load_config_with_includes(
+        CONFIG_ROOT / "convert/dlpgen-opt/truth_260914.yaml"
+    )
+    schema = config["io"]["loader"]["dataset"]["schema"]
+
+    assert "shape_precedence" not in schema["clust_label"]
+    particle_schemas = (
+        "ppn_label",
+        "clust_label",
+        "coord_label",
+        "graph_label",
+        "particles",
+    )
+    for key in particle_schemas:
+        assert schema[key]["particle_event"] == "particle_pcluster"
+
+    assert schema["clust_label"]["neutrino_event"] == "neutrino_mc_truth"
+    assert schema["particles"]["neutrino_event"] == "neutrino_mc_truth"
+    assert schema["neutrinos"] == {
+        "parser": "neutrino",
+        "neutrino_event": "neutrino_mc_truth",
+        "cluster_event": "cluster3d_pcluster",
+        "interaction_scheme": "genie",
+    }
+
+
 def test_nd_lar_cache_stages_append_only_transition_products():
     """ND-LAr caches do not duplicate tensors retained in raw LArCV."""
     root = CONFIG_ROOT / "cache/nd-lar"

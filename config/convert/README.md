@@ -36,3 +36,7 @@ A detector has another dated truth bundle only when a base or IO revision change
 the converted artifact—for example its geometry, truth parsing, built objects, or
 written products. Reco-only and otherwise irrelevant configuration changes reuse
 the existing conversion bundle.
+
+The `dlpgen-opt` converter is the generic truth-conversion recipe adapted to
+DLPGen's optimized LArCV output. It consumes the native `particle_pcluster` and
+`neutrino_mc_truth` products without reapplying semantic shape precedence.

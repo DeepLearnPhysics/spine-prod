@@ -1,0 +1,33 @@
+# DLPGen optimized-output truth conversion configuration
+# Revision date: September 14, 2026
+
+__meta__:
+  kind: bundle
+  version: "260914"
+  date: "2026-09-14"
+  description: "DLPGen optimized LArCV-to-SPINE truth conversion configuration"
+
+# Optimized DLPGen files follow the generic detector contract but retain the
+# native Supera particle and neutrino products.
+include: convert/generic/truth_240805.yaml
+
+override:
+  # DLPGen already provides authoritative semantic labels.
+  io.loader.dataset.schema.clust_label-: shape_precedence
+
+  # Use the native Supera particle collection consistently across parsers.
+  io.loader.dataset.schema.ppn_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.clust_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.coord_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.graph_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.particles.particle_event: particle_pcluster
+
+  # Preserve native neutrino truth on both built objects and the standalone
+  # neutrino collection.
+  io.loader.dataset.schema.clust_label.neutrino_event: neutrino_mc_truth
+  io.loader.dataset.schema.particles.neutrino_event: neutrino_mc_truth
+  io.loader.dataset.schema.neutrinos:
+    parser: neutrino
+    neutrino_event: neutrino_mc_truth
+    cluster_event: cluster3d_pcluster
+    interaction_scheme: genie
