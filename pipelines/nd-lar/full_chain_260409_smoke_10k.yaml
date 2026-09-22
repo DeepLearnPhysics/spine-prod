@@ -115,7 +115,7 @@ stages:
     config: train/nd-lar/grappa_shower/train_from_fragment_cache_260409.yaml
     stage: train
     time: "12:00:00"
-    minibatch_size: 32
+    minibatch_size: 16
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
     run_dir: ${workspace}/train/grappa_shower
