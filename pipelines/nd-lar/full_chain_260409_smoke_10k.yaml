@@ -120,6 +120,10 @@ stages:
     run_dir: ${workspace}/train/grappa_shower
     tensorboard: true
     val_num_entries: 1000
+    set:
+      # The optional smoke-test seed is a full-chain checkpoint, while the
+      # standalone training destination is named `grappa`.
+      - model.modules.grappa.model_name=grappa_shower
 
   - name: train_grappa_track
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
@@ -131,6 +135,10 @@ stages:
     run_dir: ${workspace}/train/grappa_track
     tensorboard: true
     val_num_entries: 1000
+    set:
+      # The optional smoke-test seed is a full-chain checkpoint, while the
+      # standalone training destination is named `grappa`.
+      - model.modules.grappa.model_name=grappa_track
 
   - name: cache_${split.name}_particle_graphs
     for_each:

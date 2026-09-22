@@ -2045,6 +2045,25 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
         assert overlay["io"]["loader"]["minibatch_size"] == minibatch_size
 
 
+def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
+    """Standalone GrapPA stages identify their source in a full-chain seed."""
+    pipeline = PipelineDefinition.load(
+        Path(__file__).parent.parent
+        / "pipelines/nd-lar/full_chain_260409_smoke_10k.yaml",
+        workspace_override="/tmp/nd-lar-260409-smoke",
+    )
+    stages = {stage["name"]: stage for stage in pipeline.stages}
+
+    assert stages["train_graph_spice"]["minibatch_size"] == 8
+    assert stages["cache_train_segmentation"]["time"] == "08:00:00"
+    assert stages["train_grappa_shower"]["set"] == [
+        "model.modules.grappa.model_name=grappa_shower"
+    ]
+    assert stages["train_grappa_track"]["set"] == [
+        "model.modules.grappa.model_name=grappa_track"
+    ]
+
+
 def write_composite_config(tmp_path, base_config, modifier_config):
     """Create a temporary bundle which applies a modifier to a base config."""
     composite_path = tmp_path / "composite.yaml"
