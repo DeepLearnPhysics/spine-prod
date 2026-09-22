@@ -1,0 +1,16 @@
+# Detector-free DLPGen optimized NEUT truth conversion configuration
+# Revision date: September 14, 2026
+
+__meta__:
+  kind: bundle
+  version: "260914"
+  date: "2026-09-14"
+  description: "Detector-free DLPGen optimized NEUT truth conversion"
+  tags: [dlpgen-opt, neut, detector-free]
+
+include:
+  - convert/generic/truth_240805.yaml
+  - convert/generic/io/dlpgen_opt.yaml
+
+override:
+  io.loader.dataset.schema.neutrinos.interaction_scheme: neut

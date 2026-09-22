@@ -734,7 +734,14 @@ class ConfigManager:
         self, detector: str, config_dir: Path, job_dir: Path
     ) -> str:
         """Snapshot the newest complete truth-conversion bundle for a detector."""
-        candidates = list(config_dir.glob("truth_*.yaml"))
+        # Unqualified ``latest`` refers only to canonical bundles. Named
+        # variants encode an additional user choice (input format, generator,
+        # and so on) and must never win merely because they have a newer date.
+        candidates = [
+            candidate
+            for candidate in config_dir.glob("truth_*.yaml")
+            if re.fullmatch(r"truth_\d{6}\.yaml", candidate.name)
+        ]
         versioned = [
             (self.extract_version(candidate), candidate) for candidate in candidates
         ]

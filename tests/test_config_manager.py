@@ -555,6 +555,7 @@ def test_create_latest_config_snapshots_complete_conversion_bundle(manager, tmp_
     (conversion_dir / "truth_custom.yaml").write_text("custom\n")
     (conversion_dir / "truth_240101.yaml").write_text("old\n")
     (conversion_dir / "truth_250101.yaml").write_text("new\n")
+    (conversion_dir / "truth_variant_260101.yaml").write_text("variant\n")
 
     result = Path(manager.create_latest_config("icarus", tmp_path, family="convert"))
 

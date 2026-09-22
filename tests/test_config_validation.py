@@ -1826,10 +1826,11 @@ def test_nd_lar_family_neutrino_parsers_use_genie_interaction_codes(config_path)
     assert neutrino["interaction_scheme"] == "genie"
 
 
-def test_dlpgen_opt_conversion_uses_native_truth_products():
-    """dlpgen-opt conversion keeps Supera labels and propagates neutrino truth."""
+@pytest.mark.parametrize("generator", ("genie", "gibuu", "nuwro", "neut"))
+def test_dlpgen_opt_conversion_uses_native_truth_products(generator):
+    """DLPGen conversions keep native labels and interpret generator truth."""
     config = load_config_with_includes(
-        CONFIG_ROOT / "convert/dlpgen-opt/truth_260914.yaml"
+        CONFIG_ROOT / f"convert/generic/truth_dlpgen_opt_{generator}_260914.yaml"
     )
     schema = config["io"]["loader"]["dataset"]["schema"]
 
@@ -1850,8 +1851,19 @@ def test_dlpgen_opt_conversion_uses_native_truth_products():
         "parser": "neutrino",
         "neutrino_event": "neutrino_mc_truth",
         "cluster_event": "cluster3d_pcluster",
-        "interaction_scheme": "genie",
+        "interaction_scheme": generator,
     }
+
+    document = yaml.safe_load(
+        (
+            CONFIG_ROOT / f"convert/generic/truth_dlpgen_opt_{generator}_260914.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    assert document["__meta__"]["tags"] == [
+        "dlpgen-opt",
+        generator,
+        "detector-free",
+    ]
 
 
 def test_nd_lar_cache_stages_append_only_transition_products():
