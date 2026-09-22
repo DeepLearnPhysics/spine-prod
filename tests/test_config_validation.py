@@ -2056,6 +2056,8 @@ def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
 
     assert stages["train_graph_spice"]["minibatch_size"] == 8
     assert stages["cache_train_segmentation"]["time"] == "08:00:00"
+    assert stages["train_grappa_shower"]["minibatch_size"] == 32
+    assert stages["train_grappa_track"]["minibatch_size"] == 32
     assert stages["train_grappa_shower"]["set"] == [
         "model.modules.grappa.model_name=grappa_shower"
     ]
