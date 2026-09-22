@@ -107,6 +107,7 @@ include:
     assert dataset["base"]["name"] == "larcv"
     assert excluded.isdisjoint(dataset["base"]["schema"])
     assert excluded.isdisjoint(config["io"]["writer"]["keys"])
+    assert config["base"]["split_output"] is False
     assert (
         dataset["base"]["schema"]["ppn_label"]["include_point_tagging"] is point_tagging
     )
@@ -154,6 +155,7 @@ include:
     assert dataset["base"]["file_keys"] is None
     assert {"run_info", "flashes", "trigger"}.isdisjoint(dataset["base"]["schema"])
     assert {"run_info", "flashes", "trigger"}.isdisjoint(config["io"]["writer"]["keys"])
+    assert config["base"]["split_output"] is False
 
 
 def test_nd_lar_dataset_refactor_preserves_standard_inference(

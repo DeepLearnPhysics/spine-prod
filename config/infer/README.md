@@ -86,4 +86,8 @@ order, both lists are truncated to the shorter length (and to `--num-files` when
 provided), and corresponding indexes are partitioned together. Use
 `--files-per-task 1` to isolate each file pair in its own task.
 
+Joint modifiers disable SPINE's per-input `split_output` mode because an overlaid
+event carries both primary and secondary file provenance. Scheduler tasks instead
+write one output file into their spine-prod-managed output directory.
+
 Refer to individual detector README files for detector-specific details, training datasets, and version-specific changes.
