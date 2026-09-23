@@ -84,6 +84,56 @@ def test_active_configs_declare_explicit_kind(config_path):
     assert config.get("__meta__", {}).get("kind") in {"bundle", "fragment", "mod"}
 
 
+def test_config_inheritance_crosses_scopes_only_for_conversion_stopgaps():
+    """Shared config must flow through common, apart from two documented gaps."""
+    config_domains = {"cache", "convert", "filter", "infer", "model", "test", "train"}
+    allowed = {
+        (
+            "convert/dune-vd-10kt-1x8x6/truth_260911.yaml",
+            "convert/dune-hd-10kt-1x2x6/truth_260202.yaml",
+        ),
+        (
+            "convert/protodune-hd/truth_260911.yaml",
+            "convert/protodune-sp/truth_260210.yaml",
+        ),
+    }
+
+    def yaml_paths(value):
+        if isinstance(value, dict):
+            for child in value.values():
+                yield from yaml_paths(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from yaml_paths(child)
+        elif isinstance(value, str) and value.endswith((".yaml", ".yml")):
+            yield value
+
+    cross_scope = set()
+    for source in CONFIG_ROOT.rglob("*.yaml"):
+        config = yaml.load(source.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        for reference in yaml_paths(config):
+            reference_path = Path(reference)
+            rooted = CONFIG_ROOT / reference_path
+            relative = source.parent / reference_path
+            target = (
+                rooted
+                if reference_path.parts[0] in config_domains and rooted.is_file()
+                else relative.resolve()
+            )
+            assert (
+                target.is_file()
+            ), f"Unresolved config reference: {source} -> {reference}"
+
+            source_rel = source.relative_to(CONFIG_ROOT)
+            target_rel = target.relative_to(CONFIG_ROOT)
+            source_scope = source_rel.parts[1]
+            target_scope = target_rel.parts[1]
+            if source_scope != target_scope and target_scope != "common":
+                cross_scope.add((source_rel.as_posix(), target_rel.as_posix()))
+
+    assert cross_scope == allowed
+
+
 @pytest.mark.parametrize("config_path", TRAIN_CONFIGS, ids=lambda path: str(path))
 def test_training_configs_use_canonical_top_level_train(config_path):
     """Training recipes must not rely on SPINE's deprecated base.train layout."""

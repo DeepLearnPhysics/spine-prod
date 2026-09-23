@@ -2,7 +2,7 @@ __meta__:
   kind: fragment
   description: SPINE v1 ND-LAr Graph-SPICE training policy and data schema
 
-include: train/generic/graph_spice/base_v1.yaml
+include: train/common/graph_spice/base_v1.yaml
 
 remove:
   - io.loader.batch_size
