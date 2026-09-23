@@ -8,3 +8,5 @@ include: model/common/grappa_shower/network_v1.yaml
 
 override:
   graph.max_length: [400, 0, 400, 400, 0, 0, 0, 35, 0, 70]
+  # Keep a model-level safety net for unfiltered inference and stale caches.
+  max_edge_count: 1600000

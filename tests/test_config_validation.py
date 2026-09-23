@@ -1947,7 +1947,7 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
         workspace_override="/tmp/nd-lar-260409",
     )
     names = [stage["name"] for stage in pipeline.stages]
-    assert len(names) == 14
+    assert len(names) == 18
     assert names[:4] == [
         "train_uresnet_ppn",
         "cache_train_segmentation",
@@ -1959,7 +1959,7 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
         "evaluate_full_chain",
         "report_full_chain",
     ]
-    assert not any("deghost" in name or "filter" in name for name in names)
+    assert not any("deghost" in name for name in names)
 
     source_root = "/sdf/data/neutrino/ndlar/sim/mpvmpr_v01"
     first = pipeline.stages[0]
@@ -1986,8 +1986,43 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
     track = next(
         stage for stage in pipeline.stages if stage["name"] == "train_grappa_track"
     )
-    assert shower["depends_on"] == track["depends_on"]
-    assert shower["profile"] == track["profile"] == "s3df_ampere"
+    assert shower["depends_on"] == [
+        "build_train_shower_edges",
+        "build_validation_shower_edges",
+    ]
+    assert track["depends_on"] == [
+        "cache_train_fragment_graphs",
+        "cache_validation_fragment_graphs",
+    ]
+    assert shower["profile"] == "s3df_ampere_full"
+    assert shower["minibatch_size"] == 1
+    assert shower["entry_filter"].endswith("/filter/shower_edges/train/accepted.yaml")
+    assert shower["val_entry_filter"].endswith(
+        "/filter/shower_edges/validation/accepted.yaml"
+    )
+    assert track["profile"] == "s3df_ampere"
+
+    for split in ("train", "validation"):
+        scan = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"scan_{split}_shower_edges"
+        )
+        build = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"build_{split}_shower_edges"
+        )
+        assert scan["source"].endswith(f"/cache/{split}.spine-cache")
+        assert scan["depends_on"] == [f"cache_{split}_fragment_graphs"]
+        assert build["output"] == (
+            f"/tmp/nd-lar-260409/filter/shower_edges/{split}/accepted.yaml"
+        )
+
+    shower_network = load_config_with_includes(
+        CONFIG_ROOT / "model/nd-lar/grappa_shower/network_260409.yaml"
+    )
+    assert shower_network["max_edge_count"] == 1600000
 
     export = next(
         stage
@@ -2056,7 +2091,18 @@ def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
 
     assert stages["train_graph_spice"]["minibatch_size"] == 8
     assert stages["cache_train_segmentation"]["time"] == "08:00:00"
-    assert stages["train_grappa_shower"]["minibatch_size"] == 8
+    assert stages["train_grappa_shower"]["profile"] == "s3df_ampere_full"
+    assert stages["train_grappa_shower"]["minibatch_size"] == 1
+    assert stages["train_grappa_shower"]["depends_on"] == [
+        "build_train_shower_edges",
+        "build_validation_shower_edges",
+    ]
+    assert stages["train_grappa_shower"]["entry_filter"].endswith(
+        "/filter/shower_edges/train/accepted.yaml"
+    )
+    assert stages["train_grappa_shower"]["val_entry_filter"].endswith(
+        "/filter/shower_edges/validation/accepted.yaml"
+    )
     assert stages["train_grappa_track"]["minibatch_size"] == 32
     assert stages["train_grappa_shower"]["set"] == [
         "model.modules.grappa.model_name=grappa_shower"

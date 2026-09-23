@@ -9,6 +9,7 @@ workspace: null
 variables:
   train_source_list: /sdf/data/neutrino/ndlar/sim/mpvmpr_v01/train_file_list.txt
   validation_source_list: /sdf/data/neutrino/ndlar/sim/mpvmpr_v01/test_file_list.txt
+  shower_filter_cache_dir: ${workspace}/filter/shower_edges/counts
 
 collections:
   splits:
@@ -17,11 +18,15 @@ collections:
       cache_dir: ${workspace}/cache/train
       cache_repository: ${workspace}/cache/train.spine-cache
       num_files: 2
+      shower_entry_filter: ${workspace}/filter/shower_edges/train/accepted.yaml
+      shower_filtered_source_list: ${workspace}/filter/shower_edges/train/accepted_sources.txt
     - name: validation
       source_list: ${validation_source_list}
       cache_dir: ${workspace}/cache/validation
       cache_repository: ${workspace}/cache/validation.spine-cache
       num_files: 1
+      shower_entry_filter: ${workspace}/filter/shower_edges/validation/accepted.yaml
+      shower_filtered_source_list: ${workspace}/filter/shower_edges/validation/accepted_sources.txt
 
 defaults:
   profile: s3df_ampere
@@ -110,14 +115,47 @@ stages:
     module_weight:
       graph_spice: ${workspace}/train/graph_spice/weights/snapshot-best.ckpt
 
+  # Scan the existing fragment caches by offset metadata; no recache is needed.
+  - name: scan_${split.name}_shower_edges
+    for_each:
+      collection: splits
+      as: split
+    kind: filter
+    operation: scan
+    depends_on: ["cache_${split.name}_fragment_graphs"]
+    config: filter/nd-lar/shower_edges_260922.yaml
+    source: ${split.cache_repository}
+    cache_dir: ${shower_filter_cache_dir}
+    run_dir: ${workspace}/filter/shower_edges/${split.name}/scan
+    profile: s3df_milano
+    workers: 1
+
+  - name: build_${split.name}_shower_edges
+    for_each:
+      collection: splits
+      as: split
+    kind: filter
+    operation: build
+    depends_on: ["scan_${split.name}_shower_edges"]
+    config: filter/nd-lar/shower_edges_260922.yaml
+    source: ${split.cache_repository}
+    cache_dir: ${shower_filter_cache_dir}
+    output: ${split.shower_entry_filter}
+    output_source_list: ${split.shower_filtered_source_list}
+    run_dir: ${workspace}/filter/shower_edges/${split.name}/build
+    profile: s3df_milano
+
   - name: train_grappa_shower
-    depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
+    depends_on: [build_train_shower_edges, build_validation_shower_edges]
     config: train/nd-lar/grappa_shower/train_from_fragment_cache_260409.yaml
     stage: train
+    profile: s3df_ampere_full
     time: "12:00:00"
-    minibatch_size: 8
+    minibatch_size: 1
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
+    entry_filter: ${workspace}/filter/shower_edges/train/accepted.yaml
+    val_entry_filter: ${workspace}/filter/shower_edges/validation/accepted.yaml
     run_dir: ${workspace}/train/grappa_shower
     tensorboard: true
     val_num_entries: 1000
