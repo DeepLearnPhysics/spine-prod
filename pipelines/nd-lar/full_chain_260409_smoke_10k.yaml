@@ -150,7 +150,7 @@ stages:
     config: train/nd-lar/grappa_shower/train_from_fragment_cache_260409.yaml
     stage: train
     profile: s3df_ampere_full
-    time: "12:00:00"
+    time: "3-00:00:00"
     minibatch_size: 1
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache

@@ -1995,6 +1995,7 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
         "cache_validation_fragment_graphs",
     ]
     assert shower["profile"] == "s3df_ampere_full"
+    assert shower["time"] == "3-00:00:00"
     assert shower["minibatch_size"] == 1
     assert shower["entry_filter"].endswith("/filter/shower_edges/train/accepted.yaml")
     assert shower["val_entry_filter"].endswith(
@@ -2092,6 +2093,7 @@ def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
     assert stages["train_graph_spice"]["minibatch_size"] == 8
     assert stages["cache_train_segmentation"]["time"] == "08:00:00"
     assert stages["train_grappa_shower"]["profile"] == "s3df_ampere_full"
+    assert stages["train_grappa_shower"]["time"] == "3-00:00:00"
     assert stages["train_grappa_shower"]["minibatch_size"] == 1
     assert stages["train_grappa_shower"]["depends_on"] == [
         "build_train_shower_edges",
