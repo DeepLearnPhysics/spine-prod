@@ -2053,6 +2053,12 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
     )
     assert track["profile"] == "s3df_ampere"
 
+    inter = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_inter"
+    )
+    assert inter["profile"] == "s3df_ampere_full"
+    assert inter["minibatch_size"] == 16
+
     for split in ("train", "validation"):
         scan = next(
             stage
@@ -2156,6 +2162,8 @@ def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
         "/filter/shower_edges/validation/accepted.yaml"
     )
     assert stages["train_grappa_track"]["minibatch_size"] == 32
+    assert stages["train_grappa_inter"]["profile"] == "s3df_ampere_full"
+    assert stages["train_grappa_inter"]["minibatch_size"] == 16
     assert stages["train_grappa_shower"]["set"] == [
         "model.modules.grappa.model_name=grappa_shower"
     ]

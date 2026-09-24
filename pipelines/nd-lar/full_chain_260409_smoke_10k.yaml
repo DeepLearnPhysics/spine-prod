@@ -206,7 +206,9 @@ stages:
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
     config: train/nd-lar/grappa_inter/train_from_particle_cache_260409.yaml
     stage: train
+    profile: s3df_ampere_full
     time: "12:00:00"
+    minibatch_size: 16
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
     run_dir: ${workspace}/train/grappa_inter
