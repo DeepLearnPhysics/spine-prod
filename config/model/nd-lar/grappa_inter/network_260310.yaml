@@ -8,6 +8,8 @@ include: model/common/grappa_inter/network_v1.yaml
 
 override:
   graph.max_length: [400, 400, 0, 0, 400, 40, 40, 0, 0, 0]
+  # Keep a model-level safety net for unfiltered inference and stale caches.
+  max_edge_count: 1000000
   gnn_model.node_pred.type: 6
   gnn_model.edge_layer.mlp.width: 128
   gnn_model.node_layer.message_mlp.width: 128

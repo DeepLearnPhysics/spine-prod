@@ -1,0 +1,19 @@
+__meta__:
+  kind: bundle
+  version: "260924"
+  date: "2026-09-24"
+  description: Reject ND-LAr entries with pathological cached interaction graphs
+
+input:
+  name: cache
+
+measurements:
+  interaction_edges:
+    kind: product_size
+    product: particle_graph_edge_index
+    stage: particle_aggregation
+
+filters:
+  # max_count is exclusive: retain entries with at most 1M interaction edges.
+  interaction_edges:
+    max_count: 1000001

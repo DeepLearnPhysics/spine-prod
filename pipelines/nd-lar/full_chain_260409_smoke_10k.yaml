@@ -10,6 +10,7 @@ variables:
   train_source_list: /sdf/data/neutrino/ndlar/sim/mpvmpr_v01/train_file_list.txt
   validation_source_list: /sdf/data/neutrino/ndlar/sim/mpvmpr_v01/test_file_list.txt
   shower_filter_cache_dir: ${workspace}/filter/shower_edges/counts
+  interaction_filter_cache_dir: ${workspace}/filter/interaction_edges/counts
 
 collections:
   splits:
@@ -20,6 +21,8 @@ collections:
       num_files: 2
       shower_entry_filter: ${workspace}/filter/shower_edges/train/accepted.yaml
       shower_filtered_source_list: ${workspace}/filter/shower_edges/train/accepted_sources.txt
+      interaction_entry_filter: ${workspace}/filter/interaction_edges/train/accepted.yaml
+      interaction_filtered_source_list: ${workspace}/filter/interaction_edges/train/accepted_sources.txt
     - name: validation
       source_list: ${validation_source_list}
       cache_dir: ${workspace}/cache/validation
@@ -27,6 +30,8 @@ collections:
       num_files: 1
       shower_entry_filter: ${workspace}/filter/shower_edges/validation/accepted.yaml
       shower_filtered_source_list: ${workspace}/filter/shower_edges/validation/accepted_sources.txt
+      interaction_entry_filter: ${workspace}/filter/interaction_edges/validation/accepted.yaml
+      interaction_filtered_source_list: ${workspace}/filter/interaction_edges/validation/accepted_sources.txt
 
 defaults:
   profile: s3df_ampere
@@ -202,15 +207,51 @@ stages:
       grappa_shower: ${workspace}/train/grappa_shower/weights/snapshot-best.ckpt
       grappa_track: ${workspace}/train/grappa_track/weights/snapshot-best.ckpt
 
+  # Reject cached interaction graphs whose message tensors cannot fit on an
+  # A100. The scan reads cache offset metadata, so it does not recache events.
+  - name: scan_${split.name}_interaction_edges
+    for_each:
+      collection: splits
+      as: split
+    kind: filter
+    operation: scan
+    depends_on: ["cache_${split.name}_particle_graphs"]
+    config: filter/nd-lar/interaction_edges_260924.yaml
+    source: ${split.cache_repository}
+    cache_dir: ${interaction_filter_cache_dir}
+    run_dir: ${workspace}/filter/interaction_edges/${split.name}/scan
+    profile: s3df_milano
+    workers: 1
+
+  - name: build_${split.name}_interaction_edges
+    for_each:
+      collection: splits
+      as: split
+    kind: filter
+    operation: build
+    depends_on: ["scan_${split.name}_interaction_edges"]
+    config: filter/nd-lar/interaction_edges_260924.yaml
+    source: ${split.cache_repository}
+    cache_dir: ${interaction_filter_cache_dir}
+    output: ${split.interaction_entry_filter}
+    output_source_list: ${split.interaction_filtered_source_list}
+    run_dir: ${workspace}/filter/interaction_edges/${split.name}/build
+    profile: s3df_milano
+
   - name: train_grappa_inter
-    depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
+    depends_on:
+      [build_train_interaction_edges, build_validation_interaction_edges]
     config: train/nd-lar/grappa_inter/train_from_particle_cache_260409.yaml
     stage: train
     profile: s3df_ampere_full
     time: "12:00:00"
+    # Ordinary batches are comfortably below the A100 ceiling at this size;
+    # pathological individual graphs are rejected by the filter below.
     minibatch_size: 16
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
+    entry_filter: ${workspace}/filter/interaction_edges/train/accepted.yaml
+    val_entry_filter: ${workspace}/filter/interaction_edges/validation/accepted.yaml
     run_dir: ${workspace}/train/grappa_inter
     tensorboard: true
     val_num_entries: 1000
