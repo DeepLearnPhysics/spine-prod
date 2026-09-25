@@ -8,7 +8,7 @@ remove:
   - io.loader.batch_size
 
 override:
-  # Four processes reproduce the historical global batch of 64.
-  io.loader.minibatch_size: 16
+  # Conservative per-rank size validated on high-occupancy ND-LAr events.
+  io.loader.minibatch_size: 4
   io.loader.dataset.schema.clust_label.particle_info.particle_event: particle_pcluster
   base.epochs: 75.0

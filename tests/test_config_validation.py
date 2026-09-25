@@ -1116,6 +1116,40 @@ def test_260828_interaction_grappa_uses_full_chain_target_policy():
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_nd_lar_260924_interaction_grappa_uses_full_chain_target_policy():
+    """ND-LAr cache targets and training use the generic reconstruction policy."""
+    standalone = load_config_with_includes(
+        CONFIG_ROOT / "model/nd-lar/grappa_inter/model_260310.yaml"
+    )["model"]["modules"]["grappa_loss"]
+    training = load_config_with_includes(
+        CONFIG_ROOT / "train/nd-lar/grappa_inter/train_from_particle_cache_260924.yaml"
+    )["model"]["modules"]["grappa_loss"]
+    cache = load_config_with_includes(
+        CONFIG_ROOT / "cache/nd-lar/grappa_shower_track/particle_graphs_260924.yaml"
+    )["model"]["modules"]["grappa_inter_loss"]
+    full_chain = load_config_with_includes(
+        CONFIG_ROOT / "model/nd-lar/full_chain/model_260924.yaml"
+    )["model"]["modules"]["grappa_inter_loss"]
+
+    assert "min_iou" not in standalone["node_loss"]["type"]
+    assert "use_closest" not in standalone["node_loss"]["primary"]
+    assert training == full_chain
+    assert cache == full_chain
+    assert full_chain["node_loss"]["type"] == {
+        **standalone["node_loss"]["type"],
+        "min_iou": 0.5,
+        "match_target": "group",
+    }
+    assert full_chain["node_loss"]["primary"] == {
+        **standalone["node_loss"]["primary"],
+        "use_closest": True,
+        "secondary_label": 0,
+        "min_iou": 0.5,
+        "match_target": "group",
+    }
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 @pytest.mark.parametrize("version", ["240718", "260828"])
 def test_track_grappa_only_builds_groups_in_full_chain_contexts(version):
     """Standalone track models must not perform full-chain reconstruction."""
@@ -1979,10 +2013,10 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
 
     expected_minibatches = {
         "uresnet_ppn": 4,
-        "graph_spice": 16,
-        "grappa_shower": 48,
-        "grappa_track": 64,
-        "grappa_inter": 128,
+        "graph_spice": 4,
+        "grappa_shower": 1,
+        "grappa_track": 32,
+        "grappa_inter": 16,
     }
     for component, minibatch_size in expected_minibatches.items():
         config = load_config_with_includes(
@@ -1997,7 +2031,7 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
         workspace_override="/tmp/nd-lar-260409",
     )
     names = [stage["name"] for stage in pipeline.stages]
-    assert len(names) == 18
+    assert len(names) == 22
     assert names[:4] == [
         "train_uresnet_ppn",
         "cache_train_segmentation",
@@ -2016,13 +2050,14 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
     assert first["source_list"] == f"{source_root}/train_file_list.txt"
     assert first["val_source_list"] == f"{source_root}/test_file_list.txt"
     assert first["profile"] == "s3df_ampere_full"
-    assert first["time"] == "5-00:00:00"
+    assert first["time"] == "2-00:00:00"
+    assert first["expandable_segments"] is True
 
     graph_spice = next(
         stage for stage in pipeline.stages if stage["name"] == "train_graph_spice"
     )
     assert graph_spice["profile"] == "s3df_ampere_full"
-    assert graph_spice["time"] == "3-00:00:00"
+    assert graph_spice["time"] == "2-00:00:00"
     assert set(graph_spice["sources"]) == {"primary", "cache"}
 
     for stage in pipeline.stages:
@@ -2051,13 +2086,25 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
     assert shower["val_entry_filter"].endswith(
         "/filter/shower_edges/validation/accepted.yaml"
     )
-    assert track["profile"] == "s3df_ampere"
+    assert track["profile"] == "s3df_ampere_full"
+    assert track["time"] == "2-00:00:00"
 
     inter = next(
         stage for stage in pipeline.stages if stage["name"] == "train_grappa_inter"
     )
     assert inter["profile"] == "s3df_ampere_full"
+    assert inter["time"] == "2-00:00:00"
     assert inter["minibatch_size"] == 16
+    assert inter["depends_on"] == [
+        "build_train_interaction_edges",
+        "build_validation_interaction_edges",
+    ]
+    assert inter["entry_filter"].endswith(
+        "/filter/interaction_edges/train/accepted.yaml"
+    )
+    assert inter["val_entry_filter"].endswith(
+        "/filter/interaction_edges/validation/accepted.yaml"
+    )
 
     for split in ("train", "validation"):
         scan = next(
@@ -2074,6 +2121,22 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
         assert scan["depends_on"] == [f"cache_{split}_fragment_graphs"]
         assert build["output"] == (
             f"/tmp/nd-lar-260409/filter/shower_edges/{split}/accepted.yaml"
+        )
+
+        interaction_scan = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"scan_{split}_interaction_edges"
+        )
+        interaction_build = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"build_{split}_interaction_edges"
+        )
+        assert interaction_scan["source"].endswith(f"/cache/{split}.spine-cache")
+        assert interaction_scan["depends_on"] == [f"cache_{split}_particle_graphs"]
+        assert interaction_build["output"] == (
+            f"/tmp/nd-lar-260409/filter/interaction_edges/{split}/accepted.yaml"
         )
 
     shower_network = load_config_with_includes(
@@ -2146,8 +2209,9 @@ def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
     )
     stages = {stage["name"]: stage for stage in pipeline.stages}
 
-    assert stages["train_graph_spice"]["minibatch_size"] == 8
-    assert stages["cache_train_segmentation"]["time"] == "08:00:00"
+    assert stages["train_graph_spice"]["minibatch_size"] == 4
+    assert stages["train_graph_spice"]["time"] == "2-00:00:00"
+    assert stages["cache_train_segmentation"]["time"] == "12:00:00"
     assert stages["train_grappa_shower"]["profile"] == "s3df_ampere_full"
     assert stages["train_grappa_shower"]["time"] == "3-00:00:00"
     assert stages["train_grappa_shower"]["minibatch_size"] == 1
@@ -2162,7 +2226,10 @@ def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
         "/filter/shower_edges/validation/accepted.yaml"
     )
     assert stages["train_grappa_track"]["minibatch_size"] == 32
+    assert stages["train_grappa_track"]["profile"] == "s3df_ampere_full"
+    assert stages["train_grappa_track"]["time"] == "2-00:00:00"
     assert stages["train_grappa_inter"]["profile"] == "s3df_ampere_full"
+    assert stages["train_grappa_inter"]["time"] == "2-00:00:00"
     assert stages["train_grappa_inter"]["minibatch_size"] == 16
     assert stages["train_grappa_shower"]["set"] == [
         "model.modules.grappa.model_name=grappa_shower"
@@ -2170,6 +2237,60 @@ def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
     assert stages["train_grappa_track"]["set"] == [
         "model.modules.grappa.model_name=grappa_track"
     ]
+
+
+def test_nd_lar_260924_pipeline_enables_image_augmentation_and_new_targets():
+    """The current ND-LAr pipeline pins augmentation and target revisions."""
+    pipeline = PipelineDefinition.load(
+        Path(__file__).parent.parent / "pipelines/nd-lar/full_chain_260924.yaml",
+        workspace_override="/tmp/nd-lar-260924",
+    )
+    stages = {stage["name"]: stage for stage in pipeline.stages}
+
+    assert stages["train_uresnet_ppn"]["apply_mods"] == ["augment_uresnet:260912"]
+    assert stages["train_graph_spice"]["apply_mods"] == ["augment_graph_spice:260912"]
+    assert stages["cache_train_particle_graphs"]["config"].endswith(
+        "particle_graphs_260924.yaml"
+    )
+    assert stages["train_grappa_inter"]["config"].endswith(
+        "train_from_particle_cache_260924.yaml"
+    )
+    assert stages["export_full_chain_weights"]["config"] == (
+        "model/nd-lar/full_chain/model_260924.yaml"
+    )
+    assert stages["evaluate_full_chain"]["config"].endswith("evaluate_260924.yaml")
+    assert stages["evaluate_full_chain"]["apply_mods"] == ["mpvmpr:260924"]
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_nd_lar_mpvmpr_modifier_enables_multiplicity_nu_ids(tmp_path):
+    """MPV/MPR inference must omit explicit, empty neutrino truth inputs."""
+    modifier = CONFIG_INFER_ROOT / "nd-lar/modifier/mpvmpr/mod_mpvmpr_260924.yaml"
+    composite = write_composite_config(
+        tmp_path,
+        CONFIG_INFER_ROOT / "nd-lar/full_chain_260409.yaml",
+        modifier,
+    )
+    config = load_config_with_includes(composite)
+    schema = config["io"]["loader"]["dataset"]["schema"]
+
+    assert "neutrino_event" not in schema["clust_label"]
+    assert "neutrino_event" not in schema["particles"]
+    assert "neutrinos" not in schema
+
+
+def test_all_nd_lar_pipeline_evaluations_use_mpvmpr_truth():
+    """Every ND-LAr training pipeline evaluates its MPV/MPR sample consistently."""
+    pipeline_root = Path(__file__).parent.parent / "pipelines/nd-lar"
+    for pipeline_path in sorted(pipeline_root.glob("*.yaml")):
+        pipeline = PipelineDefinition.load(
+            pipeline_path,
+            workspace_override=f"/tmp/{pipeline_path.stem}",
+        )
+        evaluation = next(
+            stage for stage in pipeline.stages if stage["name"] == "evaluate_full_chain"
+        )
+        assert evaluation["apply_mods"] == ["mpvmpr:260924"]
 
 
 def write_composite_config(tmp_path, base_config, modifier_config):

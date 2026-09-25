@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  description: Interpret ND-LAr MPV/MPR truth using primary-group multiplicity
+
+override:
+  # DLPGenerator MPV/MPR samples do not contain neutrino objects. Omitting
+  # neutrino_event activates SPINE's multi-primary-group nu_id proxy in both
+  # cluster labels and parsed truth particles.
+  io.loader.dataset.schema.clust_label-: neutrino_event
+  io.loader.dataset.schema.particles-: neutrino_event
+
+  # Do not expose the generator's empty neutrino collection downstream.
+  io.loader.dataset.schema-: neutrinos

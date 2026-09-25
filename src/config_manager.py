@@ -530,6 +530,7 @@ class ConfigManager:
         composite_content = "# Auto-generated composite configuration\n"
         composite_content += f"# Base: {base_config}\n"
         composite_content += f"# Modifiers: {', '.join(modifiers)}\n"
+
         # Keep generated wrappers byte-for-byte reproducible. Training retries
         # use the configuration content as part of the run identity, so a
         # wall-clock timestamp would make an unchanged composition appear to

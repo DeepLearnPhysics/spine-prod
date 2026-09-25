@@ -5,6 +5,6 @@ __meta__:
 include: train/common/grappa_shower/base_v1.yaml
 
 override:
-  # Preserve the historical global update size on one cached-training GPU.
-  io.loader.minibatch_size: 48
+  # Shower graph memory is dominated by individual high-occupancy events.
+  io.loader.minibatch_size: 1
   io.loader.dataset.schema.data.particle_info.particle_event: particle_pcluster
