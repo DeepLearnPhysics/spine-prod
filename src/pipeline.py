@@ -868,10 +868,6 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' validation entry count requires stage=train"
             )
-        if lifecycle != "train" and stage.get("val_num_files") is not None:
-            raise ValueError(
-                f"Pipeline stage '{name}' validation file count requires stage=train"
-            )
         if lifecycle != "inference" and (
             stage.get("ntasks") is not None or stage.get("files_per_task") is not None
         ):

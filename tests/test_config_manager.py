@@ -111,6 +111,18 @@ def test_detect_config_family_supports_all_config_trees_and_historical_default(
     assert manager.detect_config_family("custom.yaml") == "infer"
 
 
+def test_modifier_search_path_handles_config_prefix_and_unscoped_fallback(
+    manager, tmp_path
+):
+    """Modifier discovery normalizes repository paths but preserves unknown ones."""
+    (tmp_path / "config" / "train").mkdir(parents=True)
+
+    assert manager.modifier_search_path("config/train/generic/model.yaml") == str(
+        tmp_path / "config" / "train" / "generic"
+    )
+    assert manager.modifier_search_path("model.yaml") == "model.yaml"
+
+
 def test_resolve_config_path_supports_spine_and_repository_relative_paths(
     manager, tmp_path, monkeypatch
 ):

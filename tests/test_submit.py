@@ -18,6 +18,48 @@ def run_main(*args, submitter=None):
     return result, submitter, submitter_class
 
 
+@pytest.mark.parametrize(
+    "values",
+    [
+        ["plain.root", "primary=named.root"],
+        ["=missing-target.root"],
+        ["primary="],
+    ],
+)
+def test_normalize_source_arguments_rejects_malformed_qualified_values(values):
+    parser = Mock()
+    parser.error.side_effect = ValueError("invalid source")
+
+    with pytest.raises(ValueError, match="invalid source"):
+        submit.normalize_source_arguments(parser, values, None)
+
+
+def test_normalize_source_arguments_rejects_duplicate_named_source_lists():
+    parser = Mock()
+    parser.error.side_effect = ValueError("duplicate source")
+
+    with pytest.raises(ValueError, match="duplicate source"):
+        submit.normalize_source_arguments(
+            parser,
+            None,
+            ["primary=first.txt", "primary=second.txt"],
+        )
+
+
+def test_normalize_source_arguments_groups_direct_named_sources():
+    parser = Mock()
+
+    files, source_type, named = submit.normalize_source_arguments(
+        parser,
+        ["primary=first.root", "primary=second.root"],
+        None,
+    )
+
+    assert files is None
+    assert source_type == "source"
+    assert named == {"primary": {"source": ["first.root", "second.root"]}}
+
+
 def test_list_modifiers_prints_discovered_versions(capsys):
     submitter = Mock()
     submitter.list_modifiers.return_value = {
@@ -171,6 +213,28 @@ def test_interactive_mode_forwards_runtime_options():
     assert kwargs["weight_path"] == "/weights/full.ckpt"
     assert kwargs["entry_filter"] == "/filters/accepted.yaml"
     assert kwargs["set_overrides"] == ["model.detect_anomaly=true"]
+
+
+def test_interactive_rejects_paired_joint_mode():
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--config",
+            "config.yaml",
+            "--interactive",
+            "--joint-file-mode",
+            "paired",
+        )
+
+
+def test_interactive_rejects_named_sources():
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--config",
+            "config.yaml",
+            "--interactive",
+            "--source",
+            "primary=input.root",
+        )
 
 
 def test_batch_mode_forwards_profile_overrides(capsys):
@@ -489,6 +553,7 @@ def test_pipeline_mode_forwards_global_overrides():
         "10",
         "--flashmatch",
         "--cvmfs",
+        "--expandable-segments",
         submitter=submitter,
     )
 
@@ -502,6 +567,7 @@ def test_pipeline_mode_forwards_global_overrides():
         "iterations": 10,
         "flashmatch": True,
         "cvmfs": True,
+        "expandable_segments": True,
     }
     assert submitter.submit_pipeline.call_args.kwargs["workspace"] is None
 

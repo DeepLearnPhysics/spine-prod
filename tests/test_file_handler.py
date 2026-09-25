@@ -157,6 +157,12 @@ def test_limit_joint_sources_only_truncates_primary(handler):
     }
 
 
+@pytest.mark.parametrize("value", [0, -1, 1.5, True])
+def test_limit_named_sources_requires_positive_integer(handler, value):
+    with pytest.raises(ValueError, match="positive integer"):
+        handler.limit_named_sources({"primary": ["one.root"]}, value)
+
+
 def test_pair_joint_sources_uses_shorter_ordered_source(handler):
     sources = {
         "primary": ["primary-1.root", "primary-2.root", "primary-3.root"],
@@ -176,6 +182,15 @@ def test_pair_joint_sources_uses_shorter_ordered_source(handler):
 def test_pair_joint_sources_requires_both_roles(handler):
     with pytest.raises(ValueError, match="primary and secondary"):
         handler.pair_joint_sources({"primary": ["primary.root"]})
+
+
+@pytest.mark.parametrize("value", [0, -1, 1.5, True])
+def test_pair_joint_sources_requires_positive_integer(handler, value):
+    with pytest.raises(ValueError, match="positive integer"):
+        handler.pair_joint_sources(
+            {"primary": ["primary.root"], "secondary": ["secondary.root"]},
+            num_files=value,
+        )
 
 
 @pytest.mark.parametrize("value", [0, -1, 1.5, True])

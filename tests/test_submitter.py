@@ -1355,6 +1355,18 @@ class TestInteractiveExecution:
                 "config.yaml", in_place=True, output="result.h5"
             )
 
+    def test_run_interactive_rejects_entry_count_with_fraction(self, mock_submitter):
+        with pytest.raises(ValueError, match="cannot be combined"):
+            mock_submitter.run_interactive(
+                "config.yaml",
+                num_entries=10,
+                entry_fraction_range=(0.0, 0.5),
+            )
+
+    def test_run_interactive_requires_files_for_file_limit(self, mock_submitter):
+        with pytest.raises(ValueError, match="requires --source/--source-list"):
+            mock_submitter.run_interactive("config.yaml", num_files=1)
+
     def test_run_interactive_rejects_missing_and_invalid_task_inputs(
         self, mock_submitter, tmp_path
     ):
@@ -2128,11 +2140,68 @@ class TestBatchSpineOverride:
     @pytest.mark.parametrize(
         "kwargs, message",
         [
+            ({"joint_file_mode": "other"}, "joint_file_mode must be either"),
             ({"stage": "unknown"}, "stage must be one of"),
             ({"stage": "train"}, "--run-dir is required"),
             ({"resume": True}, "valid only for training"),
+            (
+                {"warm_start_path": "/weights/full.ckpt"},
+                "must be provided together",
+            ),
+            (
+                {"warm_start_modules": {"model": "full.model"}},
+                "must be provided together",
+            ),
+            (
+                {
+                    "warm_start_path": "/weights/full.ckpt",
+                    "warm_start_modules": {"model": "full.model"},
+                },
+                "valid only for training",
+            ),
+            (
+                {
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "warm_start_path": "/weights/full.ckpt",
+                    "warm_start_modules": {"model": "full.model"},
+                    "weight_path": "/weights/other.ckpt",
+                },
+                "cannot be combined with weight_path",
+            ),
             ({"validation_name": "data"}, "valid only for validation"),
             ({"val_entry_filter": "/filters/val.yaml"}, "valid only for training"),
+            ({"val_num_files": 1}, "valid only for training"),
+            ({"num_files": 1}, "requires --source/--source-list"),
+            (
+                {"stage": "train", "run_dir": "/tmp/train", "val_num_files": 1},
+                "requires --val-source/--val-source-list",
+            ),
+            (
+                {
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "val_num_entries": 10,
+                    "val_entry_fraction_range": (0.0, 0.5),
+                },
+                "cannot be combined with --val-entry-fraction-range",
+            ),
+            (
+                {"joint_file_mode": "paired"},
+                "require named primary and secondary",
+            ),
+            (
+                {
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "joint_file_mode": "paired",
+                    "named_sources": {
+                        "primary": {"source": "primary.root"},
+                        "secondary": {"source": "secondary.root"},
+                    },
+                },
+                "valid only for inference jobs",
+            ),
             (
                 {"validation_named_sources": {"larcv": {"source": "val.root"}}},
                 "Named validation sources are valid only for training",
@@ -2706,6 +2775,63 @@ class TestBatchSpineOverride:
         output_manifest = attempt.resolve() / "outputs.txt"
         assert output_manifest.is_file()
         assert metadata["output_manifest"] == str(output_manifest)
+
+    def test_submit_job_reports_ignored_secondary_joint_files(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        """Paired submission reports truncation from either dataset."""
+        primary = [tmp_path / "primary.root"]
+        secondary = [tmp_path / f"secondary-{index}.root" for index in range(2)]
+        for path in primary + secondary:
+            path.touch()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="joint"),
+        ):
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                named_sources={
+                    "primary": {"source": list(map(str, primary))},
+                    "secondary": {"source": list(map(str, secondary))},
+                },
+                joint_file_mode="paired",
+                run_dir=str(tmp_path / "run"),
+            )
+
+        assert "Ignored secondary: 1" in capsys.readouterr().out
+
+    def test_submit_job_limits_named_validation_sources(self, mock_submitter, tmp_path):
+        """Named validation datasets honor their independent file limit."""
+        validation = [tmp_path / f"validation-{index}.root" for index in range(2)]
+        for path in validation:
+            path.touch()
+        run_dir = tmp_path / "run"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            mock_submitter.submit_job(
+                config="train/generic/uresnet/train_240718.yaml",
+                validation_named_sources={
+                    "primary": {"source": list(map(str, validation))}
+                },
+                val_num_files=1,
+                stage="train",
+                run_dir=str(run_dir),
+            )
+
+        metadata = json.loads((run_dir / "latest/job_metadata.json").read_text())
+        assert metadata["validation_num_files"] == 1
 
     def test_submit_job_places_single_task_joint_output_under_attempt(
         self, mock_submitter, tmp_path
@@ -4206,6 +4332,43 @@ class TestPipelineSubmission:
         assert train["warm_start_modules"] == {"grappa": "grappa_shower"}
         assert cache["warm_start_path"] is None
         assert cache["warm_start_modules"] is None
+
+    @pytest.mark.parametrize("warm_start", ["", 4])
+    def test_submit_pipeline_rejects_invalid_warm_start_path(
+        self, mock_submitter, tmp_path, warm_start
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "train",
+                            "config": "train.yaml",
+                            "stage": "train",
+                            "run_dir": "/tmp/train",
+                            "warm_start": {"model": "full.model"},
+                        }
+                    ]
+                }
+            )
+        )
+
+        with pytest.raises(ValueError, match="non-empty string"):
+            mock_submitter.submit_pipeline(str(pipeline_path), warm_start=warm_start)
+
+    def test_submit_pipeline_rejects_warm_start_without_stage_mappings(
+        self, mock_submitter, tmp_path
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump({"stages": [{"name": "inference", "config": "infer.yaml"}]})
+        )
+
+        with pytest.raises(ValueError, match="declares no warm_start mappings"):
+            mock_submitter.submit_pipeline(
+                str(pipeline_path), warm_start="/weights/full.ckpt"
+            )
 
     def test_submit_pipeline_forwards_cli_source_and_override_fields(
         self, mock_submitter, tmp_path

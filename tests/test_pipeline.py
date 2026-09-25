@@ -760,6 +760,37 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             "module_weight path.*must be a non-empty string",
         ),
         (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "stage": "train",
+                "run_dir": "/run",
+                "warm_start": {"model": ""},
+            },
+            ValueError,
+            "must be a non-empty namespace",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "val_num_entries": 10,
+                "val_entry_fraction_range": [0.0, 0.5],
+            },
+            ValueError,
+            "cannot combine val_num_entries",
+        ),
+        (
+            {"name": "job", "config": "x.yaml", "in_place": "yes"},
+            TypeError,
+            "in_place must be a boolean",
+        ),
+        (
+            {"name": "job", "config": "x.yaml", "joint_file_mode": "other"},
+            ValueError,
+            "joint_file_mode must be",
+        ),
+        (
             {"name": "job", "config": "x.yaml", "kind": "other"},
             ValueError,
             "invalid kind",
@@ -811,6 +842,37 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             {"name": "job", "config": "x.yaml", "val_num_entries": 10},
             ValueError,
             "validation entry count requires stage=train",
+        ),
+        (
+            {"name": "job", "config": "x.yaml", "num_files": 1},
+            ValueError,
+            "num_files requires explicit inputs",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "stage": "train",
+                "run_dir": "/run",
+                "val_num_files": 1,
+            },
+            ValueError,
+            "val_num_files requires validation inputs",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "stage": "train",
+                "run_dir": "/run",
+                "joint_file_mode": "paired",
+                "sources": {
+                    "primary": {"source": "primary.root"},
+                    "secondary": {"source": "secondary.root"},
+                },
+            },
+            ValueError,
+            "paired joint files require stage=inference",
         ),
         (
             {
