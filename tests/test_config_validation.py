@@ -2241,6 +2241,37 @@ def test_nd_lar_smoke_pipeline_declares_full_chain_warm_start_namespaces():
     assert stages["train_grappa_inter"]["warm_start"] == {"grappa": "grappa_inter"}
 
 
+def test_all_training_pipelines_declare_full_chain_warm_start_namespaces():
+    """Every staged trainer supports the pipeline-wide full-chain seed."""
+    expected = {
+        "train_uresnet_deghost": {"uresnet": "uresnet_deghost"},
+        "train_uresnet_ppn": {
+            "uresnet": "uresnet_ppn.uresnet",
+            "ppn": "uresnet_ppn.ppn",
+        },
+        "train_graph_spice": {"graph_spice": "graph_spice"},
+        "train_grappa_shower": {"grappa": "grappa_shower"},
+        "train_grappa_track": {"grappa": "grappa_track"},
+        "train_grappa_inter": {"grappa": "grappa_inter"},
+    }
+    pipeline_root = Path(__file__).parent.parent / "pipelines"
+    training_pipeline_count = 0
+    for pipeline_path in sorted(pipeline_root.rglob("*.yaml")):
+        pipeline = PipelineDefinition.load(
+            pipeline_path,
+            workspace_override=f"/tmp/{pipeline_path.parent.name}-{pipeline_path.stem}",
+        )
+        training_stages = [
+            stage for stage in pipeline.stages if stage.get("stage") == "train"
+        ]
+        if training_stages:
+            training_pipeline_count += 1
+        for stage in training_stages:
+            assert stage["warm_start"] == expected[stage["name"]]
+
+    assert training_pipeline_count > 0
+
+
 def test_nd_lar_260924_pipeline_enables_image_augmentation_and_new_targets():
     """The current ND-LAr pipeline pins augmentation and target revisions."""
     pipeline = PipelineDefinition.load(

@@ -142,6 +142,10 @@ Then one option initializes every training stage with such a declaration:
   --warm-start /path/to/existing/full_chain.ckpt
 ```
 
+All generic, ND-LAr, and ProtoDUNE-SP training pipelines provide these
+declarations. Pipelines without training stages, such as production-only
+inference workflows, intentionally do not accept a warm start.
+
 Warm starts import parameters only; they do not restore optimizer, scheduler,
 or iteration state. Cache, export, and evaluation stages are unaffected. On a
 pipeline retry, a stage's own resumable checkpoint takes precedence over the

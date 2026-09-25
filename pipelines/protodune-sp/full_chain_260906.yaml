@@ -67,6 +67,8 @@ stages:
     depends_on: [build_train_filter, build_validation_filter]
     config: train/protodune-sp/uresnet_deghost/train_260906.yaml
     stage: train
+    warm_start:
+      uresnet: uresnet_deghost
     profile: s3df_ampere_full
     time: "5-00:00:00"
     source_list: ${train_source_list}
@@ -100,6 +102,9 @@ stages:
     depends_on: [cache_train_deghosting, cache_validation_deghosting]
     config: train/protodune-sp/uresnet_ppn/train_from_deghost_cache_260906.yaml
     stage: train
+    warm_start:
+      uresnet: uresnet_ppn.uresnet
+      ppn: uresnet_ppn.ppn
     profile: s3df_ampere_full
     time: "2-00:00:00"
     run_dir: ${workspace}/train/uresnet_ppn
@@ -144,6 +149,8 @@ stages:
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/protodune-sp/graph_spice/train_from_segmentation_cache_260906.yaml
     stage: train
+    warm_start:
+      graph_spice: graph_spice
     profile: s3df_ampere_full
     time: "2-00:00:00"
     source: ${workspace}/cache/train.spine-cache
@@ -178,6 +185,8 @@ stages:
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/protodune-sp/grappa_shower/train_from_fragment_cache_260906.yaml
     stage: train
+    warm_start:
+      grappa: grappa_shower
     profile: s3df_ampere_full
     time: "1-00:00:00"
     source: ${workspace}/cache/train.spine-cache
@@ -191,6 +200,8 @@ stages:
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/protodune-sp/grappa_track/train_from_fragment_cache_260906.yaml
     stage: train
+    warm_start:
+      grappa: grappa_track
     time: "12:00:00"
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
@@ -225,6 +236,8 @@ stages:
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
     config: train/protodune-sp/grappa_inter/train_from_particle_cache_260906.yaml
     stage: train
+    warm_start:
+      grappa: grappa_inter
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]

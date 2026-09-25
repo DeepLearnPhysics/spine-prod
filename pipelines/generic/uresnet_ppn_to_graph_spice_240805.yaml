@@ -28,6 +28,9 @@ stages:
   - name: train_uresnet_ppn
     config: train/generic/uresnet_ppn/train_240805.yaml
     stage: train
+    warm_start:
+      uresnet: uresnet_ppn.uresnet
+      ppn: uresnet_ppn.ppn
     source: ${train_source}
     val_source: ${validation_source}
     run_dir: ${workspace}/train/uresnet_ppn
@@ -54,6 +57,8 @@ stages:
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/generic/graph_spice/train_from_uresnet_ppn_240805.yaml
     stage: train
+    warm_start:
+      graph_spice: graph_spice
     run_dir: ${workspace}/train/graph_spice
     tensorboard: true
     sources:
