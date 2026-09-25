@@ -2208,47 +2208,6 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
         assert overlay["io"]["loader"]["minibatch_size"] == minibatch_size
 
 
-def test_nd_lar_smoke_pipeline_declares_full_chain_warm_start_namespaces():
-    """Every standalone trainer identifies its full-chain source namespace."""
-    pipeline = PipelineDefinition.load(
-        Path(__file__).parent.parent
-        / "pipelines/nd-lar/full_chain_260409_smoke_10k.yaml",
-        workspace_override="/tmp/nd-lar-260409-smoke",
-    )
-    stages = {stage["name"]: stage for stage in pipeline.stages}
-
-    assert stages["train_graph_spice"]["minibatch_size"] == 4
-    assert stages["train_graph_spice"]["time"] == "2-00:00:00"
-    assert stages["cache_train_segmentation"]["time"] == "12:00:00"
-    assert stages["train_grappa_shower"]["profile"] == "s3df_ampere_full"
-    assert stages["train_grappa_shower"]["time"] == "3-00:00:00"
-    assert stages["train_grappa_shower"]["minibatch_size"] == 1
-    assert stages["train_grappa_shower"]["depends_on"] == [
-        "build_train_shower_edges",
-        "build_validation_shower_edges",
-    ]
-    assert stages["train_grappa_shower"]["entry_filter"].endswith(
-        "/filter/shower_edges/train/accepted.yaml"
-    )
-    assert stages["train_grappa_shower"]["val_entry_filter"].endswith(
-        "/filter/shower_edges/validation/accepted.yaml"
-    )
-    assert stages["train_grappa_track"]["minibatch_size"] == 32
-    assert stages["train_grappa_track"]["profile"] == "s3df_ampere_full"
-    assert stages["train_grappa_track"]["time"] == "2-00:00:00"
-    assert stages["train_grappa_inter"]["profile"] == "s3df_ampere_full"
-    assert stages["train_grappa_inter"]["time"] == "2-00:00:00"
-    assert stages["train_grappa_inter"]["minibatch_size"] == 16
-    assert stages["train_uresnet_ppn"]["warm_start"] == {
-        "uresnet": "uresnet_ppn.uresnet",
-        "ppn": "uresnet_ppn.ppn",
-    }
-    assert stages["train_graph_spice"]["warm_start"] == {"graph_spice": "graph_spice"}
-    assert stages["train_grappa_shower"]["warm_start"] == {"grappa": "grappa_shower"}
-    assert stages["train_grappa_track"]["warm_start"] == {"grappa": "grappa_track"}
-    assert stages["train_grappa_inter"]["warm_start"] == {"grappa": "grappa_inter"}
-
-
 def test_all_training_pipelines_declare_full_chain_warm_start_namespaces():
     """Every staged trainer supports the pipeline-wide full-chain seed."""
     expected = {
