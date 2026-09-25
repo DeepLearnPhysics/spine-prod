@@ -109,7 +109,7 @@ stages:
     warm_start:
       grappa: grappa_shower
     profile: s3df_ampere_full
-    time: "3-00:00:00"
+    time: "2-00:00:00"
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]

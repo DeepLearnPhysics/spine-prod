@@ -2088,7 +2088,7 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
         "cache_validation_fragment_graphs",
     ]
     assert shower["profile"] == "s3df_ampere_full"
-    assert shower["time"] == "3-00:00:00"
+    assert shower["time"] == "2-00:00:00"
     assert shower["minibatch_size"] == 1
     assert shower["entry_filter"].endswith("/filter/shower_edges/train/accepted.yaml")
     assert shower["val_entry_filter"].endswith(
