@@ -85,7 +85,7 @@ def test_active_configs_declare_explicit_kind(config_path):
 
 
 def test_config_inheritance_crosses_scopes_only_for_conversion_stopgaps():
-    """Shared config must flow through common, apart from two documented gaps."""
+    """Shared config must flow through common, apart from documented gaps."""
     config_domains = {"cache", "convert", "filter", "infer", "model", "test", "train"}
     allowed = {
         (
@@ -95,6 +95,14 @@ def test_config_inheritance_crosses_scopes_only_for_conversion_stopgaps():
         (
             "convert/protodune-hd/truth_260911.yaml",
             "convert/protodune-sp/truth_260210.yaml",
+        ),
+        (
+            "convert/fsd/truth_240819.yaml",
+            "convert/nd-lar/truth_240819.yaml",
+        ),
+        (
+            "convert/fsd/truth_240819.yaml",
+            "infer/nd-lar/modifier/single/mod_single_common.yaml",
         ),
     }
 
