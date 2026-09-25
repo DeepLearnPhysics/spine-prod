@@ -1,0 +1,17 @@
+__meta__:
+  kind: bundle
+  version: "250806"
+  date: "2025-08-06"
+  description: ND-LAr v0 Graph-SPICE training with stochastic event overlay
+
+include:
+  - model/nd-lar/graph_spice/model_250505.yaml
+  - train/nd-lar/graph_spice/base_v1.yaml
+
+override:
+  base.epochs: 100.0
+  io.loader.minibatch_size: 16
+  io.loader.collate_fn:
+    name: all
+    overlay:
+      multiplicity: 4

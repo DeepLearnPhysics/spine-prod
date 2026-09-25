@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "250505"
+  date: "2025-05-05"
+  description: ND-LAr v0 UResNet-PPN training for the May 2025 chain
+
+include:
+  - model/nd-lar/uresnet_ppn/model_240819.yaml
+  - train/nd-lar/uresnet_ppn/base_v1.yaml

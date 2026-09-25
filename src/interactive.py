@@ -25,6 +25,7 @@ class InteractiveRunner(SubmissionComponent):
         flashmatch_path: Optional[str] = None,
         flashmatch: bool = False,
         cvmfs: bool = False,
+        expandable_segments: bool = False,
         apply_mods: Optional[List[str]] = None,
         preload: bool = False,
         set_overrides: Optional[List[str]] = None,
@@ -34,6 +35,8 @@ class InteractiveRunner(SubmissionComponent):
         num_workers: Optional[int] = None,
         epochs: Optional[float] = None,
         iterations: Optional[int] = None,
+        num_files: Optional[int] = None,
+        num_entries: Optional[int] = None,
         entry_fraction_range: Optional[Tuple[float, float]] = None,
         entry_filter: Optional[str] = None,
         interactive_runtime: str = "auto",
@@ -81,6 +84,9 @@ class InteractiveRunner(SubmissionComponent):
             container and no external setup is needed.
         cvmfs : bool, optional
             Expose CVMFS inside the container, by default False
+        expandable_segments : bool, optional
+            Enable PyTorch CUDA expandable memory segments before SPINE starts,
+            by default False.
         apply_mods : List[str], optional
             List of modifiers to apply
         preload : bool, optional
@@ -99,6 +105,10 @@ class InteractiveRunner(SubmissionComponent):
             Number of SPINE training epochs.
         iterations : int, optional
             Number of SPINE driver iterations.
+        num_files : int, optional
+            Maximum number of resolved input files to use.
+        num_entries : int, optional
+            Maximum number of input dataset entries to process.
         entry_fraction_range : tuple[float, float], optional
             Half-open fractional range of input entries to process.
         entry_filter : str, optional
@@ -134,12 +144,20 @@ class InteractiveRunner(SubmissionComponent):
             raise ValueError(
                 "interactive_runtime must be one of: 'auto', 'local', 'container'"
             )
+        if num_entries is not None and entry_fraction_range is not None:
+            raise ValueError(
+                "--num-entries cannot be combined with --entry-fraction-range"
+            )
+        self.file_handler.limit_files([], num_files)
+        if num_files is not None and not files:
+            raise ValueError("--num-files requires --source/--source-list")
 
         file_list = []
         if files:
             file_list = self.file_handler.parse_files(files, source_type)
             if not file_list:
                 raise ValueError("No input files found")
+            file_list = self.file_handler.limit_files(file_list, num_files)
             print(f"Found {len(file_list)} file(s) to process")
         else:
             if files_per_task is not None:
@@ -173,7 +191,11 @@ class InteractiveRunner(SubmissionComponent):
         # Apply modifiers if specified
         if apply_mods:
             config = self.config_mgr.create_composite_config(
-                config, apply_mods, job_dir, detector=detector if is_latest else None
+                config,
+                apply_mods,
+                job_dir,
+                detector=detector if is_latest else None,
+                family=config_family if is_latest else None,
             )
 
         if preload:
@@ -217,6 +239,11 @@ class InteractiveRunner(SubmissionComponent):
 
         # Cap Numba threads to the OpenBLAS build limit used in batch templates.
         cmd_parts.append("export NUMBA_NUM_THREADS=64")
+        if expandable_segments:
+            cmd_parts.append(
+                'export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:+'
+                '${PYTORCH_CUDA_ALLOC_CONF},}expandable_segments:True"'
+            )
 
         larcv_setup_cmd, larcv_bind_root = self.context.runtime.resolve_setup_path(
             larcv_path, "--larcv-path"
@@ -268,6 +295,7 @@ class InteractiveRunner(SubmissionComponent):
         entry_fraction_options = self.context.spine_cli.format_entry_fraction_ranges(
             entry_fraction_range=entry_fraction_range
         )
+        num_entry_options = self.context.spine_cli.format_num_entries(num_entries)
         entry_filter_options = self.context.spine_cli.format_entry_filters(entry_filter)
         local_spine_cmd, extra_bind_root = self.context.runtime.resolve_spine_command(
             spine_path
@@ -292,6 +320,7 @@ class InteractiveRunner(SubmissionComponent):
             part
             for part in [
                 spine_runtime_options,
+                num_entry_options,
                 entry_fraction_options,
                 entry_filter_options,
                 spine_cli_overrides,

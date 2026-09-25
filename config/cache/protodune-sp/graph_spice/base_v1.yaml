@@ -2,7 +2,7 @@ __meta__:
   kind: fragment
   description: Append ProtoDUNE-SP fragment graphs and GrapPA supervision
 
-include: cache/generic/graph_spice/base_v1.yaml
+include: cache/common/graph_spice/base_v1.yaml
 
 override:
   io.loader.minibatch_size: 16

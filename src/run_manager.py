@@ -109,24 +109,32 @@ class RunManager:
 
         if metadata_path.exists():
             metadata = cls._read_json(metadata_path)
-            digest_matches = metadata.get("training_config_sha256") == (
-                cls.config_digest(config)
-            )
+            config_digest = cls.config_digest(config)
+            digest_matches = metadata.get("training_config_sha256") == config_digest
             if retry:
-                if not digest_matches:
+                checkpoint = cls.latest_checkpoint(run_dir)
+                training_logs = list(run_dir.glob("train*_log-*.csv"))
+                if not digest_matches and (checkpoint is not None or training_logs):
                     raise ValueError(
                         f"Cannot retry training with a different configuration: "
                         f"{run_dir}"
                     )
-                checkpoint = cls.latest_checkpoint(run_dir)
                 if checkpoint is not None:
                     cls.checkpoint_digest(checkpoint)
                     return checkpoint
-                if any(run_dir.glob("train*_log-*.csv")):
+                if training_logs:
                     raise ValueError(
                         "Cannot retry training that produced logs but no checkpoint: "
                         f"{run_dir}"
                     )
+                if not digest_matches:
+                    # No training state exists, so this is still an unstarted
+                    # run. Refresh its identity to support deterministic
+                    # regeneration and fixes to generated wrapper configs.
+                    metadata["training_config"] = str(Path(config).resolve())
+                    metadata["training_config_sha256"] = config_digest
+                    metadata["config_refreshed"] = datetime.now().isoformat()
+                    cls._write_json(metadata_path, metadata)
                 return None
             if (
                 digest_matches

@@ -592,6 +592,16 @@ class TestSubmitterHelpers:
                 entry_fraction_range=(0.5, 0.5)
             )
 
+    def test_format_spine_num_entries(self, mock_submitter):
+        """Exact dataset limits use SPINE's first-class CLI options."""
+        assert mock_submitter.spine_cli.format_num_entries(10000, 1000) == (
+            "--num-entries 10000 --val-num-entries 1000"
+        )
+        assert mock_submitter.spine_cli.format_num_entries() == ""
+        for value in (0, -1, 1.5, True):
+            with pytest.raises(ValueError, match="positive integer"):
+                mock_submitter.spine_cli.format_num_entries(value)
+
     def test_format_spine_entry_filters(self, mock_submitter):
         """Eligibility manifests are quoted independently for train and val."""
         assert mock_submitter.spine_cli.format_entry_filters(
@@ -1345,6 +1355,18 @@ class TestInteractiveExecution:
                 "config.yaml", in_place=True, output="result.h5"
             )
 
+    def test_run_interactive_rejects_entry_count_with_fraction(self, mock_submitter):
+        with pytest.raises(ValueError, match="cannot be combined"):
+            mock_submitter.run_interactive(
+                "config.yaml",
+                num_entries=10,
+                entry_fraction_range=(0.0, 0.5),
+            )
+
+    def test_run_interactive_requires_files_for_file_limit(self, mock_submitter):
+        with pytest.raises(ValueError, match="requires --source/--source-list"):
+            mock_submitter.run_interactive("config.yaml", num_files=1)
+
     def test_run_interactive_rejects_missing_and_invalid_task_inputs(
         self, mock_submitter, tmp_path
     ):
@@ -1430,7 +1452,11 @@ class TestInteractiveExecution:
 
         create_latest.assert_called_once()
         create_composite.assert_called_once_with(
-            str(latest), ["data"], create_latest.call_args.args[1], detector="icarus"
+            str(latest),
+            ["data"],
+            create_latest.call_args.args[1],
+            detector="icarus",
+            family="infer",
         )
         preload.assert_called_once_with(str(composite))
 
@@ -1481,6 +1507,7 @@ class TestInteractiveExecution:
                 num_workers=4,
                 iterations=10,
                 set_overrides=["model.detect_anomaly=true"],
+                expandable_segments=True,
                 interactive_runtime="local",
             )
 
@@ -1490,6 +1517,7 @@ class TestInteractiveExecution:
         assert kwargs["shell"] is True
         assert kwargs["executable"] == "/bin/bash"
         assert "export NUMBA_NUM_THREADS=64" in run.call_args.args[0]
+        assert "expandable_segments:True" in run.call_args.args[0]
         assert "spine -S" in run.call_args.args[0]
         assert " -o " not in run.call_args.args[0]
         assert "--output-dir " in run.call_args.args[0]
@@ -2086,7 +2114,11 @@ class TestBatchSpineOverride:
         assert output_dir.is_dir()
         job_dir = create_latest.call_args.args[1]
         create_composite.assert_called_once_with(
-            str(latest), ["data"], job_dir, detector="icarus"
+            str(latest),
+            ["data"],
+            job_dir,
+            detector="icarus",
+            family="infer",
         )
         preload.assert_called_once_with(str(composite))
         scripts = sorted(job_dir.glob("attempts/*/submit_*.sbatch"))
@@ -2108,11 +2140,68 @@ class TestBatchSpineOverride:
     @pytest.mark.parametrize(
         "kwargs, message",
         [
+            ({"joint_file_mode": "other"}, "joint_file_mode must be either"),
             ({"stage": "unknown"}, "stage must be one of"),
             ({"stage": "train"}, "--run-dir is required"),
             ({"resume": True}, "valid only for training"),
+            (
+                {"warm_start_path": "/weights/full.ckpt"},
+                "must be provided together",
+            ),
+            (
+                {"warm_start_modules": {"model": "full.model"}},
+                "must be provided together",
+            ),
+            (
+                {
+                    "warm_start_path": "/weights/full.ckpt",
+                    "warm_start_modules": {"model": "full.model"},
+                },
+                "valid only for training",
+            ),
+            (
+                {
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "warm_start_path": "/weights/full.ckpt",
+                    "warm_start_modules": {"model": "full.model"},
+                    "weight_path": "/weights/other.ckpt",
+                },
+                "cannot be combined with weight_path",
+            ),
             ({"validation_name": "data"}, "valid only for validation"),
             ({"val_entry_filter": "/filters/val.yaml"}, "valid only for training"),
+            ({"val_num_files": 1}, "valid only for training"),
+            ({"num_files": 1}, "requires --source/--source-list"),
+            (
+                {"stage": "train", "run_dir": "/tmp/train", "val_num_files": 1},
+                "requires --val-source/--val-source-list",
+            ),
+            (
+                {
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "val_num_entries": 10,
+                    "val_entry_fraction_range": (0.0, 0.5),
+                },
+                "cannot be combined with --val-entry-fraction-range",
+            ),
+            (
+                {"joint_file_mode": "paired"},
+                "require named primary and secondary",
+            ),
+            (
+                {
+                    "stage": "train",
+                    "run_dir": "/tmp/train",
+                    "joint_file_mode": "paired",
+                    "named_sources": {
+                        "primary": {"source": "primary.root"},
+                        "secondary": {"source": "secondary.root"},
+                    },
+                },
+                "valid only for inference jobs",
+            ),
             (
                 {"validation_named_sources": {"larcv": {"source": "val.root"}}},
                 "Named validation sources are valid only for training",
@@ -2196,8 +2285,8 @@ class TestBatchSpineOverride:
                 config="train/generic/uresnet/train_240718.yaml",
                 files=[str(train_source)],
                 validation_files=[str(validation_source)],
-                entry_fraction_range=(0.0, 1.0),
-                val_entry_fraction_range=(0.0, 0.5),
+                num_entries=10000,
+                val_num_entries=1000,
                 entry_filter="/filters/train.yaml",
                 val_entry_filter="/filters/validation.yaml",
                 stage="train",
@@ -2224,8 +2313,8 @@ class TestBatchSpineOverride:
         )
         assert f"--source-list {train_manifest.resolve()}" in script
         assert f"--val-source-list {validation_manifest.resolve()}" in script
-        assert "--entry-fraction-range 0.0 1.0" in script
-        assert "--val-entry-fraction-range 0.0 0.5" in script
+        assert "--num-entries 10000" in script
+        assert "--val-num-entries 1000" in script
         assert "--entry-filter /filters/train.yaml" in script
         assert "--val-entry-filter /filters/validation.yaml" in script
         marker = submission.resolve() / "graceful_stop"
@@ -2240,11 +2329,57 @@ class TestBatchSpineOverride:
         assert metadata["validation_source_manifest"] == str(
             validation_manifest.resolve()
         )
-        assert metadata["entry_fraction_range"] == [0.0, 1.0]
-        assert metadata["val_entry_fraction_range"] == [0.0, 0.5]
+        assert metadata["num_entries"] == 10000
+        assert metadata["val_num_entries"] == 1000
         assert metadata["entry_filter"] == "/filters/train.yaml"
         assert metadata["val_entry_filter"] == "/filters/validation.yaml"
         assert metadata["graceful_stop_file"] == str(marker)
+
+    def test_submit_job_limits_training_files_before_writing_manifests(
+        self, mock_submitter, tmp_path
+    ):
+        train_files = [tmp_path / f"train-{index}.root" for index in range(3)]
+        validation_files = [tmp_path / f"validation-{index}.root" for index in range(2)]
+        for path in train_files + validation_files:
+            path.touch()
+        train_list = tmp_path / "train.txt"
+        validation_list = tmp_path / "validation.txt"
+        train_list.write_text("\n".join(map(str, train_files)))
+        validation_list.write_text("\n".join(map(str, validation_files)))
+        run_dir = tmp_path / "run"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            mock_submitter.submit_job(
+                config="train/generic/uresnet/train_240718.yaml",
+                files=[str(train_list)],
+                source_type="source_list",
+                validation_files=[str(validation_list)],
+                validation_source_type="source_list",
+                num_files=2,
+                val_num_files=1,
+                stage="train",
+                run_dir=str(run_dir),
+            )
+
+        submission = run_dir / "latest"
+        assert (submission / "inputs.txt").read_text().splitlines() == list(
+            map(str, train_files[:2])
+        )
+        assert (submission / "validation_inputs.txt").read_text().splitlines() == [
+            str(validation_files[0])
+        ]
+        metadata = json.loads((submission / "job_metadata.json").read_text())
+        assert metadata["num_file_limit"] == 2
+        assert metadata["val_num_file_limit"] == 1
+        assert metadata["num_files"] == 2
+        assert metadata["validation_num_files"] == 1
 
     def test_submit_job_preserves_future_pipeline_training_sources(
         self, mock_submitter, tmp_path, capsys
@@ -2325,6 +2460,90 @@ class TestBatchSpineOverride:
         assert metadata["named_sources"] == named_sources
         assert metadata["validation_named_sources"] == validation_sources
         assert metadata["module_weights"] == {"graph_spice": "/weights/seed.ckpt"}
+
+    def test_submit_job_applies_warm_start_and_explicit_override(
+        self, mock_submitter, tmp_path
+    ):
+        """A fresh stage expands a full-chain seed into weights-only imports."""
+        run_dir = tmp_path / "run"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            mock_submitter.submit_job(
+                config="config/train/generic/uresnet/train_240718.yaml",
+                module_weights={"ppn": "/weights/ppn-only.ckpt"},
+                warm_start_path="/weights/full-chain.ckpt",
+                warm_start_modules={
+                    "uresnet": "uresnet_ppn.uresnet",
+                    "ppn": "uresnet_ppn.ppn",
+                },
+                stage="train",
+                run_dir=str(run_dir),
+            )
+
+        submission = run_dir / "latest"
+        script = (submission / "submit.sbatch").read_text(encoding="utf-8")
+        assert "--module-weight uresnet=/weights/full-chain.ckpt" in script
+        assert "ppn=/weights/ppn-only.ckpt" in script
+        assert "--set model.modules.uresnet.model_name=uresnet_ppn.uresnet" in script
+        assert "model.modules.ppn.model_name" not in script
+        assert "--resume" not in script
+        metadata = json.loads((submission / "job_metadata.json").read_text())
+        assert metadata["warm_start_applied"] is True
+        assert metadata["warm_start_path"] == "/weights/full-chain.ckpt"
+
+    def test_submit_job_resume_suppresses_warm_start(self, mock_submitter, tmp_path):
+        """A stage checkpoint is authoritative when retrying a warm-started run."""
+        run_dir = tmp_path / "run"
+        config = "config/train/generic/uresnet/train_240718.yaml"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="first"),
+        ):
+            mock_submitter.submit_job(
+                config=config,
+                warm_start_path="/weights/full-chain.ckpt",
+                warm_start_modules={"uresnet": "uresnet_ppn.uresnet"},
+                stage="train",
+                run_dir=str(run_dir),
+            )
+
+        checkpoint = run_dir / "weights" / "snapshot-5.ckpt"
+        checkpoint.touch()
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="retry"),
+        ):
+            mock_submitter.submit_job(
+                config=config,
+                warm_start_path="/weights/full-chain.ckpt",
+                warm_start_modules={"uresnet": "uresnet_ppn.uresnet"},
+                stage="train",
+                run_dir=str(run_dir),
+                retry=True,
+            )
+
+        submission = run_dir / "latest"
+        script = (submission / "submit.sbatch").read_text(encoding="utf-8")
+        assert f"--weight-path {checkpoint}" in script
+        assert "--resume" in script
+        assert "--module-weight uresnet=/weights/full-chain.ckpt" not in script
+        assert "model.modules.uresnet.model_name" not in script
+        metadata = json.loads((submission / "job_metadata.json").read_text())
+        assert metadata["warm_start_applied"] is False
 
     def test_submit_job_forwards_output_for_named_sources(
         self, mock_submitter, tmp_path
@@ -2409,6 +2628,250 @@ class TestBatchSpineOverride:
         metadata = json.loads((attempt / "job_metadata.json").read_text())
         assert metadata["num_files"] == 2
         assert metadata["resolved_files_per_task"] == 1
+
+    def test_submit_job_limits_named_sources_before_array_splitting(
+        self, mock_submitter, tmp_path
+    ):
+        run_dir = tmp_path / "run"
+        paths = [tmp_path / f"input_{index}.root" for index in range(3)]
+        for path in paths:
+            path.touch()
+        manifest = tmp_path / "primary.txt"
+        manifest.write_text("\n".join(map(str, paths)), encoding="utf-8")
+        cache = tmp_path / "cache.spine-cache"
+        cache.mkdir()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="cache"),
+        ):
+            mock_submitter.submit_job(
+                config="cache/generic/graph_spice/fragment_graphs_240805.yaml",
+                named_sources={
+                    "primary": {"source_list": str(manifest)},
+                    "cache": {"source": str(cache)},
+                },
+                run_dir=str(run_dir),
+                in_place=True,
+                num_files=2,
+                files_per_task=1,
+            )
+
+        attempt = run_dir / "latest"
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "#SBATCH --array=1-2" in script
+        assert not (attempt / "tasks" / "000_3").exists()
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["num_file_limit"] == 2
+        assert metadata["num_files"] == 2
+
+    def test_submit_job_splits_joint_primary_and_shares_secondary(
+        self, mock_submitter, tmp_path
+    ):
+        run_dir = tmp_path / "run"
+        primary = [tmp_path / f"primary-{index}.root" for index in range(3)]
+        secondary = [tmp_path / f"secondary-{index}.root" for index in range(2)]
+        for path in primary + secondary:
+            path.touch()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="joint"),
+        ):
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                named_sources={
+                    "primary": {"source": list(map(str, primary))},
+                    "secondary": {"source": list(map(str, secondary))},
+                },
+                apply_mods=["joint:240819"],
+                run_dir=str(run_dir),
+                num_files=2,
+                files_per_task=1,
+            )
+
+        attempt = run_dir / "latest"
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "#SBATCH --array=1-2" in script
+        assert "--output-dir $TASK_DIR/output" in script
+        assert "--source-list primary=$TASK_DIR/primary.txt" in script
+        assert "secondary=$TASK_DIR/secondary.txt" in script
+        for index in (1, 2):
+            task_dir = attempt / "tasks" / f"000_{index}"
+            assert (task_dir / "primary.txt").read_text().splitlines() == [
+                str(primary[index - 1])
+            ]
+            assert (task_dir / "secondary.txt").read_text().splitlines() == list(
+                map(str, secondary)
+            )
+            assert (task_dir / "output").is_dir()
+
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["num_files"] == 2
+
+    def test_submit_job_pairs_joint_files_up_to_shorter_list(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        run_dir = tmp_path / "run"
+        primary = [tmp_path / f"primary-{index}.root" for index in range(3)]
+        secondary = [tmp_path / f"secondary-{index}.root" for index in range(2)]
+        for path in primary + secondary:
+            path.touch()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="joint"),
+        ):
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                named_sources={
+                    "primary": {"source": list(map(str, primary))},
+                    "secondary": {"source": list(map(str, secondary))},
+                },
+                apply_mods=["joint:240819"],
+                run_dir=str(run_dir),
+                joint_file_mode="paired",
+                files_per_task=1,
+            )
+
+        attempt = run_dir / "latest"
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "#SBATCH --array=1-2" in script
+        assert "--output-dir $TASK_DIR/output" in script
+        assert 'SPINE_PROD_TASK_OUTPUT_DIR="$TASK_DIR/output"' in script
+        assert "flock -x 9" in script
+        for index in (1, 2):
+            task_dir = attempt / "tasks" / f"000_{index}"
+            assert (task_dir / "primary.txt").read_text().splitlines() == [
+                str(primary[index - 1])
+            ]
+            assert (task_dir / "secondary.txt").read_text().splitlines() == [
+                str(secondary[index - 1])
+            ]
+            assert (task_dir / "output").is_dir()
+        assert not (attempt / "tasks" / "000_3").exists()
+
+        output = capsys.readouterr().out
+        assert "Primary files:   3" in output
+        assert "Secondary files: 2" in output
+        assert "File pairs:      2" in output
+        assert "Ignored primary: 1" in output
+
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["joint_file_mode"] == "paired"
+        assert metadata["num_files"] == 2
+        output_manifest = attempt.resolve() / "outputs.txt"
+        assert output_manifest.is_file()
+        assert metadata["output_manifest"] == str(output_manifest)
+
+    def test_submit_job_reports_ignored_secondary_joint_files(
+        self, mock_submitter, tmp_path, capsys
+    ):
+        """Paired submission reports truncation from either dataset."""
+        primary = [tmp_path / "primary.root"]
+        secondary = [tmp_path / f"secondary-{index}.root" for index in range(2)]
+        for path in primary + secondary:
+            path.touch()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="joint"),
+        ):
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                named_sources={
+                    "primary": {"source": list(map(str, primary))},
+                    "secondary": {"source": list(map(str, secondary))},
+                },
+                joint_file_mode="paired",
+                run_dir=str(tmp_path / "run"),
+            )
+
+        assert "Ignored secondary: 1" in capsys.readouterr().out
+
+    def test_submit_job_limits_named_validation_sources(self, mock_submitter, tmp_path):
+        """Named validation datasets honor their independent file limit."""
+        validation = [tmp_path / f"validation-{index}.root" for index in range(2)]
+        for path in validation:
+            path.touch()
+        run_dir = tmp_path / "run"
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            mock_submitter.submit_job(
+                config="train/generic/uresnet/train_240718.yaml",
+                validation_named_sources={
+                    "primary": {"source": list(map(str, validation))}
+                },
+                val_num_files=1,
+                stage="train",
+                run_dir=str(run_dir),
+            )
+
+        metadata = json.loads((run_dir / "latest/job_metadata.json").read_text())
+        assert metadata["validation_num_files"] == 1
+
+    def test_submit_job_places_single_task_joint_output_under_attempt(
+        self, mock_submitter, tmp_path
+    ):
+        run_dir = tmp_path / "run"
+        primary = [tmp_path / f"primary-{index}.root" for index in range(2)]
+        secondary = [tmp_path / f"secondary-{index}.root" for index in range(2)]
+        for path in primary + secondary:
+            path.touch()
+
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="joint"),
+        ):
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                named_sources={
+                    "primary": {"source": list(map(str, primary))},
+                    "secondary": {"source": list(map(str, secondary))},
+                },
+                apply_mods=["joint:240819"],
+                run_dir=str(run_dir),
+                joint_file_mode="paired",
+            )
+
+        attempt = (run_dir / "latest").resolve()
+        task_dir = attempt / "tasks" / "000_1"
+        script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
+        assert "#SBATCH --array=" not in script
+        assert f'TASK_DIR="{task_dir}"' in script
+        assert "--output-dir $TASK_DIR/output" in script
+        assert (task_dir / "output").is_dir()
+
+        metadata = json.loads((attempt / "job_metadata.json").read_text())
+        assert metadata["output"] == str(attempt / "tasks")
+        assert metadata["output_dir"] == str(attempt / "tasks")
 
     def test_submit_job_writes_expected_stage_cache_source_list(
         self, mock_submitter, tmp_path
@@ -3096,10 +3559,13 @@ class TestBatchSpineOverride:
         assert 'TASK_DIR="' not in script
         assert f"--output-dir {scripts[0].parent}/output" in script
         assert f"--log-dir {scripts[0].parent}" in script
+        assert f'SPINE_PROD_TASK_OUTPUT_DIR="{scripts[0].parent}/output"' in script
+        assert f'SPINE_PROD_OUTPUT_MANIFEST="{scripts[0].parent}/outputs.txt"' in script
 
         manifest = scripts[0].parent / "inputs.txt"
         assert manifest.read_text(encoding="utf-8").strip().splitlines() == input_files
         assert (scripts[0].parent / "output").is_dir()
+        assert (scripts[0].parent / "outputs.txt").is_file()
         assert not (scripts[0].parent / "logs").exists()
         assert not (scripts[0].parent / "tasks").exists()
 
@@ -3452,6 +3918,7 @@ class TestCVMFSOption:
             "flashmatch_path": None,
             "flashmatch": False,
             "cvmfs": False,
+            "expandable_segments": False,
             "bind_paths": None,
             "spine_cmd": "spine",
             "spine_cli_overrides": "",
@@ -3543,6 +4010,27 @@ class TestCVMFSOption:
         )
 
         assert 'SHIFTER_MODULES+=("--module=cvmfs")' in script
+
+    @pytest.mark.parametrize(
+        "template_name",
+        [
+            "job_template_s3df.sbatch",
+            "job_template_nersc.sbatch",
+            "job_template_anl.pbs",
+        ],
+    )
+    def test_expandable_segments_is_opt_in(self, mock_submitter, template_name):
+        """Allocator expansion is exported only when explicitly requested."""
+        default_script = self._render_template(mock_submitter, template_name)
+        enabled_script = self._render_template(
+            mock_submitter, template_name, expandable_segments=True
+        )
+
+        assert "PYTORCH_CUDA_ALLOC_CONF" not in default_script
+        assert (
+            'export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:+'
+            '${PYTORCH_CUDA_ALLOC_CONF},}expandable_segments:True"' in enabled_script
+        )
 
     @pytest.mark.parametrize(
         "template_name",
@@ -3805,6 +4293,83 @@ class TestPipelineSubmission:
         assert link.is_symlink()
         assert link.resolve() == (run_dir / "latest").resolve()
 
+    def test_submit_pipeline_forwards_warm_start_only_to_declared_training_stage(
+        self, mock_submitter, tmp_path
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "train",
+                            "config": "train.yaml",
+                            "stage": "train",
+                            "run_dir": "/tmp/train",
+                            "warm_start": {"grappa": "grappa_shower"},
+                        },
+                        {
+                            "name": "cache",
+                            "config": "cache.yaml",
+                            "depends_on": ["train"],
+                        },
+                    ]
+                }
+            )
+        )
+
+        with patch.object(
+            mock_submitter, "submit_job", side_effect=[["10"], ["20"]]
+        ) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path), warm_start="/weights/full-chain.ckpt"
+            )
+
+        assert result == {"train": ["10"], "cache": ["20"]}
+        train = submit_job.call_args_list[0].kwargs
+        cache = submit_job.call_args_list[1].kwargs
+        assert train["warm_start_path"] == "/weights/full-chain.ckpt"
+        assert train["warm_start_modules"] == {"grappa": "grappa_shower"}
+        assert cache["warm_start_path"] is None
+        assert cache["warm_start_modules"] is None
+
+    @pytest.mark.parametrize("warm_start", ["", 4])
+    def test_submit_pipeline_rejects_invalid_warm_start_path(
+        self, mock_submitter, tmp_path, warm_start
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "train",
+                            "config": "train.yaml",
+                            "stage": "train",
+                            "run_dir": "/tmp/train",
+                            "warm_start": {"model": "full.model"},
+                        }
+                    ]
+                }
+            )
+        )
+
+        with pytest.raises(ValueError, match="non-empty string"):
+            mock_submitter.submit_pipeline(str(pipeline_path), warm_start=warm_start)
+
+    def test_submit_pipeline_rejects_warm_start_without_stage_mappings(
+        self, mock_submitter, tmp_path
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump({"stages": [{"name": "inference", "config": "infer.yaml"}]})
+        )
+
+        with pytest.raises(ValueError, match="declares no warm_start mappings"):
+            mock_submitter.submit_pipeline(
+                str(pipeline_path), warm_start="/weights/full.ckpt"
+            )
+
     def test_submit_pipeline_forwards_cli_source_and_override_fields(
         self, mock_submitter, tmp_path
     ):
@@ -3829,6 +4394,10 @@ class TestPipelineSubmission:
                             "config": "mixed.yaml",
                             "stage": "train",
                             "run_dir": "/tmp/configured-inputs",
+                            "num_files": 2,
+                            "val_num_files": 1,
+                            "num_entries": 10000,
+                            "val_num_entries": 1000,
                             "sources": {
                                 "larcv": {"source": "raw.root"},
                                 "hdf5": {"source": "cache.h5"},
@@ -3893,6 +4462,10 @@ class TestPipelineSubmission:
             "graph_spice": "/tmp/graph-seed.ckpt",
         }
         assert configured["weight_path"] == "/tmp/full-seed.ckpt"
+        assert configured["num_entries"] == 10000
+        assert configured["val_num_entries"] == 1000
+        assert configured["num_files"] == 2
+        assert configured["val_num_files"] == 1
 
         export = submit_job.call_args_list[2].kwargs
         assert export["dependency"] == "afterok:20"
@@ -4457,6 +5030,14 @@ class TestPipelineSubmission:
                 "valid only for training",
             ),
             (
+                {"val_num_entries": 100},
+                "valid only for training",
+            ),
+            (
+                {"num_entries": 100, "entry_fraction_range": (0.0, 0.5)},
+                "cannot be combined",
+            ),
+            (
                 {"stage": "train", "run_dir": "/tmp/train", "in_place": True},
                 "in-place is valid only for inference",
             ),
@@ -4655,6 +5236,15 @@ class TestPipelineSubmission:
             (
                 {"entry_fraction_range": [0.8, 0.2]},
                 "0 <= START < STOP <= 1",
+            ),
+            ({"num_entries": 0}, "positive integer"),
+            ({"num_files": 0}, "positive integer"),
+            (
+                {
+                    "num_entries": 10,
+                    "entry_fraction_range": [0.0, 0.5],
+                },
+                "cannot combine num_entries",
             ),
         ],
     )

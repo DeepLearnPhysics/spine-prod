@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "250515"
+  date: "2025-05-15"
+  description: ND-LAr May 15 track GrapPA training from cached fragment graphs
+
+include:
+  - model/nd-lar/grappa_track/model_250515.yaml
+  - train/nd-lar/grappa_track/from_fragment_cache_v1.yaml

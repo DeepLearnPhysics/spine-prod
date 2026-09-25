@@ -84,6 +84,64 @@ def test_active_configs_declare_explicit_kind(config_path):
     assert config.get("__meta__", {}).get("kind") in {"bundle", "fragment", "mod"}
 
 
+def test_config_inheritance_crosses_scopes_only_for_conversion_stopgaps():
+    """Shared config must flow through common, apart from documented gaps."""
+    config_domains = {"cache", "convert", "filter", "infer", "model", "test", "train"}
+    allowed = {
+        (
+            "convert/dune-vd-10kt-1x8x6/truth_260911.yaml",
+            "convert/dune-hd-10kt-1x2x6/truth_260202.yaml",
+        ),
+        (
+            "convert/protodune-hd/truth_260911.yaml",
+            "convert/protodune-sp/truth_260210.yaml",
+        ),
+        (
+            "convert/fsd/truth_240819.yaml",
+            "convert/nd-lar/truth_240819.yaml",
+        ),
+        (
+            "convert/fsd/truth_240819.yaml",
+            "infer/nd-lar/modifier/single/mod_single_common.yaml",
+        ),
+    }
+
+    def yaml_paths(value):
+        if isinstance(value, dict):
+            for child in value.values():
+                yield from yaml_paths(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from yaml_paths(child)
+        elif isinstance(value, str) and value.endswith((".yaml", ".yml")):
+            yield value
+
+    cross_scope = set()
+    for source in CONFIG_ROOT.rglob("*.yaml"):
+        config = yaml.load(source.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        for reference in yaml_paths(config):
+            reference_path = Path(reference)
+            rooted = CONFIG_ROOT / reference_path
+            relative = source.parent / reference_path
+            target = (
+                rooted
+                if reference_path.parts[0] in config_domains and rooted.is_file()
+                else relative.resolve()
+            )
+            assert (
+                target.is_file()
+            ), f"Unresolved config reference: {source} -> {reference}"
+
+            source_rel = source.relative_to(CONFIG_ROOT)
+            target_rel = target.relative_to(CONFIG_ROOT)
+            source_scope = source_rel.parts[1]
+            target_scope = target_rel.parts[1]
+            if source_scope != target_scope and target_scope != "common":
+                cross_scope.add((source_rel.as_posix(), target_rel.as_posix()))
+
+    assert cross_scope == allowed
+
+
 @pytest.mark.parametrize("config_path", TRAIN_CONFIGS, ids=lambda path: str(path))
 def test_training_configs_use_canonical_top_level_train(config_path):
     """Training recipes must not rely on SPINE's deprecated base.train layout."""
@@ -262,6 +320,36 @@ def test_generic_models_and_cache_producers_name_dated_component_fragments():
         )
 
 
+@pytest.mark.parametrize(
+    ("detector", "version"),
+    (("nd-lar", "240819"), ("protodune-sp", "260210")),
+)
+def test_detector_uresnet_training_owns_canonical_backbone(detector, version):
+    """Detector UResNet-PPN and training reuse the standalone backbone."""
+    model_root = CONFIG_ROOT / "model" / detector
+    train_root = CONFIG_ROOT / "train" / detector / "uresnet"
+
+    network = yaml.load(
+        (model_root / "uresnet_ppn" / f"network_{version}.yaml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    loss = yaml.load(
+        (model_root / "uresnet_ppn" / f"loss_{version}.yaml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    training = yaml.load(
+        (train_root / f"train_{version}.yaml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+
+    assert network["uresnet"] == f"model/{detector}/uresnet/network_{version}.yaml"
+    assert loss["uresnet_loss"] == f"model/{detector}/uresnet/loss_{version}.yaml"
+    assert training["include"] == [
+        f"model/{detector}/uresnet/model_{version}.yaml",
+        f"train/{detector}/uresnet/base_v1.yaml",
+    ]
+
+
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 @pytest.mark.parametrize("version", ["240718", "240805"])
 def test_generic_segmentation_cache_reuses_uresnet_ppn_revision(version):
@@ -384,17 +472,18 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
     assert config["model"]["network_input"]["ppn_points"] == "ppn_points"
     assert [stage["name"] for stage in chain["stages"]] == [
         "fragmentation",
-        "particle_aggregation",
+        "fragment_graph",
     ]
+    assert chain["stages"][1]["provider"] == "fragment_graph"
     assert config["model"]["network_input"]["seg_pred"] == "seg_pred"
 
     modules = config["model"]["modules"]
     assert modules["graph_spice"]["model_name"] == ""
     assert modules["graph_spice"]["weight_path"] == ""
-    assert modules["grappa_shower"]["return_features"] is True
-    assert modules["grappa_track"]["return_features"] is True
-    assert modules["grappa_shower_loss"]["return_targets"] is True
-    assert modules["grappa_track_loss"]["return_targets"] is True
+    assert "return_features" not in modules["grappa_shower"]
+    assert "return_features" not in modules["grappa_track"]
+    assert "return_targets" not in modules["grappa_shower_loss"]
+    assert "return_targets" not in modules["grappa_track_loss"]
 
     # Cache-only controls aside, these are the authoritative standalone modules.
     revisions = {
@@ -417,12 +506,11 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
         assert cache_network == standalone_network
         if loss_key is not None:
             cache_loss = deepcopy(modules[f"{component}_loss"])
-            cache_loss.pop("return_targets")
             assert cache_loss == standalone[loss_key]
 
     keys = set(config["io"]["writer"]["keys"])
     for path in ("shower", "track"):
-        prefix = f"{path}_fragment"
+        prefix = f"fragment_graph_{path}"
         assert {
             f"{prefix}_edge_index",
             f"{prefix}_node_features",
@@ -430,12 +518,12 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
         }.issubset(keys)
         assert f"{prefix}_clusts" not in keys
     assert {
-        "particle_aggregation_shower_node_target",
-        "particle_aggregation_shower_node_valid",
-        "particle_aggregation_shower_edge_target",
-        "particle_aggregation_shower_edge_valid",
-        "particle_aggregation_track_edge_target",
-        "particle_aggregation_track_edge_valid",
+        "fragment_graph_shower_node_target",
+        "fragment_graph_shower_node_valid",
+        "fragment_graph_shower_edge_target",
+        "fragment_graph_shower_edge_valid",
+        "fragment_graph_track_edge_target",
+        "fragment_graph_track_edge_valid",
     }.issubset(keys)
 
 
@@ -446,13 +534,13 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
         (
             "grappa_shower",
             "train_from_fragment_cache_240718.yaml",
-            "shower_fragment",
+            "fragment_graph_shower",
             ("node", "edge"),
         ),
         (
             "grappa_track",
             "train_from_fragment_cache_240718.yaml",
-            "track_fragment",
+            "fragment_graph_track",
             ("edge",),
         ),
     ],
@@ -521,12 +609,13 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     assert cache["model"]["network_input"]["ppn_points"] == "ppn_points"
     assert [stage["name"] for stage in chain["stages"]] == [
         "particle_aggregation",
-        "interaction_aggregation",
+        "particle_graph",
     ]
+    assert chain["stages"][1]["provider"] == "particle_graph"
     assert cache["model"]["modules"]["grappa_shower"]["model_name"] == ""
     assert cache["model"]["modules"]["grappa_track"]["model_name"] == ""
-    assert cache["model"]["modules"]["grappa_inter"]["return_features"] is True
-    assert cache["model"]["modules"]["grappa_inter_loss"]["return_targets"] is True
+    assert "return_features" not in cache["model"]["modules"]["grappa_inter"]
+    assert "return_targets" not in cache["model"]["modules"]["grappa_inter_loss"]
 
     cache_modules = cache["model"]["modules"]
     revisions = {
@@ -549,7 +638,6 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
         assert cache_network == standalone_network
         if component == "grappa_inter":
             cache_loss = deepcopy(cache_modules["grappa_inter_loss"])
-            cache_loss.pop("return_targets")
             assert cache_loss == standalone["grappa_loss"]
 
     writer_keys = set(cache["io"]["writer"]["keys"])
@@ -560,9 +648,9 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
     assert "data" not in reader_keys
     assert "particle_clusts" not in reader_keys
     assert training["model"]["network_input"] == {
-        "edge_index": "particle_edge_index",
-        "node_features": "particle_node_features",
-        "edge_features": "particle_edge_features",
+        "edge_index": "particle_graph_edge_index",
+        "node_features": "particle_graph_node_features",
+        "edge_features": "particle_graph_edge_features",
     }
     assert set(training["model"]["modules"]["grappa"]) == {"nodes", "gnn_model"}
 
@@ -600,8 +688,8 @@ def test_generic_cache_stages_have_disjoint_product_ownership():
     # Raw LArCV products are mixed back in and must never acquire a cache owner.
     assert "data" not in owners
     assert "coord_label" not in owners
-    assert "shower_fragment_clusts" not in owners
-    assert "track_fragment_clusts" not in owners
+    assert "fragment_graph_shower_clusts" not in owners
+    assert "fragment_graph_track_clusts" not in owners
     assert "particle_clusts" not in owners
 
 
@@ -1020,7 +1108,40 @@ def test_260828_interaction_grappa_uses_full_chain_target_policy():
     assert "use_closest" not in standalone["node_loss"]["primary"]
 
     assert training == full_chain
-    cache.pop("return_targets")
+    assert cache == full_chain
+    assert full_chain["node_loss"]["type"] == {
+        **standalone["node_loss"]["type"],
+        "min_iou": 0.5,
+        "match_target": "group",
+    }
+    assert full_chain["node_loss"]["primary"] == {
+        **standalone["node_loss"]["primary"],
+        "use_closest": True,
+        "secondary_label": 0,
+        "min_iou": 0.5,
+        "match_target": "group",
+    }
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_nd_lar_260924_interaction_grappa_uses_full_chain_target_policy():
+    """ND-LAr cache targets and training use the generic reconstruction policy."""
+    standalone = load_config_with_includes(
+        CONFIG_ROOT / "model/nd-lar/grappa_inter/model_260310.yaml"
+    )["model"]["modules"]["grappa_loss"]
+    training = load_config_with_includes(
+        CONFIG_ROOT / "train/nd-lar/grappa_inter/train_from_particle_cache_260924.yaml"
+    )["model"]["modules"]["grappa_loss"]
+    cache = load_config_with_includes(
+        CONFIG_ROOT / "cache/nd-lar/grappa_shower_track/particle_graphs_260924.yaml"
+    )["model"]["modules"]["grappa_inter_loss"]
+    full_chain = load_config_with_includes(
+        CONFIG_ROOT / "model/nd-lar/full_chain/model_260924.yaml"
+    )["model"]["modules"]["grappa_inter_loss"]
+
+    assert "min_iou" not in standalone["node_loss"]["type"]
+    assert "use_closest" not in standalone["node_loss"]["primary"]
+    assert training == full_chain
     assert cache == full_chain
     assert full_chain["node_loss"]["type"] == {
         **standalone["node_loss"]["type"],
@@ -1413,8 +1534,8 @@ def test_protodune_sp_cache_stages_own_only_new_products():
     assert fragmentation_dataset["cache"]["stage_map"] == {"data_calib": "deghosting"}
     assert "coord_label" in fragmentation_dataset["primary"]["schema"]
     particle_keys = particles["io"]["writer"]["keys"]
-    assert "interaction_aggregation_node_orient_target" in particle_keys
-    assert "interaction_aggregation_node_orient_valid" in particle_keys
+    assert "particle_graph_node_orient_target" in particle_keys
+    assert "particle_graph_node_orient_valid" in particle_keys
 
 
 def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
@@ -1446,8 +1567,8 @@ def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
         root / "grappa_shower_track/particle_graphs_260906.yaml"
     )
     particle_keys = particles["io"]["writer"]["keys"]
-    assert "interaction_aggregation_node_orient_target" in particle_keys
-    assert "interaction_aggregation_node_orient_valid" in particle_keys
+    assert "particle_graph_node_orient_target" in particle_keys
+    assert "particle_graph_node_orient_valid" in particle_keys
 
     for version in ("260210", "260906"):
         inter_train = load_config_with_includes(
@@ -1460,14 +1581,10 @@ def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
         dataset_keys = inter_train["io"]["loader"]["dataset"]["keys"]
         loss_input = inter_train["model"]["loss_input"]
         node_loss = inter_train["model"]["modules"]["grappa_loss"]["node_loss"]
-        assert "interaction_aggregation_node_orient_target" in dataset_keys
-        assert "interaction_aggregation_node_orient_valid" in dataset_keys
-        assert loss_input["node_orient_target"] == (
-            "interaction_aggregation_node_orient_target"
-        )
-        assert loss_input["node_orient_valid"] == (
-            "interaction_aggregation_node_orient_valid"
-        )
+        assert "particle_graph_node_orient_target" in dataset_keys
+        assert "particle_graph_node_orient_valid" in dataset_keys
+        assert loss_input["node_orient_target"] == ("particle_graph_node_orient_target")
+        assert loss_input["node_orient_valid"] == ("particle_graph_node_orient_valid")
         assert node_loss["orient"] == {"name": "orient", "loss": "ce"}
 
     ppn_train = load_config_with_includes(
@@ -1728,6 +1845,452 @@ def test_protodune_sp_260906_pipeline_uses_mpvmpr_v1_and_dated_configs():
         stage for stage in pipeline.stages if stage["name"] == "report_full_chain"
     )
     assert report["config"] == "test/protodune-sp/full_chain/report_260210.yaml"
+
+
+def test_nd_lar_inference_models_are_thin_shared_model_wrappers():
+    """Every ND-LAr inference revision adds weights to a canonical model."""
+    versions = ("240819", "250505", "250515", "250806", "260310", "260409")
+    models = {}
+    for version in versions:
+        shared = load_config_with_includes(
+            CONFIG_ROOT / f"model/nd-lar/full_chain/model_{version}.yaml"
+        )["model"]
+        deployed = load_config_with_includes(
+            CONFIG_ROOT / f"infer/nd-lar/model/model_{version}.yaml"
+        )["model"]
+        assert deployed.pop("weight_path") == "/fake/weights/checkpoint.ckpt"
+        assert deployed == shared
+        models[version] = shared
+
+    # The overlay release changed training provenance but not architecture.
+    assert models["250806"] == models["250515"]
+
+    modules = models["260409"]["modules"]
+    assert modules["chain"]["deghosting"] is None
+    assert modules["graph_spice"]["embedder"]["uresnet"]["spatial_size"] == 6144
+    assert modules["graph_spice"]["constructor"]["graph"] == {
+        "name": "radius",
+        "r": 1.9,
+    }
+    assert modules["grappa_shower"]["graph"]["max_length"] == [
+        400,
+        0,
+        400,
+        400,
+        0,
+        0,
+        0,
+        35,
+        0,
+        70,
+    ]
+    assert modules["grappa_track"]["graph"]["max_length"] == 250
+    assert modules["grappa_inter"]["gnn_model"]["node_pred"]["type"] == 6
+    assert modules["grappa_inter"]["gnn_model"]["edge_layer"]["mlp"]["width"] == 128
+
+    assert (
+        models["240819"]["modules"]["graph_spice"]["embedder"]["uresnet"][
+            "spatial_size"
+        ]
+        == 31231
+    )
+    assert models["250505"]["modules"]["grappa_track"]["graph"]["max_length"] == 100
+    assert models["250515"]["modules"]["grappa_track"]["graph"]["max_length"] == 300
+    assert models["260310"]["modules"]["grappa_shower"]["graph"]["max_length"][-3] == 20
+
+
+@pytest.mark.parametrize(
+    "config_path",
+    [
+        "infer/nd-lar/io/io_240819.yaml",
+        "convert/nd-lar/truth_240819.yaml",
+        "infer/nd-lar/legacy/fsd_full_chain_250505.yaml",
+        "infer/2x2/io/io_240819.yaml",
+        "convert/2x2/truth_240819.yaml",
+    ],
+)
+def test_nd_lar_family_neutrino_parsers_use_genie_interaction_codes(config_path):
+    """ND-LAr, FSD and 2x2 truth products interpret GENIE interaction codes."""
+    config = load_config_with_includes(CONFIG_ROOT / config_path)
+    neutrino = config["io"]["loader"]["dataset"]["schema"]["neutrinos"]
+
+    assert neutrino["parser"] == "neutrino"
+    assert neutrino["interaction_scheme"] == "genie"
+
+
+@pytest.mark.parametrize("generator", ("genie", "gibuu", "nuwro", "neut"))
+def test_dlpgen_opt_conversion_uses_native_truth_products(generator):
+    """DLPGen conversions keep native labels and interpret generator truth."""
+    config = load_config_with_includes(
+        CONFIG_ROOT / f"convert/generic/truth_dlpgen_opt_{generator}_260914.yaml"
+    )
+    schema = config["io"]["loader"]["dataset"]["schema"]
+
+    assert "shape_precedence" not in schema["clust_label"]
+    particle_schemas = (
+        "ppn_label",
+        "clust_label",
+        "coord_label",
+        "graph_label",
+        "particles",
+    )
+    for key in particle_schemas:
+        assert schema[key]["particle_event"] == "particle_pcluster"
+
+    assert schema["clust_label"]["neutrino_event"] == "neutrino_mc_truth"
+    assert schema["particles"]["neutrino_event"] == "neutrino_mc_truth"
+    assert schema["neutrinos"] == {
+        "parser": "neutrino",
+        "neutrino_event": "neutrino_mc_truth",
+        "cluster_event": "cluster3d_pcluster",
+        "interaction_scheme": generator,
+    }
+
+    document = yaml.safe_load(
+        (
+            CONFIG_ROOT / f"convert/generic/truth_dlpgen_opt_{generator}_260914.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    assert document["__meta__"]["tags"] == [
+        "dlpgen-opt",
+        generator,
+        "detector-free",
+    ]
+
+
+def test_nd_lar_cache_stages_append_only_transition_products():
+    """ND-LAr caches do not duplicate tensors retained in raw LArCV."""
+    root = CONFIG_ROOT / "cache/nd-lar"
+    segmentation = load_config_with_includes(
+        root / "uresnet_ppn/segmentation_240819.yaml"
+    )
+    fragmentation = load_config_with_includes(
+        root / "graph_spice/fragment_graphs_260409.yaml"
+    )
+    particles = load_config_with_includes(
+        root / "grappa_shower_track/particle_graphs_260409.yaml"
+    )
+
+    assert segmentation["io"]["writer"]["keys"] == [
+        "seg_pred",
+        "ppn_points",
+        "clust_label_adapt",
+    ]
+    assert segmentation["io"]["loader"]["dataset"]["schema"]["clust_label"][
+        "particle_info"
+    ] == {
+        "particle_event": "particle_pcluster",
+        "type_include_secondary": False,
+        "type_include_mpr": False,
+        "primary_include_mpr": False,
+    }
+
+    fragment_writer_keys = fragmentation["io"]["writer"]["keys"]
+    assert fragmentation["io"]["loader"]["minibatch_size"] == 16
+    assert "data" not in fragment_writer_keys
+    assert "clust_label_adapt" not in fragment_writer_keys
+    assert "fragment_graph_shower_node_features" in fragment_writer_keys
+    assert "fragment_graph_track_edge_features" in fragment_writer_keys
+
+    particle_writer_keys = particles["io"]["writer"]["keys"]
+    assert "fragment_clusts" not in particle_writer_keys
+    assert "particle_graph_node_features" in particle_writer_keys
+    assert "particle_graph_node_orient_target" in particle_writer_keys
+    assert "particle_graph_node_orient_valid" in particle_writer_keys
+
+
+def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
+    """The ND-LAr workflow preserves reviewed batches and bounded concurrency."""
+    uresnet = load_config_with_includes(
+        CONFIG_ROOT / "train/nd-lar/uresnet/train_240819.yaml"
+    )
+    assert uresnet["io"]["loader"]["minibatch_size"] == 8
+
+    augmented = load_config_with_includes(
+        CONFIG_ROOT / "train/nd-lar/uresnet/train_augmented_260912.yaml"
+    )
+    assert augmented["base"]["iterations"] == 450000
+    assert "epochs" not in augmented["base"]
+    assert augmented["train"]["save_step"] == 3000
+    assert "save_epoch" not in augmented["train"]
+    assert set(augmented["io"]["loader"]["dataset"]["augment"]) == {
+        "flip_x",
+        "flip_y",
+        "flip_z",
+    }
+
+    expected_minibatches = {
+        "uresnet_ppn": 4,
+        "graph_spice": 4,
+        "grappa_shower": 1,
+        "grappa_track": 32,
+        "grappa_inter": 16,
+    }
+    for component, minibatch_size in expected_minibatches.items():
+        config = load_config_with_includes(
+            CONFIG_ROOT / f"train/nd-lar/{component}/base_v1.yaml"
+        )
+        loader = config["io"]["loader"]
+        assert loader["minibatch_size"] == minibatch_size
+        assert "batch_size" not in loader
+
+    pipeline = PipelineDefinition.load(
+        Path(__file__).parent.parent / "pipelines/nd-lar/full_chain_260409.yaml",
+        workspace_override="/tmp/nd-lar-260409",
+    )
+    names = [stage["name"] for stage in pipeline.stages]
+    assert len(names) == 22
+    assert names[:4] == [
+        "train_uresnet_ppn",
+        "cache_train_segmentation",
+        "cache_validation_segmentation",
+        "train_graph_spice",
+    ]
+    assert names[-3:] == [
+        "export_full_chain_weights",
+        "evaluate_full_chain",
+        "report_full_chain",
+    ]
+    assert not any("deghost" in name for name in names)
+
+    source_root = "/sdf/data/neutrino/ndlar/sim/mpvmpr_v01"
+    first = pipeline.stages[0]
+    assert first["source_list"] == f"{source_root}/train_file_list.txt"
+    assert first["val_source_list"] == f"{source_root}/test_file_list.txt"
+    assert first["profile"] == "s3df_ampere_full"
+    assert first["time"] == "2-00:00:00"
+    assert first["expandable_segments"] is True
+
+    graph_spice = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_graph_spice"
+    )
+    assert graph_spice["profile"] == "s3df_ampere_full"
+    assert graph_spice["time"] == "2-00:00:00"
+    assert set(graph_spice["sources"]) == {"primary", "cache"}
+
+    for stage in pipeline.stages:
+        if stage["name"].startswith("cache_"):
+            assert stage["ntasks"] == 2
+            assert stage["files_per_task"] == 1
+
+    shower = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_shower"
+    )
+    track = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_track"
+    )
+    assert shower["depends_on"] == [
+        "build_train_shower_edges",
+        "build_validation_shower_edges",
+    ]
+    assert track["depends_on"] == [
+        "cache_train_fragment_graphs",
+        "cache_validation_fragment_graphs",
+    ]
+    assert shower["profile"] == "s3df_ampere_full"
+    assert shower["time"] == "3-00:00:00"
+    assert shower["minibatch_size"] == 1
+    assert shower["entry_filter"].endswith("/filter/shower_edges/train/accepted.yaml")
+    assert shower["val_entry_filter"].endswith(
+        "/filter/shower_edges/validation/accepted.yaml"
+    )
+    assert track["profile"] == "s3df_ampere_full"
+    assert track["time"] == "2-00:00:00"
+
+    inter = next(
+        stage for stage in pipeline.stages if stage["name"] == "train_grappa_inter"
+    )
+    assert inter["profile"] == "s3df_ampere_full"
+    assert inter["time"] == "2-00:00:00"
+    assert inter["minibatch_size"] == 16
+    assert inter["depends_on"] == [
+        "build_train_interaction_edges",
+        "build_validation_interaction_edges",
+    ]
+    assert inter["entry_filter"].endswith(
+        "/filter/interaction_edges/train/accepted.yaml"
+    )
+    assert inter["val_entry_filter"].endswith(
+        "/filter/interaction_edges/validation/accepted.yaml"
+    )
+
+    for split in ("train", "validation"):
+        scan = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"scan_{split}_shower_edges"
+        )
+        build = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"build_{split}_shower_edges"
+        )
+        assert scan["source"].endswith(f"/cache/{split}.spine-cache")
+        assert scan["depends_on"] == [f"cache_{split}_fragment_graphs"]
+        assert build["output"] == (
+            f"/tmp/nd-lar-260409/filter/shower_edges/{split}/accepted.yaml"
+        )
+
+        interaction_scan = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"scan_{split}_interaction_edges"
+        )
+        interaction_build = next(
+            stage
+            for stage in pipeline.stages
+            if stage["name"] == f"build_{split}_interaction_edges"
+        )
+        assert interaction_scan["source"].endswith(f"/cache/{split}.spine-cache")
+        assert interaction_scan["depends_on"] == [f"cache_{split}_particle_graphs"]
+        assert interaction_build["output"] == (
+            f"/tmp/nd-lar-260409/filter/interaction_edges/{split}/accepted.yaml"
+        )
+
+    shower_network = load_config_with_includes(
+        CONFIG_ROOT / "model/nd-lar/grappa_shower/network_260409.yaml"
+    )
+    assert shower_network["max_edge_count"] == 1600000
+
+    export = next(
+        stage
+        for stage in pipeline.stages
+        if stage["name"] == "export_full_chain_weights"
+    )
+    assert set(export["module_weight"]) == set(expected_minibatches)
+
+    evaluation = next(
+        stage for stage in pipeline.stages if stage["name"] == "evaluate_full_chain"
+    )
+    assert evaluation["entry_fraction_range"] == [0.5, 1.0]
+    assert evaluation["ntasks"] == 4
+
+    report = pipeline.stages[-1]
+    assert report["config"] == "test/nd-lar/full_chain/report_240819.yaml"
+
+    # Every non-overlay ND-LAr production has an end-to-end staged workflow.
+    for version in ("250505", "250515", "260310", "260409"):
+        dated = PipelineDefinition.load(
+            Path(__file__).parent.parent
+            / f"pipelines/nd-lar/full_chain_{version}.yaml",
+            workspace_override=f"/tmp/nd-lar-{version}",
+        )
+        export = next(
+            stage
+            for stage in dated.stages
+            if stage["name"] == "export_full_chain_weights"
+        )
+        evaluation = next(
+            stage for stage in dated.stages if stage["name"] == "evaluate_full_chain"
+        )
+        assert export["config"] == f"model/nd-lar/full_chain/model_{version}.yaml"
+        assert evaluation["config"] == (
+            f"test/nd-lar/full_chain/evaluate_{version}.yaml"
+        )
+
+    pipeline_root = Path(__file__).parent.parent / "pipelines/nd-lar"
+    assert not (pipeline_root / "full_chain_240819.yaml").exists()
+    assert not (pipeline_root / "full_chain_250806.yaml").exists()
+
+    overlay_expected = {
+        "graph_spice": (4, 16),
+        "grappa_shower": (3, 3),
+        "grappa_track": (4, 16),
+        "grappa_inter": (4, 16),
+    }
+    for component, (multiplicity, minibatch_size) in overlay_expected.items():
+        overlay = load_config_with_includes(
+            CONFIG_ROOT / f"train/nd-lar/{component}/train_250806.yaml"
+        )
+        assert overlay["io"]["loader"]["collate_fn"]["overlay"] == {
+            "multiplicity": multiplicity
+        }
+        assert overlay["io"]["loader"]["minibatch_size"] == minibatch_size
+
+
+def test_all_training_pipelines_declare_full_chain_warm_start_namespaces():
+    """Every staged trainer supports the pipeline-wide full-chain seed."""
+    expected = {
+        "train_uresnet_deghost": {"uresnet": "uresnet_deghost"},
+        "train_uresnet_ppn": {
+            "uresnet": "uresnet_ppn.uresnet",
+            "ppn": "uresnet_ppn.ppn",
+        },
+        "train_graph_spice": {"graph_spice": "graph_spice"},
+        "train_grappa_shower": {"grappa": "grappa_shower"},
+        "train_grappa_track": {"grappa": "grappa_track"},
+        "train_grappa_inter": {"grappa": "grappa_inter"},
+    }
+    pipeline_root = Path(__file__).parent.parent / "pipelines"
+    training_pipeline_count = 0
+    for pipeline_path in sorted(pipeline_root.rglob("*.yaml")):
+        pipeline = PipelineDefinition.load(
+            pipeline_path,
+            workspace_override=f"/tmp/{pipeline_path.parent.name}-{pipeline_path.stem}",
+        )
+        training_stages = [
+            stage for stage in pipeline.stages if stage.get("stage") == "train"
+        ]
+        if training_stages:
+            training_pipeline_count += 1
+        for stage in training_stages:
+            assert stage["warm_start"] == expected[stage["name"]]
+
+    assert training_pipeline_count > 0
+
+
+def test_nd_lar_260924_pipeline_enables_image_augmentation_and_new_targets():
+    """The current ND-LAr pipeline pins augmentation and target revisions."""
+    pipeline = PipelineDefinition.load(
+        Path(__file__).parent.parent / "pipelines/nd-lar/full_chain_260924.yaml",
+        workspace_override="/tmp/nd-lar-260924",
+    )
+    stages = {stage["name"]: stage for stage in pipeline.stages}
+
+    assert stages["train_uresnet_ppn"]["apply_mods"] == ["augment_uresnet:260912"]
+    assert stages["train_graph_spice"]["apply_mods"] == ["augment_graph_spice:260912"]
+    assert stages["cache_train_particle_graphs"]["config"].endswith(
+        "particle_graphs_260924.yaml"
+    )
+    assert stages["train_grappa_inter"]["config"].endswith(
+        "train_from_particle_cache_260924.yaml"
+    )
+    assert stages["export_full_chain_weights"]["config"] == (
+        "model/nd-lar/full_chain/model_260924.yaml"
+    )
+    assert stages["evaluate_full_chain"]["config"].endswith("evaluate_260924.yaml")
+    assert stages["evaluate_full_chain"]["apply_mods"] == ["mpvmpr:260924"]
+
+
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
+def test_nd_lar_mpvmpr_modifier_enables_multiplicity_nu_ids(tmp_path):
+    """MPV/MPR inference must omit explicit, empty neutrino truth inputs."""
+    modifier = CONFIG_INFER_ROOT / "nd-lar/modifier/mpvmpr/mod_mpvmpr_260924.yaml"
+    composite = write_composite_config(
+        tmp_path,
+        CONFIG_INFER_ROOT / "nd-lar/full_chain_260409.yaml",
+        modifier,
+    )
+    config = load_config_with_includes(composite)
+    schema = config["io"]["loader"]["dataset"]["schema"]
+
+    assert "neutrino_event" not in schema["clust_label"]
+    assert "neutrino_event" not in schema["particles"]
+    assert "neutrinos" not in schema
+
+
+def test_all_nd_lar_pipeline_evaluations_use_mpvmpr_truth():
+    """Every ND-LAr training pipeline evaluates its MPV/MPR sample consistently."""
+    pipeline_root = Path(__file__).parent.parent / "pipelines/nd-lar"
+    for pipeline_path in sorted(pipeline_root.glob("*.yaml")):
+        pipeline = PipelineDefinition.load(
+            pipeline_path,
+            workspace_override=f"/tmp/{pipeline_path.stem}",
+        )
+        evaluation = next(
+            stage for stage in pipeline.stages if stage["name"] == "evaluate_full_chain"
+        )
+        assert evaluation["apply_mods"] == ["mpvmpr:260924"]
 
 
 def write_composite_config(tmp_path, base_config, modifier_config):

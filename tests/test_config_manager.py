@@ -99,10 +99,28 @@ def test_deprecated_detector_alias_selects_canonical_profile(manager):
     assert profile["partition"] == "gpu"
 
 
-def test_detect_config_family_supports_conversion_and_historical_default(manager):
+def test_detect_config_family_supports_all_config_trees_and_historical_default(
+    manager, tmp_path
+):
+    (tmp_path / "config" / "train").mkdir(parents=True)
+    (tmp_path / "config" / "test").mkdir()
     assert manager.detect_config_family("convert/icarus/latest") == "convert"
     assert manager.detect_config_family("config/infer/icarus/latest") == "infer"
+    assert manager.detect_config_family("train/generic/uresnet/train.yaml") == "train"
+    assert manager.detect_config_family("config/test/generic/evaluate.yaml") == "test"
     assert manager.detect_config_family("custom.yaml") == "infer"
+
+
+def test_modifier_search_path_handles_config_prefix_and_unscoped_fallback(
+    manager, tmp_path
+):
+    """Modifier discovery normalizes repository paths but preserves unknown ones."""
+    (tmp_path / "config" / "train").mkdir(parents=True)
+
+    assert manager.modifier_search_path("config/train/generic/model.yaml") == str(
+        tmp_path / "config" / "train" / "generic"
+    )
+    assert manager.modifier_search_path("model.yaml") == "model.yaml"
 
 
 def test_resolve_config_path_supports_spine_and_repository_relative_paths(
@@ -254,6 +272,91 @@ def test_create_composite_config_resolves_named_and_custom_modifiers(manager, tm
     assert "infer/icarus/full_chain_250101.yaml" in content
     assert "infer/icarus/modifier/data/mod_data_250101.yaml" in content
     assert str(custom) in content
+
+
+def test_create_composite_config_is_deterministic(manager, tmp_path):
+    """Regenerating an unchanged wrapper must preserve its run identity."""
+    config_dir = tmp_path / "config" / "train" / "icarus"
+    modifier_dir = config_dir / "modifier" / "augment"
+    modifier_dir.mkdir(parents=True)
+    base = config_dir / "model_250101.yaml"
+    modifier = modifier_dir / "mod_augment_250101.yaml"
+    base.write_text("{}\n")
+    modifier.write_text("{}\n")
+    job_dir = tmp_path / "job"
+    job_dir.mkdir()
+
+    first = Path(
+        manager.create_composite_config(
+            "train/icarus/model_250101.yaml", ["augment:250101"], job_dir
+        )
+    ).read_bytes()
+    second = Path(
+        manager.create_composite_config(
+            "train/icarus/model_250101.yaml", ["augment:250101"], job_dir
+        )
+    ).read_bytes()
+
+    assert second == first
+    assert b"# Generated:" not in second
+
+
+@pytest.mark.parametrize(
+    ("family", "base_path"),
+    [
+        ("convert", "truth_250101.yaml"),
+        ("train", "uresnet/train_250101.yaml"),
+        ("test", "full_chain/evaluate_250101.yaml"),
+    ],
+)
+def test_create_composite_config_discovers_family_local_modifiers(
+    manager, tmp_path, family, base_path
+):
+    family_root = tmp_path / "config" / family / "icarus"
+    base = family_root / base_path
+    modifier = family_root / "modifier" / "local" / "mod_local_250101.yaml"
+    base.parent.mkdir(parents=True)
+    modifier.parent.mkdir(parents=True)
+    (tmp_path / "job").mkdir()
+    base.write_text("{}\n")
+    modifier.write_text("{}\n")
+
+    result = Path(
+        manager.create_composite_config(str(base), ["local"], tmp_path / "job")
+    )
+
+    assert f"{family}/icarus/modifier/local/mod_local_250101.yaml" in result.read_text()
+
+
+def test_create_composite_config_uses_explicit_scope_for_generated_config(
+    manager, tmp_path
+):
+    generated = tmp_path / "job" / "icarus_truth_latest_250101.yaml"
+    modifier = (
+        tmp_path
+        / "config"
+        / "convert"
+        / "icarus"
+        / "modifier"
+        / "local"
+        / "mod_local_250101.yaml"
+    )
+    generated.parent.mkdir()
+    modifier.parent.mkdir(parents=True)
+    generated.write_text("{}\n")
+    modifier.write_text("{}\n")
+
+    result = Path(
+        manager.create_composite_config(
+            str(generated),
+            ["local"],
+            generated.parent,
+            detector="icarus",
+            family="convert",
+        )
+    )
+
+    assert "convert/icarus/modifier/local/mod_local_250101.yaml" in result.read_text()
 
 
 def test_create_composite_config_accepts_cwd_relative_external_config(
@@ -464,6 +567,7 @@ def test_create_latest_config_snapshots_complete_conversion_bundle(manager, tmp_
     (conversion_dir / "truth_custom.yaml").write_text("custom\n")
     (conversion_dir / "truth_240101.yaml").write_text("old\n")
     (conversion_dir / "truth_250101.yaml").write_text("new\n")
+    (conversion_dir / "truth_variant_260101.yaml").write_text("variant\n")
 
     result = Path(manager.create_latest_config("icarus", tmp_path, family="convert"))
 
@@ -527,6 +631,17 @@ def test_list_modifiers_resolves_detector_path_and_versions(manager, tmp_path):
     assert result["base_version"] == "250101"
     assert result["modifiers"]["data"]["selected"] == "240101"
     assert result["modifiers"]["data"]["available"] == ["240101"]
+
+
+def test_list_modifiers_uses_config_family(manager, tmp_path):
+    modifier_dir = tmp_path / "config" / "convert" / "icarus" / "modifier" / "lite"
+    modifier_dir.mkdir(parents=True)
+    modifier = modifier_dir / "mod_lite_240101.yaml"
+    modifier.touch()
+
+    result = manager.list_modifiers("convert/icarus/truth_250101.yaml")
+
+    assert result["modifiers"]["lite"]["selected"] == "240101"
 
 
 def test_list_modifiers_accepts_path_outside_infer_tree(manager, tmp_path):

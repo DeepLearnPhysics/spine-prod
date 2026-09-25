@@ -10,20 +10,20 @@ override:
     path: null
     stage: fragmentation
     keys:
-      - track_fragment_edge_index
-      - track_fragment_node_features
-      - track_fragment_edge_features
-      - particle_aggregation_track_edge_target
-      - particle_aggregation_track_edge_valid
+      - fragment_graph_track_edge_index
+      - fragment_graph_track_node_features
+      - fragment_graph_track_edge_features
+      - fragment_graph_track_edge_target
+      - fragment_graph_track_edge_valid
 
   model.network_input:
-    edge_index: track_fragment_edge_index
-    node_features: track_fragment_node_features
-    edge_features: track_fragment_edge_features
+    edge_index: fragment_graph_track_edge_index
+    node_features: fragment_graph_track_node_features
+    edge_features: fragment_graph_track_edge_features
 
   model.loss_input:
-    edge_target: particle_aggregation_track_edge_target
-    edge_valid: particle_aggregation_track_edge_valid
+    edge_target: fragment_graph_track_edge_target
+    edge_valid: fragment_graph_track_edge_valid
 
 remove:
   - model.network_input.data

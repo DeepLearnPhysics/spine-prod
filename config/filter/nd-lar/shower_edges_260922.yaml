@@ -1,0 +1,19 @@
+__meta__:
+  kind: bundle
+  version: "260922"
+  date: "2026-09-22"
+  description: Reject ND-LAr entries with pathological cached shower graphs
+
+input:
+  name: cache
+
+measurements:
+  shower_edges:
+    kind: product_size
+    product: fragment_graph_shower_edge_index
+    stage: fragmentation
+
+filters:
+  # max_count is exclusive: retain entries with at most 1.6M shower edges.
+  shower_edges:
+    max_count: 1600001

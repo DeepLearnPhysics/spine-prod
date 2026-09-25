@@ -29,8 +29,8 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v1.2.0. Maintained configurations require SPINE
-v1.2.0 or later.
+The current default is SPINE v1.3.0. Maintained configurations require SPINE
+v1.3.0 or later.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:
@@ -81,12 +81,21 @@ source configure.sh
 # Process multiple files per task explicitly
 ./submit.py --config infer/icarus/latest --source data/*.root --files-per-task 5
 
+# Resolve the source, keep its first two files, then split those files into tasks
+./submit.py --config infer/icarus/latest --source-list files.txt --num-files 2 --files-per-task 1
+
+# Overlay independent ND-LAr primary and secondary samples during inference
+./submit.py --config infer/nd-lar/latest --apply-mods joint \
+  --source-list primary=primary.txt secondary=secondary.txt
+
 # Split the file list across 50 tasks as evenly as possible
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
 # Start a persistent training run using the loader defined in the config
 ./submit.py --config train/generic/uresnet/train_240718.yaml \
-  --stage train --run-dir /path/to/experiments/uresnet/default
+  --stage train --run-dir /path/to/experiments/uresnet/default \
+  --source-list train.txt --val-source-list validation.txt \
+  --num-files 2 --val-num-files 1
 
 # Run a multi-stage pipeline
 ./submit.py --pipeline pipelines/icarus_production_example.yaml
@@ -181,6 +190,7 @@ spine-prod/
 │   │   ├── sbnd/            # SBND detector configs
 │   │   └── common/          # Shared configs
 │   ├── model/               # Common structures and detector revisions
+│   ├── test/                # Evaluation analyzers and report recipes
 │   └── train/               # Training configs (referenced as train/...)
 ├── templates/               # Job templates
 │   ├── profiles.yaml        # Resource profiles
@@ -191,6 +201,8 @@ spine-prod/
 ├── pipelines/               # Multi-stage pipeline definitions
 │   ├── generic/              # Generic detector workflow revisions
 │   │   └── uresnet_ppn_to_graph_spice_240805.yaml
+│   ├── nd-lar/               # ND-LAr cached full-chain training
+│   ├── protodune-sp/         # ProtoDUNE-SP cached full-chain training
 │   └── icarus_production_example.yaml
 │
 ├── scripts/                 # Utility scripts
@@ -208,14 +220,16 @@ generate a composite YAML config at submission time.
 ### Config Organization
 
 ```
-infer/<detector>/
-├── full_chain_*.yaml             # Version-specific top-level configs
-├── base/                         # Base component YAMLs
-├── io/                           # IO component YAMLs
-├── model/                        # Model component YAMLs
-├── post/                         # Post-processing component YAMLs
-└── modifier/                     # Optional modifier YAMLs
+<family>/<detector-or-scope>/
+├── ...                           # Family-specific configs and components
+└── modifier/                     # Optional family-local modifier YAMLs
 ```
+
+Named modifiers are resolved within the base configuration's family and scope.
+For example, `convert/icarus/truth_*.yaml` uses modifiers under
+`convert/icarus/modifier/`, while `train/generic/uresnet/train_*.yaml` uses
+modifiers under `train/generic/modifier/`. Explicit modifier file paths remain
+available for intentional cross-family composition.
 
 ### Example: ICARUS Configurations
 
@@ -727,6 +741,8 @@ writer output fields. See
 workflow with centralized paths. Its materialization jobs publish successive
 immutable stages to one logical cache repository per data split,
 then compose the independently trained modules into one full-chain checkpoint.
+The ND-LAr and ProtoDUNE-SP pipelines apply the same production pattern with
+their detector-specific model and data contracts.
 The generic full-chain pipelines finally evaluate that assembled checkpoint
 with SPINE's metric analyzers and submit a CPU-only `kind: report` reduction.
 The report stage waits for all metric inference jobs, records dataset,
@@ -754,13 +770,17 @@ runs/20260810_143022_spine_icarus_latest/
         ├── stdout.log
         ├── stderr.log
         ├── inference_log-*.csv
+        ├── outputs.txt
         └── output/
 ```
 
 `output/` is created only when spine-prod supplies the default writer output;
 it is omitted when `--output` selects an external destination or `--in-place`
 leaves the writer destination config-defined. There are no empty scheduler,
-task, or log directories.
+task, or log directories. For a managed default output, `outputs.txt` is
+initialized at submission and populated with absolute paths after each
+successful task. It is also available through `latest/outputs.txt` and its
+location is recorded as `output_manifest` in `job_metadata.json`.
 
 Only a real scheduler array creates task directories. Scheduler chunking is
 represented by numbered submit scripts instead of another directory layer:
@@ -768,6 +788,7 @@ represented by numbered submit scripts instead of another directory layer:
 ```
 attempts/TIMESTAMP/
 ├── job_metadata.json
+├── outputs.txt
 ├── submit_000.sbatch
 ├── submit_001.sbatch
 ├── JOB_*.out                   # Scheduler array logs
@@ -776,6 +797,7 @@ attempts/TIMESTAMP/
     ├── 000_1/
     │   ├── inputs.txt
     │   ├── inference_log-*.csv
+    │   ├── outputs.txt
     │   └── output/
     └── 000_2/
         └── ...
@@ -879,7 +901,16 @@ This is especially useful for large-scale production to save disk space by remov
 
 # Expose CVMFS inside the container
 ./submit.py --config infer/icarus/latest --source data.root --cvmfs
+
+# Let PyTorch grow CUDA allocator segments to reduce fragmentation
+./submit.py --config train/generic/uresnet/train_240718.yaml \
+  --stage train --run-dir /path/to/run --expandable-segments
 ```
+
+`--expandable-segments` exports
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` before starting SPINE. It is
+available for batch, interactive, and pipeline submissions; pipelines may also
+set `expandable_segments: true` globally or on an individual stage.
 
 There is no need to pass `--flashmatch`. The flag is accepted only for backward
 compatibility and is ignored. Use `--flashmatch-path` to source a custom

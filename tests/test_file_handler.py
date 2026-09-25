@@ -97,6 +97,24 @@ def test_named_sources_allow_one_shared_cache_repository(handler, tmp_path):
     }
 
 
+def test_named_joint_sources_allow_independent_file_counts(handler, tmp_path):
+    primary = [tmp_path / f"primary-{index}.root" for index in range(2)]
+    secondary = [tmp_path / f"secondary-{index}.root" for index in range(3)]
+    for path in primary + secondary:
+        path.touch()
+
+    assert handler.parse_named_sources(
+        {
+            "primary": {"source": list(map(str, primary))},
+            "secondary": {"source": list(map(str, secondary))},
+        },
+        aligned=False,
+    ) == {
+        "primary": list(map(str, primary)),
+        "secondary": list(map(str, secondary)),
+    }
+
+
 def test_named_sources_reject_invalid_cache_cardinality(handler, tmp_path):
     """A cache role always denotes exactly one logical repository."""
     caches = [tmp_path / "first.spine-cache", tmp_path / "second.spine-cache"]
@@ -112,6 +130,73 @@ def test_named_sources_reject_cache_without_partition_driver(handler, tmp_path):
     cache.mkdir()
     with pytest.raises(ValueError, match="require another target"):
         handler.parse_named_sources({"cache": {"source": str(cache)}})
+
+
+def test_limit_named_sources_preserves_alignment_and_shared_cache(handler):
+    sources = {
+        "primary": ["raw-1.root", "raw-2.root", "raw-3.root"],
+        "features": ["one.h5", "two.h5", "three.h5"],
+        "cache": ["train.spine-cache"],
+    }
+
+    assert handler.limit_named_sources(sources, 2) == {
+        "primary": ["raw-1.root", "raw-2.root"],
+        "features": ["one.h5", "two.h5"],
+        "cache": ["train.spine-cache"],
+    }
+
+
+def test_limit_joint_sources_only_truncates_primary(handler):
+    sources = {
+        "primary": ["primary-1.root", "primary-2.root"],
+        "secondary": ["secondary-1.root", "secondary-2.root"],
+    }
+    assert handler.limit_named_sources(sources, 1, primary_only=True) == {
+        "primary": ["primary-1.root"],
+        "secondary": ["secondary-1.root", "secondary-2.root"],
+    }
+
+
+@pytest.mark.parametrize("value", [0, -1, 1.5, True])
+def test_limit_named_sources_requires_positive_integer(handler, value):
+    with pytest.raises(ValueError, match="positive integer"):
+        handler.limit_named_sources({"primary": ["one.root"]}, value)
+
+
+def test_pair_joint_sources_uses_shorter_ordered_source(handler):
+    sources = {
+        "primary": ["primary-1.root", "primary-2.root", "primary-3.root"],
+        "secondary": ["secondary-1.root", "secondary-2.root"],
+    }
+
+    assert handler.pair_joint_sources(sources) == {
+        "primary": ["primary-1.root", "primary-2.root"],
+        "secondary": ["secondary-1.root", "secondary-2.root"],
+    }
+    assert handler.pair_joint_sources(sources, num_files=1) == {
+        "primary": ["primary-1.root"],
+        "secondary": ["secondary-1.root"],
+    }
+
+
+def test_pair_joint_sources_requires_both_roles(handler):
+    with pytest.raises(ValueError, match="primary and secondary"):
+        handler.pair_joint_sources({"primary": ["primary.root"]})
+
+
+@pytest.mark.parametrize("value", [0, -1, 1.5, True])
+def test_pair_joint_sources_requires_positive_integer(handler, value):
+    with pytest.raises(ValueError, match="positive integer"):
+        handler.pair_joint_sources(
+            {"primary": ["primary.root"], "secondary": ["secondary.root"]},
+            num_files=value,
+        )
+
+
+@pytest.mark.parametrize("value", [0, -1, 1.5, True])
+def test_limit_files_requires_positive_integer(handler, value):
+    with pytest.raises(ValueError, match="positive integer"):
+        handler.limit_files(["one.root"], value)
 
 
 def test_stage_cache_output_paths_follow_writer_naming(handler, tmp_path):

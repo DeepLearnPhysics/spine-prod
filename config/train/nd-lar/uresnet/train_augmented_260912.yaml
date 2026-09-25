@@ -1,0 +1,19 @@
+__meta__:
+  kind: bundle
+  version: "260912"
+  date: "2026-09-12"
+  description: ND-LAr UResNet training with lattice and detector-symmetry augmentation
+
+include:
+  - train/nd-lar/uresnet/train_240819.yaml
+  - train/nd-lar/modifier/augment_uresnet/mod_augment_uresnet_260912.yaml
+
+remove:
+  - base.epochs
+  - train.save_epoch
+
+override:
+  # Compare restricted samples at a fixed optimizer-update budget, independent
+  # of how many batches each nominal dataset epoch contains.
+  base.iterations: 450000
+  train.save_step: 3000

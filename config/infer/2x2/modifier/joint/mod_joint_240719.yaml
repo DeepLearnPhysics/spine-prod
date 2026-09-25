@@ -1,0 +1,15 @@
+__meta__:
+  kind: mod
+  name: joint
+  version: "240719"
+  date: "2024-07-19"
+  description: 2x2 primary/secondary joint-dataset inference
+  applies_to: [mc]
+  conflicts_with: [data, noflash]
+  compatible_with:
+    io: "240719"
+
+include: mod_joint_common.yaml
+
+override:
+  io.loader.dataset.base.schema.ppn_label.include_point_tagging: true

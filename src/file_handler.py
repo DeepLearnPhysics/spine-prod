@@ -3,7 +3,7 @@
 import glob
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Optional
 
 
 class FileHandler:
@@ -77,12 +77,15 @@ class FileHandler:
         self,
         sources: Mapping[str, Mapping[str, Any]],
         allow_missing: bool = False,
+        aligned: bool = True,
     ) -> Dict[str, List[str]]:
         """Resolve every target in a composite dataset source mapping.
 
-        Ordinary targets must resolve to the same number of files. The
+        Aligned targets must resolve to the same number of files. The
         canonical ``cache`` role is one shared repository and may resolve to
         one path while the ``primary`` source is partitioned across tasks.
+        Joint primary/secondary datasets set ``aligned=False`` because the
+        primary drives traversal while the secondary is sampled independently.
         """
         resolved = {}
         expected_count = None
@@ -111,7 +114,7 @@ class FileHandler:
                     )
             elif expected_count is None:
                 expected_count = len(files)
-            elif len(files) != expected_count:
+            elif aligned and len(files) != expected_count:
                 raise ValueError(
                     "Named sources must contain aligned file counts; "
                     f"'{target}' has {len(files)}, expected {expected_count}"
@@ -124,6 +127,83 @@ class FileHandler:
             )
 
         return resolved
+
+    @staticmethod
+    def limit_files(files: List[str], num_files: Optional[int]) -> List[str]:
+        """Restrict an already-resolved source list to its first files."""
+        if num_files is None:
+            return files
+        if (
+            isinstance(num_files, bool)
+            or not isinstance(num_files, int)
+            or num_files < 1
+        ):
+            raise ValueError("num_files must be a positive integer")
+        return files[:num_files]
+
+    @staticmethod
+    def limit_named_sources(
+        sources: Mapping[str, List[str]],
+        num_files: Optional[int],
+        primary_only: bool = False,
+    ) -> Dict[str, List[str]]:
+        """Restrict aligned named sources while preserving a shared cache."""
+        if num_files is None:
+            return {target: list(paths) for target, paths in sources.items()}
+        if (
+            isinstance(num_files, bool)
+            or not isinstance(num_files, int)
+            or num_files < 1
+        ):
+            raise ValueError("num_files must be a positive integer")
+        return {
+            target: (
+                list(paths)
+                if target == "cache" or (primary_only and target != "primary")
+                else list(paths[:num_files])
+            )
+            for target, paths in sources.items()
+        }
+
+    @staticmethod
+    def pair_joint_sources(
+        sources: Mapping[str, List[str]],
+        num_files: Optional[int] = None,
+    ) -> Dict[str, List[str]]:
+        """Pair ordered primary/secondary files up to the shorter source.
+
+        Parameters
+        ----------
+        sources : mapping
+            Resolved named sources containing ``primary`` and ``secondary``.
+        num_files : int, optional
+            Additional upper bound on the number of file pairs.
+
+        Returns
+        -------
+        dict
+            Source mapping with primary and secondary truncated symmetrically.
+        """
+        if "primary" not in sources or "secondary" not in sources:
+            raise ValueError("Paired joint files require primary and secondary sources")
+        if num_files is not None and (
+            isinstance(num_files, bool)
+            or not isinstance(num_files, int)
+            or num_files < 1
+        ):
+            raise ValueError("num_files must be a positive integer")
+
+        pair_count = min(len(sources["primary"]), len(sources["secondary"]))
+        if num_files is not None:
+            pair_count = min(pair_count, num_files)
+        return {
+            target: (
+                list(paths[:pair_count])
+                if target in ("primary", "secondary")
+                else list(paths)
+            )
+            for target, paths in sources.items()
+        }
 
     @staticmethod
     def stage_cache_output_paths(

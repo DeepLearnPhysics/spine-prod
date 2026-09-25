@@ -24,10 +24,27 @@ conversion bundle for convenience:
 ./submit.py --config convert/protodune-sp/latest --source input.root
 ```
 
-`latest` selects a complete dated bundle. It does not independently combine the
-newest detector IO and base fragments, which could produce an unreviewed pairing.
+Conversion-specific named modifiers may be placed under
+`convert/<detector>/modifier/<name>/mod_<name>_YYMMDD.yaml` and applied with
+`--apply-mods <name>`. Modifier lookup stays within the `convert` family;
+inference modifiers are not selected implicitly.
+
+`latest` selects the newest canonical `truth_YYMMDD.yaml` bundle. Named variants
+must be selected explicitly. It does not independently combine the newest IO and
+base fragments, which could produce an unreviewed pairing.
 
 A detector has another dated truth bundle only when a base or IO revision changes
 the converted artifact—for example its geometry, truth parsing, built objects, or
 written products. Reco-only and otherwise irrelevant configuration changes reuse
 the existing conversion bundle.
+
+The named `generic/truth_dlpgen_opt_*_260914.yaml` variants adapt the generic
+truth conversion recipe to DLPGen's optimized LArCV output. They consume the
+native `particle_pcluster` and `neutrino_mc_truth` products without reapplying
+semantic shape precedence, and interpret neutrino interaction codes according
+to the selected generator. For example:
+
+```bash
+./submit.py --config convert/generic/truth_dlpgen_opt_gibuu_260914.yaml \
+  --source input.root
+```

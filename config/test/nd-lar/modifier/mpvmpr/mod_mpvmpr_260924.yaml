@@ -1,0 +1,11 @@
+__meta__:
+  kind: mod
+  name: mpvmpr
+  version: "260924"
+  date: "2026-09-24"
+  description: Interpret ND-LAr DLPGenerator MPV/MPR truth during evaluation
+  applies_to: [mc]
+  compatible_with:
+    io: ">=240819"
+
+include: infer/nd-lar/modifier/mpvmpr/mod_mpvmpr_common.yaml

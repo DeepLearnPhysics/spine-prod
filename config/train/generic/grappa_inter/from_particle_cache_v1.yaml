@@ -10,32 +10,32 @@ override:
     path: null
     stage: particle_aggregation
     keys:
-      - particle_edge_index
-      - particle_node_features
-      - particle_edge_features
-      - interaction_aggregation_node_type_target
-      - interaction_aggregation_node_type_valid
-      - interaction_aggregation_node_primary_target
-      - interaction_aggregation_node_primary_valid
-      - interaction_aggregation_node_orient_target
-      - interaction_aggregation_node_orient_valid
-      - interaction_aggregation_edge_target
-      - interaction_aggregation_edge_valid
+      - particle_graph_edge_index
+      - particle_graph_node_features
+      - particle_graph_edge_features
+      - particle_graph_node_type_target
+      - particle_graph_node_type_valid
+      - particle_graph_node_primary_target
+      - particle_graph_node_primary_valid
+      - particle_graph_node_orient_target
+      - particle_graph_node_orient_valid
+      - particle_graph_edge_target
+      - particle_graph_edge_valid
 
   model.network_input:
-    edge_index: particle_edge_index
-    node_features: particle_node_features
-    edge_features: particle_edge_features
+    edge_index: particle_graph_edge_index
+    node_features: particle_graph_node_features
+    edge_features: particle_graph_edge_features
 
   model.loss_input:
-    node_type_target: interaction_aggregation_node_type_target
-    node_type_valid: interaction_aggregation_node_type_valid
-    node_primary_target: interaction_aggregation_node_primary_target
-    node_primary_valid: interaction_aggregation_node_primary_valid
-    node_orient_target: interaction_aggregation_node_orient_target
-    node_orient_valid: interaction_aggregation_node_orient_valid
-    edge_target: interaction_aggregation_edge_target
-    edge_valid: interaction_aggregation_edge_valid
+    node_type_target: particle_graph_node_type_target
+    node_type_valid: particle_graph_node_type_valid
+    node_primary_target: particle_graph_node_primary_target
+    node_primary_valid: particle_graph_node_primary_valid
+    node_orient_target: particle_graph_node_orient_target
+    node_orient_valid: particle_graph_node_orient_valid
+    edge_target: particle_graph_edge_target
+    edge_valid: particle_graph_edge_valid
 
 remove:
   - model.network_input.data

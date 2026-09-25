@@ -23,8 +23,17 @@ stages:
     # sources:
     #   primary: {source: /path/to/raw.root}
     #   cache: {source: /path/to/train/cache.spine-cache}
+    # A joint dataset instead uses independent primary and secondary sources.
+    # The primary drives task splitting; the complete secondary is shared.
+    # sources:
+    #   primary: {source_list: /path/to/primary.txt}
+    #   secondary: {source_list: /path/to/secondary.txt}
     # validation_sources: ...         # same shape for validation
     # val_entry_fraction_range: [0.0, 0.5]  # validation-only partition
+    # num_files: 2                           # resolved files, before task splitting
+    # val_num_files: 1                       # resolved validation files
+    # num_entries: 10000                     # exact main-dataset entry limit
+    # val_num_entries: 1000                  # exact validation entry limit
     # entry_filter: /path/to/train-filter.yaml
     # val_entry_filter: /path/to/validation-filter.yaml
     # module_weight: {module: /path/to/checkpoint.ckpt}
@@ -44,6 +53,12 @@ half-open fractional entry selectors. The generic full-chain pipelines retain
 the entire validation source in their caches, validate training against
 `[0.0, 0.5)`, and reserve `[0.5, 1.0)` for the final evaluation. Keeping the
 derived caches complete preserves positional alignment for mixed datasets.
+`num_files` and `val_num_files` truncate resolved source lists before scheduler
+task splitting. For named mixed datasets, aligned targets are truncated together
+while a shared `cache` repository remains scalar. For named joint datasets,
+`num_files` restricts only the traversal-driving primary source. `num_entries` and
+`val_num_entries` forward SPINE's exact entry-count limits;
+they are mutually exclusive with the corresponding fractional selector.
 
 Standalone `kind: filter` stages run the reusable `spine-filter` workflow
 before raw data reaches the parser. A scan records per-source measurements;
@@ -105,6 +120,37 @@ scheduler resources, and first-class SPINE runtime options. Data sources,
 outputs, dependencies, and run lifecycle settings remain on their individual
 stages. Unknown fields and unsupported pipeline CLI options are rejected rather
 than ignored.
+
+A pipeline can expose a one-checkpoint warm start by declaring how each
+standalone training module maps back to the full-chain checkpoint namespace:
+
+```yaml
+- name: train_uresnet_ppn
+  config: train/nd-lar/uresnet_ppn/train_260409.yaml
+  stage: train
+  run_dir: ${workspace}/train/uresnet_ppn
+  warm_start:
+    uresnet: uresnet_ppn.uresnet
+    ppn: uresnet_ppn.ppn
+```
+
+Then one option initializes every training stage with such a declaration:
+
+```bash
+./submit.py --pipeline pipelines/nd-lar/full_chain_260924.yaml \
+  --workspace /path/to/workflow \
+  --warm-start /path/to/existing/full_chain.ckpt
+```
+
+All generic, ND-LAr, and ProtoDUNE-SP training pipelines provide these
+declarations. Pipelines without training stages, such as production-only
+inference workflows, intentionally do not accept a warm start.
+
+Warm starts import parameters only; they do not restore optimizer, scheduler,
+or iteration state. Cache, export, and evaluation stages are unaffected. On a
+pipeline retry, a stage's own resumable checkpoint takes precedence over the
+warm start. The cache stages still consume the weights newly produced by their
+upstream training stages.
 
 An existing checkpoint can initialize one destination module without editing
 the stable pipeline document. Qualify each override by both stage and module:
@@ -212,6 +258,24 @@ new products to the split repositories.
 The `260210` pipeline intentionally preserves the deployed model choices. It
 is the reviewable baseline from which a new dated ProtoDUNE-SP revision can
 adopt selected decisions from the generic `260828` study.
+
+## ND-LAr staged training
+
+The ND-LAr `250505`, `250515`, `260310`, and `260409` pipelines apply the same
+five-model cached workflow to its busy images. Unlike ProtoDUNE-SP, they require
+neither deghosting nor an entry-size filter. Each pipeline selects the exact
+dated component composition used by its inference counterpart.
+
+The first two training jobs use four GPUs with per-rank minibatches selected to
+match the historical global A100 batch sizes. The three cached GrapPA jobs run
+on one GPU and retain their historical global update sizes without repeatedly
+loading the raw sparse images.
+
+The two remaining inference releases still have canonical shared models and
+appropriate component recipes but deliberately no stage-cache pipeline. The
+`240819` release deploys 2x2 debug weights, while `250806` used stochastic event
+overlay whose changing event identity is incompatible with aligned per-source
+cache provenance.
 
 ProtoDUNE-SP cache arrays partition only the authoritative `primary` LArCV
 source. Every task receives the same scalar `cache` repository path, and the

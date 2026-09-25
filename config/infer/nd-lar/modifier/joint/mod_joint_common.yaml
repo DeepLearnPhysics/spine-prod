@@ -1,0 +1,22 @@
+__meta__:
+  kind: fragment
+  description: Run ND-LAr inference on a primary/secondary joint dataset
+
+override:
+  # Joint events carry both primary and secondary file provenance. Until the
+  # writer has an explicit primary-routing policy, per-input splitting would
+  # write an overlaid event to both source file indexes.
+  base.split_output: false
+
+  io.loader.dataset:
+    name: joint
+    base: !include infer/nd-lar/io/dataset_joint.yaml
+    primary:
+      file_keys: null
+    secondary:
+      file_keys: null
+
+  io.writer.keys-:
+    - run_info
+    - flashes
+    - trigger

@@ -111,6 +111,10 @@ echo
 # Cap the number Numba threads to 64 (what OpenBLAS was compiled with)
 export NUMBA_NUM_THREADS=64
 echo "NUMBA_NUM_THREADS set to $NUMBA_NUM_THREADS"
+{% if expandable_segments %}
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:+${PYTORCH_CUDA_ALLOC_CONF},}expandable_segments:True"
+echo "PYTORCH_CUDA_ALLOC_CONF set to $PYTORCH_CUDA_ALLOC_CONF"
+{% endif %}
 
 # NERSC: Use Shifter
 INNER_CMD=""
@@ -181,6 +185,29 @@ echo "Running: $RUN_CMD"
 echo
 eval "$RUN_CMD"
 EXIT_STATUS=$?
+{% endif %}
+
+{% if output_manifest and task_output_dir and task_output_manifest %}
+# Publish the files actually produced by this successful task into one
+# attempt-level manifest. The lock serializes concurrent array tasks.
+if [[ $EXIT_STATUS -eq 0 ]]; then
+    SPINE_PROD_TASK_OUTPUT_DIR={{ task_output_dir|tojson }}
+    SPINE_PROD_TASK_OUTPUT_MANIFEST={{ task_output_manifest|tojson }}
+    SPINE_PROD_OUTPUT_MANIFEST={{ output_manifest|tojson }}
+    if ! find "$SPINE_PROD_TASK_OUTPUT_DIR" -maxdepth 1 -type f -print | sort \
+        > "$SPINE_PROD_TASK_OUTPUT_MANIFEST"; then
+        echo "ERROR: Could not inventory task outputs" >&2
+        EXIT_STATUS=1
+    elif ! (
+        flock -x 9
+        sort -u "$SPINE_PROD_OUTPUT_MANIFEST" "$SPINE_PROD_TASK_OUTPUT_MANIFEST" \
+            > "$SPINE_PROD_OUTPUT_MANIFEST.tmp.$$"
+        mv "$SPINE_PROD_OUTPUT_MANIFEST.tmp.$$" "$SPINE_PROD_OUTPUT_MANIFEST"
+    ) 9>"$SPINE_PROD_OUTPUT_MANIFEST.lock"; then
+        echo "ERROR: Could not update output manifest" >&2
+        EXIT_STATUS=1
+    fi
+fi
 {% endif %}
 
 echo

@@ -10,47 +10,7 @@ io:
     shuffle: false
     num_workers: 8
     collate_fn: all
-    dataset:
-      name: larcv
-      file_keys: null
-      schema:
-        data:
-          parser: sparse3d
-          sparse_event: sparse3d_pcluster
-        seg_label:
-          parser: sparse3d
-          sparse_event: sparse3d_pcluster_semantics
-        ppn_label:
-          parser: particle_points
-          sparse_event: sparse3d_pcluster
-          particle_event: particle_corrected
-          # include_point_tagging varies by config - override in specific configs
-        clust_label:
-          parser: cluster3d
-          cluster_event: cluster3d_pcluster
-          particle_event: particle_corrected
-          sparse_semantics_event: sparse3d_pcluster_semantics
-          add_particle_info: true
-          clean_data: true
-          shape_precedence: [2, 1, 0, 3, 4, 6]
-        coord_label:
-          parser: particle_coords
-          particle_event: particle_corrected
-          cluster_event: cluster3d_pcluster
-        graph_label:
-          parser: particle_graph
-          particle_event: particle_pcluster
-        particles:
-          parser: particle
-          particle_event: particle_pcluster
-          cluster_event: cluster3d_pcluster
-        meta:
-          parser: meta3d
-          sparse_event: sparse3d_pcluster
-        run_info:
-          parser: run_info
-          sparse_event: sparse3d_pcluster
-
+    dataset: !include dataset_common.yaml
   writer:
     name: hdf5
     file_name: null

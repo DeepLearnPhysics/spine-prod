@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ND-LAr track GrapPA training policy and data schema
+
+include: train/common/grappa_track/base_v1.yaml
+
+override:
+  # Conservative per-rank size validated on high-occupancy ND-LAr events.
+  io.loader.minibatch_size: 32
+  io.loader.dataset.schema.data.particle_info.particle_event: particle_pcluster

@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ND-LAr shower GrapPA training policy and data schema
+
+include: train/common/grappa_shower/base_v1.yaml
+
+override:
+  # Shower graph memory is dominated by individual high-occupancy events.
+  io.loader.minibatch_size: 1
+  io.loader.dataset.schema.data.particle_info.particle_event: particle_pcluster

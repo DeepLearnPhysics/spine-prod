@@ -1,0 +1,15 @@
+__meta__:
+  kind: bundle
+  version: "260310"
+  date: "2026-03-10"
+  description: Materialize ND-LAr March 2026 fragment graphs and supervision
+
+include: cache/nd-lar/graph_spice/base_v1.yaml
+
+model:
+  modules:
+    graph_spice: !include model/nd-lar/graph_spice/network_250505.yaml
+    grappa_shower: !include model/nd-lar/grappa_shower/network_260310.yaml
+    grappa_shower_loss: !include model/nd-lar/grappa_shower/loss_250505.yaml
+    grappa_track: !include model/nd-lar/grappa_track/network_full_chain_260310.yaml
+    grappa_track_loss: !include model/nd-lar/grappa_track/loss_240819.yaml

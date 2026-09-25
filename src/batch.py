@@ -130,6 +130,8 @@ class BatchRunner(SubmissionComponent):
         named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
         validation_named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
         module_weights: Optional[Mapping[str, str]] = None,
+        warm_start_path: Optional[str] = None,
+        warm_start_modules: Optional[Mapping[str, str]] = None,
         weight_path: Optional[str] = None,
         export_weights: Optional[str] = None,
         profile: str = "auto",
@@ -143,11 +145,13 @@ class BatchRunner(SubmissionComponent):
         no_writer: bool = False,
         ntasks: Optional[int] = None,
         files_per_task: Optional[int] = None,
+        joint_file_mode: str = "broadcast",
         dependency: Optional[str] = None,
         larcv_path: Optional[str] = None,
         flashmatch_path: Optional[str] = None,
         flashmatch: bool = False,
         cvmfs: bool = False,
+        expandable_segments: bool = False,
         apply_mods: Optional[List[str]] = None,
         dry_run: bool = False,
         preload: bool = False,
@@ -158,6 +162,10 @@ class BatchRunner(SubmissionComponent):
         num_workers: Optional[int] = None,
         epochs: Optional[float] = None,
         iterations: Optional[int] = None,
+        num_files: Optional[int] = None,
+        val_num_files: Optional[int] = None,
+        num_entries: Optional[int] = None,
+        val_num_entries: Optional[int] = None,
         entry_fraction_range: Optional[Tuple[float, float]] = None,
         val_entry_fraction_range: Optional[Tuple[float, float]] = None,
         entry_filter: Optional[str] = None,
@@ -196,6 +204,10 @@ class BatchRunner(SubmissionComponent):
             Target-qualified validation selectors for a composite dataset.
         module_weights : mapping, optional
             Model module names mapped to checkpoint paths.
+        warm_start_path : str, optional
+            Full-chain checkpoint used to initialize declared stage modules.
+        warm_start_modules : mapping, optional
+            Destination modules mapped to their source checkpoint namespaces.
         weight_path : str, optional
             Complete-model checkpoint override forwarded to SPINE.
         export_weights : str, optional
@@ -228,6 +240,11 @@ class BatchRunner(SubmissionComponent):
         files_per_task : int, optional
             Files to process per task. If omitted, all explicit input files run
             in a single task unless ``ntasks`` requests an even split.
+        joint_file_mode : str, default "broadcast"
+            Joint-dataset file sharding policy. ``broadcast`` partitions primary
+            files and gives every task all secondary files. ``paired`` truncates
+            both ordered lists to the shorter length and partitions matching
+            primary/secondary file indexes together.
         dependency : str, optional
             Batch scheduler dependency string, by default None
         larcv_path : str, optional
@@ -239,6 +256,9 @@ class BatchRunner(SubmissionComponent):
             container and no external setup is needed.
         cvmfs : bool, optional
             Expose CVMFS inside the container, by default False
+        expandable_segments : bool, optional
+            Enable PyTorch CUDA expandable memory segments before SPINE starts,
+            by default False.
         apply_mods : List[str], optional
             List of modifiers to apply (e.g., ['data', 'flash']), by default None
         dry_run : bool, optional
@@ -259,6 +279,14 @@ class BatchRunner(SubmissionComponent):
             Number of SPINE training epochs.
         iterations : int, optional
             Number of SPINE driver iterations.
+        num_files : int, optional
+            Maximum number of resolved main-dataset files to use.
+        val_num_files : int, optional
+            Maximum number of resolved validation-dataset files to use.
+        num_entries : int, optional
+            Maximum number of main-dataset entries to process.
+        val_num_entries : int, optional
+            Maximum number of validation-dataset entries to process.
         entry_fraction_range : tuple[float, float], optional
             Half-open fractional range of main-dataset entries to process.
         val_entry_fraction_range : tuple[float, float], optional
@@ -306,6 +334,9 @@ class BatchRunner(SubmissionComponent):
         if no_writer:
             self.context.spine_cli.warn_no_writer_deprecated()
 
+        if joint_file_mode not in ("broadcast", "paired"):
+            raise ValueError("joint_file_mode must be either 'broadcast' or 'paired'")
+
         if in_place and (output is not None or output_suffix is not None):
             raise ValueError(
                 "--in-place cannot be combined with --output or --output-suffix"
@@ -336,6 +367,14 @@ class BatchRunner(SubmissionComponent):
             raise ValueError("--resume and --resume-from are valid only for training")
         if weight_path and (resume or resume_from):
             raise ValueError("--weight-path cannot be combined with training resume")
+        if bool(warm_start_path) != bool(warm_start_modules):
+            raise ValueError(
+                "warm_start_path and warm_start_modules must be provided together"
+            )
+        if warm_start_path and stage != "train":
+            raise ValueError("Pipeline warm start is valid only for training jobs")
+        if warm_start_path and weight_path:
+            raise ValueError("Pipeline warm start cannot be combined with weight_path")
         if stage != "validation" and (validation_name or rerun_validation):
             raise ValueError(
                 "--validation-name and --rerun-validation are valid only for validation"
@@ -350,6 +389,33 @@ class BatchRunner(SubmissionComponent):
             raise ValueError("--val-entry-fraction-range is valid only for training")
         if val_entry_filter is not None and stage != "train":
             raise ValueError("--val-entry-filter is valid only for training")
+        if val_num_entries is not None and stage != "train":
+            raise ValueError("--val-num-entries is valid only for training")
+        if val_num_files is not None and stage != "train":
+            raise ValueError("--val-num-files is valid only for training")
+        # Validate limits independently of whether source resolution is needed.
+        self.file_handler.limit_files([], num_files)
+        self.file_handler.limit_files([], val_num_files)
+        if num_files is not None and not (files or named_sources):
+            raise ValueError(
+                "--num-files requires --source/--source-list or named sources"
+            )
+        if val_num_files is not None and not (
+            validation_files or validation_named_sources
+        ):
+            raise ValueError(
+                "--val-num-files requires --val-source/--val-source-list or "
+                "named validation sources"
+            )
+        if num_entries is not None and entry_fraction_range is not None:
+            raise ValueError(
+                "--num-entries cannot be combined with --entry-fraction-range"
+            )
+        if val_num_entries is not None and val_entry_fraction_range is not None:
+            raise ValueError(
+                "--val-num-entries cannot be combined with "
+                "--val-entry-fraction-range"
+            )
         if export_weights:
             if stage != "inference":
                 raise ValueError("--export-weights requires stage=inference")
@@ -360,6 +426,10 @@ class BatchRunner(SubmissionComponent):
                 or validation_named_sources
                 or entry_fraction_range is not None
                 or val_entry_fraction_range is not None
+                or num_entries is not None
+                or val_num_entries is not None
+                or num_files is not None
+                or val_num_files is not None
             ):
                 raise ValueError(
                     "--export-weights cannot be combined with dataset selections"
@@ -388,6 +458,7 @@ class BatchRunner(SubmissionComponent):
             )
             if not file_list:
                 raise ValueError("No input files found")
+            file_list = self.file_handler.limit_files(file_list, num_files)
             print(f"Found {len(file_list)} file(s) to process")
         elif not named_sources:
             if ntasks is not None or files_per_task is not None:
@@ -413,7 +484,92 @@ class BatchRunner(SubmissionComponent):
             )
             if not validation_file_list:
                 raise ValueError("No validation input files found")
+            validation_file_list = self.file_handler.limit_files(
+                validation_file_list, val_num_files
+            )
             print(f"Found {len(validation_file_list)} validation file(s)")
+
+        joint_named_sources = bool(
+            named_sources
+            and "primary" in named_sources
+            and "secondary" in named_sources
+            and "cache" not in named_sources
+        )
+        if joint_file_mode == "paired" and not joint_named_sources:
+            raise ValueError(
+                "Paired joint files require named primary and secondary sources"
+            )
+        if joint_file_mode == "paired" and stage != "inference":
+            raise ValueError("Paired joint files are valid only for inference jobs")
+        broadcast_joint_sources = joint_named_sources and joint_file_mode == "broadcast"
+        validation_joint_named_sources = bool(
+            validation_named_sources
+            and "primary" in validation_named_sources
+            and "secondary" in validation_named_sources
+            and "cache" not in validation_named_sources
+        )
+
+        effective_named_sources = named_sources
+        named_source_file_count = None
+        if named_sources and (num_files is not None or joint_file_mode == "paired"):
+            resolved = self.file_handler.parse_named_sources(
+                named_sources,
+                allow_missing=allow_missing_inputs,
+                aligned=not joint_named_sources,
+            )
+            if joint_file_mode == "paired":
+                primary_count = len(resolved["primary"])
+                secondary_count = len(resolved["secondary"])
+                limited = self.file_handler.pair_joint_sources(resolved, num_files)
+                pair_count = len(limited["primary"])
+                print("Paired joint submission:")
+                print(f"  Primary files:   {primary_count}")
+                print(f"  Secondary files: {secondary_count}")
+                print(f"  File pairs:      {pair_count}")
+                if primary_count > pair_count:
+                    print(f"  Ignored primary: {primary_count - pair_count}")
+                if secondary_count > pair_count:
+                    print(f"  Ignored secondary: {secondary_count - pair_count}")
+            else:
+                limited = self.file_handler.limit_named_sources(
+                    resolved,
+                    num_files,
+                    primary_only=joint_named_sources,
+                )
+            effective_named_sources = {
+                target: {"source": paths} for target, paths in limited.items()
+            }
+            named_source_file_count = len(
+                limited["primary"]
+                if joint_named_sources
+                else next(
+                    paths for target, paths in limited.items() if target != "cache"
+                )
+            )
+
+        effective_validation_named_sources = validation_named_sources
+        validation_named_source_file_count = None
+        if validation_named_sources and val_num_files is not None:
+            resolved = self.file_handler.parse_named_sources(
+                validation_named_sources,
+                allow_missing=allow_missing_inputs,
+                aligned=not validation_joint_named_sources,
+            )
+            limited = self.file_handler.limit_named_sources(
+                resolved,
+                val_num_files,
+                primary_only=validation_joint_named_sources,
+            )
+            effective_validation_named_sources = {
+                target: {"source": paths} for target, paths in limited.items()
+            }
+            validation_named_source_file_count = len(
+                limited["primary"]
+                if validation_joint_named_sources
+                else next(
+                    paths for target, paths in limited.items() if target != "cache"
+                )
+            )
 
         # Detect detector first
         detector = self.config_mgr.detect_detector(config)
@@ -463,20 +619,17 @@ class BatchRunner(SubmissionComponent):
                 apply_mods,
                 config_workspace,
                 detector=detector if is_latest else None,
+                family=config_family if is_latest else None,
             )
 
         if preload:
             self.context.preload_downloads(config)
 
-        spine_cli_overrides = self.context.spine_cli.format_set_overrides(set_overrides)
         named_source_overrides = self.context.spine_cli.format_named_sources(
-            named_sources
+            effective_named_sources
         )
         validation_named_source_overrides = self.context.spine_cli.format_named_sources(
-            validation_named_sources, validation=True
-        )
-        module_weight_overrides = self.context.spine_cli.format_module_weights(
-            module_weights
+            effective_validation_named_sources, validation=True
         )
         weight_path_override = self.context.spine_cli.format_weight_path(weight_path)
         export_weight_override = self.context.spine_cli.format_export_weights(
@@ -523,6 +676,10 @@ class BatchRunner(SubmissionComponent):
         entry_fraction_options = self.context.spine_cli.format_entry_fraction_ranges(
             entry_fraction_range,
             val_entry_fraction_range,
+        )
+        num_entry_options = self.context.spine_cli.format_num_entries(
+            num_entries,
+            val_num_entries,
         )
         entry_filter_options = self.context.spine_cli.format_entry_filters(
             entry_filter,
@@ -680,11 +837,42 @@ class BatchRunner(SubmissionComponent):
                     ]
                 )
 
+        effective_set_overrides = list(set_overrides or [])
+        effective_module_weights = dict(module_weights or {})
+        warm_start_applied = bool(warm_start_path and resume_checkpoint is None)
+        if warm_start_applied:
+            # Generated values precede explicit stage values, preserving the
+            # low-level escape hatches' established precedence.
+            warm_start_sets = [
+                f"model.modules.{module}.model_name={source}"
+                for module, source in warm_start_modules.items()
+                if module not in effective_module_weights
+            ]
+            effective_set_overrides = warm_start_sets + effective_set_overrides
+            warm_start_weights = {
+                module: warm_start_path for module in warm_start_modules
+            }
+            warm_start_weights.update(effective_module_weights)
+            effective_module_weights = warm_start_weights
+            print(f"Warm-starting training modules from {warm_start_path}")
+        elif warm_start_path:
+            print(
+                "Ignoring pipeline warm start because a resumable stage "
+                f"checkpoint was found: {resume_checkpoint}"
+            )
+
+        spine_cli_overrides = self.context.spine_cli.format_set_overrides(
+            effective_set_overrides
+        )
+        module_weight_overrides = self.context.spine_cli.format_module_weights(
+            effective_module_weights
+        )
         extra_args = " ".join(lifecycle_args)
         spine_cli_overrides = " ".join(
             part
             for part in [
                 spine_runtime_options,
+                num_entry_options,
                 entry_fraction_options,
                 entry_filter_options,
                 spine_cli_overrides,
@@ -743,17 +931,28 @@ class BatchRunner(SubmissionComponent):
             )
             if files_per_task is not None and ntasks is not None:
                 concurrent_task_limit = ntasks
-        elif stage == "inference" and named_sources:
+        elif stage == "inference" and effective_named_sources:
             resolved_named_sources = self.file_handler.parse_named_sources(
-                named_sources,
+                effective_named_sources,
                 allow_missing=allow_missing_inputs,
+                aligned=not broadcast_joint_sources,
+            )
+            resolved_named_sources = self.file_handler.limit_named_sources(
+                resolved_named_sources,
+                num_files,
+                primary_only=broadcast_joint_sources,
             )
             partitioned_sources = {
                 target: paths
                 for target, paths in resolved_named_sources.items()
                 if target != "cache"
             }
-            source_count = len(next(iter(partitioned_sources.values())))
+            source_count = (
+                len(partitioned_sources["primary"])
+                if joint_named_sources
+                else len(next(iter(partitioned_sources.values())))
+            )
+            named_source_file_count = source_count
             inference_source_count = source_count
             max_array_size = self.profiles["defaults"]["max_array_size"]
             effective_files_per_task = self.resolve_files_per_task(
@@ -784,6 +983,11 @@ class BatchRunner(SubmissionComponent):
         RunManager.expose_attempt_logs(job_dir, has_array)
         print(f"Splitting into {len(file_chunks)} scheduler job(s)")
 
+        output_manifest = None
+        if stage == "inference" and not in_place and not output:
+            output_manifest = attempt_dir / "outputs.txt"
+            output_manifest.touch()
+
         job_ids = []
         chunk_dependency = dependency  # Track dependency for chunk chaining
         default_output_location = None
@@ -793,6 +997,8 @@ class BatchRunner(SubmissionComponent):
             named_source_args = None
             chunk_output_args = output_args
             chunk_spine_log_dir = spine_log_dir
+            task_output_dir = None
+            task_output_manifest = None
 
             array_spec = None
             if len(chunk) > 1:
@@ -826,6 +1032,8 @@ class BatchRunner(SubmissionComponent):
                             ]
                         )
                         default_output_location = str(attempt_dir / "tasks")
+                        task_output_dir = "$TASK_DIR/output"
+                        task_output_manifest = "$TASK_DIR/outputs.txt"
                 else:
                     input_manifest = attempt_dir / "inputs.txt"
                     with open(input_manifest, "w", encoding="utf-8") as stream:
@@ -842,6 +1050,10 @@ class BatchRunner(SubmissionComponent):
                             ]
                         )
                         default_output_location = str(scalar_output)
+                        task_output_dir = str(scalar_output)
+                        task_output_manifest = str(
+                            attempt_dir / f"outputs_{chunk_idx:03d}.txt"
+                        )
             elif stage == "inference" and resolved_named_sources:
                 # Each task receives aligned manifests for every mixed-dataset
                 # target. The first manifest also drives template diagnostics.
@@ -851,11 +1063,18 @@ class BatchRunner(SubmissionComponent):
                 for task_idx, index_group in enumerate(chunk, start=1):
                     task_dir = attempt_dir / "tasks" / f"{chunk_idx:03d}_{task_idx}"
                     task_dir.mkdir(parents=True, exist_ok=True)
+                    if not output and not in_place:
+                        (task_dir / "output").mkdir()
                     for target, source_files in partitioned_sources.items():
                         manifest = task_dir / f"{target}.txt"
                         with manifest.open("w", encoding="utf-8") as stream:
-                            for index in index_group:
-                                stream.write(f"{source_files[index]}\n")
+                            selected_files = (
+                                source_files
+                                if broadcast_joint_sources and target == "secondary"
+                                else [source_files[index] for index in index_group]
+                            )
+                            for source_file in selected_files:
+                                stream.write(f"{source_file}\n")
                 task_list_args = " ".join(
                     f"{target}=$TASK_DIR/{target}.txt" for target in target_names
                 )
@@ -873,6 +1092,16 @@ class BatchRunner(SubmissionComponent):
                     named_source_overrides, named_source_args, 1
                 )
                 chunk_spine_log_dir = "$TASK_DIR"
+                if not output and not in_place:
+                    chunk_output_args = " ".join(
+                        [
+                            "--output-dir $TASK_DIR/output",
+                            f"--output-suffix {shlex.quote(output_suffix)}",
+                        ]
+                    )
+                    default_output_location = str(attempt_dir / "tasks")
+                    task_output_dir = "$TASK_DIR/output"
+                    task_output_manifest = "$TASK_DIR/outputs.txt"
             else:
                 chunk_spine_overrides = spine_cli_overrides
 
@@ -922,10 +1151,14 @@ class BatchRunner(SubmissionComponent):
                 ),
                 output_suffix=output_suffix,
                 output_args=chunk_output_args,
+                output_manifest=(str(output_manifest) if output_manifest else None),
+                task_output_dir=task_output_dir,
+                task_output_manifest=task_output_manifest,
                 larcv_path=larcv_path,
                 flashmatch_path=flashmatch_path,
                 flashmatch=flashmatch,
                 cvmfs=cvmfs,
+                expandable_segments=expandable_segments,
                 spine_cmd=spine_cmd or "spine",
                 cache_begin_cmd=cache_cmd or "spine-cache",
                 cache_repository=cache_repository,
@@ -992,10 +1225,14 @@ class BatchRunner(SubmissionComponent):
             "config": config,
             "original_config": original_config if apply_mods else config,
             "applied_modifiers": apply_mods or [],
-            "set_overrides": set_overrides or [],
+            "set_overrides": effective_set_overrides,
             "named_sources": named_sources or {},
             "validation_named_sources": validation_named_sources or {},
-            "module_weights": module_weights or {},
+            "joint_file_mode": joint_file_mode,
+            "module_weights": effective_module_weights,
+            "warm_start_path": warm_start_path,
+            "warm_start_modules": warm_start_modules or {},
+            "warm_start_applied": warm_start_applied,
             "weight_path": weight_path,
             "export_weights": export_weights,
             "world_size": world_size,
@@ -1004,6 +1241,10 @@ class BatchRunner(SubmissionComponent):
             "num_workers": num_workers,
             "epochs": epochs,
             "iterations": iterations,
+            "num_file_limit": num_files,
+            "val_num_file_limit": val_num_files,
+            "num_entries": num_entries,
+            "val_num_entries": val_num_entries,
             "entry_fraction_range": entry_fraction_range,
             "val_entry_fraction_range": val_entry_fraction_range,
             "entry_filter": entry_filter,
@@ -1022,6 +1263,7 @@ class BatchRunner(SubmissionComponent):
             "flashmatch_path": flashmatch_path,
             "spine_path": spine_path,
             "cvmfs": cvmfs,
+            "expandable_segments": expandable_segments,
             "no_writer": no_writer,
             "in_place": in_place,
             "cache_repository": cache_repository,
@@ -1032,7 +1274,12 @@ class BatchRunner(SubmissionComponent):
             "num_files": (
                 inference_source_count
                 if stage == "inference" and (file_list or resolved_named_sources)
-                else len(file_list) if file_list else None
+                else len(file_list) if file_list else named_source_file_count
+            ),
+            "validation_num_files": (
+                len(validation_file_list)
+                if validation_file_list
+                else validation_named_source_file_count
             ),
             "num_chunks": len(file_chunks),
             "files_per_task": files_per_task,
@@ -1053,6 +1300,7 @@ class BatchRunner(SubmissionComponent):
             ),
             "output_suffix": output_suffix,
             "output_source_list": output_source_list,
+            "output_manifest": str(output_manifest) if output_manifest else None,
             "resume_checkpoint": (
                 str(resume_checkpoint) if resume_checkpoint is not None else None
             ),
@@ -1072,5 +1320,7 @@ class BatchRunner(SubmissionComponent):
         print(f"\nRun directory: {job_dir}")
         print(f"Latest attempt: {job_dir}/latest")
         print(f"Submission metadata: {attempt_dir}/job_metadata.json")
+        if output_manifest:
+            print(f"Output manifest: {output_manifest}")
 
         return job_ids

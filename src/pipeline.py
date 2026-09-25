@@ -20,6 +20,7 @@ GLOBAL_FIELDS = frozenset(
         "spine_path",
         "flashmatch",
         "cvmfs",
+        "expandable_segments",
         "world_size",
         "batch_size",
         "minibatch_size",
@@ -56,6 +57,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "sources",
         "validation_sources",
         "module_weight",
+        "warm_start",
         "weight_path",
         "export_weights",
         "input_dir",
@@ -73,6 +75,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "no_writer",
         "ntasks",
         "files_per_task",
+        "joint_file_mode",
         "depends_on",
         "cleanup",
         "apply_mods",
@@ -84,6 +87,10 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "validation_name",
         "rerun_validation",
         "tensorboard",
+        "num_files",
+        "val_num_files",
+        "num_entries",
+        "val_num_entries",
         "entry_fraction_range",
         "val_entry_fraction_range",
         "entry_filter",
@@ -657,13 +664,21 @@ class PipelineDefinition:
     @staticmethod
     def _validate_structured_fields(name: str, stage: Mapping[str, Any]) -> None:
         """Validate fields translated into repeated SPINE CLI options."""
-        for field in ("sources", "validation_sources", "module_weight"):
+        for field in (
+            "sources",
+            "validation_sources",
+            "module_weight",
+            "warm_start",
+        ):
             value = stage.get(field)
             if value is not None and not isinstance(value, Mapping):
                 raise TypeError(f"Pipeline stage '{name}' {field} must be a mapping")
         module_weights = stage.get("module_weight")
         if module_weights is not None:
             PipelineDefinition._validate_module_weights(name, module_weights)
+        warm_start = stage.get("warm_start")
+        if warm_start is not None:
+            PipelineDefinition._validate_warm_start(name, warm_start)
         export_weights = stage.get("export_weights")
         if export_weights is not None:
             if not isinstance(export_weights, str):
@@ -698,9 +713,47 @@ class PipelineDefinition:
                     SpineCLI.validate_fraction_range(f"Pipeline {field}", value)
                 except (TypeError, ValueError) as err:
                     raise type(err)(f"Pipeline stage '{name}': {err}") from err
+        for field in ("num_files", "val_num_files"):
+            value = stage.get(field)
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 1
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{name}' {field} must be a positive integer"
+                )
+        for field in ("num_entries", "val_num_entries"):
+            value = stage.get(field)
+            if value is not None:
+                try:
+                    SpineCLI.format_num_entries(**{field: value})
+                except ValueError as err:
+                    raise ValueError(f"Pipeline stage '{name}': {err}") from err
+        if (
+            stage.get("num_entries") is not None
+            and stage.get("entry_fraction_range") is not None
+        ):
+            raise ValueError(
+                f"Pipeline stage '{name}' cannot combine num_entries with "
+                "entry_fraction_range"
+            )
+        if (
+            stage.get("val_num_entries") is not None
+            and stage.get("val_entry_fraction_range") is not None
+        ):
+            raise ValueError(
+                f"Pipeline stage '{name}' cannot combine val_num_entries with "
+                "val_entry_fraction_range"
+            )
         in_place = stage.get("in_place")
         if in_place is not None and not isinstance(in_place, bool):
             raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
+
+        joint_file_mode = stage.get("joint_file_mode", "broadcast")
+        if joint_file_mode not in ("broadcast", "paired"):
+            raise ValueError(
+                f"Pipeline stage '{name}' joint_file_mode must be "
+                "broadcast or paired"
+            )
 
         cache_fields = PipelineDefinition._present(
             stage, "cache_repository", "cache_stage"
@@ -724,6 +777,31 @@ class PipelineDefinition:
                 raise ValueError(
                     f"Pipeline stage '{name}' module_weight path for "
                     f"'{module}' must be a non-empty string"
+                )
+
+    @staticmethod
+    def _validate_warm_start(name: str, modules: Mapping[Any, Any]) -> None:
+        """Validate destination-to-source checkpoint namespace mappings."""
+        if not modules:
+            raise ValueError(f"Pipeline stage '{name}' warm_start must not be empty")
+        for module, source in modules.items():
+            if not isinstance(module, str) or not VARIABLE_NAME_PATTERN.match(module):
+                raise ValueError(
+                    f"Pipeline stage '{name}' warm_start keys must be valid "
+                    "destination module identifiers"
+                )
+            if not isinstance(source, str) or not source:
+                raise ValueError(
+                    f"Pipeline stage '{name}' warm_start source for '{module}' "
+                    "must be a non-empty namespace"
+                )
+            if any(
+                not VARIABLE_NAME_PATTERN.match(component)
+                for component in source.split(".")
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{name}' warm_start source '{source}' must "
+                    "be a dot-separated module namespace"
                 )
 
     @classmethod
@@ -752,6 +830,8 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' can resume only when stage=train"
             )
+        if lifecycle != "train" and stage.get("warm_start") is not None:
+            raise ValueError(f"Pipeline stage '{name}' warm_start requires stage=train")
         if lifecycle != "validation" and (
             stage.get("validation_name") or stage.get("rerun_validation")
         ):
@@ -763,6 +843,15 @@ class PipelineDefinition:
         validation_inputs = cls._present(
             stage, "val_source", "val_source_list", "validation_sources"
         )
+        source_inputs = cls._present(stage, "files", "source", "source_list", "sources")
+        if stage.get("num_files") is not None and not source_inputs:
+            raise ValueError(
+                f"Pipeline stage '{name}' num_files requires explicit inputs"
+            )
+        if stage.get("val_num_files") is not None and not validation_inputs:
+            raise ValueError(
+                f"Pipeline stage '{name}' val_num_files requires validation inputs"
+            )
         if lifecycle != "train" and validation_inputs:
             raise ValueError(
                 f"Pipeline stage '{name}' validation inputs require stage=train"
@@ -775,12 +864,32 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' validation entry filter requires stage=train"
             )
+        if lifecycle != "train" and stage.get("val_num_entries") is not None:
+            raise ValueError(
+                f"Pipeline stage '{name}' validation entry count requires stage=train"
+            )
         if lifecycle != "inference" and (
             stage.get("ntasks") is not None or stage.get("files_per_task") is not None
         ):
             raise ValueError(
                 f"Pipeline stage '{name}' task splitting requires stage=inference"
             )
+        if stage.get("joint_file_mode", "broadcast") == "paired":
+            sources = stage.get("sources") or {}
+            if lifecycle != "inference":
+                raise ValueError(
+                    f"Pipeline stage '{name}' paired joint files require "
+                    "stage=inference"
+                )
+            if not (
+                "primary" in sources
+                and "secondary" in sources
+                and "cache" not in sources
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{name}' paired joint files require "
+                    "primary and secondary sources"
+                )
         if stage.get("in_place"):
             if lifecycle != "inference":
                 raise ValueError(
@@ -825,6 +934,10 @@ class PipelineDefinition:
                 "validation_sources",
                 "entry_fraction_range",
                 "val_entry_fraction_range",
+                "num_entries",
+                "val_num_entries",
+                "num_files",
+                "val_num_files",
                 "entry_filter",
                 "val_entry_filter",
             )
@@ -906,6 +1019,10 @@ class PipelineDefinition:
             "validation_sources",
             "entry_fraction_range",
             "val_entry_fraction_range",
+            "num_entries",
+            "val_num_entries",
+            "num_files",
+            "val_num_files",
             "entry_filter",
             "val_entry_filter",
             "module_weight",
@@ -960,6 +1077,10 @@ class PipelineDefinition:
             "validation_sources",
             "entry_fraction_range",
             "val_entry_fraction_range",
+            "num_entries",
+            "val_num_entries",
+            "num_files",
+            "val_num_files",
             "entry_filter",
             "val_entry_filter",
             "module_weight",
@@ -1008,6 +1129,7 @@ class PipelineRunner(SubmissionComponent):
         to_stage: Optional[str] = None,
         select_stages: Optional[Sequence[str]] = None,
         stage_module_weights: Optional[Sequence[Sequence[str]]] = None,
+        warm_start: Optional[str] = None,
     ) -> Dict[str, List[str]]:
         """Submit an ordered multi-stage production pipeline.
 
@@ -1042,6 +1164,9 @@ class PipelineRunner(SubmissionComponent):
         stage_module_weights : sequence, optional
             Repeated launch-time ``STAGE MODULE=PATH`` assignments. These
             override matching module weights in the pipeline document.
+        warm_start : str, optional
+            Full-chain checkpoint used to initialize every selected training
+            stage that declares a ``warm_start`` module mapping.
 
         Returns
         -------
@@ -1058,6 +1183,14 @@ class PipelineRunner(SubmissionComponent):
             stage_module_weights=parsed_stage_weights,
         )
         all_stages = definition.stages
+        if warm_start is not None:
+            if not isinstance(warm_start, str) or not warm_start:
+                raise ValueError("Pipeline warm-start path must be a non-empty string")
+            if not any(stage.get("warm_start") for stage in all_stages):
+                raise ValueError(
+                    "--warm-start was provided, but the pipeline declares no "
+                    "warm_start mappings"
+                )
         stages, skipped, deferred = self._select_stages(
             all_stages,
             from_stage,
@@ -1107,6 +1240,7 @@ class PipelineRunner(SubmissionComponent):
                 stage,
                 dependency,
                 retry=from_stage is not None or select_stages is not None,
+                warm_start_path=warm_start,
             )
             kind = stage.get("kind", "spine")
             if kind == "filter":
@@ -1239,6 +1373,7 @@ class PipelineRunner(SubmissionComponent):
         stage: Mapping[str, Any],
         dependency: Optional[str],
         retry: bool = False,
+        warm_start_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Translate one stage to ``BatchRunner.submit_job`` options."""
         if stage.get("kind", "spine") == "report":
@@ -1306,6 +1441,10 @@ class PipelineRunner(SubmissionComponent):
                 "named_sources": stage.get("sources"),
                 "validation_named_sources": stage.get("validation_sources"),
                 "module_weights": stage.get("module_weight"),
+                "warm_start_path": (
+                    warm_start_path if stage.get("warm_start") else None
+                ),
+                "warm_start_modules": stage.get("warm_start"),
                 "weight_path": stage.get("weight_path"),
                 "export_weights": stage.get("export_weights"),
                 "profile": stage.get("profile", "auto"),
@@ -1318,12 +1457,14 @@ class PipelineRunner(SubmissionComponent):
                 "cache_stage": stage.get("cache_stage"),
                 "ntasks": stage.get("ntasks"),
                 "files_per_task": stage.get("files_per_task"),
+                "joint_file_mode": stage.get("joint_file_mode", "broadcast"),
                 "dependency": dependency,
                 "larcv_path": stage.get("larcv_path"),
                 "flashmatch_path": stage.get("flashmatch_path"),
                 "spine_path": stage.get("spine_path"),
                 "flashmatch": stage.get("flashmatch", False),
                 "cvmfs": stage.get("cvmfs", False),
+                "expandable_segments": stage.get("expandable_segments", False),
                 "apply_mods": cls._as_list(stage.get("apply_mods")),
                 "no_writer": stage.get("no_writer", False),
                 "set_overrides": cls._as_list(stage.get("set")),
@@ -1344,6 +1485,10 @@ class PipelineRunner(SubmissionComponent):
                 "num_workers": stage.get("num_workers"),
                 "epochs": stage.get("epochs"),
                 "iterations": stage.get("iterations"),
+                "num_files": stage.get("num_files"),
+                "val_num_files": stage.get("val_num_files"),
+                "num_entries": stage.get("num_entries"),
+                "val_num_entries": stage.get("val_num_entries"),
                 "entry_fraction_range": stage.get("entry_fraction_range"),
                 "val_entry_fraction_range": stage.get("val_entry_fraction_range"),
                 "entry_filter": stage.get("entry_filter"),

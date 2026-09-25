@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ND-LAr standalone UResNet training policy and data schema
+
+include: train/common/uresnet/base_v1.yaml
+
+remove:
+  - io.loader.minibatch_size
+
+override:
+  # Standalone UResNet fits a larger per-GPU batch than UResNet-PPN.
+  io.loader.minibatch_size: 8
+  base.epochs: 150.0

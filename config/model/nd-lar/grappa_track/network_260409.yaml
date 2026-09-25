@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  version: "260409"
+  date: "2026-04-09"
+  description: ND-LAr 260409 standalone track GrapPA network
+
+include: model/common/grappa_track/network_v1.yaml
+
+override:
+  graph.max_length: 250

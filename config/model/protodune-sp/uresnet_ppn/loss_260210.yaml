@@ -2,6 +2,7 @@ __meta__:
   kind: fragment
   version: "260210"
   date: "2026-02-10"
-  description: ProtoDUNE-SP 260210 UResNet-PPN loss
+  description: ProtoDUNE-SP 260210 composed UResNet-PPN loss
 
-include: model/common/uresnet_ppn/loss_v1.yaml
+uresnet_loss: !include model/protodune-sp/uresnet/loss_260210.yaml
+ppn_loss: !include model/common/uresnet_ppn/ppn_loss_v1.yaml

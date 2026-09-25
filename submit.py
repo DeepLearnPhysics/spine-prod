@@ -20,6 +20,37 @@ from pathlib import Path
 from src import Submitter
 
 
+def normalize_source_arguments(parser, direct, source_lists, validation=False):
+    """Separate flat inputs from target-qualified composite inputs."""
+    values = direct if direct else source_lists
+    source_type = "source" if direct else "source_list"
+    if not values:
+        return None, source_type, None
+
+    qualified = ["=" in value for value in values]
+    option_prefix = "--val-source" if validation else "--source"
+    option = option_prefix if direct else f"{option_prefix}-list"
+    if any(qualified) and not all(qualified):
+        parser.error(f"{option} cannot mix qualified and unqualified values")
+    if not any(qualified):
+        return values, source_type, None
+
+    named_sources = {}
+    for value in values:
+        target, path = value.split("=", 1)
+        if not target or not path:
+            parser.error(f"Invalid {option} value '{value}'. Expected TARGET=PATH")
+        source_cfg = named_sources.setdefault(target, {})
+        if source_type == "source_list":
+            if source_cfg:
+                parser.error(f"Source target '{target}' has multiple {option} values")
+            source_cfg[source_type] = path
+        else:
+            source_cfg.setdefault(source_type, []).append(path)
+
+    return None, source_type, named_sources
+
+
 def main():
     """Main entry point for the batch submission system."""
     parser = argparse.ArgumentParser(
@@ -110,8 +141,11 @@ Examples:
     source_group.add_argument(
         "--source-list",
         "-S",
-        nargs=1,
-        help="Text file containing input file paths (one per line)",
+        nargs="+",
+        help=(
+            "Text file containing input paths, or target-qualified lists for "
+            "a composite dataset"
+        ),
     )
 
     # Validation inputs for checkpoint-bound validation during training
@@ -123,8 +157,8 @@ Examples:
     )
     val_source_group.add_argument(
         "--val-source-list",
-        nargs=1,
-        help="Text file containing validation input paths (one per line)",
+        nargs="+",
+        help="Validation input list, optionally written as TARGET=PATH",
     )
 
     # Configuration modifiers
@@ -176,6 +210,16 @@ Examples:
             "unless --ntasks requests an even split"
         ),
     )
+    parser.add_argument(
+        "--joint-file-mode",
+        choices=["broadcast", "paired"],
+        default="broadcast",
+        help=(
+            "Joint-dataset file sharding: broadcast all secondary files to "
+            "each primary task (default), or pair ordered files up to the "
+            "shorter source list"
+        ),
+    )
 
     # First-class SPINE runtime overrides
     parser.add_argument(
@@ -203,6 +247,16 @@ Examples:
         help="Number of SPINE data-loader worker processes",
     )
     parser.add_argument(
+        "--num-entries",
+        type=int,
+        help="Maximum number of input dataset entries to process",
+    )
+    parser.add_argument(
+        "--num-files",
+        type=int,
+        help="Maximum number of resolved input files to use",
+    )
+    parser.add_argument(
         "--entry-fraction-range",
         type=float,
         nargs=2,
@@ -223,6 +277,16 @@ Examples:
     parser.add_argument(
         "--val-entry-filter",
         help="File-aware eligibility manifest for the validation dataset",
+    )
+    parser.add_argument(
+        "--val-num-entries",
+        type=int,
+        help="Maximum number of validation dataset entries to process",
+    )
+    parser.add_argument(
+        "--val-num-files",
+        type=int,
+        help="Maximum number of resolved validation files to use",
     )
     duration_group = parser.add_mutually_exclusive_group()
     duration_group.add_argument(
@@ -315,6 +379,13 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--warm-start",
+        help=(
+            "Initialize all declared training stages in a pipeline from one "
+            "full-chain checkpoint; resumable stage checkpoints take precedence"
+        ),
+    )
+    parser.add_argument(
         "--output",
         "-o",
         help=(
@@ -392,6 +463,14 @@ Examples:
         action="store_true",
         help="Expose CVMFS inside the container. On S3DF this adds /cvmfs/ to "
         "Singularity binds; on NERSC this adds --module=cvmfs to Shifter.",
+    )
+    parser.add_argument(
+        "--expandable-segments",
+        action="store_true",
+        help=(
+            "Enable PyTorch CUDA expandable memory segments before SPINE starts "
+            "(PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True)."
+        ),
     )
     # Profile overrides
     partition_group = parser.add_mutually_exclusive_group()
@@ -480,6 +559,8 @@ Examples:
         parser.error("--weight-path is stage-specific and cannot override a pipeline")
     if args.stage_module_weight is not None and not args.pipeline:
         parser.error("--stage-module-weight is only supported with --pipeline")
+    if args.warm_start is not None and not args.pipeline:
+        parser.error("--warm-start is only supported with --pipeline")
 
     # Handle deprecated --local-output flag
     if getattr(args, "local_output", False):
@@ -567,11 +648,15 @@ Examples:
     )
     if args.interactive and lifecycle_options:
         parser.error("run lifecycle options are currently supported in batch mode only")
+    if args.interactive and args.joint_file_mode != "broadcast":
+        parser.error("--joint-file-mode is currently supported in batch mode only")
     if args.interactive and (
         args.val_source
         or args.val_source_list
         or args.val_entry_fraction_range
         or args.val_entry_filter
+        or args.val_num_entries is not None
+        or args.val_num_files is not None
     ):
         parser.error(
             "validation source options are currently supported in batch mode only"
@@ -583,12 +668,17 @@ Examples:
             ("--val-source/--val-source-list", args.val_source or args.val_source_list),
             ("--entry-fraction-range", args.entry_fraction_range),
             ("--val-entry-fraction-range", args.val_entry_fraction_range),
+            ("--num-entries", args.num_entries is not None),
+            ("--val-num-entries", args.val_num_entries is not None),
+            ("--num-files", args.num_files is not None),
+            ("--val-num-files", args.val_num_files is not None),
             ("--entry-filter", args.entry_filter),
             ("--val-entry-filter", args.val_entry_filter),
             ("--apply-mods", args.apply_mods),
             ("--set", args.set_overrides),
             ("--ntasks", args.ntasks is not None),
             ("--files-per-task", args.files_per_task is not None),
+            ("--joint-file-mode", args.joint_file_mode != "broadcast"),
             ("--job-name", args.job_name),
             ("--stage", args.stage is not None),
             ("--run-dir", args.run_dir),
@@ -656,6 +746,8 @@ Examples:
                 pipeline_overrides["flashmatch"] = True
             if args.cvmfs:
                 pipeline_overrides["cvmfs"] = True
+            if args.expandable_segments:
+                pipeline_overrides["expandable_segments"] = True
             pipeline_overrides.update(profile_overrides)
             job_map = submitter.submit_pipeline(
                 args.pipeline,
@@ -667,6 +759,7 @@ Examples:
                 to_stage=args.to_stage,
                 select_stages=args.select_stage,
                 stage_module_weights=args.stage_module_weight,
+                warm_start=args.warm_start,
             )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():
@@ -674,8 +767,14 @@ Examples:
 
         elif args.interactive:
             # Interactive mode - run directly without SLURM
-            files = args.source if args.source else args.source_list
-            source_type = "source" if args.source else "source_list"
+            files, source_type, named_sources = normalize_source_arguments(
+                parser, args.source, args.source_list
+            )
+            if named_sources:
+                parser.error(
+                    "target-qualified composite sources are currently supported "
+                    "in batch and pipeline modes only"
+                )
 
             exit_code = submitter.run_interactive(
                 config=args.config,
@@ -691,6 +790,7 @@ Examples:
                 flashmatch_path=args.flashmatch_path,
                 flashmatch=args.flashmatch,
                 cvmfs=args.cvmfs,
+                expandable_segments=args.expandable_segments,
                 apply_mods=args.apply_mods,
                 preload=args.preload,
                 set_overrides=args.set_overrides,
@@ -700,24 +800,32 @@ Examples:
                 num_workers=args.num_workers,
                 epochs=args.epochs,
                 iterations=args.iterations,
+                num_files=args.num_files,
                 interactive_runtime=args.interactive_runtime or "auto",
                 bind_paths=args.bind_paths,
                 spine_path=args.spine_path,
                 weight_path=args.weight_path,
                 entry_fraction_range=args.entry_fraction_range,
                 entry_filter=args.entry_filter,
+                num_entries=args.num_entries,
             )
             return exit_code
 
         else:
             # Single job mode (batch submission)
-            # Determine which source type was provided
-            files = args.source if args.source else args.source_list
-            source_type = "source" if args.source else "source_list"
-            validation_files = (
-                args.val_source if args.val_source else args.val_source_list
+            files, source_type, named_sources = normalize_source_arguments(
+                parser, args.source, args.source_list
             )
-            validation_source_type = "source" if args.val_source else "source_list"
+            (
+                validation_files,
+                validation_source_type,
+                validation_named_sources,
+            ) = normalize_source_arguments(
+                parser,
+                args.val_source,
+                args.val_source_list,
+                validation=True,
+            )
 
             job_ids = submitter.submit_job(
                 config=args.config,
@@ -725,6 +833,8 @@ Examples:
                 source_type=source_type,
                 validation_files=validation_files,
                 validation_source_type=validation_source_type,
+                named_sources=named_sources,
+                validation_named_sources=validation_named_sources,
                 weight_path=args.weight_path,
                 profile=args.profile or "auto",
                 job_name=args.job_name,
@@ -734,11 +844,13 @@ Examples:
                 no_writer=args.no_writer,
                 ntasks=args.ntasks,
                 files_per_task=args.files_per_task,
+                joint_file_mode=args.joint_file_mode,
                 dependency=args.dependency,
                 larcv_path=args.larcv_path,
                 flashmatch_path=args.flashmatch_path,
                 flashmatch=args.flashmatch,
                 cvmfs=args.cvmfs,
+                expandable_segments=args.expandable_segments,
                 apply_mods=args.apply_mods,
                 dry_run=args.dry_run,
                 preload=args.preload,
@@ -749,10 +861,14 @@ Examples:
                 num_workers=args.num_workers,
                 epochs=args.epochs,
                 iterations=args.iterations,
+                num_files=args.num_files,
+                val_num_files=args.val_num_files,
                 entry_fraction_range=args.entry_fraction_range,
                 val_entry_fraction_range=args.val_entry_fraction_range,
                 entry_filter=args.entry_filter,
                 val_entry_filter=args.val_entry_filter,
+                num_entries=args.num_entries,
+                val_num_entries=args.val_num_entries,
                 spine_path=args.spine_path,
                 stage=args.stage or "inference",
                 run_dir=args.run_dir,

@@ -6,6 +6,7 @@ __meta__:
   version: "240805"
   date: "2024-08-05"
   description: "Generic LArCV-to-SPINE truth conversion configuration"
+  tags: [pilarnet-v1, detector-free]
 
 include:
   - infer/generic/base/base_240718.yaml

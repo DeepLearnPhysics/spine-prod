@@ -11,16 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Truth conversion bundles now build and write truth fragments in addition to
   truth particles and interactions, preserving the object representation
   closest to the input LArCV clusters.
+- Updated the default SPINE container release to v1.3.0 for materialized GrapPA
+  caching, cached-product filtering, graph edge ceilings, scoped checkpoint
+  loading, and corrected LArCV sentinel handling.
 - Renamed the DUNE horizontal-drift 10 kt module configuration family from
   `dune10kt-1x2x6` to the canonical `dune-hd-10kt-1x2x6` detector name and
   migrated its public model-weight URLs. Deprecated configuration requests
   using the former name continue to resolve with a warning.
+- Migrated the ND-LAr 260409 inference model to the shared component
+  composition used by its training and cache-production configurations.
 
 ### Added
 - Added a DUNE vertical-drift 10 kt module 1x8x6 truth conversion bundle using
   the shared DUNE LArCV truth-product contract and canonical VD geometry.
 - Added a ProtoDUNE-HD truth conversion bundle based on the pinned
   ProtoDUNE-SP truth-product contract and canonical HD geometry.
+- Added canonical composed models and evaluation bundles for all six ND-LAr
+  inference revisions, dated historical component-training recipes, and
+  staged end-to-end pipelines for the four non-overlay ND-LAr productions.
 
 ## [0.9.0] - 2026-09-05
 

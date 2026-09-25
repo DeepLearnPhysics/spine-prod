@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  description: SPINE v1 ND-LAr interaction GrapPA training policy and data schema
+
+include: train/common/grappa_inter/base_v1.yaml
+
+override:
+  # Conservative per-rank size used with the interaction-edge entry filter.
+  io.loader.minibatch_size: 16
+  io.loader.dataset.schema.data.particle_info.particle_event: particle_pcluster
+  base.epochs: 75.0

@@ -120,6 +120,48 @@ def test_collection_exact_substitution_preserves_scalar_type(tmp_path):
     assert definition.stages[0]["ntasks"] == 4
 
 
+def test_pipeline_forwards_paired_joint_file_mode(tmp_path):
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "joint",
+                    "config": "infer/nd-lar/latest",
+                    "sources": {
+                        "primary": {"source_list": "primary.txt"},
+                        "secondary": {"source_list": "secondary.txt"},
+                    },
+                    "joint_file_mode": "paired",
+                }
+            ]
+        },
+    )
+
+    stage = PipelineDefinition.load(str(path)).stages[0]
+    options = PipelineRunner._submission_options(stage, dependency=None)
+    assert options["joint_file_mode"] == "paired"
+
+
+def test_pipeline_rejects_paired_mode_without_joint_sources(tmp_path):
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "joint",
+                    "config": "infer/nd-lar/latest",
+                    "source_list": "primary.txt",
+                    "joint_file_mode": "paired",
+                }
+            ]
+        },
+    )
+
+    with pytest.raises(ValueError, match="primary and secondary sources"):
+        PipelineDefinition.load(str(path))
+
+
 def test_workspace_override_replaces_yaml_default(tmp_path):
     """The launch value should take precedence over a concrete YAML workspace."""
     path = write_pipeline(
@@ -223,6 +265,62 @@ def test_stage_module_weight_parser_rejects_malformed_values(values, error, mess
 def test_empty_stage_module_weight_input_is_a_noop():
     """An omitted repeatable CLI option should produce no overrides."""
     assert PipelineDefinition.parse_stage_module_weights(None) == {}
+
+
+def test_pipeline_validates_training_warm_start_mapping(tmp_path):
+    """Warm starts map standalone destinations to full-chain namespaces."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "train",
+                    "config": "train.yaml",
+                    "stage": "train",
+                    "run_dir": "/run",
+                    "warm_start": {
+                        "uresnet": "uresnet_ppn.uresnet",
+                        "ppn": "uresnet_ppn.ppn",
+                    },
+                }
+            ]
+        },
+    )
+
+    stage = PipelineDefinition.load(str(path)).stages[0]
+    assert stage["warm_start"] == {
+        "uresnet": "uresnet_ppn.uresnet",
+        "ppn": "uresnet_ppn.ppn",
+    }
+
+
+@pytest.mark.parametrize(
+    ("warm_start", "stage", "message"),
+    [
+        ({}, "train", "must not be empty"),
+        ({"bad.module": "source"}, "train", "destination module"),
+        ({"model": "bad-source"}, "train", "dot-separated"),
+        ({"model": "source"}, "inference", "requires stage=train"),
+    ],
+)
+def test_pipeline_rejects_invalid_warm_start(tmp_path, warm_start, stage, message):
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "job",
+                    "config": "job.yaml",
+                    "stage": stage,
+                    "run_dir": "/run",
+                    "warm_start": warm_start,
+                }
+            ]
+        },
+    )
+
+    with pytest.raises(ValueError, match=message):
+        PipelineDefinition.load(str(path))
 
 
 @pytest.mark.parametrize(
@@ -662,6 +760,37 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             "module_weight path.*must be a non-empty string",
         ),
         (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "stage": "train",
+                "run_dir": "/run",
+                "warm_start": {"model": ""},
+            },
+            ValueError,
+            "must be a non-empty namespace",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "val_num_entries": 10,
+                "val_entry_fraction_range": [0.0, 0.5],
+            },
+            ValueError,
+            "cannot combine val_num_entries",
+        ),
+        (
+            {"name": "job", "config": "x.yaml", "in_place": "yes"},
+            TypeError,
+            "in_place must be a boolean",
+        ),
+        (
+            {"name": "job", "config": "x.yaml", "joint_file_mode": "other"},
+            ValueError,
+            "joint_file_mode must be",
+        ),
+        (
             {"name": "job", "config": "x.yaml", "kind": "other"},
             ValueError,
             "invalid kind",
@@ -708,6 +837,42 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             },
             ValueError,
             "validation entry filter requires stage=train",
+        ),
+        (
+            {"name": "job", "config": "x.yaml", "val_num_entries": 10},
+            ValueError,
+            "validation entry count requires stage=train",
+        ),
+        (
+            {"name": "job", "config": "x.yaml", "num_files": 1},
+            ValueError,
+            "num_files requires explicit inputs",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "stage": "train",
+                "run_dir": "/run",
+                "val_num_files": 1,
+            },
+            ValueError,
+            "val_num_files requires validation inputs",
+        ),
+        (
+            {
+                "name": "job",
+                "config": "x.yaml",
+                "stage": "train",
+                "run_dir": "/run",
+                "joint_file_mode": "paired",
+                "sources": {
+                    "primary": {"source": "primary.root"},
+                    "secondary": {"source": "secondary.root"},
+                },
+            },
+            ValueError,
+            "paired joint files require stage=inference",
         ),
         (
             {

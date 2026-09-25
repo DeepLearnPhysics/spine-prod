@@ -1,0 +1,25 @@
+# DLPGen optimized-output IO adaptation
+
+__meta__:
+  kind: fragment
+  description: "DLPGen optimized LArCV truth-product adaptation"
+
+override:
+  # DLPGen already provides authoritative semantic labels.
+  io.loader.dataset.schema.clust_label-: shape_precedence
+
+  # Use the native Supera particle collection consistently across parsers.
+  io.loader.dataset.schema.ppn_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.clust_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.coord_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.graph_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.particles.particle_event: particle_pcluster
+
+  # Preserve native neutrino truth on both built objects and the standalone
+  # neutrino collection. Each bundle selects its source-code convention.
+  io.loader.dataset.schema.clust_label.neutrino_event: neutrino_mc_truth
+  io.loader.dataset.schema.particles.neutrino_event: neutrino_mc_truth
+  io.loader.dataset.schema.neutrinos:
+    parser: neutrino
+    neutrino_event: neutrino_mc_truth
+    cluster_event: cluster3d_pcluster

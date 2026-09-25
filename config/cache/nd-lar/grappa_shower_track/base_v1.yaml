@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  description: ND-LAr particle-graph cache materialization
+
+include: cache/common/grappa_shower_track/base_v1.yaml
+
+override:
+  io.loader.minibatch_size: 16
+  io.loader.dataset.primary.schema.coord_label.particle_event: particle_pcluster

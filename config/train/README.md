@@ -15,11 +15,19 @@ The configurations in this directory are used to:
 The currently populated configuration tree is:
 
 - **`generic/`**: YAML benchmark recipes for the generic dataset
+- **`nd-lar/`**: cached five-stage recipes for the busy ND-LAr dataset
 - **`protodune-sp/`**: staged recipes for the ProtoDUNE-SP `260210` chain,
   including its separately trained deghosting model
 
 Additional detector-specific trees will be added as their historical recipes
 are reviewed and migrated to this composed configuration structure.
+
+ND-LAr additionally retains standalone `250806` overlay-training recipes.
+Those recipes are intentionally not presented as an aligned stage-cache
+pipeline: stochastic event overlay changes event identity at collation time and
+therefore cannot publish one cache entry per source event. The `240819` ND-LAr
+inference revision is a 2x2-checkpoint debug deployment and likewise is not
+represented as an ND-LAr training production.
 
 ## Configuration Structure
 

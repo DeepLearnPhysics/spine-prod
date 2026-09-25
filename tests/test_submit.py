@@ -18,6 +18,48 @@ def run_main(*args, submitter=None):
     return result, submitter, submitter_class
 
 
+@pytest.mark.parametrize(
+    "values",
+    [
+        ["plain.root", "primary=named.root"],
+        ["=missing-target.root"],
+        ["primary="],
+    ],
+)
+def test_normalize_source_arguments_rejects_malformed_qualified_values(values):
+    parser = Mock()
+    parser.error.side_effect = ValueError("invalid source")
+
+    with pytest.raises(ValueError, match="invalid source"):
+        submit.normalize_source_arguments(parser, values, None)
+
+
+def test_normalize_source_arguments_rejects_duplicate_named_source_lists():
+    parser = Mock()
+    parser.error.side_effect = ValueError("duplicate source")
+
+    with pytest.raises(ValueError, match="duplicate source"):
+        submit.normalize_source_arguments(
+            parser,
+            None,
+            ["primary=first.txt", "primary=second.txt"],
+        )
+
+
+def test_normalize_source_arguments_groups_direct_named_sources():
+    parser = Mock()
+
+    files, source_type, named = submit.normalize_source_arguments(
+        parser,
+        ["primary=first.root", "primary=second.root"],
+        None,
+    )
+
+    assert files is None
+    assert source_type == "source"
+    assert named == {"primary": {"source": ["first.root", "second.root"]}}
+
+
 def test_list_modifiers_prints_discovered_versions(capsys):
     submitter = Mock()
     submitter.list_modifiers.return_value = {
@@ -173,6 +215,28 @@ def test_interactive_mode_forwards_runtime_options():
     assert kwargs["set_overrides"] == ["model.detect_anomaly=true"]
 
 
+def test_interactive_rejects_paired_joint_mode():
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--config",
+            "config.yaml",
+            "--interactive",
+            "--joint-file-mode",
+            "paired",
+        )
+
+
+def test_interactive_rejects_named_sources():
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--config",
+            "config.yaml",
+            "--interactive",
+            "--source",
+            "primary=input.root",
+        )
+
+
 def test_batch_mode_forwards_profile_overrides(capsys):
     submitter = Mock()
     submitter.submit_job.return_value = ["123", "124"]
@@ -262,6 +326,14 @@ def test_batch_mode_forwards_training_and_validation_sources():
         "/filters/train.yaml",
         "--val-entry-filter",
         "/filters/validation.yaml",
+        "--num-entries",
+        "10000",
+        "--val-num-entries",
+        "1000",
+        "--num-files",
+        "2",
+        "--val-num-files",
+        "1",
         submitter=submitter,
     )
 
@@ -273,6 +345,55 @@ def test_batch_mode_forwards_training_and_validation_sources():
     assert kwargs["validation_source_type"] == "source_list"
     assert kwargs["entry_filter"] == "/filters/train.yaml"
     assert kwargs["val_entry_filter"] == "/filters/validation.yaml"
+    assert kwargs["num_entries"] == 10000
+    assert kwargs["val_num_entries"] == 1000
+    assert kwargs["num_files"] == 2
+    assert kwargs["val_num_files"] == 1
+
+
+def test_batch_mode_forwards_target_qualified_sources():
+    submitter = Mock()
+    submitter.submit_job.return_value = []
+
+    result, _, _ = run_main(
+        "--config",
+        "infer/nd-lar/full_chain_260409.yaml",
+        "--apply-mods",
+        "joint:240819",
+        "--source-list",
+        "primary=primary.txt",
+        "secondary=secondary.txt",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    kwargs = submitter.submit_job.call_args.kwargs
+    assert kwargs["files"] is None
+    assert kwargs["named_sources"] == {
+        "primary": {"source_list": "primary.txt"},
+        "secondary": {"source_list": "secondary.txt"},
+    }
+
+
+def test_batch_mode_forwards_paired_joint_file_mode():
+    submitter = Mock()
+    submitter.submit_job.return_value = []
+
+    result, _, _ = run_main(
+        "--config",
+        "infer/nd-lar/full_chain_260409.yaml",
+        "--apply-mods",
+        "joint:240819",
+        "--source-list",
+        "primary=primary.txt",
+        "secondary=secondary.txt",
+        "--joint-file-mode",
+        "paired",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert submitter.submit_job.call_args.kwargs["joint_file_mode"] == "paired"
 
 
 def test_pipeline_mode_prints_stage_jobs(capsys):
@@ -299,6 +420,7 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         to_stage=None,
         select_stages=None,
         stage_module_weights=None,
+        warm_start=None,
     )
     output = capsys.readouterr().out
     assert "reco: 42" in output
@@ -379,6 +501,37 @@ def test_stage_module_weight_requires_pipeline():
         )
 
 
+def test_pipeline_forwards_warm_start():
+    """A full-chain warm start should reach the pipeline runner intact."""
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--warm-start",
+        "/weights/full-chain.ckpt",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert (
+        submitter.submit_pipeline.call_args.kwargs["warm_start"]
+        == "/weights/full-chain.ckpt"
+    )
+
+
+def test_warm_start_requires_pipeline():
+    """The convenient warm start is defined by pipeline stage mappings."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--config",
+            "train.yaml",
+            "--warm-start",
+            "/weights/full-chain.ckpt",
+        )
+
+
 def test_pipeline_mode_forwards_global_overrides():
     submitter = Mock()
     submitter.submit_pipeline.return_value = {}
@@ -400,6 +553,7 @@ def test_pipeline_mode_forwards_global_overrides():
         "10",
         "--flashmatch",
         "--cvmfs",
+        "--expandable-segments",
         submitter=submitter,
     )
 
@@ -413,6 +567,7 @@ def test_pipeline_mode_forwards_global_overrides():
         "iterations": 10,
         "flashmatch": True,
         "cvmfs": True,
+        "expandable_segments": True,
     }
     assert submitter.submit_pipeline.call_args.kwargs["workspace"] is None
 

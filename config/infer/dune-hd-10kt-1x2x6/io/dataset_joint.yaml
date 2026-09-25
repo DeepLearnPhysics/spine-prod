@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  description: dune-hd-10kt-1x2x6 LArCV dataset restricted to joint-overlay-compatible products
+
+include: dataset_common.yaml
+
+remove:
+  - schema.run_info
+  - schema.flashes
+  - schema.crthits

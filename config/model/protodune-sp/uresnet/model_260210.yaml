@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260210"
+  date: "2026-02-10"
+  description: ProtoDUNE-SP 260210 standalone UResNet model
+
+include: model/common/uresnet/base_v1.yaml
+
+override:
+  model.modules.uresnet: !include model/protodune-sp/uresnet/network_260210.yaml
+  model.modules.uresnet_loss: !include model/protodune-sp/uresnet/loss_260210.yaml
