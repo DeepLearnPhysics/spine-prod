@@ -42,6 +42,9 @@ stages:
   - name: train_uresnet_ppn
     config: train/nd-lar/uresnet_ppn/train_260409.yaml
     stage: train
+    warm_start:
+      uresnet: uresnet_ppn.uresnet
+      ppn: uresnet_ppn.ppn
     profile: s3df_ampere_full
     time: "2-00:00:00"
     source_list: ${train_source_list}
@@ -52,10 +55,6 @@ stages:
     val_num_files: 1
     val_num_entries: 1000
     apply_mods: ["augment_uresnet:260912"]
-    set:
-      # Map the standalone destinations onto the full-chain checkpoint names.
-      - model.modules.uresnet.model_name=uresnet_ppn.uresnet
-      - model.modules.ppn.model_name=uresnet_ppn.ppn
 
   - name: cache_${split.name}_segmentation
     for_each:
@@ -78,6 +77,8 @@ stages:
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/nd-lar/graph_spice/train_from_uresnet_ppn_260409.yaml
     stage: train
+    warm_start:
+      graph_spice: graph_spice
     profile: s3df_ampere_full
     time: "2-00:00:00"
     # Graph-SPICE memory scales strongly with event occupancy. Leave enough
@@ -155,6 +156,8 @@ stages:
     depends_on: [build_train_shower_edges, build_validation_shower_edges]
     config: train/nd-lar/grappa_shower/train_from_fragment_cache_260409.yaml
     stage: train
+    warm_start:
+      grappa: grappa_shower
     profile: s3df_ampere_full
     time: "3-00:00:00"
     minibatch_size: 1
@@ -165,15 +168,13 @@ stages:
     run_dir: ${workspace}/train/grappa_shower
     tensorboard: true
     val_num_entries: 1000
-    set:
-      # The optional smoke-test seed is a full-chain checkpoint, while the
-      # standalone training destination is named `grappa`.
-      - model.modules.grappa.model_name=grappa_shower
 
   - name: train_grappa_track
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/nd-lar/grappa_track/train_from_fragment_cache_260409.yaml
     stage: train
+    warm_start:
+      grappa: grappa_track
     profile: s3df_ampere_full
     time: "2-00:00:00"
     minibatch_size: 32
@@ -182,10 +183,6 @@ stages:
     run_dir: ${workspace}/train/grappa_track
     tensorboard: true
     val_num_entries: 1000
-    set:
-      # The optional smoke-test seed is a full-chain checkpoint, while the
-      # standalone training destination is named `grappa`.
-      - model.modules.grappa.model_name=grappa_track
 
   - name: cache_${split.name}_particle_graphs
     for_each:
@@ -245,6 +242,8 @@ stages:
       [build_train_interaction_edges, build_validation_interaction_edges]
     config: train/nd-lar/grappa_inter/train_from_particle_cache_260924.yaml
     stage: train
+    warm_start:
+      grappa: grappa_inter
     profile: s3df_ampere_full
     time: "2-00:00:00"
     # Ordinary batches are comfortably below the A100 ceiling at this size;

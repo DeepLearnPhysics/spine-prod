@@ -267,6 +267,62 @@ def test_empty_stage_module_weight_input_is_a_noop():
     assert PipelineDefinition.parse_stage_module_weights(None) == {}
 
 
+def test_pipeline_validates_training_warm_start_mapping(tmp_path):
+    """Warm starts map standalone destinations to full-chain namespaces."""
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "train",
+                    "config": "train.yaml",
+                    "stage": "train",
+                    "run_dir": "/run",
+                    "warm_start": {
+                        "uresnet": "uresnet_ppn.uresnet",
+                        "ppn": "uresnet_ppn.ppn",
+                    },
+                }
+            ]
+        },
+    )
+
+    stage = PipelineDefinition.load(str(path)).stages[0]
+    assert stage["warm_start"] == {
+        "uresnet": "uresnet_ppn.uresnet",
+        "ppn": "uresnet_ppn.ppn",
+    }
+
+
+@pytest.mark.parametrize(
+    ("warm_start", "stage", "message"),
+    [
+        ({}, "train", "must not be empty"),
+        ({"bad.module": "source"}, "train", "destination module"),
+        ({"model": "bad-source"}, "train", "dot-separated"),
+        ({"model": "source"}, "inference", "requires stage=train"),
+    ],
+)
+def test_pipeline_rejects_invalid_warm_start(tmp_path, warm_start, stage, message):
+    path = write_pipeline(
+        tmp_path,
+        {
+            "stages": [
+                {
+                    "name": "job",
+                    "config": "job.yaml",
+                    "stage": stage,
+                    "run_dir": "/run",
+                    "warm_start": warm_start,
+                }
+            ]
+        },
+    )
+
+    with pytest.raises(ValueError, match=message):
+        PipelineDefinition.load(str(path))
+
+
 @pytest.mark.parametrize(
     ("stages", "overrides", "error", "message"),
     [

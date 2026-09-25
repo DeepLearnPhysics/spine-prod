@@ -57,6 +57,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "sources",
         "validation_sources",
         "module_weight",
+        "warm_start",
         "weight_path",
         "export_weights",
         "input_dir",
@@ -663,13 +664,21 @@ class PipelineDefinition:
     @staticmethod
     def _validate_structured_fields(name: str, stage: Mapping[str, Any]) -> None:
         """Validate fields translated into repeated SPINE CLI options."""
-        for field in ("sources", "validation_sources", "module_weight"):
+        for field in (
+            "sources",
+            "validation_sources",
+            "module_weight",
+            "warm_start",
+        ):
             value = stage.get(field)
             if value is not None and not isinstance(value, Mapping):
                 raise TypeError(f"Pipeline stage '{name}' {field} must be a mapping")
         module_weights = stage.get("module_weight")
         if module_weights is not None:
             PipelineDefinition._validate_module_weights(name, module_weights)
+        warm_start = stage.get("warm_start")
+        if warm_start is not None:
+            PipelineDefinition._validate_warm_start(name, warm_start)
         export_weights = stage.get("export_weights")
         if export_weights is not None:
             if not isinstance(export_weights, str):
@@ -770,6 +779,31 @@ class PipelineDefinition:
                     f"'{module}' must be a non-empty string"
                 )
 
+    @staticmethod
+    def _validate_warm_start(name: str, modules: Mapping[Any, Any]) -> None:
+        """Validate destination-to-source checkpoint namespace mappings."""
+        if not modules:
+            raise ValueError(f"Pipeline stage '{name}' warm_start must not be empty")
+        for module, source in modules.items():
+            if not isinstance(module, str) or not VARIABLE_NAME_PATTERN.match(module):
+                raise ValueError(
+                    f"Pipeline stage '{name}' warm_start keys must be valid "
+                    "destination module identifiers"
+                )
+            if not isinstance(source, str) or not source:
+                raise ValueError(
+                    f"Pipeline stage '{name}' warm_start source for '{module}' "
+                    "must be a non-empty namespace"
+                )
+            if any(
+                not VARIABLE_NAME_PATTERN.match(component)
+                for component in source.split(".")
+            ):
+                raise ValueError(
+                    f"Pipeline stage '{name}' warm_start source '{source}' must "
+                    "be a dot-separated module namespace"
+                )
+
     @classmethod
     def _validate_lifecycle(cls, name: str, stage: Mapping[str, Any]) -> None:
         """Validate train, validation, and inference-only controls."""
@@ -796,6 +830,8 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' can resume only when stage=train"
             )
+        if lifecycle != "train" and stage.get("warm_start") is not None:
+            raise ValueError(f"Pipeline stage '{name}' warm_start requires stage=train")
         if lifecycle != "validation" and (
             stage.get("validation_name") or stage.get("rerun_validation")
         ):
@@ -1097,6 +1133,7 @@ class PipelineRunner(SubmissionComponent):
         to_stage: Optional[str] = None,
         select_stages: Optional[Sequence[str]] = None,
         stage_module_weights: Optional[Sequence[Sequence[str]]] = None,
+        warm_start: Optional[str] = None,
     ) -> Dict[str, List[str]]:
         """Submit an ordered multi-stage production pipeline.
 
@@ -1131,6 +1168,9 @@ class PipelineRunner(SubmissionComponent):
         stage_module_weights : sequence, optional
             Repeated launch-time ``STAGE MODULE=PATH`` assignments. These
             override matching module weights in the pipeline document.
+        warm_start : str, optional
+            Full-chain checkpoint used to initialize every selected training
+            stage that declares a ``warm_start`` module mapping.
 
         Returns
         -------
@@ -1147,6 +1187,14 @@ class PipelineRunner(SubmissionComponent):
             stage_module_weights=parsed_stage_weights,
         )
         all_stages = definition.stages
+        if warm_start is not None:
+            if not isinstance(warm_start, str) or not warm_start:
+                raise ValueError("Pipeline warm-start path must be a non-empty string")
+            if not any(stage.get("warm_start") for stage in all_stages):
+                raise ValueError(
+                    "--warm-start was provided, but the pipeline declares no "
+                    "warm_start mappings"
+                )
         stages, skipped, deferred = self._select_stages(
             all_stages,
             from_stage,
@@ -1196,6 +1244,7 @@ class PipelineRunner(SubmissionComponent):
                 stage,
                 dependency,
                 retry=from_stage is not None or select_stages is not None,
+                warm_start_path=warm_start,
             )
             kind = stage.get("kind", "spine")
             if kind == "filter":
@@ -1328,6 +1377,7 @@ class PipelineRunner(SubmissionComponent):
         stage: Mapping[str, Any],
         dependency: Optional[str],
         retry: bool = False,
+        warm_start_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Translate one stage to ``BatchRunner.submit_job`` options."""
         if stage.get("kind", "spine") == "report":
@@ -1395,6 +1445,10 @@ class PipelineRunner(SubmissionComponent):
                 "named_sources": stage.get("sources"),
                 "validation_named_sources": stage.get("validation_sources"),
                 "module_weights": stage.get("module_weight"),
+                "warm_start_path": (
+                    warm_start_path if stage.get("warm_start") else None
+                ),
+                "warm_start_modules": stage.get("warm_start"),
                 "weight_path": stage.get("weight_path"),
                 "export_weights": stage.get("export_weights"),
                 "profile": stage.get("profile", "auto"),

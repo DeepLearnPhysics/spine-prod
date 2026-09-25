@@ -121,6 +121,33 @@ outputs, dependencies, and run lifecycle settings remain on their individual
 stages. Unknown fields and unsupported pipeline CLI options are rejected rather
 than ignored.
 
+A pipeline can expose a one-checkpoint warm start by declaring how each
+standalone training module maps back to the full-chain checkpoint namespace:
+
+```yaml
+- name: train_uresnet_ppn
+  config: train/nd-lar/uresnet_ppn/train_260409.yaml
+  stage: train
+  run_dir: ${workspace}/train/uresnet_ppn
+  warm_start:
+    uresnet: uresnet_ppn.uresnet
+    ppn: uresnet_ppn.ppn
+```
+
+Then one option initializes every training stage with such a declaration:
+
+```bash
+./submit.py --pipeline pipelines/nd-lar/full_chain_260924.yaml \
+  --workspace /path/to/workflow \
+  --warm-start /path/to/existing/full_chain.ckpt
+```
+
+Warm starts import parameters only; they do not restore optimizer, scheduler,
+or iteration state. Cache, export, and evaluation stages are unaffected. On a
+pipeline retry, a stage's own resumable checkpoint takes precedence over the
+warm start. The cache stages still consume the weights newly produced by their
+upstream training stages.
+
 An existing checkpoint can initialize one destination module without editing
 the stable pipeline document. Qualify each override by both stage and module:
 

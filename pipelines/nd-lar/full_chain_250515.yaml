@@ -29,6 +29,9 @@ stages:
   - name: train_uresnet_ppn
     config: train/nd-lar/uresnet_ppn/train_250505.yaml
     stage: train
+    warm_start:
+      uresnet: uresnet_ppn.uresnet
+      ppn: uresnet_ppn.ppn
     profile: s3df_ampere_full
     time: "2-00:00:00"
     source_list: ${train_source_list}
@@ -59,6 +62,8 @@ stages:
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/nd-lar/graph_spice/train_from_uresnet_ppn_250505.yaml
     stage: train
+    warm_start:
+      graph_spice: graph_spice
     profile: s3df_ampere_full
     time: "2-00:00:00"
     run_dir: ${workspace}/train/graph_spice
@@ -101,6 +106,8 @@ stages:
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/nd-lar/grappa_shower/train_from_fragment_cache_250505.yaml
     stage: train
+    warm_start:
+      grappa: grappa_shower
     profile: s3df_ampere_full
     time: "3-00:00:00"
     source: ${workspace}/cache/train.spine-cache
@@ -114,6 +121,8 @@ stages:
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/nd-lar/grappa_track/train_from_fragment_cache_250515.yaml
     stage: train
+    warm_start:
+      grappa: grappa_track
     profile: s3df_ampere_full
     time: "2-00:00:00"
     source: ${workspace}/cache/train.spine-cache
@@ -149,6 +158,8 @@ stages:
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
     config: train/nd-lar/grappa_inter/train_from_particle_cache_250515.yaml
     stage: train
+    warm_start:
+      grappa: grappa_inter
     profile: s3df_ampere_full
     time: "2-00:00:00"
     source: ${workspace}/cache/train.spine-cache

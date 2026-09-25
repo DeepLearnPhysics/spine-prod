@@ -2200,8 +2200,8 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
         assert overlay["io"]["loader"]["minibatch_size"] == minibatch_size
 
 
-def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
-    """Standalone GrapPA stages identify their source in a full-chain seed."""
+def test_nd_lar_smoke_pipeline_declares_full_chain_warm_start_namespaces():
+    """Every standalone trainer identifies its full-chain source namespace."""
     pipeline = PipelineDefinition.load(
         Path(__file__).parent.parent
         / "pipelines/nd-lar/full_chain_260409_smoke_10k.yaml",
@@ -2231,12 +2231,14 @@ def test_nd_lar_smoke_pipeline_maps_optional_full_chain_grappa_seeds():
     assert stages["train_grappa_inter"]["profile"] == "s3df_ampere_full"
     assert stages["train_grappa_inter"]["time"] == "2-00:00:00"
     assert stages["train_grappa_inter"]["minibatch_size"] == 16
-    assert stages["train_grappa_shower"]["set"] == [
-        "model.modules.grappa.model_name=grappa_shower"
-    ]
-    assert stages["train_grappa_track"]["set"] == [
-        "model.modules.grappa.model_name=grappa_track"
-    ]
+    assert stages["train_uresnet_ppn"]["warm_start"] == {
+        "uresnet": "uresnet_ppn.uresnet",
+        "ppn": "uresnet_ppn.ppn",
+    }
+    assert stages["train_graph_spice"]["warm_start"] == {"graph_spice": "graph_spice"}
+    assert stages["train_grappa_shower"]["warm_start"] == {"grappa": "grappa_shower"}
+    assert stages["train_grappa_track"]["warm_start"] == {"grappa": "grappa_track"}
+    assert stages["train_grappa_inter"]["warm_start"] == {"grappa": "grappa_inter"}
 
 
 def test_nd_lar_260924_pipeline_enables_image_augmentation_and_new_targets():

@@ -379,6 +379,13 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--warm-start",
+        help=(
+            "Initialize all declared training stages in a pipeline from one "
+            "full-chain checkpoint; resumable stage checkpoints take precedence"
+        ),
+    )
+    parser.add_argument(
         "--output",
         "-o",
         help=(
@@ -552,6 +559,8 @@ Examples:
         parser.error("--weight-path is stage-specific and cannot override a pipeline")
     if args.stage_module_weight is not None and not args.pipeline:
         parser.error("--stage-module-weight is only supported with --pipeline")
+    if args.warm_start is not None and not args.pipeline:
+        parser.error("--warm-start is only supported with --pipeline")
 
     # Handle deprecated --local-output flag
     if getattr(args, "local_output", False):
@@ -750,6 +759,7 @@ Examples:
                 to_stage=args.to_stage,
                 select_stages=args.select_stage,
                 stage_module_weights=args.stage_module_weight,
+                warm_start=args.warm_start,
             )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():

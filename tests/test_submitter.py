@@ -2392,6 +2392,90 @@ class TestBatchSpineOverride:
         assert metadata["validation_named_sources"] == validation_sources
         assert metadata["module_weights"] == {"graph_spice": "/weights/seed.ckpt"}
 
+    def test_submit_job_applies_warm_start_and_explicit_override(
+        self, mock_submitter, tmp_path
+    ):
+        """A fresh stage expands a full-chain seed into weights-only imports."""
+        run_dir = tmp_path / "run"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="train"),
+        ):
+            mock_submitter.submit_job(
+                config="config/train/generic/uresnet/train_240718.yaml",
+                module_weights={"ppn": "/weights/ppn-only.ckpt"},
+                warm_start_path="/weights/full-chain.ckpt",
+                warm_start_modules={
+                    "uresnet": "uresnet_ppn.uresnet",
+                    "ppn": "uresnet_ppn.ppn",
+                },
+                stage="train",
+                run_dir=str(run_dir),
+            )
+
+        submission = run_dir / "latest"
+        script = (submission / "submit.sbatch").read_text(encoding="utf-8")
+        assert "--module-weight uresnet=/weights/full-chain.ckpt" in script
+        assert "ppn=/weights/ppn-only.ckpt" in script
+        assert "--set model.modules.uresnet.model_name=uresnet_ppn.uresnet" in script
+        assert "model.modules.ppn.model_name" not in script
+        assert "--resume" not in script
+        metadata = json.loads((submission / "job_metadata.json").read_text())
+        assert metadata["warm_start_applied"] is True
+        assert metadata["warm_start_path"] == "/weights/full-chain.ckpt"
+
+    def test_submit_job_resume_suppresses_warm_start(self, mock_submitter, tmp_path):
+        """A stage checkpoint is authoritative when retrying a warm-started run."""
+        run_dir = tmp_path / "run"
+        config = "config/train/generic/uresnet/train_240718.yaml"
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="first"),
+        ):
+            mock_submitter.submit_job(
+                config=config,
+                warm_start_path="/weights/full-chain.ckpt",
+                warm_start_modules={"uresnet": "uresnet_ppn.uresnet"},
+                stage="train",
+                run_dir=str(run_dir),
+            )
+
+        checkpoint = run_dir / "weights" / "snapshot-5.ckpt"
+        checkpoint.touch()
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="retry"),
+        ):
+            mock_submitter.submit_job(
+                config=config,
+                warm_start_path="/weights/full-chain.ckpt",
+                warm_start_modules={"uresnet": "uresnet_ppn.uresnet"},
+                stage="train",
+                run_dir=str(run_dir),
+                retry=True,
+            )
+
+        submission = run_dir / "latest"
+        script = (submission / "submit.sbatch").read_text(encoding="utf-8")
+        assert f"--weight-path {checkpoint}" in script
+        assert "--resume" in script
+        assert "--module-weight uresnet=/weights/full-chain.ckpt" not in script
+        assert "model.modules.uresnet.model_name" not in script
+        metadata = json.loads((submission / "job_metadata.json").read_text())
+        assert metadata["warm_start_applied"] is False
+
     def test_submit_job_forwards_output_for_named_sources(
         self, mock_submitter, tmp_path
     ):
@@ -4082,6 +4166,46 @@ class TestPipelineSubmission:
         link = workspace / "logs" / "cache_train_segmentation"
         assert link.is_symlink()
         assert link.resolve() == (run_dir / "latest").resolve()
+
+    def test_submit_pipeline_forwards_warm_start_only_to_declared_training_stage(
+        self, mock_submitter, tmp_path
+    ):
+        pipeline_path = tmp_path / "pipeline.yaml"
+        pipeline_path.write_text(
+            yaml.safe_dump(
+                {
+                    "stages": [
+                        {
+                            "name": "train",
+                            "config": "train.yaml",
+                            "stage": "train",
+                            "run_dir": "/tmp/train",
+                            "warm_start": {"grappa": "grappa_shower"},
+                        },
+                        {
+                            "name": "cache",
+                            "config": "cache.yaml",
+                            "depends_on": ["train"],
+                        },
+                    ]
+                }
+            )
+        )
+
+        with patch.object(
+            mock_submitter, "submit_job", side_effect=[["10"], ["20"]]
+        ) as submit_job:
+            result = mock_submitter.submit_pipeline(
+                str(pipeline_path), warm_start="/weights/full-chain.ckpt"
+            )
+
+        assert result == {"train": ["10"], "cache": ["20"]}
+        train = submit_job.call_args_list[0].kwargs
+        cache = submit_job.call_args_list[1].kwargs
+        assert train["warm_start_path"] == "/weights/full-chain.ckpt"
+        assert train["warm_start_modules"] == {"grappa": "grappa_shower"}
+        assert cache["warm_start_path"] is None
+        assert cache["warm_start_modules"] is None
 
     def test_submit_pipeline_forwards_cli_source_and_override_fields(
         self, mock_submitter, tmp_path

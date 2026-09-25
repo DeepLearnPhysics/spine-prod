@@ -356,6 +356,7 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         to_stage=None,
         select_stages=None,
         stage_module_weights=None,
+        warm_start=None,
     )
     output = capsys.readouterr().out
     assert "reco: 42" in output
@@ -433,6 +434,37 @@ def test_stage_module_weight_requires_pipeline():
             "--stage-module-weight",
             "train",
             "model=/weights/model.ckpt",
+        )
+
+
+def test_pipeline_forwards_warm_start():
+    """A full-chain warm start should reach the pipeline runner intact."""
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--warm-start",
+        "/weights/full-chain.ckpt",
+        submitter=submitter,
+    )
+
+    assert result == 0
+    assert (
+        submitter.submit_pipeline.call_args.kwargs["warm_start"]
+        == "/weights/full-chain.ckpt"
+    )
+
+
+def test_warm_start_requires_pipeline():
+    """The convenient warm start is defined by pipeline stage mappings."""
+    with pytest.raises(SystemExit, match="2"):
+        run_main(
+            "--config",
+            "train.yaml",
+            "--warm-start",
+            "/weights/full-chain.ckpt",
         )
 
 

@@ -130,6 +130,8 @@ class BatchRunner(SubmissionComponent):
         named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
         validation_named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
         module_weights: Optional[Mapping[str, str]] = None,
+        warm_start_path: Optional[str] = None,
+        warm_start_modules: Optional[Mapping[str, str]] = None,
         weight_path: Optional[str] = None,
         export_weights: Optional[str] = None,
         profile: str = "auto",
@@ -202,6 +204,10 @@ class BatchRunner(SubmissionComponent):
             Target-qualified validation selectors for a composite dataset.
         module_weights : mapping, optional
             Model module names mapped to checkpoint paths.
+        warm_start_path : str, optional
+            Full-chain checkpoint used to initialize declared stage modules.
+        warm_start_modules : mapping, optional
+            Destination modules mapped to their source checkpoint namespaces.
         weight_path : str, optional
             Complete-model checkpoint override forwarded to SPINE.
         export_weights : str, optional
@@ -361,6 +367,14 @@ class BatchRunner(SubmissionComponent):
             raise ValueError("--resume and --resume-from are valid only for training")
         if weight_path and (resume or resume_from):
             raise ValueError("--weight-path cannot be combined with training resume")
+        if bool(warm_start_path) != bool(warm_start_modules):
+            raise ValueError(
+                "warm_start_path and warm_start_modules must be provided together"
+            )
+        if warm_start_path and stage != "train":
+            raise ValueError("Pipeline warm start is valid only for training jobs")
+        if warm_start_path and weight_path:
+            raise ValueError("Pipeline warm start cannot be combined with weight_path")
         if stage != "validation" and (validation_name or rerun_validation):
             raise ValueError(
                 "--validation-name and --rerun-validation are valid only for validation"
@@ -611,15 +625,11 @@ class BatchRunner(SubmissionComponent):
         if preload:
             self.context.preload_downloads(config)
 
-        spine_cli_overrides = self.context.spine_cli.format_set_overrides(set_overrides)
         named_source_overrides = self.context.spine_cli.format_named_sources(
             effective_named_sources
         )
         validation_named_source_overrides = self.context.spine_cli.format_named_sources(
             effective_validation_named_sources, validation=True
-        )
-        module_weight_overrides = self.context.spine_cli.format_module_weights(
-            module_weights
         )
         weight_path_override = self.context.spine_cli.format_weight_path(weight_path)
         export_weight_override = self.context.spine_cli.format_export_weights(
@@ -827,6 +837,36 @@ class BatchRunner(SubmissionComponent):
                     ]
                 )
 
+        effective_set_overrides = list(set_overrides or [])
+        effective_module_weights = dict(module_weights or {})
+        warm_start_applied = bool(warm_start_path and resume_checkpoint is None)
+        if warm_start_applied:
+            # Generated values precede explicit stage values, preserving the
+            # low-level escape hatches' established precedence.
+            warm_start_sets = [
+                f"model.modules.{module}.model_name={source}"
+                for module, source in warm_start_modules.items()
+                if module not in effective_module_weights
+            ]
+            effective_set_overrides = warm_start_sets + effective_set_overrides
+            warm_start_weights = {
+                module: warm_start_path for module in warm_start_modules
+            }
+            warm_start_weights.update(effective_module_weights)
+            effective_module_weights = warm_start_weights
+            print(f"Warm-starting training modules from {warm_start_path}")
+        elif warm_start_path:
+            print(
+                "Ignoring pipeline warm start because a resumable stage "
+                f"checkpoint was found: {resume_checkpoint}"
+            )
+
+        spine_cli_overrides = self.context.spine_cli.format_set_overrides(
+            effective_set_overrides
+        )
+        module_weight_overrides = self.context.spine_cli.format_module_weights(
+            effective_module_weights
+        )
         extra_args = " ".join(lifecycle_args)
         spine_cli_overrides = " ".join(
             part
@@ -1185,11 +1225,14 @@ class BatchRunner(SubmissionComponent):
             "config": config,
             "original_config": original_config if apply_mods else config,
             "applied_modifiers": apply_mods or [],
-            "set_overrides": set_overrides or [],
+            "set_overrides": effective_set_overrides,
             "named_sources": named_sources or {},
             "validation_named_sources": validation_named_sources or {},
             "joint_file_mode": joint_file_mode,
-            "module_weights": module_weights or {},
+            "module_weights": effective_module_weights,
+            "warm_start_path": warm_start_path,
+            "warm_start_modules": warm_start_modules or {},
+            "warm_start_applied": warm_start_applied,
             "weight_path": weight_path,
             "export_weights": export_weights,
             "world_size": world_size,
