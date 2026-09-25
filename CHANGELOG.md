@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Truth conversion bundles now build and write truth fragments in addition to
   truth particles and interactions, preserving the object representation
   closest to the input LArCV clusters.
+- Updated the default SPINE container release to v1.3.0 for materialized GrapPA
+  caching, cached-product filtering, graph edge ceilings, scoped checkpoint
+  loading, and corrected LArCV sentinel handling.
 - Renamed the DUNE horizontal-drift 10 kt module configuration family from
   `dune10kt-1x2x6` to the canonical `dune-hd-10kt-1x2x6` detector name and
   migrated its public model-weight URLs. Deprecated configuration requests

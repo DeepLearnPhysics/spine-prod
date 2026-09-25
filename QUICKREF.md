@@ -7,8 +7,8 @@ recorded in `DEFAULT_SPINE_VERSION`; `configure.sh` exports
 `SPINE_CONTAINER_VERSION` from that value and derives the registry tag and
 default S3DF `.sif` path. The container provides SPINE, OpT0Finder, and runtime
 dependencies; batch jobs invoke the `spine` executable from inside the
-container. The current default is SPINE v1.1.0; maintained configurations
-require SPINE v1.1.0 or later.
+container. The current default is SPINE v1.3.0; maintained configurations
+require SPINE v1.3.0 or later.
 
 ## Common Commands
 
