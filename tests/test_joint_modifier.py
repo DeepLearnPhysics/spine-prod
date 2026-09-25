@@ -2,7 +2,13 @@
 
 import pytest
 import yaml
-from spine.config import load_config
+
+try:
+    from spine.config import load_config
+
+    SPINE_AVAILABLE = True
+except ImportError:
+    SPINE_AVAILABLE = False
 
 JOINT_CASES = (
     ("generic", "full_chain_240718.yaml", "240718", {"run_info"}, True),
@@ -78,6 +84,7 @@ JOINT_CASES = (
     JOINT_CASES,
     ids=lambda value: str(value),
 )
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 def test_joint_modifiers_wrap_detector_inference_datasets(
     workspace_root,
     monkeypatch,
@@ -134,6 +141,7 @@ def test_all_detector_joint_modifiers_are_mc_only(workspace_root):
         assert document["__meta__"]["applies_to"] == ["mc"]
 
 
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 def test_nd_lar_joint_modifier_wraps_inference_dataset(workspace_root, monkeypatch):
     config_root = workspace_root / "config"
     monkeypatch.setenv("SPINE_CONFIG_PATH", str(config_root))
@@ -158,6 +166,7 @@ include:
     assert config["base"]["split_output"] is False
 
 
+@pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
 def test_nd_lar_dataset_refactor_preserves_standard_inference(
     workspace_root, monkeypatch
 ):
