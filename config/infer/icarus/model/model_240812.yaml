@@ -21,14 +21,16 @@ override:
     hash: c2de1c81c54fec9dfb64820788f4c6b9f7babc6679eb70f8d063353ea0092bdd
 
   # No calibration applied in the chain, handled in post-processing
-  model.modules.chain.calibration: null
+  model.modules.chain.stages~:
+    - update:
+        name: deghosting
+        changes:
+          config:
+            charge_rescaling: average
   model.modules.calibration: null
   model.network_input-:
     - meta
     - run_info
-
-  # Charge rescaling uses average charge
-  model.modules.chain.charge_rescaling: average
 
   # Older PPN/GrapPA loss settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: false

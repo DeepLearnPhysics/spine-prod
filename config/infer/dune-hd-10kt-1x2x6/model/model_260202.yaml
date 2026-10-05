@@ -29,9 +29,21 @@ override:
     hash: 550820ce441160410af3d7a724301a5dfc7bba0eab7e2fd971ec3a71f52a62c7
 
   # Calibration handled before the semantic segmentation stage
-  model.modules.chain.calibration: apply
+  model.modules.chain.stages~:
+    - update:
+        name: deghosting
+        changes:
+          config:
+            charge_rescaling: collection
+    - insert:
+        before: segmentation
+        value:
+          name: calibration_before_segmentation
+          provider: calibration
+          uses: calibration
+          config:
+            mode: apply
   model.modules.calibration:
-    stage: segmentation
     gain:
       gain: 1000.0 # e-/ADC
     recombination:
@@ -41,9 +53,6 @@ override:
     lifetime:
       lifetime: 10400 # us
       driftv: 1.60563 # cm/us; should be 0.160563 for DUNE-HD
-
-  # Charge rescaling uses collection-only charge
-  model.modules.chain.charge_rescaling: collection
 
   # PPN/GrapPA loss settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: false

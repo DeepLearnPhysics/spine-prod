@@ -46,6 +46,33 @@ does not become the default data modifier for newer configurations.
 
 Legacy `.yaml` files have been moved to the `legacy/` directory.
 
+### Pre-deghosting charge scale
+
+`predeghost_scale:261005` inserts a separate calibration immediately before
+deghosting. Its default factor is **1.0**. Set a different factor through a
+named-stage override, for example **1.1**:
+
+```shell
+./submit.py --config infer/sbnd/full_chain_co_260521.yaml --source data.root \
+  --apply-mods predeghost_scale:261005 \
+  --set 'model.modules.chain.stages~={update: {name: predeghost_scale, changes: {config: {calibration: {gain: {gain: 1.1}}}}}}'
+```
+
+This scales the first input feature (charge), leaving chi-squared and the
+per-plane hit information unchanged. Deghosting uses the scaled input, then
+charge rescaling reconstructs charge from the preserved hits and clears the
+temporary calibration. Existing pre-segmentation calibration and post-processing
+remain configured as before. The scale can change which points survive
+deghosting and therefore affect subsequent reconstruction indirectly.
+
+The modifier supports both data and simulation and can be combined with `data`,
+`data_sim_gain`, or the existing detector variations. It does not move or replace
+their pre-segmentation calibration.
+
+Use a SPINE build containing [#177](https://github.com/DeepLearnPhysics/spine/pull/177)
+and [#178](https://github.com/DeepLearnPhysics/spine/pull/178). The repository's
+current `1.3.0` container pin predates these changes.
+
 ## Configurations for SBND's Generation II MPVMPR
 
 Training samples MPVMPR using `sbndcode v10_14_02` which can be found [here](https://github.com/SBNSoftware/sbndcode/tree/v10_14_02) . The training samples are generated using the following fcls:

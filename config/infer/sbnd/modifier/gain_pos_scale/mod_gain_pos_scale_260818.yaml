@@ -15,9 +15,23 @@ __meta__:
 override:
   model.network_input.meta: meta
 
-  model.modules.chain.calibration: apply
+  # Keep one calibration stage when combining detector variations.
+  model.modules.chain.stages-:
+    - name: calibration_before_segmentation
+      provider: calibration
+      uses: calibration
+      config:
+        mode: apply
+  model.modules.chain.stages~:
+    - insert:
+        before: segmentation
+        value:
+          name: calibration_before_segmentation
+          provider: calibration
+          uses: calibration
+          config:
+            mode: apply
   model.modules.calibration:
-    stage: segmentation
     gain:
       # Apply the multiplicative gain variation before post-deghosting calibration.
       priority: 10

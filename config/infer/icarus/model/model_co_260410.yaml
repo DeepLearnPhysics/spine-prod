@@ -29,9 +29,21 @@ override:
     hash: 86197441c982c603107d0ecfffd61dad5174c7f61bc4b6654514d18291a0c2f0
 
   # Calibration handled before the semantic segmentation stage
-  model.modules.chain.calibration: apply
+  model.modules.chain.stages~:
+    - update:
+        name: deghosting
+        changes:
+          config:
+            charge_rescaling: collection
+    - insert:
+        before: segmentation
+        value:
+          name: calibration_before_segmentation
+          provider: calibration
+          uses: calibration
+          config:
+            mode: apply
   model.modules.calibration:
-    stage: segmentation
     gain:
       gain: 79.9169 # e-/ADC
     recombination:
@@ -43,9 +55,6 @@ override:
       driftv_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
     transparency:
       transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
-
-  # Charge rescaling uses collection-only charge
-  model.modules.chain.charge_rescaling: collection
 
   # Older PPN/GrapPA loss settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: false

@@ -1389,10 +1389,18 @@ def test_protodune_sp_260210_model_is_shared_and_preserves_deployed_choices():
     assert deployed == shared
 
     modules = shared["modules"]
-    assert modules["chain"]["deghosting"] == "uresnet"
-    assert modules["chain"]["charge_rescaling"] == "collection"
-    assert modules["chain"]["calibration"] == "apply"
-    assert modules["calibration"]["stage"] == "segmentation"
+    stages = {stage["name"]: stage for stage in modules["chain"]["stages"]}
+    assert stages["deghosting"]["config"] == {
+        "mode": "uresnet",
+        "charge_rescaling": "collection",
+    }
+    assert stages["calibration_before_segmentation"]["config"]["mode"] == "apply"
+    assert list(stages)[:3] == [
+        "deghosting",
+        "calibration_before_segmentation",
+        "segmentation",
+    ]
+    assert "stage" not in modules["calibration"]
     assert modules["graph_spice"]["embedder"]["uresnet"]["spatial_size"] == 6144
     assert modules["grappa_shower"]["graph"]["max_length"] == [
         300,
@@ -1866,7 +1874,7 @@ def test_nd_lar_inference_models_are_thin_shared_model_wrappers():
     assert models["250806"] == models["250515"]
 
     modules = models["260409"]["modules"]
-    assert modules["chain"]["deghosting"] is None
+    assert "deghosting" not in {stage["name"] for stage in modules["chain"]["stages"]}
     assert modules["graph_spice"]["embedder"]["uresnet"]["spatial_size"] == 6144
     assert modules["graph_spice"]["constructor"]["graph"] == {
         "name": "radius",
@@ -2577,9 +2585,15 @@ class TestConfigValidation:
         )
         config = load_config_with_includes(composite)
 
-        assert config["model"]["modules"]["chain"]["calibration"] == "apply"
+        stages = config["model"]["modules"]["chain"]["stages"]
+        calibration_stage = next(
+            stage
+            for stage in stages
+            if stage["name"] == "calibration_before_segmentation"
+        )
+        assert calibration_stage["config"]["mode"] == "apply"
         calibration = config["model"]["modules"]["calibration"]
-        assert calibration["stage"] == "segmentation"
+        assert "stage" not in calibration
         assert calibration["response"]["priority"] == 10
         assert calibration["response"]["response_func"] == "46.478/49.819*x"
 
@@ -2653,10 +2667,15 @@ class TestConfigValidation:
         )
 
         config = load_config_with_includes(composite)
-        assert config["model"]["modules"]["chain"]["calibration"] == "apply"
+        stages = config["model"]["modules"]["chain"]["stages"]
+        calibration_stage = next(
+            stage
+            for stage in stages
+            if stage["name"] == "calibration_before_segmentation"
+        )
+        assert calibration_stage["config"]["mode"] == "apply"
         calibration = config["model"]["modules"]["calibration"]
         assert calibration == {
-            "stage": "segmentation",
             "transparency": {
                 "transparency_file": "sbnd_MattMod_YZ.root",
                 "map_type": "correction",
@@ -2728,7 +2747,7 @@ class TestConfigValidation:
         )
         config = load_config_with_includes(composite)
         calibration = config["model"]["modules"]["calibration"]
-        assert calibration["stage"] == "segmentation"
+        assert "stage" not in calibration
         assert calibration["gain"]["gain"] == 79.9169
         assert "recombination" in calibration
         assert "lifetime" in calibration

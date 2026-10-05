@@ -28,9 +28,21 @@ override:
     hash: d76b505478d3d8279abaf181cb9338d05f5eeaa95245bb15a02d20943b9169ff
 
   # Calibration handled before the semantic segmentation stage
-  model.modules.chain.calibration: apply
+  model.modules.chain.stages~:
+    - update:
+        name: deghosting
+        changes:
+          config:
+            charge_rescaling: collection
+    - insert:
+        before: segmentation
+        value:
+          name: calibration_before_segmentation
+          provider: calibration
+          uses: calibration
+          config:
+            mode: apply
   model.modules.calibration:
-    stage: segmentation
     gain:
       gain: 14.0 # e-/ADC
     recombination:
@@ -40,9 +52,6 @@ override:
     lifetime:
       lifetime: 35000 # us
       driftv: 0.157725 # cm/us, derived from efield at T=87.68 (ICARUS fit)
-
-  # Charge rescaling uses collection-only charge
-  model.modules.chain.charge_rescaling: collection
 
   # Older PPN/GrapPA loss settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: false

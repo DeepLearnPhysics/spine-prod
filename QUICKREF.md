@@ -10,6 +10,14 @@ dependencies; batch jobs invoke the `spine` executable from inside the
 container. The current default is SPINE v1.3.0; maintained configurations
 require SPINE v1.3.0 or later.
 
+Maintained full-chain configurations now use ordered `model.modules.chain.stages`
+and named-list edits (`stages~`). They require a SPINE build containing
+[#178](https://github.com/DeepLearnPhysics/spine/pull/178), beyond the current
+`1.3.0` default pin. Pre-deghosting calibration with charge rescaling also requires
+[#177](https://github.com/DeepLearnPhysics/spine/pull/177). Select a build containing
+both changes before running these configurations; the release pin will be updated
+when that build is published.
+
 ## Common Commands
 
 ### Basic Submission
@@ -38,6 +46,14 @@ require SPINE v1.3.0 or later.
 # List available modifiers for a config
 ./submit.py --list-mods infer/icarus/icarus_full_chain_co_250625.yaml
 ```
+
+Full-chain modifiers address entries by their unique stage names. Keep the base
+configuration before modifiers in an include list; a later replacement of the
+whole stage list discards earlier edits. For an SBND pre-deghosting charge factor,
+see [the modifier example](config/infer/sbnd/README.md#pre-deghosting-charge-scale).
+
+Post-processing and calibration correction blocks retain their existing mapping
+and priority syntax. Archived configurations under `legacy/` are unchanged.
 
 ### Profiles
 ```bash

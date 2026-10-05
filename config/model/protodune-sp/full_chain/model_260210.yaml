@@ -11,11 +11,26 @@ override:
   model.network_input.meta: meta
   model.network_input.run_info: run_info
 
-  model.modules.chain.deghosting: uresnet
-  model.modules.chain.charge_rescaling: collection
-  model.modules.chain.calibration: apply
+  model.modules.chain.stages~:
+    - insert:
+        before: segmentation
+        value:
+          name: deghosting
+          provider: deghost
+          uses: uresnet_deghost
+          loss: uresnet_deghost_loss
+          config:
+            mode: uresnet
+            charge_rescaling: collection
+    - insert:
+        before: segmentation
+        value:
+          name: calibration_before_segmentation
+          provider: calibration
+          uses: calibration
+          config:
+            mode: apply
   model.modules.calibration: !include model/protodune-sp/calibration/calibration_260210.yaml
-  model.modules.calibration.stage: segmentation
 
   model.modules.uresnet_deghost: !include model/protodune-sp/uresnet_deghost/network_260210.yaml
   model.modules.uresnet_deghost_loss: !include model/protodune-sp/uresnet_deghost/loss_260210.yaml

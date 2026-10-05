@@ -21,9 +21,23 @@ override:
 
   # Match the charge seen by semantic segmentation to simulation. Data uses
   # 46.478 e-/ADC while the 250901 simulation uses 49.819 e-/ADC.
-  model.modules.chain.calibration: apply
+  # Keep one calibration stage when combining detector variations.
+  model.modules.chain.stages-:
+    - name: calibration_before_segmentation
+      provider: calibration
+      uses: calibration
+      config:
+        mode: apply
+  model.modules.chain.stages~:
+    - insert:
+        before: segmentation
+        value:
+          name: calibration_before_segmentation
+          provider: calibration
+          uses: calibration
+          config:
+            mode: apply
   model.modules.calibration:
-    stage: segmentation
     response:
       priority: 10
       response_func: 46.478/49.819*x

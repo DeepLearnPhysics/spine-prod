@@ -17,7 +17,6 @@ override:
   ### Model overrides ###
   # Set calibration parameters for data (before segmentation stage)
   model.modules.calibration:
-    stage: segmentation
     gain:
       gain: [76.13, 75.39, 77.46, 77.21] # e-/ADC for the collection planes
     recombination:

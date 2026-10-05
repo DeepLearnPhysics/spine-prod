@@ -31,10 +31,22 @@ override:
   # Add metadata for the model input
   model.network_input.meta: meta
 
-  # No pre-calibration
-  model.modules.chain.calibration: apply
+  # Calibrate before semantic segmentation
+  model.modules.chain.stages~:
+    - update:
+        name: deghosting
+        changes:
+          config:
+            charge_rescaling: collection
+    - insert:
+        before: segmentation
+        value:
+          name: calibration_before_segmentation
+          provider: calibration
+          uses: calibration
+          config:
+            mode: apply
   model.modules.calibration:
-    stage: segmentation
     gain:
       gain: 47.551 # e-/ADC
     recombination:
@@ -46,9 +58,6 @@ override:
     lifetime:
       lifetime: 35000 # us
       driftv: 0.1563 # cm/us
-
-  # Charge rescaling uses collection-only charge
-  model.modules.chain.charge_rescaling: collection
 
   # Older PPN/GrapPA loss settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: false

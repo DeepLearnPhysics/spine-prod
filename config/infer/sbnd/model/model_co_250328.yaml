@@ -20,11 +20,13 @@ override:
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/sbnd/sbnd_co_snapshot_250328.ckpt
     hash: df1cd7e40fbc31eceebd089fef30075e42d5561591567495c451834f8d410fc3
 
-  # No pre-calibration
-  model.modules.chain.calibration: null
-
-  # Charge rescaling uses collection-only charge
-  model.modules.chain.charge_rescaling: collection
+  # Configure deghosting charge rescaling
+  model.modules.chain.stages~:
+    - update:
+        name: deghosting
+        changes:
+          config:
+            charge_rescaling: collection
 
   # Older PPN/GrapPA loss settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: false

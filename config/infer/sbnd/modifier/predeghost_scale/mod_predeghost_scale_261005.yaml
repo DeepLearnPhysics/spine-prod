@@ -1,0 +1,28 @@
+# Fixed charge scale for the SBND deghosting input.
+# Requires SPINE with PRs #177 and #178.
+
+__meta__:
+  kind: mod
+  name: "predeghost_scale"
+  version: "261005"
+  date: "2026-10-05"
+  description: "Scale charge before deghosting without changing hit charge calibration"
+  applies_to: [mc, data]
+  compatible_with:
+    model: ">=240720"
+
+override:
+  model.network_input.meta: meta
+  model.modules.chain.stages~:
+    insert:
+      before: deghosting
+      value:
+        name: predeghost_scale
+        provider: calibration
+        config:
+          mode: apply
+          calibration:
+            gain:
+              # Neutral default; set the desired multiplicative factor here
+              # or update this named stage with a --set override.
+              gain: 1.0

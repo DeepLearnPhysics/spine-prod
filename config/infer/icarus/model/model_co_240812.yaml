@@ -40,14 +40,16 @@ override:
     - sparse3d_reco_cryoW_hit_key2
 
   # No calibration applied in the chain, handled in post-processing
-  model.modules.chain.calibration: null
+  model.modules.chain.stages~:
+    - update:
+        name: deghosting
+        changes:
+          config:
+            charge_rescaling: collection
   model.modules.calibration: null
   model.network_input-:
     - meta
     - run_info
-
-  # Charge rescaling uses collection-only charge
-  model.modules.chain.charge_rescaling: collection
 
   # Older PPN/GrapPA loss settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: false
