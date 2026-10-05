@@ -49,7 +49,7 @@ Legacy `.yaml` files have been moved to the `legacy/` directory.
 ### Pre-deghosting charge scale
 
 `predeghost_scale:261005` inserts a separate calibration immediately before
-deghosting. Its default factor is **1.0**. Set a different factor through a
+deghosting. Its default factor is **1.03** (+3%). Set a different factor through a
 named-stage override, for example **1.1**:
 
 ```shell

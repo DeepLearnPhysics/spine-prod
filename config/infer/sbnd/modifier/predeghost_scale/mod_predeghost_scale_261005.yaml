@@ -23,6 +23,6 @@ override:
           mode: apply
           calibration:
             gain:
-              # Neutral default; set the desired multiplicative factor here
+              # Example +3% scale; set the desired multiplicative factor here
               # or update this named stage with a --set override.
-              gain: 1.0
+              gain: 1.03
