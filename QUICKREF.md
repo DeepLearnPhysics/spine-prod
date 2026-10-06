@@ -7,16 +7,11 @@ recorded in `DEFAULT_SPINE_VERSION`; `configure.sh` exports
 `SPINE_CONTAINER_VERSION` from that value and derives the registry tag and
 default S3DF `.sif` path. The container provides SPINE, OpT0Finder, and runtime
 dependencies; batch jobs invoke the `spine` executable from inside the
-container. The current default is SPINE v1.3.0; maintained configurations
-require SPINE v1.3.0 or later.
+container. The current default is SPINE v1.4.0; maintained configurations
+require SPINE v1.4.0 or later.
 
-Maintained full-chain configurations now use ordered `model.modules.chain.stages`
-and named-list edits (`stages~`). They require a SPINE build containing
-[#178](https://github.com/DeepLearnPhysics/spine/pull/178), beyond the current
-`1.3.0` default pin. Pre-deghosting calibration with charge rescaling also requires
-[#177](https://github.com/DeepLearnPhysics/spine/pull/177). Select a build containing
-both changes before running these configurations; the release pin will be updated
-when that build is published.
+Maintained configurations use canonical `provider` selectors and ordered module
+pipelines from SPINE 1.4.0. Legacy archived configurations are not migrated.
 
 ## Common Commands
 
@@ -52,8 +47,10 @@ configuration before modifiers in an include list; a later replacement of the
 whole stage list discards earlier edits. For an SBND pre-deghosting charge factor,
 see [the modifier example](config/infer/sbnd/README.md#pre-deghosting-charge-scale).
 
-Post-processing and calibration correction blocks retain their existing mapping
-and priority syntax. Archived configurations under `legacy/` are unchanged.
+Post-processing, analysis, augmentation, and most model calibration use ordered
+`stages` lists. Use `stages~` for named edits, preserving the target descriptor’s
+inline or nested `config` form. See [the 1.4 migration notes](MIGRATION_1_4.md)
+for modifier version boundaries and the calibration composition exceptions.
 
 ### Profiles
 ```bash

@@ -9,5 +9,5 @@ include: model/common/graph_spice/network_v1.yaml
 override:
   embedder.uresnet.spatial_size: 6144
   constructor.graph:
-    name: knn
+    provider: knn
     k: 5

@@ -36,7 +36,7 @@ override:
   # Graph-SPICE uses a radius graph with r=1.9 pixels (direct neighbors)
   model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
   model.modules.graph_spice.constructor.graph:
-    name: radius
+    provider: radius
     r: 1.9
 
   # Direction and dE/dx radii settings for GrapPA modules

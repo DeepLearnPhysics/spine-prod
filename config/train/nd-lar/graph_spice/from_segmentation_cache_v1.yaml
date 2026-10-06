@@ -9,21 +9,21 @@ remove:
 
 override:
   io.loader.dataset:
-    name: mixed
+    provider: mixed
     primary:
-      name: larcv
-      file_keys: null
+      provider: larcv
+      file_keys:
       schema:
         data:
-          parser: sparse3d
+          provider: sparse3d
           sparse_event: sparse3d_pcluster
     cache:
-      path: null
+      path:
       stage: segmentation
       keys: [seg_pred, clust_label_adapt]
 
   validation.sources:
     primary:
-      file_keys: null
+      file_keys:
     cache:
-      path: null
+      path:

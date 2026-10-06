@@ -11,9 +11,11 @@ __meta__:
   compatible_with:
     post: "<=250115"
   conflicts_with: [data]
-
 override:
-  # Add transparency correction
-  post.apply_calibrations.transparency:
-    run_id: 9435
-    transparency_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_yz_correction_data.db
+  post.stages~:
+    - update:
+        name: apply_calibrations
+        changes:
+          transparency:
+            run_id: 9435
+            transparency_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_yz_correction_data.db

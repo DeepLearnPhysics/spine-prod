@@ -2,22 +2,22 @@ __meta__:
   kind: fragment
   description: Common generic simulation LArCV inference dataset
 
-name: larcv
-file_keys: null
+provider: larcv
+file_keys:
 schema:
   data:
-    parser: sparse3d
+    provider: sparse3d
     sparse_event: sparse3d_pcluster
   seg_label:
-    parser: sparse3d
+    provider: sparse3d
     sparse_event: sparse3d_pcluster_semantics
   ppn_label:
-    parser: particle_points
+    provider: particle_points
     sparse_event: sparse3d_pcluster
     particle_event: particle_corrected
     # include_point_tagging varies by config - override in specific configs
   clust_label:
-    parser: cluster3d
+    provider: cluster3d
     cluster_event: cluster3d_pcluster
     particle_event: particle_corrected
     sparse_semantics_event: sparse3d_pcluster_semantics
@@ -25,19 +25,19 @@ schema:
     clean_data: true
     shape_precedence: [2, 1, 0, 3, 4, 6]
   coord_label:
-    parser: particle_coords
+    provider: particle_coords
     particle_event: particle_corrected
     cluster_event: cluster3d_pcluster
   graph_label:
-    parser: particle_graph
+    provider: particle_graph
     particle_event: particle_pcluster
   particles:
-    parser: particle
+    provider: particle
     particle_event: particle_pcluster
     cluster_event: cluster3d_pcluster
   meta:
-    parser: meta3d
+    provider: meta3d
     sparse_event: sparse3d_pcluster
   run_info:
-    parser: run_info
+    provider: run_info
     sparse_event: sparse3d_pcluster

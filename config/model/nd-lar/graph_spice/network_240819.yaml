@@ -9,5 +9,5 @@ include: model/common/graph_spice/network_v1.yaml
 override:
   embedder.uresnet.spatial_size: 31231
   constructor.graph:
-    name: radius
+    provider: radius
     r: 1.9

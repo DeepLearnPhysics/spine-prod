@@ -21,12 +21,12 @@ base:
 # IO configuration
 io:
   reader:
-    name: hdf5
-    file_keys: null
+    provider: hdf5
+    file_keys:
 
   writer:
-    name: hdf5
-    file_name: null
+    provider: hdf5
+    file_name:
     overwrite: true
     lite: true
     keys:

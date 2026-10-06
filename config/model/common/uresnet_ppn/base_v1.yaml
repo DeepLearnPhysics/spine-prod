@@ -3,8 +3,8 @@ __meta__:
   description: SPINE v1 standalone UResNet-PPN model
 
 model:
-  name: uresnet_ppn
-  weight_path: null
+  provider: uresnet_ppn
+  weight_path:
 
   network_input:
     data: data

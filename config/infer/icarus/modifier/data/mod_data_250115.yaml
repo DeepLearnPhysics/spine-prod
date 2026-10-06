@@ -14,20 +14,57 @@ __meta__:
 include: mod_data_common.yaml
 
 override:
-  ### Post-processing overrides ###
-  # Set calibration parameters for data (post-processor)
-  post.apply_calibrations:
-    gain:
-      gain: [83.4912, 80.5949, 84.7336, 82.6476] # e-/ADC for the collection planes
-    recombination:
-      model: mbox
-      efield: 0.4938 # kV/cm
-    lifetime:
-      lifetime_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_elifetime_data.db
-      driftv_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_edriftvelocity_data.db
-    transparency:
-      transparency_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_yz_correction_data.db
-    priority: 7
-
-  # Change the flash matching scale
-  post.flash_match.scaling: 1/1400
+  post.stages~:
+    - remove:
+        name: children_count
+    - remove:
+        name: match
+    - remove:
+        name: apply_calibrations
+    - insert:
+        before: calo_ke
+        value:
+          name: apply_calibrations
+          gain:
+            gain:
+              - 83.4912
+              - 80.5949
+              - 84.7336
+              - 82.6476
+          recombination:
+            model: mbox
+            efield: 0.4938
+          lifetime:
+            lifetime_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_elifetime_data.db
+            driftv_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_edriftvelocity_data.db
+          transparency:
+            transparency_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_yz_correction_data.db
+    - insert:
+        before: calo_ke
+        value:
+          name: trigger
+          file_path: /sdf/data/neutrino/icarus/trigger/trigger_04032026.csv
+          flash_keys:
+            - flashes
+          correct_flash_times: true
+          flash_time_corr_us: 4
+    - update:
+        name: calo_ke
+        changes:
+          run_mode: reco
+    - update:
+        name: containment
+        changes:
+          run_mode: reco
+    - update:
+        name: fiducial
+        changes:
+          run_mode: reco
+    - update:
+        name: topology_threshold
+        changes:
+          run_mode: reco
+    - update:
+        name: flash_match
+        changes:
+          scaling: 1/1400

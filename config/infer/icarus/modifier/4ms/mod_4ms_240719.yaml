@@ -11,7 +11,10 @@ __meta__:
   compatible_with:
     post: "<=250115"
   conflicts_with: [data, 8ms]
-
 override:
-  # Change calibration lifetime to 4 ms
-  post.apply_calibrations.lifetime.lifetime: 4000 # us
+  post.stages~:
+    - update:
+        name: apply_calibrations
+        changes:
+          lifetime:
+            lifetime: 4000

@@ -20,6 +20,6 @@ override:
   io.loader.dataset.schema.clust_label.neutrino_event: neutrino_mc_truth
   io.loader.dataset.schema.particles.neutrino_event: neutrino_mc_truth
   io.loader.dataset.schema.neutrinos:
-    parser: neutrino
+    provider: neutrino
     neutrino_event: neutrino_mc_truth
     cluster_event: cluster3d_pcluster

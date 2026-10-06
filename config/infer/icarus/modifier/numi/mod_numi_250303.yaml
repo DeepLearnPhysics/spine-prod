@@ -12,5 +12,8 @@ __meta__:
     post: ">=250303"
 
 override:
-  # Use NuMI-specific flash matching configuration
-  post.flash_match.cfg: !path flashmatch/flashmatch_numi_250214.cfg
+  post.stages~:
+    - update:
+        name: flash_match
+        changes:
+          cfg: !path infer/icarus/modifier/numi/flashmatch/flashmatch_numi_250214.cfg

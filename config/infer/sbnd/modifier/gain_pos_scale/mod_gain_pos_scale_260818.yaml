@@ -32,9 +32,11 @@ override:
           config:
             mode: apply
   model.modules.calibration:
-    gain:
-      # Apply the multiplicative gain variation before post-deghosting calibration.
-      priority: 10
-      gain: 1.05
-
-  post.apply_calibrations.depositions_source: depositions
+    stages:
+      - name: gain
+        gain: 1.05
+  post.stages~:
+    - update:
+        name: apply_calibrations
+        changes:
+          depositions_source: depositions

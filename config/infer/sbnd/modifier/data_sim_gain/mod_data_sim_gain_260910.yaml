@@ -38,21 +38,41 @@ override:
           config:
             mode: apply
   model.modules.calibration:
-    response:
-      priority: 10
-      response_func: 46.478/49.819*x
-
-  ### Post-processing overrides ###
-  # Calibrate the response-scaled charge with the simulation gain. Their
-  # product preserves the original 46.478 e-/ADC data normalization.
-  post.apply_calibrations:
-    depositions_source: depositions
-    gain:
-      gain: 49.819 # e-/ADC, matching the 250901 simulation
-    recombination:
-      model: mbox
-      efield: 0.5 # kV/cm
-    lifetime:
-      lifetime: 35000 # us
-      driftv: 0.1563 # cm/us
-    priority: 2
+    stages:
+      - name: response
+        response_func: 46.478/49.819*x
+  post.stages~:
+    - remove:
+        name: children_count
+    - remove:
+        name: match
+    - update:
+        name: direction
+        changes:
+          run_mode: reco
+    - update:
+        name: time_containment
+        changes:
+          run_mode: reco
+    - update:
+        name: apply_calibrations
+        changes:
+          depositions_source: depositions
+          lifetime:
+            lifetime: 35000
+    - update:
+        name: calo_ke
+        changes:
+          run_mode: reco
+    - update:
+        name: containment
+        changes:
+          run_mode: reco
+    - update:
+        name: topology_threshold
+        changes:
+          run_mode: reco
+    - update:
+        name: fiducial
+        changes:
+          run_mode: reco

@@ -11,21 +11,22 @@ override:
   # keeping every coordinate-bearing tensor aligned through each reflection.
   # Validation derives an unaugmented loader from the training loader.
   io.loader.dataset.augment:
-    flip_x:
-      name: flip
-      axis: 0
-      use_geo_center: true
-      keep_meta: true
-      p: 0.5
-    flip_y:
-      name: flip
-      axis: 1
-      use_geo_center: true
-      keep_meta: true
-      p: 0.5
-    flip_z:
-      name: flip
-      axis: 2
-      use_geo_center: true
-      keep_meta: true
-      p: 0.5
+    stages:
+      - name: flip_x
+        provider: flip
+        axis: 0
+        use_geo_center: true
+        keep_meta: true
+        p: 0.5
+      - name: flip_y
+        provider: flip
+        axis: 1
+        use_geo_center: true
+        keep_meta: true
+        p: 0.5
+      - name: flip_z
+        provider: flip
+        axis: 2
+        use_geo_center: true
+        keep_meta: true
+        p: 0.5

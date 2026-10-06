@@ -4,12 +4,13 @@ __meta__:
   date: "2026-02-10"
   description: ProtoDUNE-SP 260210 detector calibration
 
-gain:
-  gain: 1000 # e-/ADC
-recombination:
-  model: mbox
-  efield: 0.4867 # kV/cm
-  mip_dedx: 2.105168 # MeV/cm
-lifetime:
-  lifetime: 35000 # us
-  driftv: 0.1565 # cm/us
+stages:
+  - name: gain
+    gain: 1000
+  - name: recombination
+    model: mbox
+    efield: 0.4867
+    mip_dedx: 2.105168
+  - name: lifetime
+    lifetime: 35000
+    driftv: 0.1565

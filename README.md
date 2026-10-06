@@ -29,8 +29,10 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v1.3.0. Maintained configurations require SPINE
-v1.3.0 or later.
+The current default is SPINE v1.4.0. Maintained configurations require SPINE
+v1.4.0 or later. Launchers check the selected executable after environment
+setup, inside the container when applicable. See the [migration notes](MIGRATION_1_4.md)
+for ordered stages, named modifiers, and compatibility changes.
 
 **Alternative Container Location:** You can override the local `.sif` path or
 container release before sourcing `configure.sh`:

@@ -6,8 +6,8 @@ include: train/generic/grappa_shower/base_v1.yaml
 
 override:
   io.loader.dataset:
-    name: cache
-    path: null
+    provider: cache
+    path:
     stage: fragmentation
     keys:
       - fragment_graph_shower_edge_index
@@ -30,10 +30,6 @@ override:
     edge_valid: fragment_graph_shower_edge_valid
 
 remove:
-  - model.network_input.data
-  - model.network_input.coord_label
-  - model.loss_input.clust_label
-  - model.loss_input.coord_label
   - model.modules.grappa.graph
   - model.modules.grappa.node_encoder
   - model.modules.grappa.edge_encoder

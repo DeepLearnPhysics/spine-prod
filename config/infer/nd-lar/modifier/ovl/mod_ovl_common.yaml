@@ -7,7 +7,7 @@ __meta__:
 override:
   # Overlay collate function
   io.loader.collate_fn:
-    name: all
+    provider: all
     overlay:
       multiplicity: 4
 

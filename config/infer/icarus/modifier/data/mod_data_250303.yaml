@@ -11,11 +11,42 @@ __meta__:
   compatible_with:
     model: ">=250303"
 
+    post: ==250303
 include: mod_data_common.yaml
 
 override:
   ### Model overrides ###
   # Set calibration parameters for data (before segmentation stage)
+  post.stages~:
+    - remove:
+        name: children_count
+    - remove:
+        name: match
+    - insert:
+        before: calo_ke
+        value:
+          name: trigger
+          file_path: /sdf/data/neutrino/icarus/trigger/trigger_04032026.csv
+          flash_keys:
+            - flashes
+          correct_flash_times: true
+          flash_time_corr_us: 4
+    - update:
+        name: calo_ke
+        changes:
+          run_mode: reco
+    - update:
+        name: containment
+        changes:
+          run_mode: reco
+    - update:
+        name: fiducial
+        changes:
+          run_mode: reco
+    - update:
+        name: topology_threshold
+        changes:
+          run_mode: reco
   model.modules.calibration:
     gain:
       gain: [76.13, 75.39, 77.46, 77.21] # e-/ADC for the collection planes

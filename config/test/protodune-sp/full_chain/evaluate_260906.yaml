@@ -13,12 +13,20 @@ include:
 
 override:
   # This stage emits analyzer CSVs only; reconstruction HDF5 is unnecessary.
-  io.writer: null
+  io.writer:
 
   # Adapt cluster truth only for metric evaluation.
   model.network_input.clust_label: clust_label
 
   # Preserve the raw/deghosted index distinction in evaluation and include
   # deghosting itself in the semantic confusion counts.
-  post.match.ghost: true
-  ana.segment_eval.ghost: true
+  post.stages~:
+    update:
+      name: match
+      changes:
+        ghost: true
+  ana.stages~:
+    update:
+      name: segment_eval
+      changes:
+        ghost: true

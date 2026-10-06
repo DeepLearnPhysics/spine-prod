@@ -5,10 +5,7 @@ __meta__:
   description: Reject pathological ProtoDUNE-SP tomographic events
 
 input:
-  name: larcv
-
-# Retain all three historical counters for diagnostics. Only reconstructed
-# space-point multiplicity determines whether an entry is accepted.
+  provider: larcv
 measurements:
   sparse3d_reco:
     kind: product_size

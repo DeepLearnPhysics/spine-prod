@@ -4194,6 +4194,10 @@ class TestCVMFSOption:
         assert 'kill -USR1 "$SPINE_PROD_WORKLOAD_PID"' not in script
         assert 'eval "exec $RUN_CMD" &' in script
         assert "exec spine -S $TASK_FILE_LIST" in script
+        assert "scripts/check_spine_version.py" in script
+        assert script.index("scripts/check_spine_version.py") < script.index(
+            "exec spine -S $TASK_FILE_LIST"
+        )
         syntax = subprocess.run(
             ["bash", "-n"],
             input=script,

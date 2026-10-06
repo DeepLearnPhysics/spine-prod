@@ -17,5 +17,10 @@ __meta__:
 include: mod_single_common.yaml
 
 override:
-  # Use the NuMI-specific flashmatch configuration (MPV generation window matches NuMI)
-  post.flash_match.cfg: flashmatch/flashmatch_numi_230930.cfg
+  post.stages~:
+    - remove:
+        name: particle_threshold
+    - update:
+        name: flash_match
+        changes:
+          cfg: flashmatch/flashmatch_numi_230930.cfg

@@ -1,5 +1,5 @@
 # Fixed charge scale for the SBND deghosting input.
-# Requires SPINE with PRs #177 and #178.
+# Requires SPINE 1.4.0 or later.
 
 __meta__:
   kind: mod
@@ -22,7 +22,6 @@ override:
         config:
           mode: apply
           calibration:
-            gain:
-              # Example +3% scale; set the desired multiplicative factor here
-              # or update this named stage with a --set override.
-              gain: 1.03
+            stages:
+              - name: gain
+                gain: 1.03

@@ -12,6 +12,6 @@ override:
   base.epochs: 100.0
   io.loader.minibatch_size: 16
   io.loader.collate_fn:
-    name: all
+    provider: all
     overlay:
       multiplicity: 4

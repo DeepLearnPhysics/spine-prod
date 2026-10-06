@@ -24,7 +24,6 @@ override:
         mode: uresnet
         charge_rescaling: collection
     - name: calibration
-      provider: calibration
       config:
         mode: apply
         calibration: !include model/protodune-sp/calibration/calibration_260210.yaml

@@ -3,11 +3,11 @@ __meta__:
   description: SPINE v1 shower GrapPA loss
 
 node_loss:
-  name: shower_primary
+  provider: shower_primary
   high_purity: true
   use_closest: true
   use_group_pred: true
 edge_loss:
-  name: channel
+  provider: channel
   target: group
   high_purity: true

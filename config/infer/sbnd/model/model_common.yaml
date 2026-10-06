@@ -5,8 +5,7 @@ __meta__:
 
 # Model configuration
 model:
-  name: full_chain
-  # weight_path varies by config - override in specific configs
+  provider: full_chain
   to_numpy: true
 
   network_input:
@@ -25,23 +24,20 @@ model:
           loss: uresnet_deghost_loss
           config:
             mode: uresnet
-            charge_rescaling: null
+            charge_rescaling:
         - name: segmentation
-          provider: segmentation
           uses: uresnet_ppn
           loss: uresnet_ppn_loss
           config:
             mode: uresnet
             point_proposal: ppn
         - name: fragmentation
-          provider: fragmentation
           uses: graph_spice
           loss:
             graph_spice: graph_spice_loss
           config:
             mode: graph_spice
         - name: particle_aggregation
-          provider: particle_aggregation
           uses:
             - grappa_shower
             - grappa_track
@@ -52,9 +48,8 @@ model:
             shower_aggregation: grappa
             shower_primary: grappa
             track_aggregation: grappa
-            particle_aggregation: null
+            particle_aggregation:
         - name: interaction_aggregation
-          provider: interaction_aggregation
           uses: grappa_inter
           loss: grappa_inter_loss
           config:
@@ -73,10 +68,10 @@ model:
       reps: 2
       allow_bias: false
       activation:
-        name: lrelu
+        provider: lrelu
         negative_slope: 0.33
       norm_layer:
-        name: batch_norm
+        provider: batch_norm
         eps: 0.0001
         momentum: 0.01
 
@@ -96,10 +91,10 @@ model:
         reps: 2
         allow_bias: false
         activation:
-          name: lrelu
+          provider: lrelu
           negative_slope: 0.33
         norm_layer:
-          name: batch_norm
+          provider: batch_norm
           eps: 0.0001
           momentum: 0.01
 
@@ -135,14 +130,14 @@ model:
           # spatial_size varies by config - override in specific configs
           allow_bias: false
           activation:
-            name: lrelu
+            provider: lrelu
             negative_slope: 0.33
           norm_layer:
-            name: batch_norm
+            provider: batch_norm
             eps: 0.0001
             momentum: 0.01
       kernel:
-        name: bilinear
+        provider: bilinear
         num_features: 32
       constructor:
         edge_threshold: 0.1
@@ -156,7 +151,7 @@ model:
           assign_all: true
 
     graph_spice_loss:
-      name: edge
+      provider: edge
       loss: binary_log_dice_ce
 
     # Shower fragment aggregation + shower primary identification
@@ -167,11 +162,11 @@ model:
         make_groups: true
         grouping_method: score
       graph:
-        name: complete
+        provider: complete
         max_length: [500, 0, 500, 500, 0, 0, 0, 25, 0, 25]
         dist_algorithm: recursive
       node_encoder:
-        name: geo
+        provider: geo
         use_numpy: true
         add_value: true
         add_shape: true
@@ -181,50 +176,49 @@ model:
         # dir_max_dist varies by config - override in specific configs
         # dedx_max_dist varies by config - override in specific configs
       edge_encoder:
-        name: geo
+        provider: geo
         use_numpy: true
       gnn_model:
-        name: meta
+        provider: meta
         node_feats: 33 # 16 (geo) + 3 (extra) + 6 (points) + 6 (directions) + 2 (local dedxs)
         edge_feats: 19
         node_pred: 2
         edge_pred: 2
         edge_layer:
-          name: mlp
+          provider: mlp
           mlp:
             depth: 3
             width: 64
             activation:
-              name: lrelu
+              provider: lrelu
               negative_slope: 0.1
             normalization: batch_norm
         node_layer:
-          name: mlp
+          provider: mlp
           reduction: max
           attention: false
           message_mlp:
             depth: 3
             width: 64
             activation:
-              name: lrelu
+              provider: lrelu
               negative_slope: 0.1
             normalization: batch_norm
           aggr_mlp:
             depth: 3
             width: 64
             activation:
-              name: lrelu
+              provider: lrelu
               negative_slope: 0.1
             normalization: batch_norm
 
     grappa_shower_loss:
       node_loss:
-        name: shower_primary
-        # use_closest varies by config - override in specific configs
+        provider: shower_primary
         high_purity: true
         use_group_pred: true
       edge_loss:
-        name: channel
+        provider: channel
         target: group
         high_purity: true
 
@@ -236,11 +230,11 @@ model:
         make_groups: true
         grouping_method: score
       graph:
-        name: complete
+        provider: complete
         max_length: 100
         dist_algorithm: recursive
       node_encoder:
-        name: geo
+        provider: geo
         use_numpy: true
         add_value: true
         add_shape: false
@@ -250,44 +244,44 @@ model:
         # dir_max_dist varies by config - override in specific configs
         # dedx_max_dist varies by config - override in specific configs
       edge_encoder:
-        name: geo
+        provider: geo
         use_numpy: true
       gnn_model:
-        name: meta
+        provider: meta
         node_feats: 32 # 16 (geo) + 2 (extra) + 6 (points) + 6 (directions) + 2 (local dedxs)
         edge_feats: 19
         edge_pred: 2
         edge_layer:
-          name: mlp
+          provider: mlp
           mlp:
             depth: 3
             width: 64
             activation:
-              name: lrelu
+              provider: lrelu
               negative_slope: 0.1
             normalization: batch_norm
         node_layer:
-          name: mlp
+          provider: mlp
           reduction: max
           attention: false
           message_mlp:
             depth: 3
             width: 64
             activation:
-              name: lrelu
+              provider: lrelu
               negative_slope: 0.1
             normalization: batch_norm
           aggr_mlp:
             depth: 3
             width: 64
             activation:
-              name: lrelu
+              provider: lrelu
               negative_slope: 0.1
             normalization: batch_norm
 
     grappa_track_loss:
       edge_loss:
-        name: channel
+        provider: channel
         target: group
 
     # Interaction aggregation, PID, primary, orientation
@@ -298,11 +292,11 @@ model:
         make_groups: true
         grouping_through_track: true
       graph:
-        name: complete
+        provider: complete
         max_length: [500, 500, 0, 0, 25, 25, 25, 0, 0, 0]
         dist_algorithm: recursive
       node_encoder:
-        name: geo
+        provider: geo
         use_numpy: true
         add_value: true
         add_shape: true
@@ -312,10 +306,10 @@ model:
         # dir_max_dist varies by config - override in specific configs
         # dedx_max_dist varies by config - override in specific configs
       edge_encoder:
-        name: geo
+        provider: geo
         use_numpy: true
       gnn_model:
-        name: meta
+        provider: meta
         node_feats: 33 # 16 (geo) + 3 (extra) + 6 (points) + 6 (directions) + 2 (local dedxs)
         edge_feats: 19
         node_pred:
@@ -324,48 +318,48 @@ model:
           orient: 2
         edge_pred: 2
         edge_layer:
-          name: mlp
+          provider: mlp
           mlp:
             depth: 3
             width: 128
             activation:
-              name: lrelu
+              provider: lrelu
               negative_slope: 0.1
             normalization: batch_norm
         node_layer:
-          name: mlp
+          provider: mlp
           reduction: max
           attention: false
           message_mlp:
             depth: 3
             width: 128
             activation:
-              name: lrelu
+              provider: lrelu
               negative_slope: 0.1
             normalization: batch_norm
           aggr_mlp:
             depth: 3
             width: 128
             activation:
-              name: lrelu
+              provider: lrelu
               negative_slope: 0.1
             normalization: batch_norm
 
     grappa_inter_loss:
       node_loss:
         type:
-          name: class
+          provider: class
           target: pid
           loss: ce
           balance_loss: true
         primary:
-          name: class
+          provider: class
           target: inter_primary
           loss: ce
           balance_loss: true
         orient:
-          name: orient
+          provider: orient
           loss: ce
       edge_loss:
-        name: channel
+        provider: channel
         target: interaction

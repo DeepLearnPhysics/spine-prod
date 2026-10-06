@@ -12,25 +12,25 @@ base:
 
 io:
   loader:
-    minibatch_size: null
+    minibatch_size:
     shuffle: false
     num_workers: 16
     collate_fn: all
     dataset:
-      name: mixed
+      provider: mixed
       primary:
-        name: larcv
-        file_keys: null
+        provider: larcv
+        file_keys:
         schema:
           data:
-            parser: sparse3d
+            provider: sparse3d
             sparse_event: sparse3d_pcluster
           coord_label:
-            parser: particle_coords
-            particle_event: null
+            provider: particle_coords
+            particle_event:
             cluster_event: cluster3d_pcluster
       cache:
-        path: null
+        path:
         stage: fragmentation
         stage_map:
           ppn_points: segmentation
@@ -42,7 +42,7 @@ io:
           - fragment_clusts
           - fragment_shapes
   writer:
-    name: cache
+    provider: cache
     stage: particle_aggregation
     keep_open: true
     overwrite_stage: true
@@ -60,7 +60,7 @@ io:
       - particle_graph_edge_valid
 
 model:
-  name: full_chain
+  provider: full_chain
   to_numpy: true
 
   network_input:
@@ -80,16 +80,14 @@ model:
       inputs: [ppn_points, fragment_clusts, fragment_shapes]
       stages:
         - name: particle_aggregation
-          provider: particle_aggregation
           uses: [grappa_shower, grappa_track]
           config:
             shower_aggregation: grappa
             shower_primary: grappa
             track_aggregation: grappa
-            particle_aggregation: null
+            particle_aggregation:
 
         - name: particle_graph
-          provider: particle_graph
           uses: grappa_inter
           loss: grappa_inter_loss
 

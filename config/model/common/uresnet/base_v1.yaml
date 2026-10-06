@@ -3,8 +3,8 @@ __meta__:
   description: SPINE v1 standalone UResNet semantic-segmentation model
 
 model:
-  name: uresnet
-  weight_path: null
+  provider: uresnet
+  weight_path:
 
   network_input:
     data: data

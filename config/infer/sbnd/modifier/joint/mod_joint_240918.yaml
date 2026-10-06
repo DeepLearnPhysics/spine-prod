@@ -13,4 +13,6 @@ __meta__:
 include: mod_joint_common.yaml
 
 override:
-  post-: flash_match
+  post.stages~:
+    - remove:
+        name: flash_match

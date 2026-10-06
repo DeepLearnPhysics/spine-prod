@@ -6,8 +6,8 @@ include: train/nd-lar/grappa_inter/base_v1.yaml
 
 override:
   io.loader.dataset:
-    name: cache
-    path: null
+    provider: cache
+    path:
     stage: particle_aggregation
     keys:
       - particle_graph_edge_index
@@ -38,10 +38,6 @@ override:
     edge_valid: particle_graph_edge_valid
 
 remove:
-  - model.network_input.data
-  - model.network_input.coord_label
-  - model.loss_input.clust_label
-  - model.loss_input.coord_label
   - model.modules.grappa.graph
   - model.modules.grappa.node_encoder
   - model.modules.grappa.edge_encoder

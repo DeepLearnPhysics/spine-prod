@@ -33,9 +33,12 @@ override:
           config:
             mode: apply
   model.modules.calibration:
-    transparency:
-      transparency_file: sbnd_MattMod_YZ.root
-      map_type: correction
-
-  # Continue post-processing from the transparency-corrected depositions.
-  post.apply_calibrations.depositions_source: depositions
+    stages:
+      - name: transparency
+        transparency_file: sbnd_MattMod_YZ.root
+        map_type: correction
+  post.stages~:
+    - update:
+        name: apply_calibrations
+        changes:
+          depositions_source: depositions

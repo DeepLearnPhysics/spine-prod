@@ -13,3 +13,6 @@ include: mod_joint_common.yaml
 
 override:
   io.loader.dataset.base.schema.ppn_label.include_point_tagging: false
+  post.stages~:
+    - remove:
+        name: flash_match

@@ -3,8 +3,8 @@ __meta__:
   description: SPINE v1 standalone track GrapPA model structure
 
 model:
-  name: grappa
-  weight_path: null
+  provider: grappa
+  weight_path:
 
   network_input:
     data: data

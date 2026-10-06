@@ -10,14 +10,14 @@ io:
     shuffle: false
     num_workers: 8
     collate_fn:
-      name: all
+      provider: all
       split: true
       source:
         sources: sources
     dataset: !include dataset_common.yaml
   writer:
-    name: hdf5
-    file_name: null
+    provider: hdf5
+    file_name:
     overwrite: true
     keys:
       - run_info

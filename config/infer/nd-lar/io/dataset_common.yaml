@@ -2,22 +2,22 @@ __meta__:
   kind: fragment
   description: Common ND-LAr LArCV inference dataset
 
-name: larcv
-file_keys: null
+provider: larcv
+file_keys:
 schema:
   data:
-    parser: sparse3d
+    provider: sparse3d
     sparse_event: sparse3d_pcluster
   seg_label:
-    parser: sparse3d
+    provider: sparse3d
     sparse_event: sparse3d_pcluster_semantics
   ppn_label:
-    parser: particle_points
+    provider: particle_points
     sparse_event: sparse3d_pcluster
     particle_event: particle_pcluster
     include_point_tagging: false
   clust_label:
-    parser: cluster3d
+    provider: cluster3d
     cluster_event: cluster3d_pcluster
     particle_event: particle_pcluster
     neutrino_event: neutrino_mc_truth
@@ -25,29 +25,29 @@ schema:
     add_particle_info: true
     clean_data: true
   coord_label:
-    parser: particle_coords
+    provider: particle_coords
     particle_event: particle_pcluster
     cluster_event: cluster3d_pcluster
   particles:
-    parser: particle
+    provider: particle
     particle_event: particle_pcluster
     neutrino_event: neutrino_mc_truth
     cluster_event: cluster3d_pcluster
     skip_empty: true
   neutrinos:
-    parser: neutrino
+    provider: neutrino
     neutrino_event: neutrino_mc_truth
     cluster_event: cluster3d_pcluster
     interaction_scheme: genie
   meta:
-    parser: meta
+    provider: meta
     sparse_event: sparse3d_pcluster
   run_info:
-    parser: run_info
+    provider: run_info
     sparse_event: sparse3d_pcluster
   trigger:
-    parser: trigger
+    provider: trigger
     trigger_event: trigger_base
   flashes:
-    parser: flash
+    provider: flash
     flash_event: opflash_light

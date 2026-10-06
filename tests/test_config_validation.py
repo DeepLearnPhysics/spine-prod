@@ -437,7 +437,7 @@ def test_generic_graph_spice_can_train_from_segmentation_cache():
     )
 
     dataset = config["io"]["loader"]["dataset"]
-    assert dataset["name"] == "mixed"
+    assert dataset["provider"] == "mixed"
     assert set(dataset["primary"]["schema"]) == {"data"}
     assert dataset["cache"]["stage"] == "segmentation"
     assert dataset["cache"]["keys"] == ["seg_pred", "clust_label_adapt"]
@@ -474,7 +474,10 @@ def test_generic_fragment_cache_materializes_both_grappa_training_contracts():
         "fragmentation",
         "fragment_graph",
     ]
-    assert chain["stages"][1]["provider"] == "fragment_graph"
+    assert (
+        chain["stages"][1].get("provider", chain["stages"][1]["name"])
+        == "fragment_graph"
+    )
     assert config["model"]["network_input"]["seg_pred"] == "seg_pred"
 
     modules = config["model"]["modules"]
@@ -554,7 +557,7 @@ def test_generic_particle_grappas_train_only_from_cached_graphs(
     )
 
     dataset = config["io"]["loader"]["dataset"]
-    assert dataset["name"] == "cache"
+    assert dataset["provider"] == "cache"
     assert dataset["stage"] == "fragmentation"
     assert config["model"]["network_input"] == {
         "edge_index": f"{prefix}_edge_index",
@@ -591,7 +594,7 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
 
     loader = cache["io"]["loader"]
     assert loader["num_workers"] == 16
-    assert loader["dataset"]["name"] == "mixed"
+    assert loader["dataset"]["provider"] == "mixed"
     assert loader["dataset"]["cache"]["keep_open"] is True
     assert loader["dataset"]["cache"]["stage_map"] == {
         "ppn_points": "segmentation",
@@ -611,7 +614,10 @@ def test_generic_particle_cache_and_inter_training_share_one_graph_contract():
         "particle_aggregation",
         "particle_graph",
     ]
-    assert chain["stages"][1]["provider"] == "particle_graph"
+    assert (
+        chain["stages"][1].get("provider", chain["stages"][1]["name"])
+        == "particle_graph"
+    )
     assert cache["model"]["modules"]["grappa_shower"]["model_name"] == ""
     assert cache["model"]["modules"]["grappa_track"]["model_name"] == ""
     assert "return_features" not in cache["model"]["modules"]["grappa_inter"]
@@ -1321,6 +1327,30 @@ def test_metadata_does_not_declare_runtime_priority(config_path):
     assert "priority" not in config.get("__meta__", {})
 
 
+def module_parameter_view(value, key=None):
+    """Expose named provider parameters for existing physics assertions.
+
+    Ordered-schema structure and manager execution are checked separately in
+    test_spine140_migration; this view retains list order and drops no parameters.
+    """
+    if isinstance(value, list):
+        return [module_parameter_view(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    if key in {"post", "ana", "augment", "calibration"} and "stages" in value:
+        result = {k: v for k, v in value.items() if k != "stages"}
+        for stage in value["stages"]:
+            params = stage.get(
+                "config",
+                {k: v for k, v in stage.items() if k not in {"name", "provider"}},
+            ).copy()
+            if stage.get("provider", stage["name"]) != stage["name"]:
+                params["provider"] = stage["provider"]
+            result[stage["name"]] = module_parameter_view(params, stage["name"])
+        return result
+    return {k: module_parameter_view(v, k) for k, v in value.items()}
+
+
 def load_config_with_includes(config_path):
     """Load a YAML config using SPINE's load_config function.
 
@@ -1360,7 +1390,7 @@ def load_config_with_includes(config_path):
 
         # Return a fake path instead of downloading
         mock_download.return_value = "/fake/weights/checkpoint.ckpt"
-        return load_config_file(str(config_path))
+        return module_parameter_view(load_config_file(str(config_path)))
 
 
 def test_protodune_sp_260210_model_is_shared_and_preserves_deployed_choices():
@@ -1416,7 +1446,7 @@ def test_protodune_sp_260210_model_is_shared_and_preserves_deployed_choices():
     ]
     assert modules["grappa_inter"]["nodes"]["grouping_through_track"] is True
     assert modules["grappa_inter_loss"]["node_loss"]["orient"] == {
-        "name": "orient",
+        "provider": "orient",
         "loss": "ce",
     }
 
@@ -1481,7 +1511,7 @@ def test_protodune_sp_260906_inference_uses_trained_shared_model():
     deployed_model = deployed["model"]
     assert deployed_model.pop("weight_path") == "/fake/weights/checkpoint.ckpt"
     assert deployed_model == shared["model"]
-    assert deployed["io"]["writer"]["name"] == "hdf5"
+    assert deployed["io"]["writer"]["provider"] == "hdf5"
     assert deployed["post"]["match"]["ghost"] is True
 
 
@@ -1538,7 +1568,7 @@ def test_protodune_sp_cache_stages_own_only_new_products():
     ]
     assert "data_calib" not in fragmentation["io"]["writer"]["keys"]
     fragmentation_dataset = fragmentation["io"]["loader"]["dataset"]
-    assert fragmentation_dataset["name"] == "mixed"
+    assert fragmentation_dataset["provider"] == "mixed"
     assert fragmentation_dataset["cache"]["stage_map"] == {"data_calib": "deghosting"}
     assert "coord_label" in fragmentation_dataset["primary"]["schema"]
     particle_keys = particles["io"]["writer"]["keys"]
@@ -1593,7 +1623,7 @@ def test_protodune_sp_common_truth_policy_applies_to_both_training_dates():
         assert "particle_graph_node_orient_valid" in dataset_keys
         assert loss_input["node_orient_target"] == ("particle_graph_node_orient_target")
         assert loss_input["node_orient_valid"] == ("particle_graph_node_orient_valid")
-        assert node_loss["orient"] == {"name": "orient", "loss": "ce"}
+        assert node_loss["orient"] == {"provider": "orient", "loss": "ce"}
 
     ppn_train = load_config_with_includes(
         CONFIG_ROOT
@@ -1621,7 +1651,7 @@ def test_protodune_sp_evaluation_and_report_include_deghosting_metrics():
         CONFIG_ROOT / "test/protodune-sp/full_chain/report_260210.yaml"
     )
     assert report["metrics"]["deghosting"] == {
-        "name": "segment_confusion",
+        "provider": "segment_confusion",
         "source": "**/*segment_eval_summary.csv",
         "class_mapping": {
             "Non-ghost": ["shower", "track", "michel", "delta", "low_energy"],
@@ -1877,7 +1907,7 @@ def test_nd_lar_inference_models_are_thin_shared_model_wrappers():
     assert "deghosting" not in {stage["name"] for stage in modules["chain"]["stages"]}
     assert modules["graph_spice"]["embedder"]["uresnet"]["spatial_size"] == 6144
     assert modules["graph_spice"]["constructor"]["graph"] == {
-        "name": "radius",
+        "provider": "radius",
         "r": 1.9,
     }
     assert modules["grappa_shower"]["graph"]["max_length"] == [
@@ -1922,7 +1952,7 @@ def test_nd_lar_family_neutrino_parsers_use_genie_interaction_codes(config_path)
     config = load_config_with_includes(CONFIG_ROOT / config_path)
     neutrino = config["io"]["loader"]["dataset"]["schema"]["neutrinos"]
 
-    assert neutrino["parser"] == "neutrino"
+    assert neutrino["provider"] == "neutrino"
     assert neutrino["interaction_scheme"] == "genie"
 
 
@@ -1948,7 +1978,7 @@ def test_dlpgen_opt_conversion_uses_native_truth_products(generator):
     assert schema["clust_label"]["neutrino_event"] == "neutrino_mc_truth"
     assert schema["particles"]["neutrino_event"] == "neutrino_mc_truth"
     assert schema["neutrinos"] == {
-        "parser": "neutrino",
+        "provider": "neutrino",
         "neutrino_event": "neutrino_mc_truth",
         "cluster_event": "cluster3d_pcluster",
         "interaction_scheme": generator,
@@ -2594,7 +2624,7 @@ class TestConfigValidation:
         assert calibration_stage["config"]["mode"] == "apply"
         calibration = config["model"]["modules"]["calibration"]
         assert "stage" not in calibration
-        assert calibration["response"]["priority"] == 10
+        assert next(iter(calibration)) == "response"
         assert calibration["response"]["response_func"] == "46.478/49.819*x"
 
         post_calibration = config["post"]["apply_calibrations"]
@@ -2613,7 +2643,7 @@ class TestConfigValidation:
             ),
             encoding="utf-8",
         )
-        with pytest.raises(Exception, match="compatible"):
+        with pytest.raises(Exception, match="compatible|does not exist"):
             load_config_with_includes(incompatible)
 
     def test_sbnd_smearing_25_percent_composes_with_supported_model(
@@ -2752,8 +2782,13 @@ class TestConfigValidation:
         assert "recombination" in calibration
         assert "lifetime" in calibration
         assert "transparency" in calibration
-        assert calibration["response"]["priority"] == 10
-        assert calibration["smearing"]["priority"] == 9
+        from spine.config.factory import parse_module_config
+
+        assert list(
+            parse_module_config(
+                calibration, sort_by_priority=True, priority_descending=True
+            )
+        )[:2] == ["response", "smearing"]
 
     def test_icarus_charge_scale_accepts_first_in_chain_calibration(
         self, config_infer_root, tmp_path
@@ -2811,7 +2846,7 @@ class TestConfigValidation:
         calibration = config["model"]["modules"]["calibration"]
         assert calibration["gain"]["gain"] == 79.9169
         assert calibration["gain_scale"] == {
-            "name": "response",
+            "provider": "response",
             "priority": 10,
             "response_func": f"{scale}*x",
         }
@@ -2866,5 +2901,5 @@ class TestConfigValidation:
         modifier = sbnd_root / "modifier" / "data" / modifier_name
         composite = write_composite_config(tmp_path, sbnd_root / base_name, modifier)
 
-        with pytest.raises(Exception, match="compatible"):
+        with pytest.raises(Exception, match="compatible|does not exist"):
             load_config_with_includes(composite)

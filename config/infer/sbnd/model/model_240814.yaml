@@ -36,7 +36,7 @@ override:
   # Graph-SPICE uses a kNN graph with k=10
   model.modules.graph_spice.embedder.uresnet.spatial_size: 1728
   model.modules.graph_spice.constructor.graph:
-    name: knn
+    provider: knn
     k: 10
 
   # Direction and dE/dx radii settings for GrapPA modules

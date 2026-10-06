@@ -8,11 +8,11 @@ nodes:
   min_size: -1
   make_groups: true
 graph:
-  name: complete
+  provider: complete
   max_length: [500, 500, 0, 0, 25, 25, 25, 0, 0, 0]
   dist_algorithm: recursive
 node_encoder:
-  name: geo
+  provider: geo
   use_numpy: true
   add_value: true
   add_shape: true
@@ -22,10 +22,10 @@ node_encoder:
   add_local_dedxs: true
   dedx_max_dist: 5
 edge_encoder:
-  name: geo
+  provider: geo
   use_numpy: true
 gnn_model:
-  name: meta
+  provider: meta
   node_feats: 33
   edge_feats: 19
   node_pred:
@@ -34,29 +34,29 @@ gnn_model:
     orient: 2
   edge_pred: 2
   edge_layer:
-    name: mlp
+    provider: mlp
     mlp:
       depth: 3
-      width: null
+      width:
       activation:
-        name: lrelu
+        provider: lrelu
         negative_slope: 0.1
       normalization: batch_norm
   node_layer:
-    name: mlp
+    provider: mlp
     reduction: max
     attention: false
     message_mlp:
       depth: 3
-      width: null
+      width:
       activation:
-        name: lrelu
+        provider: lrelu
         negative_slope: 0.1
       normalization: batch_norm
     aggr_mlp:
       depth: 3
-      width: null
+      width:
       activation:
-        name: lrelu
+        provider: lrelu
         negative_slope: 0.1
       normalization: batch_norm

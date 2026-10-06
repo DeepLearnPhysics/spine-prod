@@ -3,6 +3,6 @@
 
 include:
   - ../full_chain_co_250625.yaml
-  - ../modifier/data/mod_data_250303.yaml
+  - ../modifier/data/mod_data_250625.yaml
   - ../modifier/lite/mod_lite_240719.yaml
   - ../modifier/unblind/mod_unblind_240719.yaml

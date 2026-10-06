@@ -7,17 +7,17 @@ include: cache/common/graph_spice/base_v1.yaml
 override:
   io.loader.minibatch_size: 16
   io.loader.dataset:
-    name: mixed
+    provider: mixed
     primary:
-      name: larcv
-      file_keys: null
+      provider: larcv
+      file_keys:
       schema:
         coord_label:
-          parser: particle_coords
+          provider: particle_coords
           particle_event: particle_corrected
           cluster_event: cluster3d_pcluster
     cache:
-      path: null
+      path:
       stage: segmentation
       keep_open: true
       stage_map:

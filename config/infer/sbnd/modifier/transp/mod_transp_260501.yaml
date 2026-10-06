@@ -13,7 +13,10 @@ __meta__:
   conflicts_with: [data]
 
 override:
-  model.modules.calibration.transparency:
-    # Placeholder until the production transparency-map path is available.
-    transparency_file: sbnd_MattMod_YZ.root
-    map_type: correction
+  model.modules.calibration.stages~:
+    - insert:
+        after: lifetime
+        value:
+          name: transparency
+          transparency_file: sbnd_MattMod_YZ.root
+          map_type: correction

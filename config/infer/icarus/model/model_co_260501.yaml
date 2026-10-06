@@ -43,20 +43,6 @@ override:
           uses: calibration
           config:
             mode: apply
-  model.modules.calibration:
-    gain:
-      gain: 79.9169 # e-/ADC
-    recombination:
-      model: mbox
-      efield: 0.4938 # kV/cm
-      mip_dedx: 2.105168 # MeV/cm
-    lifetime:
-      lifetime_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_elifetime_data.db
-      driftv_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
-    transparency:
-      transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
-
-  # Older PPN/GrapPA loss settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: false
   model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
   model.modules.grappa_shower_loss.node_loss.use_closest: true
@@ -71,3 +57,17 @@ override:
 
   # Interaction grouping restriction applied
   model.modules.grappa_inter.nodes.grouping_through_track: true
+  model.modules.calibration:
+    gain:
+      gain: 79.9169 # e-/ADC
+    recombination:
+      model: mbox
+      efield: 0.4938 # kV/cm
+      mip_dedx: 2.105168 # MeV/cm
+    lifetime:
+      lifetime_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_elifetime_data.db
+      driftv_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
+    transparency:
+      transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
+
+  # Older PPN/GrapPA loss settings

@@ -4,18 +4,18 @@ __meta__:
 
 node_loss:
   type:
-    name: class
+    provider: class
     target: pid
     loss: ce
     balance_loss: true
   primary:
-    name: class
+    provider: class
     target: inter_primary
     loss: ce
     balance_loss: true
   orient:
-    name: orient
+    provider: orient
     loss: ce
 edge_loss:
-  name: channel
+  provider: channel
   target: interaction

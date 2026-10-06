@@ -7,7 +7,8 @@ jinja2>=3.0.0
 pyyaml>=5.0.0
 
 # Production jobs run inside a tagged SPINE container. Some preload tests are
-# skipped unless a matching SPINE Python package is available locally.
+# skipped unless SPINE >=1.4.0 is available locally. Install spine==1.4.0
+# to run configuration regressions and manager smoke tests against this release.
 
 # Testing
 pytest>=6.0.0

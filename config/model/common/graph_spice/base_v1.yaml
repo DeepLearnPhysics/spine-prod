@@ -3,8 +3,8 @@ __meta__:
   description: SPINE v1 standalone Graph-SPICE model structure
 
 model:
-  name: graph_spice
-  weight_path: null
+  provider: graph_spice
+  weight_path:
 
   network_input:
     data: data

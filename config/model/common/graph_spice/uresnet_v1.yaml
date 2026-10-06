@@ -7,12 +7,12 @@ filters: 32
 input_kernel: 5
 depth: 5
 reps: 2
-spatial_size: null
+spatial_size:
 allow_bias: false
 activation:
-  name: lrelu
+  provider: lrelu
   negative_slope: 0.33
 norm_layer:
-  name: batch_norm
+  provider: batch_norm
   eps: 0.0001
   momentum: 0.01

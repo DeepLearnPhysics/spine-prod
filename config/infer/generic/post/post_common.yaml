@@ -5,47 +5,41 @@ __meta__:
 
 # Run post-processors
 post:
-  shape_logic:
-    enforce_pid: true
-    enforce_primary: true
-    priority: 3
-  direction:
-    obj_type: particle
-    optimize: true
-    run_mode: both
-    priority: 1
-  calo_ke:
-    scaling: 1.
-    shower_fudge: 1/0.83
-    priority: 1
-  csda_ke:
-    tracking_mode: step_next
-    segment_length: 5.0
-    priority: 1
-  mcs_ke:
-    tracking_mode: bin_pca
-    segment_length: 5.0
-    priority: 1
-  containment:
-    margin: 5.0
-    mode: meta
-    priority: 1
-  vertex:
-    use_primaries: true
-    update_primaries: false
-    priority: 1
-  topology_threshold:
-    ke_thresholds:
-      4: 50
-      default: 25
-  fiducial:
-    margin: 25.0
-    mode: meta
-  children_count:
-    mode: shape
-  match:
-    match_mode: both
-    ghost: false
-    fragment: false
-    particle: true
-    interaction: true
+  stages:
+    - name: shape_logic
+      enforce_pid: true
+      enforce_primary: true
+    - name: direction
+      obj_type: particle
+      optimize: true
+      run_mode: both
+    - name: calo_ke
+      scaling: 1.0
+      shower_fudge: 1/0.83
+    - name: csda_ke
+      tracking_mode: step_next
+      segment_length: 5.0
+    - name: mcs_ke
+      tracking_mode: bin_pca
+      segment_length: 5.0
+    - name: containment
+      margin: 5.0
+      mode: meta
+    - name: vertex
+      use_primaries: true
+      update_primaries: false
+    - name: topology_threshold
+      ke_thresholds:
+        4: 50
+        default: 25
+    - name: fiducial
+      margin: 25.0
+      mode: meta
+    - name: children_count
+      mode: shape
+    - name: match
+      match_mode: both
+      ghost: false
+      fragment: false
+      particle: true
+      interaction: true

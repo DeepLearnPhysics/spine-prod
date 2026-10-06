@@ -32,11 +32,10 @@ override:
           config:
             mode: apply
   model.modules.calibration:
-    field:
-      # Apply the displacement before charge calibrations.
-      priority: 10
-      map_file: $SBND_DATA_DIR/v01_42_00/SCEoffsets/SCEoffsets_SBND_E500_dualmap_voxelTH3.root
-      map_prefix: TrueBkwd_Displacement
-      map_suffixes: [_E, _W]
-      map_selection_axis: 0
-      map_selection_boundaries: [0.0]
+    stages:
+      - name: field
+        map_file: $SBND_DATA_DIR/v01_42_00/SCEoffsets/SCEoffsets_SBND_E500_dualmap_voxelTH3.root
+        map_prefix: TrueBkwd_Displacement
+        map_suffixes: [_E, _W]
+        map_selection_axis: 0
+        map_selection_boundaries: [0.0]
