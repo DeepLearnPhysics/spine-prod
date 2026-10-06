@@ -8,7 +8,7 @@ include: test/common/full_chain/report_v1.yaml
 
 metrics:
   deghosting:
-    name: segment_confusion
+    provider: segment_confusion
     source: "**/*segment_eval_summary.csv"
     class_mapping:
       Non-ghost: [shower, track, michel, delta, low_energy]

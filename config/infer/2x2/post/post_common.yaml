@@ -5,53 +5,48 @@ __meta__:
 
 # Run post-processors
 post:
-  shape_logic:
-    enforce_pid: true
-    enforce_primary: true
-    priority: 3
-  direction:
-    run_mode: reco
-    obj_type: particle
-    optimize: true
-    priority: 1
-  calo_ke:
-    run_mode: both
-    scaling: 1.
-    shower_fudge: 1/0.83
-    priority: 1
-  csda_ke:
-    run_mode: reco
-    tracking_mode: step_next
-    segment_length: 5.0
-    priority: 1
-  mcs_ke:
-    run_mode: reco
-    tracking_mode: bin_pca
-    segment_length: 5.0
-    priority: 1
-  containment:
-    run_mode: both
-    margin: 5.0
-    mode: detector
-  vertex:
-    run_mode: reco
-    use_primaries: true
-    update_primaries: false
-    priority: 1
-  topology_threshold:
-    run_mode: both
-    ke_thresholds:
-      4: 50
-      default: 25
-  fiducial:
-    run_mode: both
-    margin: 15.0
-    mode: detector
-  children_count:
-    mode: shape
-  match:
-    match_mode: both
-    ghost: false
-    fragment: false
-    particle: true
-    interaction: true
+  stages:
+    - name: shape_logic
+      enforce_pid: true
+      enforce_primary: true
+    - name: direction
+      run_mode: reco
+      obj_type: particle
+      optimize: true
+    - name: calo_ke
+      run_mode: both
+      scaling: 1.0
+      shower_fudge: 1/0.83
+    - name: csda_ke
+      run_mode: reco
+      tracking_mode: step_next
+      segment_length: 5.0
+    - name: mcs_ke
+      run_mode: reco
+      tracking_mode: bin_pca
+      segment_length: 5.0
+    - name: vertex
+      run_mode: reco
+      use_primaries: true
+      update_primaries: false
+    - name: containment
+      run_mode: both
+      margin: 5.0
+      mode: detector
+    - name: topology_threshold
+      run_mode: both
+      ke_thresholds:
+        4: 50
+        default: 25
+    - name: fiducial
+      run_mode: both
+      margin: 15.0
+      mode: detector
+    - name: children_count
+      mode: shape
+    - name: match
+      match_mode: both
+      ghost: false
+      fragment: false
+      particle: true
+      interaction: true

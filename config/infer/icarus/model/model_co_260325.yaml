@@ -5,7 +5,9 @@ __meta__:
   kind: bundle
   version: "260325"
   date: "2026-03-25"
-  description: "ICARUS collection-only model with in-chain calibration, v4 dataset, fixed GrapPA encoder radii settings (including shower/track)"
+  description:
+    "ICARUS collection-only model with in-chain calibration, v4 dataset, fixed GrapPA encoder radii settings (including
+    shower/track)"
   compatible_with:
     base: ">=240719"
     io: ">=240812"
@@ -43,18 +45,6 @@ override:
           uses: calibration
           config:
             mode: apply
-  model.modules.calibration:
-    gain:
-      gain: 82.03 # e-/ADC
-    recombination:
-      model: mbox
-      efield: 0.4938 # kV/cm
-      mip_dedx: 2.105168 # MeV/cm
-    lifetime:
-      lifetime: 3000 # us
-      driftv: 0.157565 # cm/us
-
-  # Older PPN/GrapPA loss settings
   model.modules.uresnet_ppn.ppn.classify_endpoints: false
   model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
   model.modules.grappa_shower_loss.node_loss.use_closest: true
@@ -69,3 +59,16 @@ override:
 
   # Interaction grouping restriction applied
   model.modules.grappa_inter.nodes.grouping_through_track: true
+  model.modules.calibration:
+    gain:
+      gain: 82.03 # e-/ADC
+    recombination:
+      model: mbox
+      efield: 0.4938 # kV/cm
+      mip_dedx: 2.105168 # MeV/cm
+    lifetime:
+      lifetime: 3000 # us
+      driftv: 0.157565 # cm/us
+
+
+  # Older PPN/GrapPA loss settings

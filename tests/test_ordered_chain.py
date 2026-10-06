@@ -68,7 +68,7 @@ def test_predeghost_scale_preserves_existing_chain_and_accepts_factor(path):
         scaled,
         [
             "model.modules.chain.stages~={update: {name: predeghost_scale, "
-            "changes: {config: {calibration: {gain: {gain: 1.1}}}}}}"
+            "changes: {config: {calibration: {stages: [{name: gain, gain: 1.1}]}}}}}"
         ],
     )
     modules = scaled["model"]["modules"]
@@ -77,7 +77,10 @@ def test_predeghost_scale_preserves_existing_chain_and_accepts_factor(path):
     assert predeghost == {
         "name": "predeghost_scale",
         "provider": "calibration",
-        "config": {"mode": "apply", "calibration": {"gain": {"gain": 1.1}}},
+        "config": {
+            "mode": "apply",
+            "calibration": {"stages": [{"name": "gain", "gain": 1.1}]},
+        },
     }
     assert stages[0]["name"] == "deghosting"
     assert modules == baseline["model"]["modules"]

@@ -12,3 +12,25 @@ __meta__:
     post: ">=240819"
 
 include: mod_data_common.yaml
+override:
+  post.stages~:
+    - remove:
+        name: children_count
+    - remove:
+        name: match
+    - update:
+        name: calo_ke
+        changes:
+          run_mode: reco
+    - update:
+        name: containment
+        changes:
+          run_mode: reco
+    - update:
+        name: topology_threshold
+        changes:
+          run_mode: reco
+    - update:
+        name: fiducial
+        changes:
+          run_mode: reco

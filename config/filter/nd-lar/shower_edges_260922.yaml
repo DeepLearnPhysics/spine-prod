@@ -5,8 +5,7 @@ __meta__:
   description: Reject ND-LAr entries with pathological cached shower graphs
 
 input:
-  name: cache
-
+  provider: cache
 measurements:
   shower_edges:
     kind: product_size

@@ -1,5 +1,6 @@
 """Interactive SPINE execution without scheduler submission."""
 
+import shlex
 import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -330,6 +331,12 @@ class InteractiveRunner(SubmissionComponent):
         )
         if spine_options:
             spine_cmd = f"{spine_cmd} {spine_options}"
+        # Probe the same environment used for inference, after setup and inside
+        # the container when selected. This does not import the GPU model stack.
+        version_check = self.basedir / "scripts" / "check_spine_version.py"
+        cmd_parts.append(
+            f"python3 {shlex.quote(str(version_check))} {local_spine_cmd or 'spine'}"
+        )
         cmd_parts.append(spine_cmd)
 
         # Join with && for proper sequencing

@@ -20,14 +20,55 @@ override:
   model.network_input.run_info: run_info
 
   # Set calibration parameters for data before semantic segmentation.
-  model.modules.calibration.gain.gain: 45.652 # e-/ADC
-  model.modules.calibration.lifetime:
-    lifetime_db: $SBND_DATA_DIR/v01_42_00/CalibrationDatabase/tpc_elifetime.db
-    lifetime_db_value_keys:
-      - etau_sce_spatial_east
-      - etau_sce_spatial_west
-    lifetime_db_value_scale: 1000.0 # ms to us
-    driftv: 0.1563 # cm/us
-  model.modules.calibration.transparency:
-    transparency_file: $SBND_DATA_DIR/v01_42_00/YZmaps/yz_data2025_v10_14_02.root
-    map_type: correction
+  model.modules.calibration.stages~:
+    - update:
+        name: gain
+        changes:
+          gain: 45.652
+    - remove:
+        name: lifetime
+    - insert:
+        after: recombination
+        value:
+          name: lifetime
+          lifetime_db: $SBND_DATA_DIR/v01_42_00/CalibrationDatabase/tpc_elifetime.db
+          lifetime_db_value_keys:
+            - etau_sce_spatial_east
+            - etau_sce_spatial_west
+          lifetime_db_value_scale: 1000.0
+          driftv: 0.1563
+    - insert:
+        after: lifetime
+        value:
+          name: transparency
+          transparency_file: $SBND_DATA_DIR/v01_42_00/YZmaps/yz_data2025_v10_14_02.root
+          map_type: correction
+  post.stages~:
+    - remove:
+        name: children_count
+    - remove:
+        name: match
+    - update:
+        name: direction
+        changes:
+          run_mode: reco
+    - update:
+        name: time_containment
+        changes:
+          run_mode: reco
+    - update:
+        name: calo_ke
+        changes:
+          run_mode: reco
+    - update:
+        name: containment
+        changes:
+          run_mode: reco
+    - update:
+        name: topology_threshold
+        changes:
+          run_mode: reco
+    - update:
+        name: fiducial
+        changes:
+          run_mode: reco

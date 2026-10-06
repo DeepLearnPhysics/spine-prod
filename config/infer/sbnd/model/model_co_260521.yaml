@@ -47,19 +47,18 @@ override:
           config:
             mode: apply
   model.modules.calibration:
-    gain:
-      gain: 47.551 # e-/ADC
-    recombination:
-      model: mbox_ell
-      efield: 0.5 # kV/cm
-      mbox_alpha: 0.904
-      mbox_beta: 0.204
-      mbox_ell_r: 1.25
-    lifetime:
-      lifetime: 35000 # us
-      driftv: 0.1563 # cm/us
-
-  # Older PPN/GrapPA loss settings
+    stages:
+      - name: gain
+        gain: 47.551
+      - name: recombination
+        model: mbox_ell
+        efield: 0.5
+        mbox_alpha: 0.904
+        mbox_beta: 0.204
+        mbox_ell_r: 1.25
+      - name: lifetime
+        lifetime: 35000
+        driftv: 0.1563
   model.modules.uresnet_ppn.ppn.classify_endpoints: false
   model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
   model.modules.grappa_shower_loss.node_loss.use_closest: true
@@ -67,7 +66,7 @@ override:
   # Graph-SPICE uses a radius graph with r=1.9 pixels (direct neighbors)
   model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
   model.modules.graph_spice.constructor.graph:
-    name: radius
+    provider: radius
     r: 1.9
 
   # Direction and dE/dx radii settings for GrapPA modules

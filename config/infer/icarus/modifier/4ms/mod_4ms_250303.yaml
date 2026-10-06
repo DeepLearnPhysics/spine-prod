@@ -14,4 +14,4 @@ __meta__:
 
 override:
   # Change calibration lifetime to 4 ms
-  model.modules.calibration.lifetime.lifetime: 4000 # us
+  model.modules.calibration.lifetime.lifetime: 4000

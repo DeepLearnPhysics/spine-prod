@@ -3,5 +3,5 @@ __meta__:
   description: SPINE v1 track GrapPA loss
 
 edge_loss:
-  name: channel
+  provider: channel
   target: group

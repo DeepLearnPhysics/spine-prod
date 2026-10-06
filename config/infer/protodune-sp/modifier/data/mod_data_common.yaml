@@ -43,21 +43,3 @@ override:
   ### Post-processing overrides ###
   # Set build/post to reco-only mode
   build.mode: reco
-  post.direction.run_mode: reco
-  post.calo_ke.run_mode: reco
-  post.containment.run_mode: reco
-  post.time_containment.run_mode: reco
-  post.topology_threshold.run_mode: reco
-  post.fiducial.run_mode: reco
-
-  # Remove match post-processor (no truth)
-  post-:
-    - match
-    - children_count
-
-  # Remove irrelevant arguments
-  post.containment-: truth_point_mode
-  post.topology_threshold-: truth_ke_mode
-
-  # Modify calibration parameters for data
-  # post.apply_calibrations varies by config - override in specific configs

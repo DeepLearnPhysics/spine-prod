@@ -2,11 +2,11 @@ __meta__:
   kind: fragment
   description: Common icarus LArCV inference dataset
 
-name: larcv
-file_keys: null
+provider: larcv
+file_keys:
 schema:
   data:
-    parser: sparse3d
+    provider: sparse3d
     sparse_event_list:
       - sparse3d_reco_cryoE
       - sparse3d_reco_cryoE_chi2
@@ -26,7 +26,7 @@ schema:
       - sparse3d_reco_cryoW_hit_key2
     num_features: 8
   sources:
-    parser: sparse3d
+    provider: sparse3d
     sparse_event_list:
       - sparse3d_reco_cryoE_cryo
       - sparse3d_reco_cryoE_tpc
@@ -35,15 +35,15 @@ schema:
     feature_only: true
     num_features: 2
   seg_label:
-    parser: sparse3d
+    provider: sparse3d
     sparse_event: sparse3d_pcluster_semantics_ghost
   ppn_label:
-    parser: particle_points
+    provider: particle_points
     sparse_event: sparse3d_pcluster
     particle_event: particle_corrected
     # include_point_tagging varies by config - override in specific configs
   clust_label:
-    parser: cluster3d
+    provider: cluster3d
     cluster_event: cluster3d_pcluster
     particle_event: particle_corrected
     neutrino_event: neutrino_mpv
@@ -51,43 +51,43 @@ schema:
     add_particle_info: true
     clean_data: true
   clust_label_g4:
-    parser: cluster3d
+    provider: cluster3d
     cluster_event: cluster3d_sed
     particle_event: particle_corrected
     add_particle_info: true
   charge_label:
-    parser: sparse3d_aggr
+    provider: sparse3d_aggr
     aggr: sum
     sparse_event_list:
       - sparse3d_reco_cryoE_rescaled
       - sparse3d_reco_cryoW_rescaled
   coord_label:
-    parser: particle_coords
+    provider: particle_coords
     particle_event: particle_corrected
     cluster_event: cluster3d_pcluster
   graph_label:
-    parser: particle_graph
+    provider: particle_graph
     particle_event: particle_corrected
   particles:
-    parser: particle
+    provider: particle
     particle_event: particle_corrected
     neutrino_event: neutrino_mpv
     cluster_event: cluster3d_pcluster
   neutrinos:
-    parser: neutrino
+    provider: neutrino
     neutrino_event: neutrino_mpv
     cluster_event: cluster3d_pcluster
   flashes:
-    parser: flash
+    provider: flash
     flash_event_list:
       - opflash_cryoE
       - opflash_cryoW
   crthits:
-    parser: crthit
+    provider: crthit
     crthit_event: crthit_crthit
   meta:
-    parser: meta
+    provider: meta
     sparse_event: sparse3d_pcluster
   run_info:
-    parser: run_info
+    provider: run_info
     sparse_event: sparse3d_pcluster

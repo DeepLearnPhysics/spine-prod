@@ -46,7 +46,6 @@ override:
         changes:
           config:
             charge_rescaling: collection
-  model.modules.calibration: null
   model.network_input-:
     - meta
     - run_info
@@ -66,3 +65,4 @@ override:
 
   # Interaction grouping restriction not applied
   model.modules.grappa_inter.nodes.grouping_through_track: false
+  model.modules.calibration:

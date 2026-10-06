@@ -6,8 +6,8 @@ include: train/protodune-sp/graph_spice/base_v1.yaml
 
 override:
   io.loader.dataset:
-    name: cache
-    path: null
+    provider: cache
+    path:
     stage: segmentation
     stage_map:
       data_calib: deghosting

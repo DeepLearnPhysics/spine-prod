@@ -7,7 +7,7 @@ base:
   epochs: 50.0
   seed: 0
   unwrap: false
-  log_dir: null
+  log_dir:
   log_step: 1
 
 io:
@@ -17,24 +17,24 @@ io:
     num_workers: 16
     collate_fn: all
     sampler:
-      name: random_sequence
+      provider: random_sequence
       seed: 0
     dataset:
-      name: larcv
-      file_keys: null
+      provider: larcv
+      file_keys:
       schema:
         data:
-          parser: sparse3d
+          provider: sparse3d
           sparse_event: sparse3d_pcluster
         seg_label:
-          parser: sparse3d
+          provider: sparse3d
           sparse_event: sparse3d_pcluster_semantics
         ppn_label:
-          parser: particle_points
+          provider: particle_points
           sparse_event: sparse3d_pcluster
           particle_event: particle_corrected
         clust_label:
-          parser: cluster3d
+          provider: cluster3d
           cluster_event: cluster3d_pcluster
           sparse_semantics_event: sparse3d_pcluster_semantics
           clean_data: true
@@ -45,14 +45,14 @@ io:
             primary_include_mpr: false
 
 train:
-  weight_prefix: null
+  weight_prefix:
   save_epoch: 1.0
   optimizer:
-    name: Adam
+    provider: Adam
     lr: 0.001
 
 validation:
-  file_keys: null
+  file_keys:
   fraction: 1.0
   early_stopping:
     monitor: loss

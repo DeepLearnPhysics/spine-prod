@@ -13,8 +13,8 @@ io:
     dataset: !include dataset_common.yaml
 
   writer:
-    name: hdf5
-    file_name: null
+    provider: hdf5
+    file_name:
     overwrite: true
     keys:
       - run_info

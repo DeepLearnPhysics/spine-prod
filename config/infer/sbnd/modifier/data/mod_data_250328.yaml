@@ -10,20 +10,40 @@ __meta__:
   applies_to: [data]
   compatible_with:
     model: "<260501"
-    post: "<260501"
+    post: "<=250328"
 
 include: mod_data_common.yaml
 
 override:
-  ### Post-processing overrides ###
-  # Set calibration parameters for data (post-processor)
-  post.apply_calibrations:
-    gain:
-      gain: 46.533 # e-/ADC for the collection planes
-    recombination:
-      model: mbox
-      efield: 0.5 # kV/cm
-    lifetime:
-      lifetime: 35000 # us
-      driftv: 0.1563 # cm/us
-    priority: 2
+  post.stages~:
+    - remove:
+        name: children_count
+    - remove:
+        name: match
+    - update:
+        name: direction
+        changes:
+          run_mode: reco
+    - update:
+        name: apply_calibrations
+        changes:
+          gain:
+            gain: 46.533
+          lifetime:
+            lifetime: 35000
+    - update:
+        name: calo_ke
+        changes:
+          run_mode: reco
+    - update:
+        name: containment
+        changes:
+          run_mode: reco
+    - update:
+        name: topology_threshold
+        changes:
+          run_mode: reco
+    - update:
+        name: fiducial
+        changes:
+          run_mode: reco

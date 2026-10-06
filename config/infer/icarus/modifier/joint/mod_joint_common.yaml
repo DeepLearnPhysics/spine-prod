@@ -9,16 +9,14 @@ override:
   base.split_output: false
 
   io.loader.dataset:
-    name: joint
+    provider: joint
     base: !include infer/icarus/io/dataset_joint.yaml
     primary:
-      file_keys: null
+      file_keys:
     secondary:
-      file_keys: null
+      file_keys:
 
   io.writer.keys-:
     - run_info
     - flashes
     - crthits
-
-  post-: flash_match

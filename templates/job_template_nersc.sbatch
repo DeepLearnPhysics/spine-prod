@@ -127,6 +127,8 @@ INNER_CMD="${INNER_CMD}source {{ (larcv_path ~ '/configure.sh')|tojson }}; "
 INNER_CMD="${INNER_CMD}source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
+# Validate the configuration API inside the selected runtime.
+INNER_CMD="$INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {{ spine_cmd|default('spine') }} || exit \$?; "
 {% if cache_repository %}
 # Register the shared publication fence after scheduler dependencies clear.
 INNER_CMD="${INNER_CMD}export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id_shell }}; {{ cache_begin_cmd }} begin {{ cache_repository_shell }} {{ cache_stage_shell }} --publication-id \"\$SPINE_CACHE_PUBLICATION_ID\"; "

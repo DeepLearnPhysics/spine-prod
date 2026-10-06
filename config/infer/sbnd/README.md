@@ -55,7 +55,7 @@ named-stage override, for example **1.1**:
 ```shell
 ./submit.py --config infer/sbnd/full_chain_co_260521.yaml --source data.root \
   --apply-mods predeghost_scale:261005 \
-  --set 'model.modules.chain.stages~={update: {name: predeghost_scale, changes: {config: {calibration: {gain: {gain: 1.1}}}}}}'
+  --set 'model.modules.chain.stages~={update: {name: predeghost_scale, changes: {config: {calibration: {stages: [{name: gain, gain: 1.1}]}}}}}'
 ```
 
 This scales the first input feature (charge), leaving chi-squared and the
@@ -69,9 +69,8 @@ The modifier supports both data and simulation and can be combined with `data`,
 `data_sim_gain`, or the existing detector variations. It does not move or replace
 their pre-segmentation calibration.
 
-Use a SPINE build containing [#177](https://github.com/DeepLearnPhysics/spine/pull/177)
-and [#178](https://github.com/DeepLearnPhysics/spine/pull/178). The repository's
-current `1.3.0` container pin predates these changes.
+Use SPINE **1.4.0 or later**, which supports both named-list edits and
+calibration around deghosting charge rescaling.
 
 ## Configurations for SBND's Generation II MPVMPR
 

@@ -108,10 +108,10 @@ include:
     )
 
     dataset = config["io"]["loader"]["dataset"]
-    assert dataset["name"] == "joint"
+    assert dataset["provider"] == "joint"
     assert dataset["primary"] == {"file_keys": None}
     assert dataset["secondary"] == {"file_keys": None}
-    assert dataset["base"]["name"] == "larcv"
+    assert dataset["base"]["provider"] == "larcv"
     assert excluded.isdisjoint(dataset["base"]["schema"])
     assert excluded.isdisjoint(config["io"]["writer"]["keys"])
     assert config["base"]["split_output"] is False
@@ -156,10 +156,10 @@ include:
     )
 
     dataset = config["io"]["loader"]["dataset"]
-    assert dataset["name"] == "joint"
+    assert dataset["provider"] == "joint"
     assert dataset["primary"] == {"file_keys": None}
     assert dataset["secondary"] == {"file_keys": None}
-    assert dataset["base"]["name"] == "larcv"
+    assert dataset["base"]["provider"] == "larcv"
     assert dataset["base"]["file_keys"] is None
     assert {"run_info", "flashes", "trigger"}.isdisjoint(dataset["base"]["schema"])
     assert {"run_info", "flashes", "trigger"}.isdisjoint(config["io"]["writer"]["keys"])
@@ -179,7 +179,7 @@ def test_nd_lar_dataset_refactor_preserves_standard_inference(
     )
 
     dataset = config["io"]["loader"]["dataset"]
-    assert dataset["name"] == "larcv"
+    assert dataset["provider"] == "larcv"
     assert dataset["file_keys"] is None
     assert set(dataset["schema"]) == {
         "data",

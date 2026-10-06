@@ -1,0 +1,53 @@
+# Data-only modification for SBND configs
+# Revision date: August 18, 2025
+
+__meta__:
+  kind: mod
+  name: "data"
+  version: "250818"
+  date: "2025-08-18"
+  description: "SBND data configuration for pipelines with time containment"
+  applies_to: [data]
+  compatible_with:
+    model: "<260501"
+    post: ">=250818"
+
+include: mod_data_common.yaml
+
+override:
+  post.stages~:
+    - remove:
+        name: children_count
+    - remove:
+        name: match
+    - update:
+        name: direction
+        changes:
+          run_mode: reco
+    - update:
+        name: time_containment
+        changes:
+          run_mode: reco
+    - update:
+        name: apply_calibrations
+        changes:
+          gain:
+            gain: 46.533
+          lifetime:
+            lifetime: 35000
+    - update:
+        name: calo_ke
+        changes:
+          run_mode: reco
+    - update:
+        name: containment
+        changes:
+          run_mode: reco
+    - update:
+        name: topology_threshold
+        changes:
+          run_mode: reco
+    - update:
+        name: fiducial
+        changes:
+          run_mode: reco

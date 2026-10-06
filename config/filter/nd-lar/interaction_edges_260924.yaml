@@ -5,8 +5,7 @@ __meta__:
   description: Reject ND-LAr entries with pathological cached interaction graphs
 
 input:
-  name: cache
-
+  provider: cache
 measurements:
   interaction_edges:
     kind: product_size

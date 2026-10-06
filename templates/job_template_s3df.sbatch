@@ -128,6 +128,8 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (larcv_path ~ '/configur
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
+# Validate the configuration API inside the selected runtime.
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {{ spine_cmd|default('spine') }} || exit \$?; "
 {% if cache_repository %}
 # Fence this logical cache stage before any task publishes a shard. Every
 # array task repeats the same idempotent registration with one shared ID.

@@ -12,3 +12,45 @@ __meta__:
     post: ">=260202"
 
 include: mod_data_common.yaml
+override:
+  post.stages~:
+    - remove:
+        name: children_count
+    - remove:
+        name: match
+    - update:
+        name: calo_ke
+        changes:
+          run_mode: reco
+    - remove:
+        name: containment
+    - insert:
+        before: time_containment
+        value:
+          name: containment
+          run_mode: reco
+          mode: source
+          margin: 5.0
+          cathode_margin: -5.0
+          exclude_pids:
+            - 0
+            - 1
+    - update:
+        name: time_containment
+        changes:
+          run_mode: reco
+    - update:
+        name: fiducial
+        changes:
+          run_mode: reco
+    - remove:
+        name: topology_threshold
+    - insert:
+        before: start_dedx
+        value:
+          name: topology_threshold
+          run_mode: reco
+          ke_thresholds:
+            1: 50
+            4: 50
+            default: 25
