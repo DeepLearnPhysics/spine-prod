@@ -4297,8 +4297,9 @@ class TestPipelineSubmission:
         assert link.is_symlink()
         assert link.resolve() == (run_dir / "latest").resolve()
 
+    @pytest.mark.parametrize("warm_start", [None, "/weights/full-chain.ckpt"])
     def test_submit_pipeline_forwards_warm_start_only_to_declared_training_stage(
-        self, mock_submitter, tmp_path
+        self, mock_submitter, tmp_path, warm_start
     ):
         pipeline_path = tmp_path / "pipeline.yaml"
         pipeline_path.write_text(
@@ -4326,14 +4327,16 @@ class TestPipelineSubmission:
             mock_submitter, "submit_job", side_effect=[["10"], ["20"]]
         ) as submit_job:
             result = mock_submitter.submit_pipeline(
-                str(pipeline_path), warm_start="/weights/full-chain.ckpt"
+                str(pipeline_path), warm_start=warm_start
             )
 
         assert result == {"train": ["10"], "cache": ["20"]}
         train = submit_job.call_args_list[0].kwargs
         cache = submit_job.call_args_list[1].kwargs
-        assert train["warm_start_path"] == "/weights/full-chain.ckpt"
-        assert train["warm_start_modules"] == {"grappa": "grappa_shower"}
+        assert train["warm_start_path"] == warm_start
+        assert train["warm_start_modules"] == (
+            {"grappa": "grappa_shower"} if warm_start else None
+        )
         assert cache["warm_start_path"] is None
         assert cache["warm_start_modules"] is None
 
