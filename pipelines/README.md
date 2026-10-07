@@ -320,11 +320,14 @@ uses no endpoint classification and spatial size 320. Both use the 2x2 graph
 limits, local-feature radii, and six-class interaction head. Neither requires
 deghosting or ND-LAr's busy-event graph filters.
 
-The initial resource policy uses one A100 per training job, Adam at 0.001,
-50 epochs with integrated validation and early stopping, and eight loader
-workers. The example configs inform the provisional update sizes: 1024 for
-UResNet-PPN, 256 for Graph-SPICE and both fragment GrapPAs, and 512 for
-interaction GrapPA. Cache materialization starts at 64 events per batch.
+The initial resource policy uses four A100 GPUs for each UResNet-backed
+training job (UResNet-PPN and Graph-SPICE), one A100 for each GrapPA training
+job, Adam at 0.001, 50 epochs with integrated validation and early stopping,
+and eight loader workers. The example configs inform the provisional global
+update sizes: 1024 for UResNet-PPN, 256 for Graph-SPICE and both fragment
+GrapPAs, and 512 for interaction GrapPA. Across four GPUs, the unchanged
+UResNet-PPN and Graph-SPICE batches correspond to 256 and 64 events per rank,
+respectively. Cache materialization starts at 64 events per batch.
 These sizes require a real GPU trial before production; adjust individual
 stages or use stage-specific configuration overrides after measuring memory.
 

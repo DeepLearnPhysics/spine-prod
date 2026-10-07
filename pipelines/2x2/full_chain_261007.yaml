@@ -27,6 +27,7 @@ defaults:
 stages:
   # Train semantic segmentation and point proposal directly from LArCV truth.
   - name: train_uresnet_ppn
+    profile: s3df_ampere_full
     config: train/2x2/uresnet_ppn/train_261007.yaml
     apply_mods: ["augment_uresnet:261007"]
     stage: train
@@ -60,6 +61,7 @@ stages:
 
   # Train Graph-SPICE from raw detector data and cached segmentation products.
   - name: train_graph_spice
+    profile: s3df_ampere_full
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/2x2/graph_spice/train_from_segmentation_cache_261007.yaml
     apply_mods: ["augment_graph_spice:261007"]
