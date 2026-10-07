@@ -1,0 +1,11 @@
+__meta__:
+  kind: mod
+  name: mpvmpr
+  version: "261007"
+  date: "2026-10-07"
+  description: Interpret 2x2 DLPGenerator MPV/MPR truth during evaluation
+  applies_to: [mc]
+  compatible_with:
+    io: ">=240819"
+
+include: infer/2x2/modifier/mpvmpr/mod_mpvmpr_common.yaml

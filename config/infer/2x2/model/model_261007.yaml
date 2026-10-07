@@ -1,0 +1,11 @@
+__meta__:
+  kind: bundle
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current candidate model requiring a trained checkpoint
+
+include: model/2x2/full_chain/model_261007.yaml
+
+override:
+  # Supply the exported checkpoint with --weight-path when running inference.
+  model.weight_path: null

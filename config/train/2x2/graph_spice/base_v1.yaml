@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  description: 2x2 graph_spice training policy; provisional example resource sizes
+
+include: train/common/graph_spice/base_v1.yaml
+
+override:
+  io.loader.num_workers: 8
+  io.loader.batch_size: 256

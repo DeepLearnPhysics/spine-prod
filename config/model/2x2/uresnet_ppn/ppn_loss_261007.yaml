@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 cluster-restricted PPN supervision
+
+include: model/common/uresnet_ppn/ppn_loss_v1.yaml

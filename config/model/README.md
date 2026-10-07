@@ -60,3 +60,17 @@ unchanged and record changes to spatial extent, graph-distance limits, local
 feature radii, the six-class interaction PID head, and interaction-layer width.
 The `250806` model deliberately repeats the `250515` component selection: its
 distinction is stochastic-overlay training rather than architecture.
+
+2x2 has canonical five-component compositions for both supported releases,
+`240719` and `240819`. Inference wrappers add only their deployed checkpoint.
+Standalone training and cache producers select the same network and loss
+leaves, preserving the July/August PPN and Graph-SPICE differences. The ND-LAr
+`240819` debug composition has different settings and is not the 2x2 model
+source.
+
+The new 2x2 `261007` candidate adopts current common PPN and shower-primary
+losses, local 5-voxel GrapPA features, and overlap-aware reconstructed-particle
+supervision. Its standalone and full-chain interaction losses are separate:
+only reconstructed-particle/cache targets use the IoU and closest-primary
+policy. Full-chain interaction grouping runs through tracks, while the 2x2
+six-class PID head and graph-distance limits remain pinned.

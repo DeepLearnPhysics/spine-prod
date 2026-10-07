@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 deployed grappa_track objective
+
+edge_loss:
+  provider: channel
+  target: group

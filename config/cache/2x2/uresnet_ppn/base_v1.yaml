@@ -1,0 +1,71 @@
+__meta__:
+  kind: fragment
+  description: Materialize 2x2 UResNet-PPN predictions and adapted cluster truth
+
+base:
+  world_size: 1
+  iterations: -1
+  seed: 0
+  unwrap: true
+  split_output: true
+  log_step: 1
+
+io:
+  loader:
+    minibatch_size: 64
+    shuffle: false
+    num_workers: 8
+    collate_fn: all
+    dataset:
+      provider: larcv
+      file_keys:
+      schema:
+        data:
+          provider: sparse3d
+          sparse_event: sparse3d_pcluster
+        seg_label:
+          provider: sparse3d
+          sparse_event: sparse3d_pcluster_semantics
+        clust_label:
+          provider: cluster3d
+          cluster_event: cluster3d_pcluster
+          sparse_semantics_event: sparse3d_pcluster_semantics
+          clean_data: true
+          particle_info:
+            particle_event: particle_pcluster
+            type_include_secondary: false
+            type_include_mpr: false
+            primary_include_mpr: false
+  writer:
+    provider: cache
+    stage: segmentation
+    overwrite_stage: true
+    keys: [seg_pred, ppn_points, clust_label_adapt]
+
+model:
+  provider: full_chain
+  to_numpy: true
+
+  network_input:
+    data: data
+    seg_label: seg_label
+    clust_label: clust_label
+
+  modules:
+    chain:
+      stages:
+        - name: segmentation
+          uses: uresnet_ppn
+          config:
+            mode: uresnet
+            point_proposal: ppn
+            adapt_labels:
+              break_eps: 1.1
+              break_metric: chebyshev
+              break_p: 2.0
+              break_classes: [0, 1, 2, 3]
+              weighted: true
+
+override:
+  model.modules.uresnet_ppn.model_name: ""
+  model.modules.uresnet_ppn.weight_path: ""

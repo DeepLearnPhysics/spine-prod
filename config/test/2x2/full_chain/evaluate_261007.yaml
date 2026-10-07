@@ -1,0 +1,17 @@
+__meta__:
+  kind: bundle
+  version: "261007"
+  date: "2026-10-07"
+  description: Evaluate the current 2x2 full chain on MPV/MPR truth
+
+include:
+  - infer/2x2/base/base_240719.yaml
+  - infer/2x2/io/io_240819.yaml
+  - model/2x2/full_chain/model_261007.yaml
+  - infer/2x2/post/post_240719.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+  - infer/2x2/modifier/mpvmpr/mod_mpvmpr_common.yaml
+
+override:
+  io.writer: null
+  model.network_input.clust_label: clust_label

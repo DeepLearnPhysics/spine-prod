@@ -1,0 +1,16 @@
+__meta__:
+  kind: bundle
+  version: "240819"
+  date: "2024-08-19"
+  description: Evaluate the deployed 2x2 240819 full chain
+
+include:
+  - infer/2x2/base/base_240719.yaml
+  - infer/2x2/io/io_240819.yaml
+  - model/2x2/full_chain/model_240819.yaml
+  - infer/2x2/post/post_240719.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+
+override:
+  io.writer: null
+  model.network_input.clust_label: clust_label

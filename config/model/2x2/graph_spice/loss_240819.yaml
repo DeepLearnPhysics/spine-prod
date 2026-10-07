@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 deployed graph_spice objective
+
+provider: edge
+loss: binary_log_dice_ce

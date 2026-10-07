@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  description: 2x2 grappa_inter training policy; provisional example resource sizes
+
+include: train/common/grappa_inter/base_v1.yaml
+
+override:
+  io.loader.num_workers: 8
+  io.loader.minibatch_size: 512
+  io.loader.dataset.schema.data.particle_info.particle_event: particle_pcluster
+  io.loader.dataset.schema.coord_label.particle_event: particle_pcluster

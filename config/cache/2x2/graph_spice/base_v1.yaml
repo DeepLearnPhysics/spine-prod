@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  description: 2x2 fragment-graph cache materialization
+
+include: cache/common/graph_spice/base_v1.yaml
+
+override:
+  io.loader.minibatch_size: 64
+  io.loader.dataset.primary.schema.coord_label.particle_event: particle_pcluster

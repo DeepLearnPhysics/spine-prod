@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current standalone grappa_shower
+
+include: model/common/grappa_shower/network_v1.yaml

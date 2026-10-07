@@ -1,0 +1,14 @@
+__meta__:
+  kind: mod
+  name: augment_uresnet
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 detector-symmetry and lattice augmentation for UResNet models
+  applies_to: [mc]
+
+include: train/2x2/modifier/augment/mod_augment_common.yaml
+
+override:
+  # UResNet and standalone UResNet-PPN expose the backbone as this module.
+  model.modules.uresnet.lattice:
+    period: auto

@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 240819 grappa_inter training
+
+include:
+  - model/2x2/grappa_inter/model_240819.yaml
+  - train/2x2/grappa_inter/from_particle_cache_v1.yaml

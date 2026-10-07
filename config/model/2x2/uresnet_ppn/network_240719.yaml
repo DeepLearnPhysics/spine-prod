@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "240719"
+  date: "2024-07-19"
+  description: 2x2 240719 UResNet-PPN network
+
+uresnet: !include model/2x2/uresnet_ppn/uresnet_240819.yaml
+ppn: !include model/2x2/uresnet_ppn/ppn_240719.yaml

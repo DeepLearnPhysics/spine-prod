@@ -27,7 +27,8 @@ Each main config includes modular YAML files:
 **Model Components:**
 - **`model/model_240719.yaml`**: July 2024 model weights (v1)
 - **`model/model_240819.yaml`**: August 2024 model weights (v2)
-- **`model/model_common.yaml`**: Common model architecture
+- **`model/model_common.yaml`**: Historical common model fragment
+- **`config/model/2x2/`**: Canonical dated components shared with training and cache materialization
 
 **Post-processing Components:**
 - **`post/post_240719.yaml`**: Post-processing configuration
@@ -89,3 +90,20 @@ Description:
 Known issue(s):
   - Module 2 packets are simply wrong (performance in that module is terrible, may affect others)
   - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
+
+## Staged training
+
+Both supported inference releases have matching pipelines under `pipelines/2x2/`.
+Their five standalone models preserve the deployed architectures and objectives;
+the files in `2x2_config_examples/` inform training resource defaults only. See
+`pipelines/README.md` for dataset splits, provisional batch sizes, and launch usage.
+
+### October 7th 2026 candidate (`261007`)
+
+`full_chain_261007.yaml` uses the current PPN, shower-primary, overlap-aware
+interaction supervision, local GrapPA feature radii and track-mediated
+interaction grouping. Its corresponding training pipeline adds image
+augmentation and corrects MPV/MPR evaluation truth. It retains the v2 dataset
+and six-class PID head. Supply a newly exported checkpoint using `--weight-path`;
+this candidate has no published weights. The update comparison is recorded in
+`pipelines/README.md` under “Current 2x2 variant”.

@@ -12,22 +12,10 @@ __meta__:
   tags: []
   training_set: "v1"
 
-include: model_common.yaml
+include: model/2x2/full_chain/model_240719.yaml
 
 override:
   # Path to the v1 model weights
   model.weight_path: !download
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/2x2/2x2_snapshot_240719.ckpt
     hash: e4f1c050d515c9d78e7920121533729d1112684c549232f1761514f74f6f55a2
-
-  # Older PPN/Graph SPICE settings
-  model.modules.uresnet_ppn.ppn.classify_endpoints: true
-  model.modules.graph_spice.embedder.uresnet.spatial_size: 6144
-
-  # Direction and dE/dx radii settings for GrapPA modules
-  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
-  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_track.node_encoder.dir_max_dist: -1
-  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1

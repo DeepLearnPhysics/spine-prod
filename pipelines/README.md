@@ -305,3 +305,86 @@ resubmitting Graph-SPICE training:
   --from-stage cache_train_fragment_graphs \
   --spine-path /path/to/fixed/spine
 ```
+
+## 2x2 staged training
+
+`2x2/full_chain_240719.yaml` and `2x2/full_chain_240819.yaml` train the five
+learned components of the corresponding supported inference releases. Their
+inputs are the MPV/MPR v1 and v2 train/test file lists respectively. They use
+split cache repositories, support full-chain warm starts, export the five best
+component checkpoints, evaluate on the held-out test half, and publish a report.
+
+The shared models preserve the deployed architectures and objectives. July
+retains PPN endpoint classification and Graph-SPICE spatial size 6144; August
+uses no endpoint classification and spatial size 320. Both use the 2x2 graph
+limits, local-feature radii, and six-class interaction head. Neither requires
+deghosting or ND-LAr's busy-event graph filters.
+
+The initial resource policy uses one A100 per training job, Adam at 0.001,
+50 epochs with integrated validation and early stopping, and eight loader
+workers. The example configs inform the provisional update sizes: 1024 for
+UResNet-PPN, 256 for Graph-SPICE and both fragment GrapPAs, and 512 for
+interaction GrapPA. Cache materialization starts at 64 events per batch.
+These sizes require a real GPU trial before production; adjust individual
+stages or use stage-specific configuration overrides after measuring memory.
+
+```bash
+./submit.py --pipeline pipelines/2x2/full_chain_240819.yaml \
+  --workspace /path/to/2x2-v2-training \
+  --spine-path /path/to/spine
+```
+
+The validation half used during training is `[0.0, 0.5)`; final evaluation
+uses `[0.5, 1.0)`. Cache stages retain all validation events so that the
+Graph-SPICE mixed dataset remains aligned with its raw sources.
+
+### Current 2x2 variant: `261007`
+
+`2x2/full_chain_261007.yaml` is the new training candidate on MPV/MPR v2.
+It adopts the current generic/ProtoDUNE-SP task policies and ND-LAr augmentation
+and overlap supervision. The historical `240719` and `240819` variants retain
+their deployed definitions.
+
+Changes relative to `240819`:
+
+| Area | `261007` update | Reference |
+| --- | --- | --- |
+| PPN targets | Explicit `restrict_to_clusters: true` | Current common PPN loss |
+| Shower-primary targets | Explicit `use_closest: true`, with high-purity and predicted-group selection | Current common shower loss / generic `260828` |
+| GrapPA features | Local direction and dE/dx radii change from `-1` to 5 voxels in all three branches | Current common networks |
+| Interaction PID targets | Require particle-group IoU of at least 0.5 | ND-LAr `260924`, generic `260828`, ProtoDUNE-SP `260906` |
+| Interaction-primary targets | Same overlap gate; only the fragment closest to the truth creation point is primary, other matched pieces receive secondary label 0 | Same current full-chain losses |
+| Interaction grouping | Enable `grouping_through_track` in full-chain aggregation and cache production | ProtoDUNE-SP current full chain |
+| Image training | Independent x/y/z reflections with probability 0.5 around the geometry center, plus automatic lattice period | ND-LAr `260924` pipeline |
+| MPV/MPR evaluation truth | Remove empty neutrino inputs and use the multi-primary-group `nu_id` proxy | Current ND-LAr evaluation |
+
+Interaction caches and their cached training loss share the exact overlap and
+closest-primary policy. Standalone interaction models retain the ordinary
+truth-group loss, as in the current generic recipes. Track training likewise
+uses the standalone network, while cache and full-chain models enable group
+materialization. The mixed Graph-SPICE training dataset applies reflections
+after merging raw and cached products; validation remains unaugmented.
+
+The report reuses the latest shared metric recipe: five-class and collapsed
+shower/track semantic confusion, PPN distances in cm, fragment/particle/
+interaction clustering, and overlap-qualified shower-primary, particle PID,
+primary and orientation metrics. Those metrics were already inherited by the
+historical 2x2 pipelines; the new MPV/MPR truth correction makes their `nu_id`
+quality cuts meaningful for this sample rather than introducing new report
+formulas.
+
+The v2 dataset, `mr5-0` geometry, five-stage chain, Graph-SPICE spatial size 320,
+2x2 graph-distance limits, six-class PID head, and provisional resource sizes
+are retained. Detector-specific deghosting, calibration, ND-LAr edge filters,
+and ND-LAr graph-distance limits are not transplanted.
+
+```bash
+./submit.py --pipeline pipelines/2x2/full_chain_261007.yaml \
+  --workspace /path/to/2x2-current-training --spine-path /path/to/spine
+```
+
+Use a fresh workspace to rebuild feature and target caches for this revision.
+`infer/2x2/full_chain_261007.yaml` is the matching inference entry point and
+requires `--weight-path /path/to/weights/full_chain_261007.ckpt` after training;
+there is no published checkpoint for this new candidate. GPU batch-size and
+end-to-end metric validation remain pending the real-life trial.

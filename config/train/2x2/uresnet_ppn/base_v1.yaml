@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  description: 2x2 uresnet_ppn training policy; provisional example resource sizes
+
+include: train/common/uresnet_ppn/base_v1.yaml
+
+override:
+  io.loader.num_workers: 8
+  io.loader.batch_size: 1024
+  io.loader.dataset.schema.ppn_label.particle_event: particle_pcluster
+  io.loader.dataset.schema.clust_label.particle_info.particle_event: particle_pcluster

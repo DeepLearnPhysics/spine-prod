@@ -1,0 +1,12 @@
+__meta__:
+  kind: bundle
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current uresnet_ppn training
+
+include:
+  - model/2x2/uresnet_ppn/model_261007.yaml
+  - train/2x2/uresnet_ppn/base_v1.yaml
+
+override:
+  io.loader.dataset.schema.ppn_label.include_point_tagging: false

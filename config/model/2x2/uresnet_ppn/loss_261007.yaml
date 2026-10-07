@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current UResNet-PPN objectives
+
+uresnet_loss: !include model/2x2/uresnet_ppn/uresnet_loss_240819.yaml
+ppn_loss: !include model/2x2/uresnet_ppn/ppn_loss_261007.yaml

@@ -1,0 +1,23 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 deployed grappa_inter objective
+
+node_loss:
+  type:
+    provider: class
+    target: pid
+    loss: ce
+    balance_loss: true
+  primary:
+    provider: class
+    target: inter_primary
+    loss: ce
+    balance_loss: true
+  orient:
+    provider: orient
+    loss: ce
+edge_loss:
+  provider: channel
+  target: interaction

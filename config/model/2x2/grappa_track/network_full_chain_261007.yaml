@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current track aggregation network
+
+include: model/2x2/grappa_track/network_261007.yaml
+
+override:
+  nodes.make_groups: true
+  nodes.grouping_method: score

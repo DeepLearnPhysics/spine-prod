@@ -1,0 +1,61 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 deployed grappa_track network
+
+nodes:
+  source: cluster
+  shapes:
+    - track
+  make_groups: true
+  grouping_method: score
+graph:
+  provider: complete
+  max_length: 100
+  dist_algorithm: recursive
+node_encoder:
+  provider: geo
+  use_numpy: true
+  add_value: true
+  add_shape: false
+  add_points: true
+  add_local_dirs: true
+  add_local_dedxs: true
+  dir_max_dist: -1
+  dedx_max_dist: -1
+edge_encoder:
+  provider: geo
+  use_numpy: true
+gnn_model:
+  provider: meta
+  node_feats: 32
+  edge_feats: 19
+  edge_pred: 2
+  edge_layer:
+    provider: mlp
+    mlp:
+      depth: 3
+      width: 64
+      activation:
+        provider: lrelu
+        negative_slope: 0.1
+      normalization: batch_norm
+  node_layer:
+    provider: mlp
+    reduction: max
+    attention: false
+    message_mlp:
+      depth: 3
+      width: 64
+      activation:
+        provider: lrelu
+        negative_slope: 0.1
+      normalization: batch_norm
+    aggr_mlp:
+      depth: 3
+      width: 64
+      activation:
+        provider: lrelu
+        negative_slope: 0.1
+      normalization: batch_norm

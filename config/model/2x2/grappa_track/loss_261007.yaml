@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current standalone grappa_track objective
+
+include: model/common/grappa_track/loss_v1.yaml
