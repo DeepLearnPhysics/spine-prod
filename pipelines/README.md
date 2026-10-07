@@ -324,10 +324,10 @@ The initial resource policy uses four A100 GPUs for each UResNet-backed
 training job (UResNet-PPN and Graph-SPICE), one A100 for each GrapPA training
 job, Adam at 0.001, 50 epochs with integrated validation and early stopping,
 and eight loader workers. The example configs inform the provisional global
-update sizes: 128 for UResNet-PPN, 256 for Graph-SPICE and both fragment
+update sizes: 512 for UResNet-PPN, 256 for Graph-SPICE and both fragment
 GrapPAs, and 512 for interaction GrapPA. UResNet-PPN was reduced from the
 example batch of 1024 after a GPU OOM during backward. Across four GPUs,
-UResNet-PPN and Graph-SPICE batches correspond to 32 and 64 events per rank,
+UResNet-PPN and Graph-SPICE batches correspond to 128 and 64 events per rank,
 respectively. Cache materialization starts at 64 events per batch.
 These sizes require a real GPU trial before production; adjust individual
 stages or use stage-specific configuration overrides after measuring memory.

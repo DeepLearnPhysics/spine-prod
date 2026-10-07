@@ -103,7 +103,7 @@ def test_pipeline_resolves_complete_workflow(version, dataset):
         == f"/sdf/data/neutrino/2x2/sim/mpvmpr_{dataset}/train_file_list.txt"
     )
     batches = {
-        "uresnet_ppn": 128,
+        "uresnet_ppn": 512,
         "graph_spice": 256,
         "grappa_shower": 256,
         "grappa_track": 256,
