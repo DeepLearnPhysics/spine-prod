@@ -41,8 +41,16 @@ class FileHandler:
             if len(file_input) != 1:
                 raise ValueError("--source-list/-S accepts exactly one text file")
             source_list_path = file_input[0]
-            with open(source_list_path, "r", encoding="utf-8") as f:
-                listed_files = [line.strip() for line in f if line.strip()]
+            try:
+                with open(source_list_path, "r", encoding="utf-8") as f:
+                    listed_files = [line.strip() for line in f if line.strip()]
+            except UnicodeDecodeError as error:
+                raise ValueError(
+                    f"Source list '{source_list_path}' is not valid UTF-8 text. "
+                    "--source-list expects a text file containing one input "
+                    "path per line; use --source for ROOT or other data files "
+                    "(--val-source for validation data)."
+                ) from error
             duplicate_paths = self._duplicates(listed_files)
             if duplicate_paths:
                 examples = ", ".join(duplicate_paths[:3])

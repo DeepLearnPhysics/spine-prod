@@ -33,6 +33,21 @@ def test_parse_source_list_requires_one_path(handler):
         handler.parse_files(["one.txt", "two.txt"], "source_list")
 
 
+def test_parse_source_list_explains_binary_input(handler, tmp_path):
+    source_list = tmp_path / "events.root"
+    source_list.write_bytes(b"root\x00\x00\xf5\x00")
+
+    with pytest.raises(ValueError, match="not valid UTF-8 text") as caught:
+        handler.parse_files([str(source_list)], "source_list")
+
+    message = str(caught.value)
+    assert str(source_list) in message
+    assert "one input path per line" in message
+    assert "use --source" in message
+    assert "--val-source" in message
+    assert isinstance(caught.value.__cause__, UnicodeDecodeError)
+
+
 def test_parse_direct_sources_expands_globs_and_warns_for_missing(
     handler, tmp_path, capsys
 ):
