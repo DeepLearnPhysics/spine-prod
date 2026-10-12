@@ -340,7 +340,9 @@ stages or use stage-specific configuration overrides after measuring memory.
 
 The validation half used during training is `[0.0, 0.5)`; final evaluation
 uses `[0.5, 1.0)`. Cache stages retain all validation events so that the
-Graph-SPICE mixed dataset remains aligned with its raw sources.
+Graph-SPICE mixed dataset remains aligned with its raw sources. Metric
+evaluation omits optical flashes and hardware triggers, which are absent from
+some MPV/MPR files and are not used by the metric post-processors or analyzers.
 
 ### Current 2x2 variant: `261007`
 

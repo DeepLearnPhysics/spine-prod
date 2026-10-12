@@ -14,3 +14,8 @@ include:
 override:
   io.writer: null
   model.network_input.clust_label: clust_label
+
+remove:
+  # MC metric evaluation does not consume optical flashes or hardware triggers.
+  - io.loader.dataset.schema.flashes
+  - io.loader.dataset.schema.trigger

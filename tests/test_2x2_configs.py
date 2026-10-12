@@ -224,3 +224,22 @@ def test_current_pipeline_augmentation_and_metric_truth():
     infer = load("infer/2x2/full_chain_261007.yaml")
     assert infer["model"]["weight_path"] is None
     assert infer["model"]["modules"] == evaluation["model"]["modules"]
+
+
+@pytest.mark.parametrize("version", ["240719", "240819", "261007"])
+def test_metric_evaluation_does_not_require_optical_or_trigger_products(version):
+    evaluation = load(f"test/2x2/full_chain/evaluate_{version}.yaml")
+    schema = evaluation["io"]["loader"]["dataset"]["schema"]
+    assert "flashes" not in schema
+    assert "trigger" not in schema
+    assert {
+        "data",
+        "seg_label",
+        "ppn_label",
+        "clust_label",
+        "particles",
+        "meta",
+    } <= set(schema)
+    # Production inference continues to expose the detector's optional products.
+    inference = load(f"infer/2x2/full_chain_{version}.yaml")
+    assert {"flashes", "trigger"} <= set(inference["io"]["loader"]["dataset"]["schema"])
