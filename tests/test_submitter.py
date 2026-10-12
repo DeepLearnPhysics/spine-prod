@@ -1151,6 +1151,8 @@ class TestSubmitterHelpers:
         assert resolved["include"] == "test/common/full_chain/report_v1.yaml"
         script = (attempt / "submit.sbatch").read_text()
         assert "spine-report --config" in script
+        assert 'scripts/check_spine_version.py\\" spine' in script
+        assert 'scripts/check_spine_version.py\\" None' not in script
         assert f"--input-dir {input_dir}" in script
         assert f"--output-dir {output_dir}" in script
 

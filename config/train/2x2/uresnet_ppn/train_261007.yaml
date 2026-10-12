@@ -9,4 +9,6 @@ include:
   - train/2x2/uresnet_ppn/base_v1.yaml
 
 override:
+  # The smoke trial was still improving at its 50-epoch ceiling.
+  base.epochs: 100.0
   io.loader.dataset.schema.ppn_label.include_point_tagging: false

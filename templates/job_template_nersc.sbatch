@@ -128,7 +128,7 @@ INNER_CMD="${INNER_CMD}source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; 
 {% endif %}
 {% endif %}
 # Validate the configuration API inside the selected runtime.
-INNER_CMD="$INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {{ spine_cmd|default('spine') }} || exit \$?; "
+INNER_CMD="$INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {{ spine_cmd|default('spine', true) }} || exit \$?; "
 {% if cache_repository %}
 # Register the shared publication fence after scheduler dependencies clear.
 INNER_CMD="${INNER_CMD}export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id_shell }}; {{ cache_begin_cmd }} begin {{ cache_repository_shell }} {{ cache_stage_shell }} --publication-id \"\$SPINE_CACHE_PUBLICATION_ID\"; "
@@ -136,7 +136,7 @@ INNER_CMD="${INNER_CMD}export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id
 {% if custom_command %}
 INNER_CMD="${INNER_CMD}exec {{ custom_command }}"
 {% else %}
-INNER_CMD="${INNER_CMD}exec {{ spine_cmd|default('spine') }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+INNER_CMD="${INNER_CMD}exec {{ spine_cmd|default('spine', true) }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 {% endif %}
 
 # Add Shifter modules requested by the job profile/options

@@ -394,3 +394,25 @@ Use a fresh workspace to rebuild feature and target caches for this revision.
 requires `--weight-path /path/to/weights/full_chain_261007.ckpt` after training;
 there is no published checkpoint for this new candidate. GPU batch-size and
 end-to-end metric validation remain pending the real-life trial.
+
+
+### 2x2 smoke-trial follow-up
+
+The current `261007` UResNet-PPN recipe permits 100 epochs, retaining validation
+loss early stopping and best-checkpoint selection. The first v2 smoke trial
+finished all 50 epochs with its best validation loss at the final epoch;
+Graph-SPICE and the GrapPAs instead plateaued and stopped after five epochs
+without improvement. Historical 2x2 recipes retain their 50-epoch ceiling.
+The UResNet-PPN global batch remains 512 on four A100 GPUs. Keep the existing
+Graph-SPICE and GrapPA batches while collecting more performance evidence.
+
+The initial report attempt exposed a scheduler-template bug: a null
+`spine_cmd` was rendered as the literal command `None` during the runtime
+version check. Templates now fall back to `spine` for custom report/filter
+commands as well as ordinary workloads. Recover the report without rerunning
+inference using the same pipeline/workspace and `--select-stage report_full_chain`.
+
+Increasing the upstream training limit changes future segmentation predictions.
+To assess an extended UResNet-PPN checkpoint, regenerate its segmentation caches
+and all dependent training/cache stages in a separate workflow before comparing
+held-out metrics. Preserve the first smoke trial as a baseline.
