@@ -243,3 +243,18 @@ def test_metric_evaluation_does_not_require_optical_or_trigger_products(version)
     # Production inference continues to expose the detector's optional products.
     inference = load(f"infer/2x2/full_chain_{version}.yaml")
     assert {"flashes", "trigger"} <= set(inference["io"]["loader"]["dataset"]["schema"])
+
+
+def test_latest_inference_keeps_published_checkpoint(tmp_path):
+    from src.config_manager import ConfigManager
+
+    generated = ConfigManager(ROOT).create_latest_config("2x2", tmp_path)
+    latest = spine_config.load_config_file(generated, download=False)
+    published = load("infer/2x2/full_chain_240819.yaml")
+    latest_weight = latest["model"].pop("weight_path")
+    published_weight = published["model"].pop("weight_path")
+    assert latest["model"] == published["model"]
+    assert vars(latest_weight) == vars(published_weight)
+    assert latest_weight is not None
+    candidate = load("infer/2x2/full_chain_261007.yaml")
+    assert candidate["model"]["weight_path"] is None

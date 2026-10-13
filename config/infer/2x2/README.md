@@ -107,3 +107,7 @@ augmentation and corrects MPV/MPR evaluation truth. It retains the v2 dataset
 and six-class PID head. Supply a newly exported checkpoint using `--weight-path`;
 this candidate has no published weights. The update comparison is recorded in
 `pipelines/README.md` under “Current 2x2 variant”.
+
+`infer/2x2/latest` selects the published `240819` model and checkpoint. The
+`261007` candidate is selected explicitly through `full_chain_261007.yaml`;
+its model wrapper lives under `model/candidate/` and requires `--weight-path`.

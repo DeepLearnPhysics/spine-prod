@@ -7,5 +7,5 @@ __meta__:
 include:
   - base/base_240719.yaml
   - io/io_240819.yaml
-  - model/model_261007.yaml
+  - model/candidate/model_261007.yaml
   - post/post_240719.yaml
