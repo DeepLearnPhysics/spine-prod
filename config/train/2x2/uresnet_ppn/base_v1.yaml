@@ -5,6 +5,7 @@ __meta__:
 include: train/common/uresnet_ppn/base_v1.yaml
 
 override:
+  base.epochs: 100.0
   io.loader.num_workers: 8
   # Four GPUs split this global batch into 128 events per rank.
   io.loader.batch_size: 512

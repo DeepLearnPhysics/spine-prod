@@ -320,17 +320,16 @@ uses no endpoint classification and spatial size 320. Both use the 2x2 graph
 limits, local-feature radii, and six-class interaction head. Neither requires
 deghosting or ND-LAr's busy-event graph filters.
 
-The initial resource policy uses four A100 GPUs for each UResNet-backed
+The training resource policy uses four A100 GPUs for each UResNet-backed
 training job (UResNet-PPN and Graph-SPICE), one A100 for each GrapPA training
-job, Adam at 0.001, 50 epochs with integrated validation and early stopping,
-and eight loader workers. The example configs inform the provisional global
-update sizes: 512 for UResNet-PPN, 256 for Graph-SPICE and both fragment
-GrapPAs, and 512 for interaction GrapPA. UResNet-PPN was reduced from the
-example batch of 1024 after a GPU OOM during backward. Across four GPUs,
-UResNet-PPN and Graph-SPICE batches correspond to 128 and 64 events per rank,
-respectively. Cache materialization starts at 64 events per batch.
-These sizes require a real GPU trial before production; adjust individual
-stages or use stage-specific configuration overrides after measuring memory.
+job, Adam at 0.001, and eight loader workers. UResNet-PPN permits 100 epochs;
+the other models permit 50 epochs. All training recipes use integrated
+validation, early stopping, and best-checkpoint selection.
+
+Global batches are 512 for UResNet-PPN, 256 for Graph-SPICE and both fragment
+GrapPAs, and 512 for interaction GrapPA. Across four GPUs, UResNet-PPN and
+Graph-SPICE batches correspond to 128 and 64 events per rank, respectively.
+Cache materialization uses 64 events per batch.
 
 ```bash
 ./submit.py --pipeline pipelines/2x2/full_chain_240819.yaml \
@@ -380,9 +379,9 @@ quality cuts meaningful for this sample rather than introducing new report
 formulas.
 
 The v2 dataset, `mr5-0` geometry, five-stage chain, Graph-SPICE spatial size 320,
-2x2 graph-distance limits, six-class PID head, and provisional resource sizes
+2x2 graph-distance limits, six-class PID head, and shared training resources
 are retained. Detector-specific deghosting, calibration, ND-LAr edge filters,
-and ND-LAr graph-distance limits are not transplanted.
+and ND-LAr graph-distance limits are not included.
 
 ```bash
 ./submit.py --pipeline pipelines/2x2/full_chain_261007.yaml \
@@ -392,27 +391,4 @@ and ND-LAr graph-distance limits are not transplanted.
 Use a fresh workspace to rebuild feature and target caches for this revision.
 `infer/2x2/full_chain_261007.yaml` is the matching inference entry point and
 requires `--weight-path /path/to/weights/full_chain_261007.ckpt` after training;
-there is no published checkpoint for this new candidate. GPU batch-size and
-end-to-end metric validation remain pending the real-life trial.
-
-
-### 2x2 smoke-trial follow-up
-
-The current `261007` UResNet-PPN recipe permits 100 epochs, retaining validation
-loss early stopping and best-checkpoint selection. The first v2 smoke trial
-finished all 50 epochs with its best validation loss at the final epoch;
-Graph-SPICE and the GrapPAs instead plateaued and stopped after five epochs
-without improvement. Historical 2x2 recipes retain their 50-epoch ceiling.
-The UResNet-PPN global batch remains 512 on four A100 GPUs. Keep the existing
-Graph-SPICE and GrapPA batches while collecting more performance evidence.
-
-The initial report attempt exposed a scheduler-template bug: a null
-`spine_cmd` was rendered as the literal command `None` during the runtime
-version check. Templates now fall back to `spine` for custom report/filter
-commands as well as ordinary workloads. Recover the report without rerunning
-inference using the same pipeline/workspace and `--select-stage report_full_chain`.
-
-Increasing the upstream training limit changes future segmentation predictions.
-To assess an extended UResNet-PPN checkpoint, regenerate its segmentation caches
-and all dependent training/cache stages in a separate workflow before comparing
-held-out metrics. Preserve the first smoke trial as a baseline.
+there is no published checkpoint for this new candidate.

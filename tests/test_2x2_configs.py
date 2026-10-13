@@ -118,7 +118,7 @@ def test_pipeline_resolves_complete_workflow(version, dataset):
             )
             == batch
         )
-        assert cfg["base"]["epochs"] == 50.0
+        assert cfg["base"]["epochs"] == (100.0 if component == "uresnet_ppn" else 50.0)
         assert stage["warm_start"]
         assert stage["val_entry_fraction_range"] == [0.0, 0.5]
         if component.startswith("grappa"):

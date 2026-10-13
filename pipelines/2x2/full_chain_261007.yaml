@@ -22,7 +22,6 @@ collections:
 defaults:
   profile: s3df_ampere
   time: "08:00:00"
-  expandable_segments: true
 
 stages:
   # Train semantic segmentation and point proposal directly from LArCV truth.
