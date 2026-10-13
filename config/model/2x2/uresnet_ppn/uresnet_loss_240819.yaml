@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 deployed uresnet_loss
+
+balance_loss: false

@@ -1,0 +1,14 @@
+__meta__:
+  kind: bundle
+  version: "240719"
+  date: "2024-07-19"
+  description: 2x2 240719 particle_graphs materialization
+
+include: cache/2x2/grappa_shower_track/base_v1.yaml
+
+model:
+  modules:
+    grappa_shower: !include model/2x2/grappa_shower/network_240819.yaml
+    grappa_track: !include model/2x2/grappa_track/network_240819.yaml
+    grappa_inter: !include model/2x2/grappa_inter/network_240819.yaml
+    grappa_inter_loss: !include model/2x2/grappa_inter/loss_240819.yaml

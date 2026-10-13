@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 deployed UResNet-PPN objectives
+
+uresnet_loss: !include model/2x2/uresnet_ppn/uresnet_loss_240819.yaml
+ppn_loss: !include model/2x2/uresnet_ppn/ppn_loss_240819.yaml

@@ -1,0 +1,15 @@
+__meta__:
+  kind: bundle
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 240819 fragment_graphs materialization
+
+include: cache/2x2/graph_spice/base_v1.yaml
+
+model:
+  modules:
+    graph_spice: !include model/2x2/graph_spice/network_240819.yaml
+    grappa_shower: !include model/2x2/grappa_shower/network_240819.yaml
+    grappa_track: !include model/2x2/grappa_track/network_240819.yaml
+    grappa_shower_loss: !include model/2x2/grappa_shower/loss_240819.yaml
+    grappa_track_loss: !include model/2x2/grappa_track/loss_240819.yaml

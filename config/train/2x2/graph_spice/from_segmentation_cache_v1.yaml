@@ -1,0 +1,29 @@
+__meta__:
+  kind: fragment
+  description: 2x2 Graph-SPICE training from cached semantics and adapted truth
+
+include: train/2x2/graph_spice/base_v1.yaml
+
+remove:
+  - validation.file_keys
+
+override:
+  io.loader.dataset:
+    provider: mixed
+    primary:
+      provider: larcv
+      file_keys:
+      schema:
+        data:
+          provider: sparse3d
+          sparse_event: sparse3d_pcluster
+    cache:
+      path:
+      stage: segmentation
+      keys: [seg_pred, clust_label_adapt]
+
+  validation.sources:
+    primary:
+      file_keys:
+    cache:
+      path:

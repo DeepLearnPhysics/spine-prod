@@ -1,0 +1,19 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 deployed uresnet
+
+num_input: 1
+num_classes: 5
+filters: 32
+depth: 5
+reps: 2
+allow_bias: false
+activation:
+  provider: lrelu
+  negative_slope: 0.33
+norm_layer:
+  provider: batch_norm
+  eps: 0.0001
+  momentum: 0.01

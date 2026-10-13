@@ -2097,7 +2097,7 @@ def test_nd_lar_training_and_pipeline_use_busy_event_resource_defaults():
     assert first["val_source_list"] == f"{source_root}/test_file_list.txt"
     assert first["profile"] == "s3df_ampere_full"
     assert first["time"] == "2-00:00:00"
-    assert first["expandable_segments"] is True
+    assert first.get("expandable_segments", False) is False
 
     graph_spice = next(
         stage for stage in pipeline.stages if stage["name"] == "train_graph_spice"

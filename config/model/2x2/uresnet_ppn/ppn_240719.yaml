@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "240719"
+  date: "2024-07-19"
+  description: 2x2 July PPN with endpoint classification
+
+classify_endpoints: true

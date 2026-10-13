@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current interaction aggregation through tracks
+
+include: model/2x2/grappa_inter/network_261007.yaml
+
+override:
+  nodes.grouping_through_track: true

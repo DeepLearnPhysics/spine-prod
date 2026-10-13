@@ -1444,7 +1444,9 @@ class PipelineRunner(SubmissionComponent):
                 "warm_start_path": (
                     warm_start_path if stage.get("warm_start") else None
                 ),
-                "warm_start_modules": stage.get("warm_start"),
+                "warm_start_modules": (
+                    stage.get("warm_start") if warm_start_path else None
+                ),
                 "weight_path": stage.get("weight_path"),
                 "export_weights": stage.get("export_weights"),
                 "profile": stage.get("profile", "auto"),

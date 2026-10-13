@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current standalone grappa_track model
+
+include: model/common/grappa_track/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/2x2/grappa_track/network_261007.yaml
+  model.modules.grappa_loss: !include model/2x2/grappa_track/loss_261007.yaml

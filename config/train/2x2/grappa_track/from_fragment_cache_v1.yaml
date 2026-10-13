@@ -1,0 +1,31 @@
+__meta__:
+  kind: fragment
+  description: 2x2 track GrapPA training from cached fragment graphs
+
+include: train/2x2/grappa_track/base_v1.yaml
+
+override:
+  io.loader.dataset:
+    provider: cache
+    path:
+    stage: fragmentation
+    keys:
+      - fragment_graph_track_edge_index
+      - fragment_graph_track_node_features
+      - fragment_graph_track_edge_features
+      - fragment_graph_track_edge_target
+      - fragment_graph_track_edge_valid
+
+  model.network_input:
+    edge_index: fragment_graph_track_edge_index
+    node_features: fragment_graph_track_node_features
+    edge_features: fragment_graph_track_edge_features
+
+  model.loss_input:
+    edge_target: fragment_graph_track_edge_target
+    edge_valid: fragment_graph_track_edge_valid
+
+remove:
+  - model.modules.grappa.graph
+  - model.modules.grappa.node_encoder
+  - model.modules.grappa.edge_encoder

@@ -1,0 +1,7 @@
+__meta__:
+  kind: bundle
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current shared full-chain metrics and quality cuts
+
+include: test/common/full_chain/report_v1.yaml

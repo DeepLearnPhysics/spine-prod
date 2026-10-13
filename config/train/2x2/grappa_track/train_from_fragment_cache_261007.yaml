@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 current grappa_track training
+
+include:
+  - model/2x2/grappa_track/model_261007.yaml
+  - train/2x2/grappa_track/from_fragment_cache_v1.yaml

@@ -27,7 +27,8 @@ Each main config includes modular YAML files:
 **Model Components:**
 - **`model/model_240719.yaml`**: July 2024 model weights (v1)
 - **`model/model_240819.yaml`**: August 2024 model weights (v2)
-- **`model/model_common.yaml`**: Common model architecture
+- **`model/model_common.yaml`**: Historical common model fragment
+- **`config/model/2x2/`**: Canonical dated components shared with training and cache materialization
 
 **Post-processing Components:**
 - **`post/post_240719.yaml`**: Post-processing configuration
@@ -89,3 +90,13 @@ Description:
 Known issue(s):
   - Module 2 packets are simply wrong (performance in that module is terrible, may affect others)
   - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
+
+## Staged training
+
+Both supported inference releases have matching pipelines under `pipelines/2x2/`.
+Their five standalone models preserve the deployed architectures and objectives;
+the files in `2x2_config_examples/` inform training resource defaults only. See
+`pipelines/README.md` for dataset splits, training resource settings, and launch usage.
+
+Released 2x2 inference models are `240719` and `240819`.
+`infer/2x2/latest` selects the published `240819` model and checkpoint.

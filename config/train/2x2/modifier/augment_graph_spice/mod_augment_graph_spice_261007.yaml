@@ -1,0 +1,14 @@
+__meta__:
+  kind: mod
+  name: augment_graph_spice
+  version: "261007"
+  date: "2026-10-07"
+  description: 2x2 detector-symmetry and lattice augmentation for Graph-SPICE
+  applies_to: [mc]
+
+include: train/2x2/modifier/augment/mod_augment_common.yaml
+
+override:
+  # Graph-SPICE owns its UResNet inside the embedding network.
+  model.modules.graph_spice.embedder.uresnet.lattice:
+    period: auto

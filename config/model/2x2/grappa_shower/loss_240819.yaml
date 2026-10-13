@@ -1,0 +1,14 @@
+__meta__:
+  kind: fragment
+  version: "240819"
+  date: "2024-08-19"
+  description: 2x2 deployed grappa_shower objective
+
+node_loss:
+  provider: shower_primary
+  high_purity: true
+  use_group_pred: true
+edge_loss:
+  provider: channel
+  target: group
+  high_purity: true

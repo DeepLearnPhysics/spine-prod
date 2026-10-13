@@ -129,7 +129,7 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/con
 {% endif %}
 {% endif %}
 # Validate the configuration API inside the selected runtime.
-SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {{ spine_cmd|default('spine') }} || exit \$?; "
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {{ spine_cmd|default('spine', true) }} || exit \$?; "
 {% if cache_repository %}
 # Fence this logical cache stage before any task publishes a shard. Every
 # array task repeats the same idempotent registration with one shared ID.
@@ -138,7 +138,7 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD export SPINE_CACHE_PUBLICATION_ID=
 {% if custom_command %}
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ custom_command }}"
 {% else %}
-SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ spine_cmd|default('spine') }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ spine_cmd|default('spine', true) }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 {% endif %}
 SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
 RUN_CMD="$SINGULARITY_CMD"

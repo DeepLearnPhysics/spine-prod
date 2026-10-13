@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "240719"
+  date: "2024-07-19"
+  description: 2x2 240719 standalone grappa_shower
+
+include: model/common/grappa_shower/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/2x2/grappa_shower/network_240819.yaml
+  model.modules.grappa_loss: !include model/2x2/grappa_shower/loss_240819.yaml
