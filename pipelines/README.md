@@ -388,7 +388,8 @@ and ND-LAr graph-distance limits are not included.
   --workspace /path/to/2x2-current-training --spine-path /path/to/spine
 ```
 
-Use a fresh workspace to rebuild feature and target caches for this revision.
-`infer/2x2/full_chain_261007.yaml` is the matching inference entry point and
-requires `--weight-path /path/to/weights/full_chain_261007.ckpt` after training;
-there is no published checkpoint for this new candidate.
+Use a fresh workspace to build feature and target caches for this revision.
+The pipeline exports `weights/full_chain_261007.ckpt` and evaluates that
+checkpoint through `test/2x2/full_chain/evaluate_261007.yaml`. This revision
+is available for training and evaluation only; it has no released inference
+configuration.

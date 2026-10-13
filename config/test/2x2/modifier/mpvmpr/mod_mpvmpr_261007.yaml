@@ -8,4 +8,4 @@ __meta__:
   compatible_with:
     io: ">=240819"
 
-include: infer/2x2/modifier/mpvmpr/mod_mpvmpr_common.yaml
+include: test/2x2/modifier/mpvmpr/mod_mpvmpr_common.yaml

@@ -96,18 +96,7 @@ Known issue(s):
 Both supported inference releases have matching pipelines under `pipelines/2x2/`.
 Their five standalone models preserve the deployed architectures and objectives;
 the files in `2x2_config_examples/` inform training resource defaults only. See
-`pipelines/README.md` for dataset splits, provisional batch sizes, and launch usage.
+`pipelines/README.md` for dataset splits, training resource settings, and launch usage.
 
-### October 7th 2026 candidate (`261007`)
-
-`full_chain_261007.yaml` uses the current PPN, shower-primary, overlap-aware
-interaction supervision, local GrapPA feature radii and track-mediated
-interaction grouping. Its corresponding training pipeline adds image
-augmentation and corrects MPV/MPR evaluation truth. It retains the v2 dataset
-and six-class PID head. Supply a newly exported checkpoint using `--weight-path`;
-this candidate has no published weights. The update comparison is recorded in
-`pipelines/README.md` under “Current 2x2 variant”.
-
-`infer/2x2/latest` selects the published `240819` model and checkpoint. The
-`261007` candidate is selected explicitly through `full_chain_261007.yaml`;
-its model wrapper lives under `model/candidate/` and requires `--weight-path`.
+Released 2x2 inference models are `240719` and `240819`.
+`infer/2x2/latest` selects the published `240819` model and checkpoint.

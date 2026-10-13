@@ -10,7 +10,7 @@ include:
   - model/2x2/full_chain/model_261007.yaml
   - infer/2x2/post/post_240719.yaml
   - test/common/full_chain/analyzers_v1.yaml
-  - infer/2x2/modifier/mpvmpr/mod_mpvmpr_common.yaml
+  - test/2x2/modifier/mpvmpr/mod_mpvmpr_common.yaml
 
 override:
   io.writer: null

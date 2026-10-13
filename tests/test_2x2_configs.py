@@ -221,9 +221,8 @@ def test_current_pipeline_augmentation_and_metric_truth():
         == stages["export_full_chain_weights"]["export_weights"]
     )
     assert stages["evaluate_full_chain"]["entry_fraction_range"] == [0.5, 1.0]
-    infer = load("infer/2x2/full_chain_261007.yaml")
-    assert infer["model"]["weight_path"] is None
-    assert infer["model"]["modules"] == evaluation["model"]["modules"]
+    model = load("model/2x2/full_chain/model_261007.yaml")
+    assert model["model"]["modules"] == evaluation["model"]["modules"]
 
 
 @pytest.mark.parametrize("version", ["240719", "240819", "261007"])
@@ -240,9 +239,12 @@ def test_metric_evaluation_does_not_require_optical_or_trigger_products(version)
         "particles",
         "meta",
     } <= set(schema)
-    # Production inference continues to expose the detector's optional products.
-    inference = load(f"infer/2x2/full_chain_{version}.yaml")
-    assert {"flashes", "trigger"} <= set(inference["io"]["loader"]["dataset"]["schema"])
+    # Released inference retains the detector's optional products.
+    if version in {"240719", "240819"}:
+        inference = load(f"infer/2x2/full_chain_{version}.yaml")
+        assert {"flashes", "trigger"} <= set(
+            inference["io"]["loader"]["dataset"]["schema"]
+        )
 
 
 def test_latest_inference_keeps_published_checkpoint(tmp_path):
@@ -256,5 +258,5 @@ def test_latest_inference_keeps_published_checkpoint(tmp_path):
     assert latest["model"] == published["model"]
     assert vars(latest_weight) == vars(published_weight)
     assert latest_weight is not None
-    candidate = load("infer/2x2/full_chain_261007.yaml")
-    assert candidate["model"]["weight_path"] is None
+    released = {p.name for p in (ROOT / "config/infer/2x2").glob("full_chain_*.yaml")}
+    assert released == {"full_chain_240719.yaml", "full_chain_240819.yaml"}
