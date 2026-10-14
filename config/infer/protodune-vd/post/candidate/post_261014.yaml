@@ -1,9 +1,12 @@
 __meta__:
-  kind: fragment
+  kind: bundle
   version: "261014"
   date: "2026-10-14"
-  description: ProtoDUNE-VD evaluation post-processing for calibrated candidate
+  description: ProtoDUNE-VD candidate post-processing with upstream charge calibration
+  compatible_with:
+    model: ">=261014"
 
+# Keep this candidate outside the released post/ catalog until weights exist.
 include: infer/protodune-vd/post/post_260128.yaml
 
 override:

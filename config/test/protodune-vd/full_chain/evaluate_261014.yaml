@@ -8,7 +8,7 @@ include:
   - infer/protodune-vd/base/base_260118.yaml
   - infer/protodune-vd/io/io_260118.yaml
   - model/protodune-vd/full_chain/model_261014.yaml
-  - test/protodune-vd/full_chain/post_261014.yaml
+  - infer/protodune-vd/post/candidate/post_261014.yaml
   - test/common/full_chain/analyzers_v1.yaml
 
 override:

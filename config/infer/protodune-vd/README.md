@@ -90,3 +90,7 @@ They train learned deghosting and the five downstream components, export one
 checkpoint, and evaluate it with the corresponding released post-processing.
 The deployed inference models and checkpoints retain their original behavior.
 See `pipelines/README.md` for resource settings and launch usage.
+
+The `post/candidate/post_261014.yaml` block uses charge calibrated upstream and
+applies no additional gain. The `261014` training evaluator uses this block;
+it remains outside automatic `latest` selection until the model is released.

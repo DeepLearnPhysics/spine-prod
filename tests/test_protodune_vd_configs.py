@@ -243,6 +243,7 @@ def test_latest_inference_keeps_released_checkpoint(tmp_path):
         released["model"]["weight_path"]
     )
     assert latest["model"]["modules"] == released["model"]["modules"]
+    assert latest["post"] == released["post"]
     assert {
         p.name for p in (CONFIG / "infer/protodune-vd").glob("full_chain_*.yaml")
     } == {"full_chain_260118.yaml", "full_chain_260128.yaml"}
@@ -263,6 +264,10 @@ def test_candidate_calibrates_charge_before_recombination_without_double_scaling
         cache["model"]["modules"]["chain"]["stages"][1]["config"]["calibration"]
         == calibration
     )
+    candidate_post = load("infer/protodune-vd/post/candidate/post_261014.yaml")
+    assert "calibration" not in {
+        stage["name"] for stage in candidate_post["post"]["stages"]
+    }
     evaluation = load("test/protodune-vd/full_chain/evaluate_261014.yaml")
     assert evaluation["model"]["modules"] == model["model"]["modules"]
     assert "calibration" not in {
