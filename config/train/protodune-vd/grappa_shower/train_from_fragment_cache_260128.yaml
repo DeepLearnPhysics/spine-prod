@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260128"
+  date: "2026-01-28"
+  description: ProtoDUNE-VD 260128 grappa_shower training
+
+include:
+  - model/protodune-vd/grappa_shower/model_260118.yaml
+  - train/protodune-vd/grappa_shower/from_fragment_cache_v1.yaml

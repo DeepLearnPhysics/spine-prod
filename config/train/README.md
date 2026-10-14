@@ -18,6 +18,7 @@ The currently populated configuration tree is:
 - **`2x2/`**: cached five-stage recipes for supported `240719` and `240819` chains,
   plus the current `261007` task/augmentation candidate
 - **`nd-lar/`**: cached five-stage recipes for the busy ND-LAr dataset
+- **`protodune-vd/`**: six-stage cached recipes for the `260118` and `260128` chains
 - **`protodune-sp/`**: staged recipes for the ProtoDUNE-SP `260210` chain,
   including its separately trained deghosting model
 

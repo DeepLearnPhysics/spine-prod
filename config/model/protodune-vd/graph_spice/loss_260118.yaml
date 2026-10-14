@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "260118"
+  date: "2026-01-18"
+  description: ProtoDUNE-VD deployed graph_spice objective
+
+provider: edge
+loss: binary_log_dice_ce

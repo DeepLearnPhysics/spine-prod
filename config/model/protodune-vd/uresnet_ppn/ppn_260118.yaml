@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "260118"
+  date: "2026-01-18"
+  description: ProtoDUNE-VD deployed ppn network
+
+classify_endpoints: false

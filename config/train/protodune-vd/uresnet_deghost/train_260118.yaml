@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260118"
+  date: "2026-01-18"
+  description: ProtoDUNE-VD 260118 uresnet_deghost training
+
+include:
+  - model/protodune-vd/uresnet_deghost/model_260118.yaml
+  - train/protodune-vd/uresnet_deghost/base_v1.yaml

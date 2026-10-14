@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "260118"
+  date: "2026-01-18"
+  description: ProtoDUNE-VD deployed UResNet-PPN objective
+
+uresnet_loss: !include model/protodune-vd/uresnet_ppn/uresnet_loss_260118.yaml
+ppn_loss: !include model/protodune-vd/uresnet_ppn/ppn_loss_260118.yaml
