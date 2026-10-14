@@ -81,3 +81,11 @@ calibration, with `protodunevd_v5` geometry available during checkpoint export.
 They retain the five-class PID head and the configured interaction PID,
 primary, and edge losses. Their separately versioned evaluation bundles select
 the corresponding released post-processing recipe.
+
+The ProtoDUNE-VD `261014` training candidate retains the six deployed network
+architectures and five PID classes. Its charge calibration uses 200
+electrons/ADC, the inverse VD MC calorimetry constant. Reconstructed-particle
+PID and primary targets use truth-group IoU filtering and closest-primary
+selection, and its existing orientation head receives explicit supervision.
+Standalone and full-chain interaction objectives remain separate. This
+candidate has no released inference checkpoint.

@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "261014"
+  date: "2026-10-14"
+  description: ProtoDUNE-VD 261014 grappa_track training
+
+include:
+  - model/protodune-vd/grappa_track/model_260118.yaml
+  - train/protodune-vd/grappa_track/from_fragment_cache_v1.yaml

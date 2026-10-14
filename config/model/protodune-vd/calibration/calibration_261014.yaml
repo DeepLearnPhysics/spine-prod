@@ -1,0 +1,18 @@
+__meta__:
+  kind: fragment
+  version: "261014"
+  date: "2026-10-14"
+  description: ProtoDUNE-VD collection-charge calibration
+
+# Invert the VD MC CalAreaConstants = 5.0e-3 ADC/electron.
+# https://github.com/DUNE/dunesw/blob/61fa3cb5d95a4786a2cf674b9f5d6b0fc3f453cc/fcl/common/calorimetry_vdcb.fcl
+stages:
+  - name: gain
+    gain: 200.0
+  - name: recombination
+    model: mbox
+    efield: 0.495
+    mip_dedx: 2.105168
+  - name: lifetime
+    lifetime: 35000
+    driftv: 0.157725

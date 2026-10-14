@@ -1,0 +1,21 @@
+__meta__:
+  kind: bundle
+  version: "261014"
+  date: "2026-10-14"
+  description: Evaluate the ProtoDUNE-VD 261014 trained full chain
+
+include:
+  - infer/protodune-vd/base/base_260118.yaml
+  - infer/protodune-vd/io/io_260118.yaml
+  - model/protodune-vd/full_chain/model_261014.yaml
+  - test/protodune-vd/full_chain/post_261014.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+
+override:
+  io.writer: null
+  model.network_input.clust_label: clust_label
+  ana.stages~:
+    update:
+      name: segment_eval
+      changes:
+        ghost: true

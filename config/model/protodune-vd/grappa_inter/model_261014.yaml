@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "261014"
+  date: "2026-10-14"
+  description: ProtoDUNE-VD five-class interaction model with orientation supervision
+
+include: model/common/grappa_inter/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/protodune-vd/grappa_inter/network_260118.yaml
+  model.modules.grappa_loss: !include model/protodune-vd/grappa_inter/loss_261014.yaml

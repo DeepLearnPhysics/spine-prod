@@ -396,6 +396,17 @@ configuration.
 
 ## ProtoDUNE-VD staged training
 
+`protodune-vd/full_chain_261014.yaml` is the current training candidate on
+MPV/MPR v0. It uses 200 electrons/ADC before recombination, matching the inverse
+VD MC calorimetry constant of 0.005 ADC/electron, and applies no additional
+post-processing gain. Interaction PID and primary supervision require a
+truth-group IoU of at least 0.5; only the matched piece closest to the creation
+point is labeled primary. The orientation head is supervised from cached
+endpoint targets. Its evaluator reports deghosting, segmentation, PPN,
+clustering, PID, primary identification, and track orientation performance.
+Use a new workspace for this revision so its calibrated caches are independent
+of the historical recipes. It is not a released inference model.
+
 `protodune-vd/full_chain_260118.yaml` and
 `protodune-vd/full_chain_260128.yaml` train the six components used by the
 corresponding released inference configurations on MPV/MPR v0. They share the
@@ -408,7 +419,7 @@ collection-rescaled calibrated data with its original-row mapping. UResNet-PPN
 trains from that point domain. Segmentation, fragment graphs, and particle
 graphs are published successively into one cache repository per split.
 
-The recipes retain `protodunevd_v5` geometry, the deployed calibration constants,
+The historical recipes retain `protodunevd_v5` geometry and calibration constants,
 Graph-SPICE spatial size 6144, and five PID classes. Particle supervision reads
 `particle_corrected` and `neutrino_mpv`. Interaction caches contain the PID,
 primary, and edge targets configured by the released models; no orientation
@@ -424,11 +435,11 @@ early stopping, and best-checkpoint selection. Expandable segments remain
 explicit opt-in.
 
 ```bash
-./submit.py --pipeline pipelines/protodune-vd/full_chain_260128.yaml \
+./submit.py --pipeline pipelines/protodune-vd/full_chain_261014.yaml \
   --workspace /path/to/protodune-vd-training --spine-path /path/to/spine
 ```
 
-Both pipelines support warm starts and stage-level recovery. They export the
+All three pipelines support warm starts and stage-level recovery. They export the
 six best component checkpoints into one full-chain checkpoint, evaluate that
 checkpoint on `[0.5, 1.0)` of the validation source, and publish its metric
 report. Training validation uses `[0.0, 0.5)`; cache stages retain the complete
