@@ -20,7 +20,10 @@ override:
   # Provide the run number needed for the lifetime database lookup.
   model.network_input.run_info: run_info
 
-  # Set calibration parameters for data before semantic segmentation.
+  # Set calibration parameters for data before semantic segmentation. The gain
+  # is the data gain scaled by data/simulation (47.551 * 47.551 / 49.529), the
+  # same offset as the simulation pre-calibration; post-processing applies the
+  # residual simulation/data ratio to both.
   model.modules.calibration.stages~:
     - update:
         name: gain

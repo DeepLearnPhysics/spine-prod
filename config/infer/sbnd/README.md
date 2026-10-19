@@ -100,6 +100,13 @@ The following modifications were made w.r.t. the May 21 2026 configuration
   PCA angle error 27 deg, 100 cm candidate distance, [-5, 5] us flash window and
   light/charge ratio in [0.25, 3]. The score is 1/chi2 (larger is better).
 - Same model weights and in-model calibration as the May 21 2026 configuration
+- Apply the residual gain correction in post-processing. The model was trained
+  on simulation calibrated with the data gain (1/0.02103 = 47.551 e-/ADC)
+  instead of the simulation gain (1/0.02019 = 49.529 e-/ADC). Simulation
+  therefore keeps the data gain in the model, and the data modifier uses
+  47.551 x 47.551 / 49.529 = 45.652 e-/ADC. An `apply_calibrations` stage then
+  scales reconstructed depositions in both by 0.02103/0.02019 (+4.2%), before
+  flash matching and calorimetry
 
 Data: `--apply-mods data` selects `mod_data_261019.yaml`. It applies the same
 database calibration as `mod_data_260501.yaml` (gain, per-run lifetime, YZ map

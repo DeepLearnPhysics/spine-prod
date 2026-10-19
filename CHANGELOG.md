@@ -10,7 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added the SBND Gen-II production chain `full_chain_co_261019.yaml`, with
   post-processing that replaces likelihood flash matching by the barycenter
-  matcher configured as in sbndcode's TPCPMTBarycenterMatching.
+  matcher configured as in sbndcode's TPCPMTBarycenterMatching. It also applies
+  the residual simulation/data gain ratio (0.02103/0.02019) to reconstructed
+  depositions in simulation and data, because the model was trained with the data
+  gain.
 - Added the matching SBND data modifier `mod_data_261019.yaml`, which keeps the
   Gen-II database calibration and sets the data drift-coordinate error used in
   flash matching.

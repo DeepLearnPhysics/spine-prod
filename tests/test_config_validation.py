@@ -2347,6 +2347,20 @@ def write_composite_config(tmp_path, base_config, modifier_config):
     return composite_path
 
 
+def assert_sbnd_261019_residual_gain(config):
+    """Check the simulation/data gain residual applied before flash matching."""
+    post = config["post"]
+    stages = list(post)
+    assert stages.index("apply_calibrations") < stages.index("flash_match")
+
+    post_calibration = post["apply_calibrations"]
+    assert post_calibration["run_mode"] == "reco"
+    assert post_calibration["depositions_source"] == "depositions"
+    assert list(post_calibration["stages"]) == [
+        {"name": "response", "response_func": "0.02103/0.02019*x"}
+    ]
+
+
 @contextmanager
 def ignore_expected_legacy_metadata_warnings():
     """Ignore metadata diagnostics expected while loading legacy bundles.
@@ -2908,7 +2922,7 @@ class TestConfigValidation:
         )
         for key in ("cfg", "merge", "time_contained", "max_cathode_offset"):
             assert key not in flash_match
-        assert "apply_calibrations" not in config["post"]
+        assert_sbnd_261019_residual_gain(config)
 
     def test_sbnd_261019_data_modifier_sets_data_flash_matching(
         self, config_infer_root, tmp_path
@@ -2937,6 +2951,7 @@ class TestConfigValidation:
         assert flash_match["position_errors"] == [11.0, 21.0, 25.0]
         assert "match" not in config["post"]
         assert "children_count" not in config["post"]
+        assert_sbnd_261019_residual_gain(config)
 
     @pytest.mark.parametrize(
         ("base_name", "modifier_name"),

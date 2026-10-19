@@ -49,6 +49,20 @@ override:
             - 0
             - 1
           min_particle_sizes: 25
+    # Residual gain correction. The model was trained on simulation calibrated
+    # with the data gain (1/0.02103 e-/ADC) instead of the simulation gain
+    # (1/0.02019 e-/ADC), and the data modifier pre-calibrates data with the
+    # same relative offset. Restore the simulation/data gain ratio in both,
+    # before flash matching and calorimetry use the depositions.
+    - insert:
+        before: vertex
+        value:
+          name: apply_calibrations
+          run_mode: reco
+          depositions_source: depositions
+          stages:
+            - name: response
+              response_func: 0.02103/0.02019*x
     - insert:
         before: vertex
         value:
