@@ -1,0 +1,86 @@
+# Data-only modification for SBND configs with in-model calibration and
+# barycenter flash matching
+# Revision date: October 19, 2026
+
+__meta__:
+  kind: mod
+  name: "data"
+  version: "261019"
+  date: "2026-10-19"
+  description: "Data-only configuration with Gen-II calibration and barycenter flash matching"
+  applies_to: [data]
+  compatible_with:
+    model: ">=260501"
+    post: ">=261019"
+
+include: mod_data_common.yaml
+
+override:
+  ### Model overrides ###
+  # Provide the run number needed for the lifetime database lookup.
+  model.network_input.run_info: run_info
+
+  # Set calibration parameters for data before semantic segmentation. The gain
+  # is the data gain scaled by data/simulation (47.551 * 47.551 / 49.529), the
+  # same offset as the simulation pre-calibration; post-processing applies the
+  # residual simulation/data ratio to both.
+  model.modules.calibration.stages~:
+    - update:
+        name: gain
+        changes:
+          gain: 45.652
+    - remove:
+        name: lifetime
+    - insert:
+        after: recombination
+        value:
+          name: lifetime
+          lifetime_db: $SBND_DATA_DIR/v01_42_00/CalibrationDatabase/tpc_elifetime.db
+          lifetime_db_value_keys:
+            - etau_sce_spatial_east
+            - etau_sce_spatial_west
+          lifetime_db_value_scale: 1000.0
+          driftv: 0.1563
+    - insert:
+        after: lifetime
+        value:
+          name: transparency
+          transparency_file: $SBND_DATA_DIR/v01_42_00/YZmaps/yz_data2025_v10_14_02.root
+          map_type: correction
+  post.stages~:
+    - remove:
+        name: children_count
+    - remove:
+        name: match
+    - update:
+        name: direction
+        changes:
+          run_mode: reco
+    - update:
+        name: time_containment
+        changes:
+          run_mode: reco
+    - update:
+        name: flash_match
+        changes:
+          # sbndcode uses a larger drift-coordinate error for data (XError)
+          position_errors:
+            - 11.0
+            - 21.0
+            - 25.0
+    - update:
+        name: calo_ke
+        changes:
+          run_mode: reco
+    - update:
+        name: containment
+        changes:
+          run_mode: reco
+    - update:
+        name: topology_threshold
+        changes:
+          run_mode: reco
+    - update:
+        name: fiducial
+        changes:
+          run_mode: reco

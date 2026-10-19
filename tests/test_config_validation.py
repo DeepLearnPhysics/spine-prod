@@ -2347,6 +2347,18 @@ def write_composite_config(tmp_path, base_config, modifier_config):
     return composite_path
 
 
+def assert_sbnd_261019_residual_gain(config):
+    """Check the simulation/data gain residual applied before flash matching."""
+    post = config["post"]
+    stages = list(post)
+    assert stages.index("apply_calibrations") < stages.index("flash_match")
+
+    post_calibration = post["apply_calibrations"]
+    assert post_calibration["run_mode"] == "reco"
+    assert post_calibration["depositions_source"] == "depositions"
+    assert list(post_calibration["stages"]) == [{"name": "gain", "gain": 1.0416}]
+
+
 @contextmanager
 def ignore_expected_legacy_metadata_warnings():
     """Ignore metadata diagnostics expected while loading legacy bundles.
@@ -2886,11 +2898,66 @@ class TestConfigValidation:
         }
         assert "apply_calibrations" not in config["post"]
 
+    def test_sbnd_261019_uses_barycenter_flash_matching(self, config_infer_root):
+        """The October 2026 SBND chain mirrors sbndcode's barycenter matcher."""
+        config = load_config_with_includes(
+            config_infer_root / "sbnd" / "full_chain_co_261019.yaml"
+        )
+        flash_match = config["post"]["flash_match"]
+
+        assert flash_match["method"] == "barycenter"
+        assert flash_match["volume"] == "tpc"
+        assert flash_match["volume_report_mode"] == "brightest"
+        assert flash_match["report_mode"] == "best_per_interaction"
+        assert flash_match["dimensions"] == [0, 1, 2]
+        assert flash_match["position_errors"] == [9.0, 21.0, 25.0]
+        assert flash_match["angle_error"] == 27.0
+        assert flash_match["candidate_distance"] == 100.0
+        assert flash_match["time_window"] == [-5.0, 5.0]
+        assert flash_match["light_charge_bounds"] == [0.25, 3.0]
+        assert flash_match["light_model_cfg"].endswith(
+            "infer/sbnd/post/flashmatch/flashmatch_250408.cfg"
+        )
+        for key in ("cfg", "merge", "time_contained", "max_cathode_offset"):
+            assert key not in flash_match
+        assert_sbnd_261019_residual_gain(config)
+
+    def test_sbnd_261019_data_modifier_sets_data_flash_matching(
+        self, config_infer_root, tmp_path
+    ):
+        """Gen-II data keeps the database calibration and widens the X error."""
+        sbnd_root = config_infer_root / "sbnd"
+        composite = write_composite_config(
+            tmp_path,
+            sbnd_root / "full_chain_co_261019.yaml",
+            sbnd_root / "modifier" / "data" / "mod_data_261019.yaml",
+        )
+
+        config = load_config_with_includes(composite)
+        calibration = config["model"]["modules"]["calibration"]
+        flash_match = config["post"]["flash_match"]
+
+        assert config["model"]["network_input"]["run_info"] == "run_info"
+        assert calibration["gain"]["gain"] == 45.652
+        assert calibration["lifetime"]["lifetime_db"] == (
+            "$SBND_DATA_DIR/v01_42_00/CalibrationDatabase/tpc_elifetime.db"
+        )
+        assert calibration["transparency"]["transparency_file"] == (
+            "$SBND_DATA_DIR/v01_42_00/YZmaps/yz_data2025_v10_14_02.root"
+        )
+        assert flash_match["method"] == "barycenter"
+        assert flash_match["position_errors"] == [11.0, 21.0, 25.0]
+        assert "match" not in config["post"]
+        assert "children_count" not in config["post"]
+        assert_sbnd_261019_residual_gain(config)
+
     @pytest.mark.parametrize(
         ("base_name", "modifier_name"),
         [
             ("full_chain_co_260521.yaml", "mod_data_250901.yaml"),
             ("full_chain_co_250901.yaml", "mod_data_260501.yaml"),
+            ("full_chain_co_261019.yaml", "mod_data_260501.yaml"),
+            ("full_chain_co_260521.yaml", "mod_data_261019.yaml"),
         ],
     )
     def test_sbnd_data_modifiers_reject_wrong_calibration_stage(

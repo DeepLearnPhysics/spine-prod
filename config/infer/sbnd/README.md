@@ -86,6 +86,38 @@ These weights have been trained using the following files at Polaris:
 - Training set: `/lus/eagle/projects/neutrinoGPU/jmueller/spine_train/datasets/v10_14_02/generic/train/files.txt` (450k)
 - Test set: `/lus/eagle/projects/neutrinoGPU/jmueller/spine_train/datasets/v10_14_02/generic/test/files.txt` (50k)
 
+## October 19th 2026
+
+```shell
+full_chain_co_261019.yaml
+```
+
+The following modifications were made w.r.t. the May 21 2026 configuration
+- Replace likelihood (OpT0Finder) flash matching with the 3D barycenter
+  matcher, configured as sbndcode's TPCPMTBarycenterMatching
+  (`sbnd_tpcpmt3dbarycentermatching_config.fcl`): per-TPC matching, best flash
+  per interaction, brightest match across TPCs, position errors (9, 21, 25) cm,
+  PCA angle error 27 deg, 100 cm candidate distance, [-5, 5] us flash window and
+  light/charge ratio in [0.25, 3]. The score is 1/chi2 (larger is better).
+- Same model weights and in-model calibration as the May 21 2026 configuration
+- Apply the residual gain correction in post-processing. The model was trained
+  on simulation calibrated with the data gain (1/0.02103 = 47.551 e-/ADC)
+  instead of the simulation gain (1/0.02019 = 49.529 e-/ADC). Simulation
+  therefore keeps the data gain in the model, and the data modifier uses
+  47.551 x 47.551 / 49.529 = 45.652 e-/ADC. An `apply_calibrations` stage then
+  applies a gain of 0.02103/0.02019 = 1.0416 to reconstructed depositions in
+  both, before flash matching and calorimetry
+
+Data: `--apply-mods data` selects `mod_data_261019.yaml`. It applies the same
+database calibration as `mod_data_260501.yaml` (gain, per-run lifetime, YZ map
+from `SBND_DATA_DIR`) and sets the flash-matching X error to 11 cm, as in
+sbndcode's data configuration. `mod_data_260501.yaml` remains the data modifier
+for `full_chain_co_260521.yaml`.
+
+Description:
+  - UResNet + PPN + gSPICE + GrapPAs (track + shower + interaction)
+  - Class-weighted loss on PID predictions
+
 ## May 21st 2026
 
 ```shell

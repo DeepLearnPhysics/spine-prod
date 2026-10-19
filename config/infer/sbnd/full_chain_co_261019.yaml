@@ -1,0 +1,14 @@
+# SBND full chain configuration
+# Revision date: October 19, 2026
+
+__meta__:
+  kind: bundle
+  version: "261019"
+  date: "2026-10-19"
+  description: "SBND full chain configuration with barycenter flash matching"
+
+include:
+  - base/base_260501.yaml
+  - io/io_260218.yaml
+  - model/model_co_260521.yaml
+  - post/post_261019.yaml
