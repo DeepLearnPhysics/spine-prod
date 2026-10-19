@@ -10,7 +10,7 @@ __meta__:
   applies_to: [data]
   compatible_with:
     model: ">=260501"
-    post: ">=260501"
+    post: "==260501"
 
 include: mod_data_common.yaml
 

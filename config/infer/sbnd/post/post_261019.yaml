@@ -1,0 +1,142 @@
+# Post-processing configuration for SBND
+# Revision date: October 19, 2026
+#
+# Same as the May 1 2026 post-processing, except that flash matching uses the
+# 3D barycenter matcher, which mirrors sbndcode's TPCPMTBarycenterMatching
+# (sbnd_tpcpmt3dbarycentermatching_config.fcl). Position errors are set for
+# simulation; the data modifier sets the data value.
+
+__meta__:
+  kind: bundle
+  version: "261019"
+  date: "2026-10-19"
+  description: "SBND post-processing with barycenter flash matching"
+  compatible_with:
+    base: ">=260501"
+    io: ">=260218"
+    model: ">=260501"
+  tags: [barycenter-fm, shower-pp]
+
+include: post_common.yaml
+
+override:
+  # Cathode crosser configuration
+  post.stages~:
+    - update:
+        name: direction
+        changes:
+          radius: 60.0
+    - insert:
+        before: shape_logic
+        value:
+          name: cathode_crosser
+          run_mode: reco
+          crossing_point_tolerance: 15
+          offset_tolerance: 15
+          angle_tolerance: 0.26
+          merge_crossers: true
+          adjust_crossers: false
+          adjust_method: distance
+    - insert:
+        before: shape_logic
+        value:
+          name: time_containment
+          logical: true
+          mode: source
+          margin: 0.0
+          cathode_margin: -5.0
+          exclude_pids:
+            - 0
+            - 1
+          min_particle_sizes: 25
+    - insert:
+        before: vertex
+        value:
+          name: flash_match
+          flash_key: flashes
+          volume: tpc
+          # Keep the brightest match across TPCs, as in sbndcode
+          volume_report_mode: brightest
+          method: barycenter
+          report_mode: best_per_interaction
+          dimensions:
+            - 0
+            - 1
+            - 2
+          # XError, YError, ZError in cm (simulation)
+          position_errors:
+            - 9.0
+            - 21.0
+            - 25.0
+          # AngleError, deg
+          angle_error: 27.0
+          # DistanceCandidateFlashes, cm
+          candidate_distance: 100.0
+          charge_weighted: true
+          # FlashVetoWindow, us
+          time_window:
+            - -5.0
+            - 5.0
+          # LightChargeRatioBounds
+          light_charge_bounds:
+            - 0.25
+            - 3.0
+          light_model_cfg: !path infer/sbnd/post/flashmatch/flashmatch_250408.cfg
+          light_model_algorithm: SemiAnalyticalModel
+    - insert:
+        before: topology_threshold
+        value:
+          name: mcs_ke
+          run_mode: reco
+          tracking_mode: bin_pca
+          segment_length: 14.0
+          fill_per_pid: true
+          res_a: 0.21265598
+          res_b: 1.40789473
+          res_mixture: true
+          res_weight_ratio: 1.0
+          res_scale_ratio: 2.5
+    - insert:
+        before: topology_threshold
+        value:
+          name: containment
+          run_mode: both
+          mode: source
+          margin: 5.0
+          cathode_margin: -5.0
+          exclude_pids:
+            - 0
+            - 1
+    - insert:
+        after: match
+        value:
+          name: start_dedx
+          radius: 3.0
+          mode: default
+    - insert:
+        after: start_dedx
+        value:
+          name: end_dedx
+          radius: 4.0
+          mode: default
+          include_pids:
+            - 2
+            - 3
+            - 4
+    - insert:
+        after: end_dedx
+        value:
+          name: start_straightness
+          radius: 3.0
+          n_components: 3
+    - insert:
+        after: start_straightness
+        value:
+          name: particle_spread
+          start_mode: start_point
+          use_start_dir: false
+    - insert:
+        after: particle_spread
+        value:
+          name: shower_conversion_distance
+          mode: vertex_to_points

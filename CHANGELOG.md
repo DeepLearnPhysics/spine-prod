@@ -5,6 +5,20 @@ All notable changes to the SPINE Production System will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Added the SBND Gen-II production chain `full_chain_co_261019.yaml`, with
+  post-processing that replaces likelihood flash matching by the barycenter
+  matcher configured as in sbndcode's TPCPMTBarycenterMatching.
+- Added the matching SBND data modifier `mod_data_261019.yaml`, which keeps the
+  Gen-II database calibration and sets the data drift-coordinate error used in
+  flash matching.
+
+### Changed
+- Restricted the SBND `mod_data_260501.yaml` data modifier to the 260501
+  post-processing.
+
 ## [0.9.1] - 2026-09-18
 
 ### Changed
