@@ -2356,9 +2356,7 @@ def assert_sbnd_261019_residual_gain(config):
     post_calibration = post["apply_calibrations"]
     assert post_calibration["run_mode"] == "reco"
     assert post_calibration["depositions_source"] == "depositions"
-    assert list(post_calibration["stages"]) == [
-        {"name": "response", "response_func": "0.02103/0.02019*x"}
-    ]
+    assert list(post_calibration["stages"]) == [{"name": "gain", "gain": 1.0416}]
 
 
 @contextmanager
