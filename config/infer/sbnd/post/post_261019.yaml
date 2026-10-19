@@ -62,7 +62,7 @@ override:
           depositions_source: depositions
           stages:
             - name: gain
-              gain: 1.0416  # 0.02103/0.02019
+              gain: 1.0416 # 0.02103/0.02019
     - insert:
         before: vertex
         value:
