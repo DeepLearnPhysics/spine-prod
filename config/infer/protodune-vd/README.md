@@ -26,7 +26,8 @@ Each main config includes modular YAML files:
 **Model Components:**
 - **`model/model_260118.yaml`**: Jan 2026 weights and model settings
 - **`model/model_260128.yaml`**: Jan 2026 (v2) weights and model settings
-- **`model/model_common.yaml`**: Common model architecture
+- **`model/model_common.yaml`**: Historical common model fragment
+- **`config/model/protodune-vd/`**: Dated components shared with training and cache producers
 
 **Post-processing Components:**
 - **`post/post_260128.yaml`**: Post-processing configuration (Jan 2026)
@@ -81,3 +82,15 @@ Known issue(s):
   - No charged kaon in the training sample
 
 *For more details on each component, see the corresponding YAML files in the subdirectories.*
+
+## Staged training
+
+Both released configurations have matching pipelines under `pipelines/protodune-vd/`.
+They train learned deghosting and the five downstream components, export one
+checkpoint, and evaluate it with the corresponding released post-processing.
+The deployed inference models and checkpoints retain their original behavior.
+See `pipelines/README.md` for resource settings and launch usage.
+
+The `post/candidate/post_261014.yaml` block uses charge calibrated upstream and
+applies no additional gain. The `261014` training evaluator uses this block;
+it remains outside automatic `latest` selection until the model is released.

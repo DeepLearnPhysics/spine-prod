@@ -1,0 +1,18 @@
+__meta__:
+  kind: fragment
+  version: "261014"
+  date: "2026-10-14"
+  description: ProtoDUNE-VD overlap-aware reconstructed-particle objectives
+
+include: model/protodune-vd/grappa_inter/loss_261014.yaml
+
+override:
+  # Supervise PID only for particles with sufficient truth-group overlap.
+  node_loss.type.min_iou: 0.5
+  node_loss.type.match_target: group
+
+  # Only the matched piece closest to the creation point is a primary.
+  node_loss.primary.use_closest: true
+  node_loss.primary.secondary_label: 0
+  node_loss.primary.min_iou: 0.5
+  node_loss.primary.match_target: group

@@ -1,0 +1,27 @@
+__meta__:
+  kind: fragment
+  description: Append ProtoDUNE-VD fragment graphs and GrapPA supervision
+
+include: cache/common/graph_spice/base_v1.yaml
+
+override:
+  io.loader.minibatch_size: 16
+  io.loader.dataset:
+    provider: mixed
+    primary:
+      provider: larcv
+      file_keys:
+      schema:
+        coord_label:
+          provider: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+    cache:
+      path:
+      stage: segmentation
+      keep_open: true
+      stage_map:
+        data_calib: deghosting
+      keys: [data_calib, seg_pred, ppn_points, clust_label_adapt]
+
+  model.network_input.data: data_calib

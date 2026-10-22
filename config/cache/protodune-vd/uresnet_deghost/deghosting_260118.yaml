@@ -1,0 +1,29 @@
+__meta__:
+  kind: bundle
+  version: "260118"
+  date: "2026-01-18"
+  description: Materialize ProtoDUNE-VD 260118 deghosting and calibration products
+
+include: cache/protodune-vd/uresnet_deghost/base_v1.yaml
+
+# Calibration resolves detector volumes through the same geometry as inference.
+geo:
+  detector: protodune-vd
+  tag: protodunevd_v5
+
+model:
+  modules:
+    uresnet_deghost: !include model/protodune-vd/uresnet_deghost/network_260118.yaml
+
+override:
+  model.modules.chain.stages:
+    - name: deghosting
+      provider: deghost
+      uses: uresnet_deghost
+      config:
+        mode: uresnet
+        charge_rescaling: collection
+    - name: calibration
+      config:
+        mode: apply
+        calibration: !include model/protodune-vd/calibration/calibration_260118.yaml

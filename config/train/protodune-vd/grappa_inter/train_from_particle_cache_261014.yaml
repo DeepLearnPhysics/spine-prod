@@ -1,0 +1,17 @@
+__meta__:
+  kind: bundle
+  version: "261014"
+  date: "2026-10-14"
+  description: ProtoDUNE-VD 261014 grappa_inter training
+
+include:
+  - model/protodune-vd/grappa_inter/model_261014.yaml
+  - train/protodune-vd/grappa_inter/from_particle_cache_v1.yaml
+
+override:
+  model.modules.grappa_loss: !include model/protodune-vd/grappa_inter/loss_full_chain_261014.yaml
+  io.loader.dataset.keys+:
+    - particle_graph_node_orient_target
+    - particle_graph_node_orient_valid
+  model.loss_input.node_orient_target: particle_graph_node_orient_target
+  model.loss_input.node_orient_valid: particle_graph_node_orient_valid

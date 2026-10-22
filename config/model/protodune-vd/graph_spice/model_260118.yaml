@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260118"
+  date: "2026-01-18"
+  description: ProtoDUNE-VD standalone graph_spice model
+
+include: model/common/graph_spice/base_v1.yaml
+
+override:
+  model.modules.graph_spice: !include model/protodune-vd/graph_spice/network_260118.yaml
+  model.modules.graph_spice_loss: !include model/protodune-vd/graph_spice/loss_260118.yaml

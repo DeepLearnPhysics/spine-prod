@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260118"
+  date: "2026-01-18"
+  description: ProtoDUNE-VD standalone uresnet_deghost model
+
+include: model/common/uresnet_deghost/base_v1.yaml
+
+override:
+  model.modules.uresnet: !include model/protodune-vd/uresnet_deghost/network_260118.yaml
+  model.modules.uresnet_loss: !include model/protodune-vd/uresnet_deghost/loss_260118.yaml

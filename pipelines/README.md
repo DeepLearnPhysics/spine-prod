@@ -393,3 +393,61 @@ The pipeline exports `weights/full_chain_261007.ckpt` and evaluates that
 checkpoint through `test/2x2/full_chain/evaluate_261007.yaml`. This revision
 is available for training and evaluation only; it has no released inference
 configuration.
+
+## ProtoDUNE-VD staged training
+
+`protodune-vd/full_chain_261014.yaml` is the current training candidate on
+MPV/MPR v0. It uses 200 electrons/ADC before recombination, matching the inverse
+VD MC calorimetry constant of 0.005 ADC/electron, and applies no additional
+post-processing gain. Interaction PID and primary supervision require a
+truth-group IoU of at least 0.5; only the matched piece closest to the creation
+point is labeled primary. The orientation head is supervised from cached
+endpoint targets. Its evaluator reports deghosting, segmentation, PPN,
+clustering, PID, primary identification, and track orientation performance.
+Use a new workspace for this revision so its calibrated caches are independent
+of the historical recipes. It is not a released inference model.
+
+`protodune-vd/full_chain_260118.yaml` and
+`protodune-vd/full_chain_260128.yaml` train the six components used by the
+corresponding released inference configurations on MPV/MPR v0. They share the
+same model architecture and in-chain calibration, and select their respective
+released post-processing recipes for evaluation.
+
+Each pipeline scans the train and validation inputs, accepts entries with fewer
+than 500,000 reconstructed space points, trains binary deghosting, and caches
+collection-rescaled calibrated data with its original-row mapping. UResNet-PPN
+trains from that point domain. Segmentation, fragment graphs, and particle
+graphs are published successively into one cache repository per split.
+
+The historical recipes retain `protodunevd_v5` geometry and calibration constants,
+Graph-SPICE spatial size 6144, and five PID classes. Particle supervision reads
+`particle_corrected` and `neutrino_mpv`. Interaction caches contain the PID,
+primary, and edge targets configured by the released models; no orientation
+loss is configured. The shared report evaluates deghosting and the standard
+segmentation, PPN, clustering, and reconstructed-object metrics.
+
+UResNet-backed training stages use four A100 GPUs. Deghosting uses a global
+batch of 16 and 50 epochs; cached UResNet-PPN uses 32 events per rank and a
+100-epoch limit; Graph-SPICE uses 32 events per rank and 50 epochs. The three
+GrapPA stages use one A100 each, 50 epochs, and batches of 64 (shower), 128
+(track), and 256 (interaction). All trainers use Adam at 0.001, validation-loss
+early stopping, and best-checkpoint selection. Expandable segments remain
+explicit opt-in.
+
+All three VD pipelines allow 72 hours for UResNet-PPN training, 16 hours for
+track GrapPA training, four hours for interaction GrapPA training and each cache
+stage, and three hours for full-chain evaluation. The other stage limits are
+unchanged.
+
+```bash
+./submit.py --pipeline pipelines/protodune-vd/full_chain_261014.yaml \
+  --workspace /path/to/protodune-vd-training --spine-path /path/to/spine
+```
+
+All three pipelines support warm starts and stage-level recovery. They export the
+six best component checkpoints into one full-chain checkpoint, evaluate that
+checkpoint on `[0.5, 1.0)` of the validation source, and publish its metric
+report. Training validation uses `[0.0, 0.5)`; cache stages retain the complete
+accepted validation domain. The `260128` evaluator retains its released
+post-processing gain correction. Released inference models and their
+`latest` selection are unchanged.

@@ -19,43 +19,10 @@ __meta__:
     ]
   training_set: "v0"
 
-include: model_common.yaml
+include: model/protodune-vd/full_chain/model_260118.yaml
 
 override:
   # Path to the first full chain model weights
   model.weight_path: !download
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/protodune-vd/protodune-vd_snapshot_260118.ckpt
     hash: 525d50afa5cddcfe05669e4ae01d14b05d111c9987a4e4c1c77c357125ac1a6c
-
-  # Calibration handled before the semantic segmentation stage
-  model.modules.chain.stages~:
-    - update:
-        name: deghosting
-        changes:
-          config:
-            charge_rescaling: collection
-    - insert:
-        before: segmentation
-        value:
-          name: calibration_before_segmentation
-          provider: calibration
-          uses: calibration
-          config:
-            mode: apply
-  model.modules.calibration:
-    stages:
-      - name: gain
-        gain: 14.0
-      - name: recombination
-        model: mbox
-        efield: 0.495
-        mip_dedx: 2.105168
-      - name: lifetime
-        lifetime: 35000
-        driftv: 0.157725
-  model.modules.uresnet_ppn.ppn.classify_endpoints: false
-  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
-  model.modules.grappa_shower_loss.node_loss.use_closest: true
-
-  # Interaction grouping restriction applied
-  model.modules.grappa_inter.nodes.grouping_through_track: true

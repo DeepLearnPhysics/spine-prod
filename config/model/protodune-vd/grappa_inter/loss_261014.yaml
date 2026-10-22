@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "261014"
+  date: "2026-10-14"
+  description: ProtoDUNE-VD standalone PID primary and orientation objectives
+
+include: model/common/grappa_inter/loss_v1.yaml

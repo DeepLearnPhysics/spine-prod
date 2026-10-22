@@ -1,0 +1,16 @@
+__meta__:
+  kind: fragment
+  version: "260118"
+  date: "2026-01-18"
+  description: ProtoDUNE-VD deployed charge calibration
+
+stages:
+  - name: gain
+    gain: 14.0
+  - name: recombination
+    model: mbox
+    efield: 0.495
+    mip_dedx: 2.105168
+  - name: lifetime
+    lifetime: 35000
+    driftv: 0.157725

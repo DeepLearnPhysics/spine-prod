@@ -1,0 +1,16 @@
+__meta__:
+  kind: bundle
+  version: "261014"
+  date: "2026-10-14"
+  description: ProtoDUNE-VD 261014 graph_spice training
+
+include:
+  - model/protodune-vd/graph_spice/model_260118.yaml
+  - train/protodune-vd/graph_spice/from_segmentation_cache_v1.yaml
+
+override:
+  model.network_input.data: data_calib
+  model.network_input.seg_label: seg_pred
+  model.loss_input.seg_label: seg_pred
+  model.loss_input.clust_label: clust_label_adapt
+  model.modules.graph_spice.make_clusters: false

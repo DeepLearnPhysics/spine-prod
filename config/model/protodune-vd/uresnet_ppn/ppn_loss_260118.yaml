@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  version: "260118"
+  date: "2026-01-18"
+  description: ProtoDUNE-VD deployed ppn objective
+
+mask_loss: CE
+resolution: 5.0
+restrict_to_clusters: true

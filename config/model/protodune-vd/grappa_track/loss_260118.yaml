@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  version: "260118"
+  date: "2026-01-18"
+  description: ProtoDUNE-VD deployed grappa_track objective
+
+edge_loss:
+  provider: channel
+  target: group
