@@ -263,7 +263,7 @@ stages:
   - name: evaluate_full_chain
     depends_on: [export_full_chain_weights]
     config: test/protodune-vd/full_chain/evaluate_260128.yaml
-    time: "01:00:00"
+    time: "08:00:00"
     source_list: ${validation_source_list}
     entry_fraction_range: [0.5, 1.0]
     run_dir: ${workspace}/metrics/full_chain/raw
