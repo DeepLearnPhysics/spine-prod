@@ -429,10 +429,15 @@ segmentation, PPN, clustering, and reconstructed-object metrics.
 UResNet-backed training stages use four A100 GPUs. Deghosting uses a global
 batch of 16 and 50 epochs; cached UResNet-PPN uses 32 events per rank and a
 100-epoch limit; Graph-SPICE uses 32 events per rank and 50 epochs. The three
-GrapPA stages use one A100 each, 50 epochs, and batches of 32 (shower), 128
+GrapPA stages use one A100 each, 50 epochs, and batches of 64 (shower), 128
 (track), and 256 (interaction). All trainers use Adam at 0.001, validation-loss
 early stopping, and best-checkpoint selection. Expandable segments remain
 explicit opt-in.
+
+All three VD pipelines allow 72 hours for UResNet-PPN training, 16 hours for
+track GrapPA training, four hours for interaction GrapPA training and each cache
+stage, and three hours for full-chain evaluation. The other stage limits are
+unchanged.
 
 ```bash
 ./submit.py --pipeline pipelines/protodune-vd/full_chain_261014.yaml \

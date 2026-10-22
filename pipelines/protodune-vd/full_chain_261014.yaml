@@ -81,6 +81,7 @@ stages:
 
   # Materialize only calibrated deghosted data and its raw-index mapping.
   - name: cache_${split.name}_deghosting
+    time: "04:00:00"
     for_each:
       collection: splits
       as: split
@@ -105,7 +106,7 @@ stages:
     warm_start:
       uresnet_ppn: uresnet_ppn
     profile: s3df_ampere_full
-    time: "2-00:00:00"
+    time: "3-00:00:00"
     run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
     sources:
@@ -124,6 +125,7 @@ stages:
 
   # Append segmentation predictions and adapted cluster labels to each cache.
   - name: cache_${split.name}_segmentation
+    time: "04:00:00"
     for_each:
       collection: splits
       as: split
@@ -160,6 +162,7 @@ stages:
 
   # Append fragment graphs and static supervision for both particle branches.
   - name: cache_${split.name}_fragment_graphs
+    time: "04:00:00"
     for_each:
       collection: splits
       as: split
@@ -201,7 +204,7 @@ stages:
     stage: train
     warm_start:
       grappa: grappa_track
-    time: "12:00:00"
+    time: "16:00:00"
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
@@ -210,6 +213,7 @@ stages:
 
   # Append particle graphs and static interaction supervision to each cache.
   - name: cache_${split.name}_particle_graphs
+    time: "04:00:00"
     for_each:
       collection: splits
       as: split
@@ -232,6 +236,7 @@ stages:
 
   # Train interaction aggregation and particle classifiers from cached graphs.
   - name: train_grappa_inter
+    time: "04:00:00"
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
     config: train/protodune-vd/grappa_inter/train_from_particle_cache_261014.yaml
     stage: train
@@ -263,7 +268,7 @@ stages:
   - name: evaluate_full_chain
     depends_on: [export_full_chain_weights]
     config: test/protodune-vd/full_chain/evaluate_261014.yaml
-    time: "08:00:00"
+    time: "03:00:00"
     source_list: ${validation_source_list}
     entry_fraction_range: [0.5, 1.0]
     run_dir: ${workspace}/metrics/full_chain/raw
