@@ -1,0 +1,14 @@
+__meta__:
+  kind: fragment
+  version: "260510"
+  date: "2026-05-10"
+  description: Historical FD-HD grappa_shower objective
+node_loss:
+  provider: shower_primary
+  high_purity: true
+  use_group_pred: true
+  use_closest: true
+edge_loss:
+  provider: channel
+  target: group
+  high_purity: true

@@ -475,7 +475,7 @@ accepting fewer than 500,000 reconstructed points per event. No reference skip
 list is hardcoded. It then trains deghosting, UResNet-PPN, Graph-SPICE, shower,
 track, and interaction aggregation, with immutable cache stages between them.
 Train and validation sources default to
-`/sdf/data/neutrino/dune/sim/mpvmpr_v1/{train,test}_file_list.txt`.
+`/sdf/data/neutrino/dune/sim/hd/mpvmpr_v1/{train,test}_file_list.txt`.
 Training validation uses `[0.0, 0.5)` of the accepted validation domain;
 full-chain evaluation uses `[0.5, 1.0)` of the validation source.
 
@@ -501,3 +501,21 @@ checkpoint or expandable-segment requirement.
 ./submit.py --pipeline pipelines/dune-hd-10kt-1x2x6/full_chain_261022.yaml \
   --workspace /path/to/dune-hd-training --spine-path /path/to/spine
 ```
+
+The legacy pipelines preserve the released model and post-processing behavior:
+
+| Pipeline revision | Training components | Default dataset | Calibration and evaluation |
+| --- | --- | --- | --- |
+| `260202` | February model | MPV/MPR v0 | Original gain 1000 and drift velocity 1.60563; February post-processing |
+| `260510` | May model | MPV/MPR v1 | Original gain 1000 and drift velocity 0.160563; February post-processing |
+| `260626` | May model | MPV/MPR v1 | Same training as May; June post-processing gain correction |
+
+Each lives at `pipelines/dune-hd-10kt-1x2x6/full_chain_<revision>.yaml` and
+supports the same filtering, cache stages, optional warm starts, and resource
+budgets as the candidate. These are staged retraining recipes for the released
+models, not reproductions of the original optimizer history. They retain the
+historical interaction objectives without the candidate's IoU cuts or
+orientation loss. February defaults to
+`/sdf/data/neutrino/dune/sim/mpvmpr_v0/`; the v1 recipes use
+`/sdf/data/neutrino/dune/sim/hd/mpvmpr_v1/`. Keep separate workspaces for
+calibration revisions.

@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "260510"
+  date: "2026-05-10"
+  description: Historical FD-HD ppn objective
+mask_loss: CE
+resolution: 5.0
+restrict_to_clusters: true

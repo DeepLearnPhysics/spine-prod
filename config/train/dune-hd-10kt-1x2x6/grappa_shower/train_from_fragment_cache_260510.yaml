@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260510"
+  date: "2026-05-10"
+  description: DUNE-HD 10 kt module 1x2x6 260510 grappa_shower training
+
+include:
+  - model/dune-hd-10kt-1x2x6/grappa_shower/model_260510.yaml
+  - train/dune-hd-10kt-1x2x6/grappa_shower/from_fragment_cache_v1.yaml

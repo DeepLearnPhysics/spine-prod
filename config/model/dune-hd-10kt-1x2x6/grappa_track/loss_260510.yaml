@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "260510"
+  date: "2026-05-10"
+  description: Historical FD-HD grappa_track objective
+edge_loss:
+  provider: channel
+  target: group

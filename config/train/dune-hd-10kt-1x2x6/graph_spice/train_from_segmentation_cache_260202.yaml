@@ -1,0 +1,16 @@
+__meta__:
+  kind: bundle
+  version: "260202"
+  date: "2026-02-02"
+  description: DUNE-HD 10 kt module 1x2x6 260202 graph_spice training
+
+include:
+  - model/dune-hd-10kt-1x2x6/graph_spice/model_260202.yaml
+  - train/dune-hd-10kt-1x2x6/graph_spice/from_segmentation_cache_v1.yaml
+
+override:
+  model.network_input.data: data_calib
+  model.network_input.seg_label: seg_pred
+  model.loss_input.seg_label: seg_pred
+  model.loss_input.clust_label: clust_label_adapt
+  model.modules.graph_spice.make_clusters: false

@@ -1,0 +1,14 @@
+__meta__:
+  kind: bundle
+  version: "260510"
+  date: "2026-05-10"
+  description: Append DUNE-HD 10 kt module 1x2x6 historical particle graphs and historical supervision
+
+include: cache/dune-hd-10kt-1x2x6/grappa_shower_track/base_v1.yaml
+
+model:
+  modules:
+    grappa_shower: !include model/dune-hd-10kt-1x2x6/grappa_shower/network_260510.yaml
+    grappa_track: !include model/dune-hd-10kt-1x2x6/grappa_track/network_full_chain_260510.yaml
+    grappa_inter: !include model/dune-hd-10kt-1x2x6/grappa_inter/network_full_chain_260510.yaml
+    grappa_inter_loss: !include model/dune-hd-10kt-1x2x6/grappa_inter/loss_260510.yaml

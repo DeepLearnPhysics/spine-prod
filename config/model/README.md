@@ -96,3 +96,7 @@ collection calibration upstream to `1 / 0.005045` electrons/ADC and uses
 IoU-filtered interaction PID/primary supervision plus orientation targets.
 Its candidate post-processing removes the historical compensating gain;
 released inference bundles and latest selection are unchanged.
+
+Historical FD-HD `260202` and `260510` compositions preserve the released
+networks, objectives, and calibration. The `260626` pipeline reuses `260510`
+training components and selects the June post-processing revision.

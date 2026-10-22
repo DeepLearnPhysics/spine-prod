@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260510"
+  date: "2026-05-10"
+  description: DUNE-HD 10 kt module 1x2x6 260510 uresnet_deghost training
+
+include:
+  - model/dune-hd-10kt-1x2x6/uresnet_deghost/model_260510.yaml
+  - train/dune-hd-10kt-1x2x6/uresnet_deghost/base_v1.yaml

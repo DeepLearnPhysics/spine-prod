@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "260510"
+  date: "2026-05-10"
+  description: DUNE-HD 10 kt module 1x2x6 standalone grappa_shower model
+
+include: model/common/grappa_shower/base_v1.yaml
+
+override:
+  model.modules.grappa: !include model/dune-hd-10kt-1x2x6/grappa_shower/network_260510.yaml
+  model.modules.grappa_loss: !include model/dune-hd-10kt-1x2x6/grappa_shower/loss_260510.yaml

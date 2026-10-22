@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "260510"
+  date: "2026-05-10"
+  description: Historical FD-HD graph_spice objective
+provider: edge
+loss: binary_log_dice_ce

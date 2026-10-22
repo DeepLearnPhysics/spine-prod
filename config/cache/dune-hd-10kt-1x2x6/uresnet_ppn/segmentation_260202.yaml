@@ -1,0 +1,11 @@
+__meta__:
+  kind: bundle
+  version: "260202"
+  date: "2026-02-02"
+  description: Append DUNE-HD 10 kt module 1x2x6 260202 segmentation products
+
+include: cache/dune-hd-10kt-1x2x6/uresnet_ppn/base_v1.yaml
+
+model:
+  modules:
+    uresnet_ppn: !include model/dune-hd-10kt-1x2x6/uresnet_ppn/network_260202.yaml

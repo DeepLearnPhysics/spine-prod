@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  version: "260202"
+  date: "2026-02-02"
+  description: Historical FD-HD uresnet objective
+balance_loss: false

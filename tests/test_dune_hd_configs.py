@@ -189,3 +189,57 @@ def test_candidate_pipeline_uses_new_calibration_targets_and_checkpoint_end_to_e
     report = load(stages["report_full_chain"]["config"])
     assert "particle_orientation" in report["metrics"]["nodes"]["tasks"]
     assert "deghosting" in report["metrics"]
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_legacy_pipeline_preserves_released_model_and_postprocessing(version):
+    pipeline = PipelineDefinition.load(
+        ROOT / f"pipelines/dune-hd-10kt-1x2x6/full_chain_{version}.yaml",
+        workspace_override=f"/tmp/fd-{version}",
+    )
+    stages = {stage["name"]: stage for stage in pipeline.stages}
+    assert len(stages) == 21
+    for stage in pipeline.stages:
+        cfg = load(stage["config"])
+        if stage.get("stage") == "train":
+            assert cfg["model"].get("weight_path") is None
+            assert set(stage["warm_start"]) <= set(cfg["model"]["modules"])
+    released = load(f"infer/dune-hd-10kt-1x2x6/full_chain_{version}.yaml")
+    exported = load(stages["export_full_chain_weights"]["config"])
+    evaluated = load(stages["evaluate_full_chain"]["config"])
+    assert exported["model"]["modules"] == released["model"]["modules"]
+    assert evaluated["model"]["modules"] == released["model"]["modules"]
+    # Metrics enable fragment matching in adapted space and add PPN records.
+    expected_post = released["post"]["stages"]
+    for stage in expected_post:
+        if stage["name"] == "match":
+            stage.update(truth_point_mode="points_adapt", fragment=True)
+    assert evaluated["post"]["stages"] == expected_post + [{"name": "ppn"}]
+    dataset_root = (
+        "/sdf/data/neutrino/dune/sim/mpvmpr_v0"
+        if version == "260202"
+        else "/sdf/data/neutrino/dune/sim/hd/mpvmpr_v1"
+    )
+    assert (
+        stages["train_uresnet_deghost"]["source_list"]
+        == f"{dataset_root}/train_file_list.txt"
+    )
+    cache = load(stages["cache_train_deghosting"]["config"])
+    assert (
+        cache["model"]["modules"]["chain"]["stages"][1]["config"]["calibration"]
+        == released["model"]["modules"]["calibration"]
+    )
+    particle_cache = load(stages["cache_train_particle_graphs"]["config"])
+    trainer = load(stages["train_grappa_inter"]["config"])
+    assert (
+        particle_cache["model"]["modules"]["grappa_inter_loss"]
+        == released["model"]["modules"]["grappa_inter_loss"]
+    )
+    assert (
+        trainer["model"]["modules"]["grappa_loss"]
+        == released["model"]["modules"]["grappa_inter_loss"]
+    )
+    assert set(particle_cache["io"]["writer"]["keys"]) == set(
+        trainer["io"]["loader"]["dataset"]["keys"]
+    )
+    assert not any("orient" in key for key in particle_cache["io"]["writer"]["keys"])

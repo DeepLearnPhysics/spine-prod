@@ -1,0 +1,19 @@
+__meta__:
+  kind: fragment
+  version: "260510"
+  date: "2026-05-10"
+  description: Historical FD-HD grappa_inter objective
+node_loss:
+  type:
+    provider: class
+    target: pid
+    loss: ce
+    balance_loss: true
+  primary:
+    provider: class
+    target: inter_primary
+    loss: ce
+    balance_loss: true
+edge_loss:
+  provider: channel
+  target: interaction

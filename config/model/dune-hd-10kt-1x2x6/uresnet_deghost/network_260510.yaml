@@ -1,0 +1,18 @@
+__meta__:
+  kind: fragment
+  version: "260510"
+  date: "2026-05-10"
+  description: Historical FD-HD uresnet_deghost network
+num_input: 2
+num_classes: 2
+filters: 32
+depth: 5
+reps: 2
+allow_bias: false
+activation:
+  provider: lrelu
+  negative_slope: 0.33
+norm_layer:
+  provider: batch_norm
+  eps: 0.0001
+  momentum: 0.01

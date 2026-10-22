@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  version: "260510"
+  date: "2026-05-10"
+  description: Historical FD-HD uresnet_deghost objective
+balance_loss: false

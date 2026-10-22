@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260202"
+  date: "2026-02-02"
+  description: DUNE-HD 10 kt module 1x2x6 260202 grappa_inter training
+
+include:
+  - model/dune-hd-10kt-1x2x6/grappa_inter/model_260202.yaml
+  - train/dune-hd-10kt-1x2x6/grappa_inter/from_particle_cache_v1.yaml
