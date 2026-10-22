@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD candidate uresnet_ppn ppn_loss
+mask_loss: CE
+resolution: 5.0
+restrict_to_clusters: true

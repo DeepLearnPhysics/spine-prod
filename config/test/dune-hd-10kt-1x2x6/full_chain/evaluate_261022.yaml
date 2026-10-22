@@ -1,0 +1,21 @@
+__meta__:
+  kind: bundle
+  version: "261022"
+  date: "2026-10-22"
+  description: Evaluate the DUNE-HD 10 kt module 1x2x6 261022 trained full chain
+
+include:
+  - infer/dune-hd-10kt-1x2x6/base/base_260202.yaml
+  - infer/dune-hd-10kt-1x2x6/io/io_260202.yaml
+  - model/dune-hd-10kt-1x2x6/full_chain/model_261022.yaml
+  - infer/dune-hd-10kt-1x2x6/post/candidate/post_261022.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+
+override:
+  io.writer: null
+  model.network_input.clust_label: clust_label
+  ana.stages~:
+    update:
+      name: segment_eval
+      changes:
+        ghost: true

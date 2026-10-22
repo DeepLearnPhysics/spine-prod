@@ -89,3 +89,10 @@ PID and primary targets use truth-group IoU filtering and closest-primary
 selection, and its existing orientation head receives explicit supervision.
 Standalone and full-chain interaction objectives remain separate. This
 candidate has no released inference checkpoint.
+
+DUNE-HD `dune-hd-10kt-1x2x6/` provides the `261022` training candidate with
+six PID classes and the released FD-HD network architectures. It corrects
+collection calibration upstream to `1 / 0.005045` electrons/ADC and uses
+IoU-filtered interaction PID/primary supervision plus orientation targets.
+Its candidate post-processing removes the historical compensating gain;
+released inference bundles and latest selection are unchanged.

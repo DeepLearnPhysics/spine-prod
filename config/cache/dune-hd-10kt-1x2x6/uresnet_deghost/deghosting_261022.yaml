@@ -1,0 +1,29 @@
+__meta__:
+  kind: bundle
+  version: "261022"
+  date: "2026-10-22"
+  description: Materialize DUNE-HD 10 kt module 1x2x6 261022 deghosting and calibration products
+
+include: cache/dune-hd-10kt-1x2x6/uresnet_deghost/base_v1.yaml
+
+# Calibration resolves detector volumes through the same geometry as inference.
+geo:
+  detector: dune-hd-10kt-1x2x6
+  tag: dune10kt_v4_1x2x6
+
+model:
+  modules:
+    uresnet_deghost: !include model/dune-hd-10kt-1x2x6/uresnet_deghost/network_261022.yaml
+
+override:
+  model.modules.chain.stages:
+    - name: deghosting
+      provider: deghost
+      uses: uresnet_deghost
+      config:
+        mode: uresnet
+        charge_rescaling: collection
+    - name: calibration
+      config:
+        mode: apply
+        calibration: !include model/dune-hd-10kt-1x2x6/calibration/calibration_261022.yaml

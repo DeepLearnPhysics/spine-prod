@@ -1,0 +1,17 @@
+__meta__:
+  kind: bundle
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD 10 kt module 1x2x6 261022 grappa_inter training
+
+include:
+  - model/dune-hd-10kt-1x2x6/grappa_inter/model_261022.yaml
+  - train/dune-hd-10kt-1x2x6/grappa_inter/from_particle_cache_v1.yaml
+
+override:
+  model.modules.grappa_loss: !include model/dune-hd-10kt-1x2x6/grappa_inter/loss_full_chain_261022.yaml
+  io.loader.dataset.keys+:
+    - particle_graph_node_orient_target
+    - particle_graph_node_orient_valid
+  model.loss_input.node_orient_target: particle_graph_node_orient_target
+  model.loss_input.node_orient_valid: particle_graph_node_orient_valid

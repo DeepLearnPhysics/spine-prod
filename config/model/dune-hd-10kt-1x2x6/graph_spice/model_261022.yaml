@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD 10 kt module 1x2x6 standalone graph_spice model
+
+include: model/common/graph_spice/base_v1.yaml
+
+override:
+  model.modules.graph_spice: !include model/dune-hd-10kt-1x2x6/graph_spice/network_261022.yaml
+  model.modules.graph_spice_loss: !include model/dune-hd-10kt-1x2x6/graph_spice/loss_261022.yaml

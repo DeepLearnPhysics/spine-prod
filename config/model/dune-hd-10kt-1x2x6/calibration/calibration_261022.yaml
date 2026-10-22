@@ -1,0 +1,19 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD collection-charge calibration
+
+# Invert collection-plane dune10kt_calorimetryalgmc.CalAreaConstants:
+# 1 / 5.045e-3 ADC/electron = 198.21605550049554 electrons/ADC.
+# https://github.com/DUNE/dunesw/blob/61fa3cb5d95a4786a2cf674b9f5d6b0fc3f453cc/fcl/common/calorimetry_dune10kt.fcl
+stages:
+  - name: gain
+    gain: 198.21605550049554
+  - name: recombination
+    model: mbox
+    efield: 0.5
+    mip_dedx: 2.105168
+  - name: lifetime
+    lifetime: 10400
+    driftv: 0.160563

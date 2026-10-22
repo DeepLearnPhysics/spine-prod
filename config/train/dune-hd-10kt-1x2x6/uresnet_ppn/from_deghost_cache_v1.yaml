@@ -1,0 +1,96 @@
+__meta__:
+  kind: fragment
+  description: DUNE-HD 10 kt module 1x2x6 UResNet-PPN training from cached deghosted data
+
+base:
+  world_size: 1
+  epochs: 100.0
+  seed: 0
+  unwrap: false
+  log_dir:
+  log_step: 1
+
+io:
+  loader:
+    minibatch_size: 32
+    shuffle: false
+    num_workers: 8
+    collate_fn: all
+    sampler:
+      provider: random_sequence
+      seed: 0
+    dataset:
+      provider: mixed
+      primary:
+        provider: larcv
+        file_keys:
+        schema:
+          seg_label:
+            provider: sparse3d
+            sparse_event: sparse3d_pcluster_semantics_ghost
+          ppn_label:
+            provider: particle_points
+            sparse_event: sparse3d_pcluster
+            particle_event: particle_corrected
+            include_point_tagging: false
+          clust_label:
+            provider: cluster3d
+            cluster_event: cluster3d_pcluster
+            sparse_semantics_event: sparse3d_pcluster_semantics
+            clean_data: true
+            particle_info:
+              particle_event: particle_corrected
+              neutrino_event: neutrino_mpv
+              type_include_secondary: false
+              type_include_mpr: false
+              primary_include_mpr: false
+      cache:
+        path:
+        stage: deghosting
+        keep_open: true
+        keys: [data_calib, orig_index]
+
+train:
+  weight_prefix:
+  save_epoch: 1.0
+  optimizer:
+    provider: Adam
+    lr: 0.001
+
+validation:
+  file_keys:
+  fraction: 1.0
+  early_stopping:
+    monitor: loss
+    mode: min
+    patience: 5
+    min_delta: 0.0
+  best_checkpoint: true
+
+model:
+  provider: full_chain
+  weight_path:
+  to_numpy: false
+
+  network_input:
+    data: data_calib
+    orig_index: orig_index
+    seg_label: seg_label
+    clust_label: clust_label
+
+  loss_input:
+    seg_label: seg_label
+    ppn_label: ppn_label
+    clust_label: clust_label
+
+  modules:
+    chain:
+      stages:
+        - name: segmentation
+          uses: uresnet_ppn
+          loss: uresnet_ppn_loss
+          config:
+            mode: uresnet
+            point_proposal: ppn
+            # PPN supervision must remain in the raw cluster-label domain.
+            adapt_labels: false

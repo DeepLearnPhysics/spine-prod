@@ -1,0 +1,75 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD 10 kt module 1x2x6 candidate with corrected charge and overlap-aware tasks
+
+include: model/dune-hd-10kt-1x2x6/full_chain/base_v1.yaml
+
+override:
+  model.weight_path: null
+  model.network_input:
+    data: data
+    sources: sources
+    seg_label: seg_label
+    meta: meta
+    run_info: run_info
+  model.modules.chain.stages:
+    - name: deghosting
+      provider: deghost
+      uses: uresnet_deghost
+      loss: uresnet_deghost_loss
+      config:
+        mode: uresnet
+        charge_rescaling: collection
+    - name: calibration_before_segmentation
+      provider: calibration
+      uses: calibration
+      config:
+        mode: apply
+    - name: segmentation
+      uses: uresnet_ppn
+      loss: uresnet_ppn_loss
+      config:
+        mode: uresnet
+        point_proposal: ppn
+    - name: fragmentation
+      uses: graph_spice
+      loss:
+        graph_spice: graph_spice_loss
+      config:
+        mode: graph_spice
+    - name: particle_aggregation
+      uses:
+        - grappa_shower
+        - grappa_track
+      loss:
+        shower: grappa_shower_loss
+        track: grappa_track_loss
+      config:
+        shower_aggregation: grappa
+        shower_primary: grappa
+        track_aggregation: grappa
+        particle_aggregation: null
+    - name: interaction_aggregation
+      uses: grappa_inter
+      loss: grappa_inter_loss
+      config:
+        mode: grappa
+        task_modes:
+          type: grappa
+          primary: grappa
+          orient: grappa
+  model.modules.calibration: !include model/dune-hd-10kt-1x2x6/calibration/calibration_261022.yaml
+  model.modules.uresnet_deghost: !include model/dune-hd-10kt-1x2x6/uresnet_deghost/network_261022.yaml
+  model.modules.uresnet_deghost_loss: !include model/dune-hd-10kt-1x2x6/uresnet_deghost/loss_261022.yaml
+  model.modules.uresnet_ppn: !include model/dune-hd-10kt-1x2x6/uresnet_ppn/network_261022.yaml
+  model.modules.uresnet_ppn_loss: !include model/dune-hd-10kt-1x2x6/uresnet_ppn/loss_261022.yaml
+  model.modules.graph_spice: !include model/dune-hd-10kt-1x2x6/graph_spice/network_261022.yaml
+  model.modules.graph_spice_loss: !include model/dune-hd-10kt-1x2x6/graph_spice/loss_261022.yaml
+  model.modules.grappa_shower: !include model/dune-hd-10kt-1x2x6/grappa_shower/network_261022.yaml
+  model.modules.grappa_shower_loss: !include model/dune-hd-10kt-1x2x6/grappa_shower/loss_261022.yaml
+  model.modules.grappa_track: !include model/dune-hd-10kt-1x2x6/grappa_track/network_full_chain_261022.yaml
+  model.modules.grappa_track_loss: !include model/dune-hd-10kt-1x2x6/grappa_track/loss_261022.yaml
+  model.modules.grappa_inter: !include model/dune-hd-10kt-1x2x6/grappa_inter/network_full_chain_261022.yaml
+  model.modules.grappa_inter_loss: !include model/dune-hd-10kt-1x2x6/grappa_inter/loss_full_chain_261022.yaml

@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD candidate graph_spice loss
+provider: edge
+loss: binary_log_dice_ce

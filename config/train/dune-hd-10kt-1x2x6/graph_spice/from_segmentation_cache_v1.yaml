@@ -1,0 +1,15 @@
+__meta__:
+  kind: fragment
+  description: DUNE-HD 10 kt module 1x2x6 Graph-SPICE training from cached segmentation products
+
+include: train/dune-hd-10kt-1x2x6/graph_spice/base_v1.yaml
+
+override:
+  io.loader.dataset:
+    provider: cache
+    path:
+    stage: segmentation
+    stage_map:
+      data_calib: deghosting
+    keep_open: true
+    keys: [data_calib, seg_pred, clust_label_adapt]

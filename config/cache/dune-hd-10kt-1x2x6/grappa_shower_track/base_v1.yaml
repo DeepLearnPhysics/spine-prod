@@ -1,0 +1,45 @@
+__meta__:
+  kind: fragment
+  description: Append DUNE-HD 10 kt module 1x2x6 particle graphs and interaction supervision
+
+include: cache/common/grappa_shower_track/base_v1.yaml
+
+override:
+  io.loader.num_workers: 8
+  io.loader.minibatch_size: 128
+  io.loader.dataset:
+    provider: mixed
+    primary:
+      provider: larcv
+      file_keys:
+      schema:
+        coord_label:
+          provider: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+    cache:
+      path:
+      stage: fragmentation
+      stage_map:
+        data_calib: deghosting
+        ppn_points: segmentation
+        clust_label_adapt: segmentation
+      keep_open: true
+      keys:
+        - data_calib
+        - ppn_points
+        - clust_label_adapt
+        - fragment_clusts
+        - fragment_shapes
+  model.network_input.data: data_calib
+
+  io.writer.keys:
+    - particle_graph_edge_index
+    - particle_graph_node_features
+    - particle_graph_edge_features
+    - particle_graph_node_type_target
+    - particle_graph_node_type_valid
+    - particle_graph_node_primary_target
+    - particle_graph_node_primary_valid
+    - particle_graph_edge_target
+    - particle_graph_edge_valid

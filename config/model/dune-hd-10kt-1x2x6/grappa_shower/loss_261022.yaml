@@ -1,0 +1,14 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD candidate grappa_shower loss
+node_loss:
+  provider: shower_primary
+  high_purity: true
+  use_group_pred: true
+  use_closest: true
+edge_loss:
+  provider: channel
+  target: group
+  high_purity: true

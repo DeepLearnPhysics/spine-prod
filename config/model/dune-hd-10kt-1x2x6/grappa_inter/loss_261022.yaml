@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD 10 kt module 1x2x6 standalone PID primary and orientation objectives
+
+include: model/common/grappa_inter/loss_v1.yaml

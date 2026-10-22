@@ -451,3 +451,53 @@ report. Training validation uses `[0.0, 0.5)`; cache stages retain the complete
 accepted validation domain. The `260128` evaluator retains its released
 post-processing gain correction. Released inference models and their
 `latest` selection are unchanged.
+
+## DUNE-HD staged training
+
+`dune-hd-10kt-1x2x6/full_chain_261022.yaml` trains a new six-component candidate
+on MPV/MPR v1, using `dune10kt_v4_1x2x6` geometry and six PID classes. The
+released `260202`, `260510`, and `260626` inference configurations and their
+`latest` selection remain unchanged. Use a new workspace for this candidate.
+
+The candidate converts collection charge with `1 / 0.005045`, approximately
+198.2160555 electrons/ADC, before modified-box recombination. This is the
+inverse collection-plane `dune10kt_calorimetryalgmc.CalAreaConstants` value in
+[the pinned DUNE calorimetry configuration](https://github.com/DUNE/dunesw/blob/61fa3cb5d95a4786a2cf674b9f5d6b0fc3f453cc/fcl/common/calorimetry_dune10kt.fcl).
+Lifetime correction uses 10400 microseconds and drift velocity 0.160563 cm/us.
+The candidate evaluator removes the historical compensating post-processing
+gain. Interaction PID and primary targets require group IoU of at least 0.5,
+primary matching selects the closest piece, and cached endpoint targets
+supervise track orientation. FD-HD network architectures and graph distances
+are retained.
+
+The pipeline builds file-aware entry filters from measured space-point counts,
+accepting fewer than 500,000 reconstructed points per event. No reference skip
+list is hardcoded. It then trains deghosting, UResNet-PPN, Graph-SPICE, shower,
+track, and interaction aggregation, with immutable cache stages between them.
+Train and validation sources default to
+`/sdf/data/neutrino/dune/sim/mpvmpr_v1/{train,test}_file_list.txt`.
+Training validation uses `[0.0, 0.5)` of the accepted validation domain;
+full-chain evaluation uses `[0.5, 1.0)` of the validation source.
+
+These resource settings are initial estimates pending the FD-HD smoke test:
+
+| Trainer | A100 GPUs | Batch | Epoch limit | Time limit |
+| --- | ---: | --- | ---: | --- |
+| Deghosting | 4 | 16 global | 50 | 120 h |
+| UResNet-PPN | 4 | 32 per rank | 100 | 72 h |
+| Graph-SPICE | 4 | 32 per rank | 50 | 48 h |
+| Shower GrapPA | 1 | 16 | 50 | 24 h |
+| Track GrapPA | 1 | 32 | 50 | 16 h |
+| Interaction GrapPA | 1 | 128 | 50 | 8 h |
+
+Cache stages and raw metrics each allow eight hours; export and reporting allow
+30 minutes. Cache batches are 4 for deghosting, 16 for segmentation and fragment
+graphs, and 128 for particle graphs. Trainers use eight loader workers, Adam at
+0.001, validation-loss early stopping, and best-checkpoint selection. The
+pipeline supports the standard optional warm start, with no fixed pretrained
+checkpoint or expandable-segment requirement.
+
+```bash
+./submit.py --pipeline pipelines/dune-hd-10kt-1x2x6/full_chain_261022.yaml \
+  --workspace /path/to/dune-hd-training --spine-path /path/to/spine
+```

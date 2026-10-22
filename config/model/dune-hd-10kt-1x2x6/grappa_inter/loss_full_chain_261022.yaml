@@ -1,0 +1,18 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD 10 kt module 1x2x6 overlap-aware reconstructed-particle objectives
+
+include: model/dune-hd-10kt-1x2x6/grappa_inter/loss_261022.yaml
+
+override:
+  # Supervise PID only for particles with sufficient truth-group overlap.
+  node_loss.type.min_iou: 0.5
+  node_loss.type.match_target: group
+
+  # Only the matched piece closest to the creation point is a primary.
+  node_loss.primary.use_closest: true
+  node_loss.primary.secondary_label: 0
+  node_loss.primary.min_iou: 0.5
+  node_loss.primary.match_target: group

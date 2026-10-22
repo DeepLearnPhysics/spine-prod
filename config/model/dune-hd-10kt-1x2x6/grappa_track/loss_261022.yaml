@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD candidate grappa_track loss
+edge_loss:
+  provider: channel
+  target: group

@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  description: Shared DUNE-HD 10 kt module 1x2x6 full-chain dependencies
+
+include: model/common/full_chain/base_v1.yaml
+
+geo:
+  detector: dune-hd-10kt-1x2x6
+  tag: dune10kt_v4_1x2x6

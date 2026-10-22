@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-HD candidate uresnet_deghost loss
+balance_loss: false

@@ -2274,9 +2274,9 @@ def test_all_training_pipelines_declare_full_chain_warm_start_namespaces():
         for stage in training_stages:
             stage_expected = expected[stage["name"]]
             if stage["name"] == "train_uresnet_ppn" and stage["config"].startswith(
-                "train/protodune-vd/"
+                ("train/protodune-vd/", "train/dune-hd-10kt-1x2x6/")
             ):
-                # Cached VD segmentation owns one UResNet-PPN full-chain module.
+                # Cached deghosted segmentation owns one UResNet-PPN full-chain module.
                 stage_expected = {"uresnet_ppn": "uresnet_ppn"}
             assert stage["warm_start"] == stage_expected
 
