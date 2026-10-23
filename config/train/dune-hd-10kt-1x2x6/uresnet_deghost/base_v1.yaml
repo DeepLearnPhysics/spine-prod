@@ -12,7 +12,7 @@ base:
 
 io:
   loader:
-    batch_size: 16
+    batch_size: 12
     shuffle: false
     num_workers: 8
     collate_fn: all

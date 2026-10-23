@@ -75,7 +75,7 @@ def test_filters_and_initial_resource_budget():
         assert load(build["config"])["filters"]["sparse3d_reco"]["max_count"] == 500000
         assert stages[f"cache_{split}_deghosting"]["entry_filter"] == build["output"]
     for component, batch, hours in [
-        ("uresnet_deghost", 16, "5-00:00:00"),
+        ("uresnet_deghost", 12, "5-00:00:00"),
         ("uresnet_ppn", 32, "3-00:00:00"),
         ("graph_spice", 32, "2-00:00:00"),
         ("grappa_shower", 16, "1-00:00:00"),

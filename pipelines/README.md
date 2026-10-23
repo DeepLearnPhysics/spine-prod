@@ -483,12 +483,16 @@ These resource settings are initial estimates pending the FD-HD smoke test:
 
 | Trainer | A100 GPUs | Batch | Epoch limit | Time limit |
 | --- | ---: | --- | ---: | --- |
-| Deghosting | 4 | 16 global | 50 | 120 h |
+| Deghosting | 4 | 12 global | 50 | 120 h |
 | UResNet-PPN | 4 | 32 per rank | 100 | 72 h |
 | Graph-SPICE | 4 | 32 per rank | 50 | 48 h |
 | Shower GrapPA | 1 | 16 | 50 | 24 h |
 | Track GrapPA | 1 | 32 | 50 | 16 h |
 | Interaction GrapPA | 1 | 128 | 50 | 8 h |
+
+The FD-HD smoke run exhausted GPU memory with four events per rank. All FD-HD
+revisions therefore use three events per rank (12 global) for deghosting,
+while retaining the 500,000-point filter. This reduced batch awaits validation.
 
 Cache stages and raw metrics each allow eight hours; export and reporting allow
 30 minutes. Cache batches are 4 for deghosting, 16 for segmentation and fragment
