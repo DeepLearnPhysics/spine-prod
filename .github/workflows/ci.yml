@@ -55,11 +55,11 @@ jobs:
       - name: Run tests
         run: pytest -v --cov=. --cov-branch --cov-report=xml
 
-      - name: Require full submission and sharding coverage
+      - name: Require full production Python coverage
         if: matrix.python-version == '3.11'
         run: >-
           python -m coverage report
-          --include=src/batch.py,src/joint_sharding.py,src/pipeline.py,submit.py
+          --include='src/*,submit.py'
           --fail-under=100
 
       - name: Upload coverage to Codecov
