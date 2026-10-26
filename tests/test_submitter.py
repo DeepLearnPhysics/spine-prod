@@ -3522,8 +3522,9 @@ SPINE_CONTAINER_PATH=/unused.sif
         assert metadata["stage"] == "train"
         assert metadata["resume_checkpoint"] == str(saved)
 
+    @pytest.mark.parametrize("tensorboard", [False, True])
     def test_submit_validation_selects_missing_checkpoints_and_noops(
-        self, mock_submitter, tmp_path, capsys
+        self, mock_submitter, tmp_path, capsys, tensorboard
     ):
         """Test validation submits only checkpoints without complete CSV logs."""
         run_dir = tmp_path / "experiments" / "deghost" / "default"
@@ -3553,7 +3554,7 @@ SPINE_CONTAINER_PATH=/unused.sif
                 profile="s3df_ampere",
                 stage="validation",
                 run_dir=str(run_dir),
-                tensorboard=True,
+                tensorboard=tensorboard,
             ) == ["val-1"]
             submit.assert_called_once()
 
@@ -3564,10 +3565,14 @@ SPINE_CONTAINER_PATH=/unused.sif
         assert f"--log-dir {run_dir}" in script
         assert f"--weight-list {(submission / 'weights.txt').resolve()}" in script
         assert "model.weight_path=null" in script
-        assert (
-            f"--tensorboard --tensorboard-dir {run_dir}/tensorboard/validation"
-            in script
-        )
+        if tensorboard:
+            assert (
+                f"--tensorboard --tensorboard-dir {run_dir}/tensorboard/validation"
+                in script
+            )
+        else:
+            assert "--tensorboard" not in script
+            assert not (run_dir / "tensorboard").exists()
 
         (run_dir / "inference_log-0000020.csv").write_text(
             "iter,loss\n0,1\n", encoding="utf-8"
