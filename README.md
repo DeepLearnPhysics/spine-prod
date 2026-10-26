@@ -90,6 +90,13 @@ source configure.sh
 ./submit.py --config infer/nd-lar/latest --apply-mods joint \
   --source-list primary=primary.txt secondary=secondary.txt
 
+# Survey entries and give each group of up to two primary files a disjoint
+# range of secondary events; run at most four tasks concurrently
+./submit.py --config infer/nd-lar/latest --apply-mods joint \
+  --joint-file-mode balanced \
+  --source-list primary=primary.txt secondary=secondary.txt \
+  --files-per-task 2 --ntasks 4
+
 # Split the file list across 50 tasks as evenly as possible
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
@@ -112,6 +119,34 @@ source configure.sh
 ./submit.py --interactive --config infer/icarus/latest --source test.root
 ./submit.py -I --config infer/icarus/latest --source-list files.txt --task-id 2
 ```
+
+Balanced joint sharding currently supports local LArCV ROOT files and requires
+`uproot` or PyROOT on the submission host. Install the optional dependencies with
+`python3 -m pip install -r requirements-joint.txt`; PyROOT is not needed when
+uproot is installed. The survey runs where `submit.py` runs, so worker environments
+need no additional survey dependency. It surveys
+`*_tree` entry counts, requiring consistent counts across products in each file.
+It pairs entries in sorted file-path order, processes the smaller source's total,
+and never reuses secondary entries. If secondary runs out, the last primary group
+is shortened and later groups are omitted. `--files-per-task` limits primary files;
+secondary files are selected as needed and may be shared through disjoint slices.
+`--num-files` limits the primary list before surveying. Without `--files-per-task`,
+`--ntasks` splits primary files as usual.
+
+Dry runs also survey inputs and write `joint_shards.json` in the attempt directory,
+including counts, ranges and unused totals. `entry_counts.json` in the run directory
+caches metadata for retries, invalidated by file size or modification time. Inputs
+must remain unchanged between survey and execution. Use an unfiltered joint dataset:
+custom dataset entry filters/selections are not supported by this mode. Balanced
+mode owns source ranges and uses sequential pairing with incomplete batches retained.
+
+Joint modifiers disable per-input output splitting because overlay events contain
+both primary and secondary provenance. The default is one output per task. Use
+`--files-per-task 1` for one output per processed primary file; this also works
+when several tasks read disjoint slices of the same secondary file. If secondary
+entries run out, the final output may contain only part of its primary file and
+later primary files produce no output. Multiple primary files per task currently
+share one output; primary-only output routing would require writer support.
 
 ### Interactive Mode
 

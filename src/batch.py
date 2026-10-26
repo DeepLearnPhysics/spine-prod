@@ -1,5 +1,6 @@
 """Single-job planning, template rendering, and scheduler submission."""
 
+import json
 import math
 import shlex
 import sys
@@ -10,6 +11,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from .client import PBSClient, SlurmClient
 from .component import SubmissionComponent
+from .joint_sharding import plan_shards, survey_sources
 from .run_manager import RunManager
 
 
@@ -244,7 +246,8 @@ class BatchRunner(SubmissionComponent):
             Joint-dataset file sharding policy. ``broadcast`` partitions primary
             files and gives every task all secondary files. ``paired`` truncates
             both ordered lists to the shorter length and partitions matching
-            primary/secondary file indexes together.
+            primary/secondary file indexes together. ``balanced`` surveys ROOT
+            entry counts and assigns disjoint secondary slices to primary groups.
         dependency : str, optional
             Batch scheduler dependency string, by default None
         larcv_path : str, optional
@@ -334,8 +337,10 @@ class BatchRunner(SubmissionComponent):
         if no_writer:
             self.context.spine_cli.warn_no_writer_deprecated()
 
-        if joint_file_mode not in ("broadcast", "paired"):
-            raise ValueError("joint_file_mode must be either 'broadcast' or 'paired'")
+        if joint_file_mode not in ("broadcast", "paired", "balanced"):
+            raise ValueError(
+                "joint_file_mode must be either 'broadcast', 'paired' or 'balanced'"
+            )
 
         if in_place and (output is not None or output_suffix is not None):
             raise ValueError(
@@ -495,12 +500,30 @@ class BatchRunner(SubmissionComponent):
             and "secondary" in named_sources
             and "cache" not in named_sources
         )
-        if joint_file_mode == "paired" and not joint_named_sources:
+        if joint_file_mode in ("paired", "balanced") and not joint_named_sources:
             raise ValueError(
                 "Paired joint files require named primary and secondary sources"
             )
-        if joint_file_mode == "paired" and stage != "inference":
+        if joint_file_mode in ("paired", "balanced") and stage != "inference":
             raise ValueError("Paired joint files are valid only for inference jobs")
+        balanced_joint_sources = joint_file_mode == "balanced"
+        if balanced_joint_sources:
+            if set(named_sources) != {"primary", "secondary"}:
+                raise ValueError(
+                    "Balanced joint sharding requires exactly primary and secondary"
+                )
+            if allow_missing_inputs:
+                raise ValueError("Balanced joint sharding must survey existing inputs")
+            if num_entries is not None or entry_fraction_range is not None:
+                raise ValueError(
+                    "Balanced joint sharding cannot combine entry selection overrides"
+                )
+            for override in set_overrides or []:
+                key = override.split("=", 1)[0]
+                if key.startswith(("io.loader.dataset", "io.loader.sampler")):
+                    raise ValueError(
+                        "Balanced joint sharding manages dataset and sampler overrides"
+                    )
         broadcast_joint_sources = joint_named_sources and joint_file_mode == "broadcast"
         validation_joint_named_sources = bool(
             validation_named_sources
@@ -919,6 +942,7 @@ class BatchRunner(SubmissionComponent):
 
         file_chunks = [[]]
         resolved_named_sources = None
+        balanced_shards = None
         inference_source_count = len(file_list)
         concurrent_task_limit = None
         if stage == "inference" and file_list:
@@ -935,12 +959,12 @@ class BatchRunner(SubmissionComponent):
             resolved_named_sources = self.file_handler.parse_named_sources(
                 effective_named_sources,
                 allow_missing=allow_missing_inputs,
-                aligned=not broadcast_joint_sources,
+                aligned=not (broadcast_joint_sources or balanced_joint_sources),
             )
             resolved_named_sources = self.file_handler.limit_named_sources(
                 resolved_named_sources,
                 num_files,
-                primary_only=broadcast_joint_sources,
+                primary_only=broadcast_joint_sources or balanced_joint_sources,
             )
             partitioned_sources = {
                 target: paths
@@ -961,6 +985,32 @@ class BatchRunner(SubmissionComponent):
             file_chunks = self.file_handler.chunk_files(
                 list(range(source_count)), max_array_size, effective_files_per_task
             )
+            if balanced_joint_sources:
+                # SPINE readers sort input paths before constructing entry offsets.
+                partitioned_sources = {
+                    target: sorted(paths)
+                    for target, paths in partitioned_sources.items()
+                }
+                counts = survey_sources(
+                    partitioned_sources, job_dir / "entry_counts.json"
+                )
+                balanced_shards = plan_shards(
+                    partitioned_sources, counts, effective_files_per_task
+                )
+                file_chunks = self.file_handler.chunk_files(
+                    list(range(len(balanced_shards))), max_array_size, 1
+                )
+                totals = {target: sum(values) for target, values in counts.items()}
+                usable = sum(shard["entries"] for shard in balanced_shards)
+                print(f"Balanced joint submission: {usable} entry pairs")
+                for target, total in totals.items():
+                    print(f"  {target}: {total} entries, {total - usable} unused")
+                (attempt_dir / "joint_shards.json").write_text(
+                    json.dumps(
+                        {"totals": totals, "counts": counts, "shards": balanced_shards},
+                        indent=2,
+                    )
+                )
             if files_per_task is not None and ntasks is not None:
                 concurrent_task_limit = ntasks
 
@@ -1065,14 +1115,28 @@ class BatchRunner(SubmissionComponent):
                     task_dir.mkdir(parents=True, exist_ok=True)
                     if not output and not in_place:
                         (task_dir / "output").mkdir()
+                    shard = (
+                        balanced_shards[index_group[0]]
+                        if balanced_shards is not None
+                        else None
+                    )
+                    if shard:
+                        for target in ("primary", "secondary"):
+                            (task_dir / f"{target}.skip").write_text(
+                                str(shard[target]["n_skip"])
+                            )
+                        (task_dir / "entries.count").write_text(str(shard["entries"]))
                     for target, source_files in partitioned_sources.items():
                         manifest = task_dir / f"{target}.txt"
                         with manifest.open("w", encoding="utf-8") as stream:
                             selected_files = (
                                 source_files
-                                if broadcast_joint_sources and target == "secondary"
+                                if balanced_joint_sources
+                                or (broadcast_joint_sources and target == "secondary")
                                 else [source_files[index] for index in index_group]
                             )
+                            if shard:
+                                selected_files = shard[target]["files"]
                             for source_file in selected_files:
                                 stream.write(f"{source_file}\n")
                 task_list_args = " ".join(
@@ -1091,6 +1155,20 @@ class BatchRunner(SubmissionComponent):
                 chunk_spine_overrides = spine_cli_overrides.replace(
                     named_source_overrides, named_source_args, 1
                 )
+                if balanced_joint_sources:
+                    for target in ("primary", "secondary"):
+                        prefix = f"io.loader.dataset.{target}"
+                        chunk_spine_overrides += (
+                            f' --set {prefix}.n_skip=$(cat "$TASK_DIR/{target}.skip")'
+                            f' --set {prefix}.n_entry=$(cat "$TASK_DIR/entries.count")'
+                        )
+                    sampler = "{name: joint_sequential, drop_last: false}"
+                    chunk_spine_overrides += " --set io.loader.sampler=" + shlex.quote(
+                        sampler
+                    )
+                    chunk_spine_overrides += (
+                        " --set io.loader.drop_last=false --set io.loader.shuffle=false"
+                    )
                 chunk_spine_log_dir = "$TASK_DIR"
                 if not output and not in_place:
                     chunk_output_args = " ".join(

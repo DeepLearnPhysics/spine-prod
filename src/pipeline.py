@@ -749,10 +749,10 @@ class PipelineDefinition:
             raise TypeError(f"Pipeline stage '{name}' in_place must be a boolean")
 
         joint_file_mode = stage.get("joint_file_mode", "broadcast")
-        if joint_file_mode not in ("broadcast", "paired"):
+        if joint_file_mode not in ("broadcast", "paired", "balanced"):
             raise ValueError(
                 f"Pipeline stage '{name}' joint_file_mode must be "
-                "broadcast or paired"
+                "broadcast, paired or balanced"
             )
 
         cache_fields = PipelineDefinition._present(
@@ -874,7 +874,7 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' task splitting requires stage=inference"
             )
-        if stage.get("joint_file_mode", "broadcast") == "paired":
+        if stage.get("joint_file_mode", "broadcast") in ("paired", "balanced"):
             sources = stage.get("sources") or {}
             if lifecycle != "inference":
                 raise ValueError(
