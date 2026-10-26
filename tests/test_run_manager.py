@@ -140,6 +140,8 @@ def test_checkpoint_order_latest_and_explicit_resume(tmp_path):
     first = checkpoint(run_dir, 9)
     latest = checkpoint(run_dir, 100)
     checkpoint(run_dir, 500, name="other")
+    (run_dir / "weights" / "snapshot-best.ckpt").touch()
+    (run_dir / "weights" / "snapshot-invalid.ckpt").touch()
 
     assert RunManager.checkpoints(run_dir) == [(9, first), (100, latest)]
     assert RunManager.latest_checkpoint(run_dir) == latest

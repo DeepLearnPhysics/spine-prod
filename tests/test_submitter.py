@@ -887,8 +887,9 @@ class TestSubmitterHelpers:
         with patch("src.runtime.shutil.which", return_value=None):
             assert mock_submitter.runtime.resolve_spine_cache_command() == (None, None)
 
+    @pytest.mark.parametrize("bind_paths", [None, "/existing"])
     def test_submit_filter_scan_builds_persistent_scheduler_job(
-        self, mock_submitter, tmp_path
+        self, mock_submitter, tmp_path, bind_paths
     ):
         """A scan job records its exact reusable counter-cache invocation."""
         run_dir = tmp_path / "filter-scan"
@@ -914,6 +915,7 @@ class TestSubmitterHelpers:
                 cache_dir=str(cache_dir),
                 run_dir=str(run_dir),
                 workers=16,
+                bind_paths=bind_paths,
                 force=True,
                 dependency="afterok:40",
             )
@@ -922,6 +924,8 @@ class TestSubmitterHelpers:
         attempt = (run_dir / "latest").resolve()
         script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
         assert "spine-filter scan" in script
+        expected_bind = bind_paths or "/sdf/"
+        assert f'BIND_PATHS="{expected_bind},/checkout"' in script
         assert "--source '/data/input one.root' /data/input-two.root" in script
         assert "--workers 16 --force" in script
         assert "#SBATCH --dependency=afterok:40" in script
@@ -5207,8 +5211,10 @@ class TestPipelineSubmission:
                 exclude="node01",
             )
 
+    @pytest.mark.parametrize("bind_paths", [None, "/existing"])
+    @pytest.mark.parametrize("job_id", ["42", None])
     def test_submit_report_adds_checkout_bind_account_and_dependency(
-        self, mock_submitter, tmp_path, capsys
+        self, mock_submitter, tmp_path, capsys, bind_paths, job_id
     ):
         """Report jobs derive omitted site resources and bind a source checkout."""
         source = tmp_path / "report.yaml"
@@ -5217,6 +5223,7 @@ class TestPipelineSubmission:
             "site": "s3df",
             "scheduler": "slurm",
             "description": "Slurm test",
+            "bind_paths": bind_paths,
         }
 
         with (
@@ -5238,7 +5245,7 @@ class TestPipelineSubmission:
                 "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
-            patch.object(mock_submitter.batch_client, "submit", return_value="42"),
+            patch.object(mock_submitter.batch_client, "submit", return_value=job_id),
         ):
             assert mock_submitter.submit_report(
                 config=str(source),
@@ -5246,11 +5253,14 @@ class TestPipelineSubmission:
                 output_dir=str(tmp_path / "output"),
                 run_dir=str(tmp_path / "run"),
                 dependency="afterok:41",
-            ) == ["42"]
+                dry_run=job_id is None,
+            ) == ([job_id] if job_id else [])
 
-        assert profile["bind_paths"] == "/sdf/,/checkout"
+        assert profile["bind_paths"] == f"{bind_paths or '/sdf/'},/checkout"
         assert profile["account"]
-        assert "Dependency: afterok:41" in capsys.readouterr().out
+        output = capsys.readouterr().out
+        assert "Dependency: afterok:41" in output
+        assert ("Job ID: 42" in output) is bool(job_id)
 
     def test_resolve_spine_report_command_path_forms_and_fallbacks(
         self, mock_submitter, tmp_path
