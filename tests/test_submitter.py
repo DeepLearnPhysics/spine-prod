@@ -2781,13 +2781,24 @@ class TestBatchSpineOverride:
             survey.assert_not_called()
             submit.assert_not_called()
 
-    def test_submit_job_balances_joint_entries(self, mock_submitter, tmp_path):
+    @pytest.mark.parametrize(
+        "spine_command",
+        ["spine", "/opt/spine/bin/spine", "python3 /opt/spine/bin/run.py"],
+    )
+    def test_submit_job_balances_joint_entries(
+        self, mock_submitter, tmp_path, spine_command
+    ):
         run_dir = tmp_path / "run"
         primary = [tmp_path / f"p-{index}.root" for index in range(5)]
         secondary = [tmp_path / "secondary.root"]
         for path in primary + secondary:
             path.touch()
         with (
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_command",
+                return_value=(spine_command, None),
+            ),
             patch.object(
                 mock_submitter.batch,
                 "get_batch_client",
@@ -2827,11 +2838,12 @@ class TestBatchSpineOverride:
         # Exercise both quoting layers with a fake container and executable.
         import subprocess
 
+        assert f" exec {spine_command} " in script
         command_line = next(
             line
             for line in script.splitlines()
             if line.startswith('SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec ')
-        ).replace(" exec spine ", " fake_spine ")
+        ).replace(f" exec {spine_command} ", " fake_spine ", 1)
         container_line = next(
             line for line in script.splitlines() if line.startswith("SINGULARITY_CMD=")
         )
