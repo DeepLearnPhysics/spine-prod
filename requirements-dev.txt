@@ -2,9 +2,8 @@
 # Install with: pip install -r requirements-dev.txt
 # Aligned with SPINE repository standards
 
-# Base requirements
-jinja2>=3.0.0
-pyyaml>=5.0.0
+# Base requirements and real ROOT survey fixtures for CI
+-r requirements-joint.txt
 
 # Production jobs run inside a tagged SPINE container. Some preload tests are
 # skipped unless SPINE >=1.4.0 is available locally. Install spine==1.4.0

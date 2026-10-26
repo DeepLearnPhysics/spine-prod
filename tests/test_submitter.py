@@ -2719,6 +2719,68 @@ class TestBatchSpineOverride:
         metadata = json.loads((attempt / "job_metadata.json").read_text())
         assert metadata["num_files"] == 2
 
+    @pytest.mark.parametrize(
+        "options,error,message",
+        [
+            ({"joint_validate_trees": "yes"}, TypeError, "must be a boolean"),
+            (
+                {"joint_validate_trees": True, "joint_file_mode": "broadcast"},
+                ValueError,
+                "requires balanced",
+            ),
+            (
+                {"named_sources": None},
+                ValueError,
+                "require named primary and secondary",
+            ),
+            ({"stage": "train"}, ValueError, "valid only for inference"),
+            ({"extra_source": True}, ValueError, "exactly primary and secondary"),
+            ({"allow_missing_inputs": True}, ValueError, "must survey existing inputs"),
+            ({"num_entries": 2}, ValueError, "entry selection overrides"),
+            (
+                {"entry_fraction_range": (0.0, 0.5)},
+                ValueError,
+                "entry selection overrides",
+            ),
+            (
+                {"set_overrides": ["io.loader.dataset.primary.n_skip=1"]},
+                ValueError,
+                "manages dataset and sampler",
+            ),
+            (
+                {"set_overrides": ["io.loader.sampler=joint_sequential"]},
+                ValueError,
+                "manages dataset and sampler",
+            ),
+        ],
+    )
+    def test_balanced_joint_rejects_conflicting_options(
+        self, mock_submitter, tmp_path, options, error, message
+    ):
+        """Reject unsupported combinations before surveying or submitting work."""
+        options = dict(options)
+        sources = {
+            "primary": {"source": ["primary.root"]},
+            "secondary": {"source": ["secondary.root"]},
+        }
+        if options.pop("extra_source", False):
+            sources["extra"] = {"source": ["extra.root"]}
+        kwargs = {
+            "joint_file_mode": "balanced",
+            "named_sources": sources,
+            "run_dir": str(tmp_path / "run"),
+        }
+        kwargs.update(options)
+        with patch("src.batch.survey_sources") as survey, patch.object(
+            mock_submitter.batch_client, "submit"
+        ) as submit:
+            with pytest.raises(error, match=message):
+                mock_submitter.submit_job(
+                    config="infer/nd-lar/full_chain_260409.yaml", **kwargs
+                )
+            survey.assert_not_called()
+            submit.assert_not_called()
+
     def test_submit_job_balances_joint_entries(self, mock_submitter, tmp_path):
         run_dir = tmp_path / "run"
         primary = [tmp_path / f"p-{index}.root" for index in range(5)]
@@ -2735,7 +2797,7 @@ class TestBatchSpineOverride:
             patch(
                 "src.batch.survey_sources",
                 return_value={"primary": [5] * 5, "secondary": [200]},
-            ),
+            ) as survey,
         ):
             mock_submitter.submit_job(
                 config="infer/nd-lar/full_chain_260409.yaml",
@@ -2746,9 +2808,14 @@ class TestBatchSpineOverride:
                 apply_mods=["joint:240819"],
                 run_dir=str(run_dir),
                 joint_file_mode="balanced",
+                joint_validate_trees=True,
+                set_overrides=["base.seed=123"],
                 files_per_task=2,
                 ntasks=2,
             )
+        assert survey.call_args.kwargs["validate_trees"] is True
+        metadata = json.loads((run_dir / "latest" / "job_metadata.json").read_text())
+        assert metadata["joint_validate_trees"] is True
         attempt = run_dir / "latest"
         script = (attempt / "submit.sbatch").read_text()
         assert "#SBATCH --array=1-3%2" in script
@@ -2809,6 +2876,104 @@ SPINE_CONTAINER_PATH=/unused.sif
             )
             assert int((task / "secondary.skip").read_text()) == skip
             assert len((task / "primary.txt").read_text().splitlines()) <= 2
+
+    @pytest.mark.parametrize(
+        "files_per_task,ntasks,num_files,max_array_size,expected_entries",
+        [
+            (None, 2, None, 99, [8, 2]),
+            (2, 1, None, 1, [3, 7]),
+            (None, None, 2, 99, [3]),
+        ],
+    )
+    def test_balanced_submission_surveys_real_files_and_writes_disjoint_tasks(
+        self,
+        mock_submitter,
+        tmp_path,
+        monkeypatch,
+        files_per_task,
+        ntasks,
+        num_files,
+        max_array_size,
+        expected_entries,
+    ):
+        """Exercise real ROOT surveys through task manifests and scheduler chunks."""
+        uproot = pytest.importorskip("uproot")
+        import numpy as np
+
+        sizes = {"primary": [0, 3, 5, 4, 2], "secondary": [4, 4, 2]}
+        paths = {}
+        for role, counts in sizes.items():
+            paths[role] = []
+            for index, count in enumerate(counts):
+                path = tmp_path / f"{role}-{index:02d}.root"
+                with uproot.recreate(path) as source:
+                    for name in ("data_tree", "truth_tree"):
+                        source.mktree(name, {"entry": "int64"})
+                        if count:
+                            source[name].extend(
+                                {"entry": np.arange(count, dtype=np.int64)}
+                            )
+                paths[role].append(str(path))
+        run_dir = tmp_path / "run"
+        monkeypatch.setitem(
+            mock_submitter.profiles["defaults"], "max_array_size", max_array_size
+        )
+        with patch.object(
+            mock_submitter.batch,
+            "get_batch_client",
+            return_value=mock_submitter.batch_client,
+        ), patch.object(
+            mock_submitter.batch_client, "submit", return_value="joint"
+        ) as submit:
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                apply_mods=["joint:240819"],
+                joint_file_mode="balanced",
+                joint_validate_trees=True,
+                named_sources={
+                    role: {"source": values if num_files else list(reversed(values))}
+                    for role, values in paths.items()
+                },
+                run_dir=str(run_dir),
+                num_files=num_files,
+                files_per_task=files_per_task,
+                ntasks=ntasks,
+                dry_run=True,
+            )
+        attempt = run_dir / "latest"
+        plan = json.loads((attempt / "joint_shards.json").read_text())
+        assert [shard["entries"] for shard in plan["shards"]] == expected_entries
+        assert plan["counts"]["primary"] == sizes["primary"][:num_files]
+        tasks = sorted((attempt / "tasks").iterdir())
+        assert len(tasks) == len(expected_entries)
+        assert submit.call_count == (len(tasks) + max_array_size - 1) // max_array_size
+        consumed = {role: [] for role in paths}
+        for task, shard in zip(tasks, plan["shards"]):
+            count = int((task / "entries.count").read_text())
+            assert count == shard["entries"]
+            for role in paths:
+                files = (task / f"{role}.txt").read_text().splitlines()
+                assert files == shard[role]["files"]
+                skip = int((task / f"{role}.skip").read_text())
+                entries = [
+                    (path, entry)
+                    for path in files
+                    for entry in range(sizes[role][paths[role].index(path)])
+                ]
+                consumed[role].extend(entries[skip : skip + count])
+        for role in paths:
+            eligible = [
+                (path, entry)
+                for path, count in zip(paths[role], sizes[role])
+                for entry in range(count)
+            ]
+            assert consumed[role] == eligible[: sum(expected_entries)]
+        if num_files:
+            cache = json.loads((run_dir / "entry_counts.json").read_text())
+            assert all(path not in cache for path in paths["primary"][num_files:])
+        for script in attempt.glob("submit*.sbatch"):
+            if max_array_size == 1 or len(tasks) == 1:
+                assert "#SBATCH --array=" not in script.read_text()
 
     def test_submit_job_pairs_joint_files_up_to_shorter_list(
         self, mock_submitter, tmp_path, capsys

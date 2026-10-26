@@ -698,3 +698,11 @@ def test_non_batch_modes_reject_run_lifecycle_options(args):
 def test_non_batch_modes_reject_validation_sources(args):
     with pytest.raises(SystemExit, match="2"):
         run_main(*args)
+
+
+def test_tree_validation_requires_balanced_mode(capsys):
+    """Reject a survey-validation flag that otherwise would be ignored."""
+    with pytest.raises(SystemExit) as error:
+        run_main("--config", "infer/nd-lar/latest", "--joint-validate-trees")
+    assert error.value.code == 2
+    assert "requires --joint-file-mode balanced" in capsys.readouterr().err

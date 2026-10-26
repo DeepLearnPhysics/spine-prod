@@ -53,7 +53,11 @@ jobs:
           python -c "import spine; assert spine.__version__ == '$SPINE_VERSION'"
 
       - name: Run tests
-        run: pytest -v --cov=. --cov-report=xml
+        run: pytest -v --cov=. --cov-branch --cov-report=xml
+
+      - name: Require full joint sharding coverage
+        if: matrix.python-version == '3.11'
+        run: python -m coverage report --include=src/joint_sharding.py --fail-under=100
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.11'
