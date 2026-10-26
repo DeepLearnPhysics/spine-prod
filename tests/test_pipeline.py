@@ -120,7 +120,8 @@ def test_collection_exact_substitution_preserves_scalar_type(tmp_path):
     assert definition.stages[0]["ntasks"] == 4
 
 
-def test_pipeline_forwards_paired_joint_file_mode(tmp_path):
+@pytest.mark.parametrize("mode,validate", [("paired", False), ("balanced", True)])
+def test_pipeline_forwards_joint_survey_options(tmp_path, mode, validate):
     path = write_pipeline(
         tmp_path,
         {
@@ -132,7 +133,8 @@ def test_pipeline_forwards_paired_joint_file_mode(tmp_path):
                         "primary": {"source_list": "primary.txt"},
                         "secondary": {"source_list": "secondary.txt"},
                     },
-                    "joint_file_mode": "paired",
+                    "joint_file_mode": mode,
+                    "joint_validate_trees": validate,
                 }
             ]
         },
@@ -140,7 +142,9 @@ def test_pipeline_forwards_paired_joint_file_mode(tmp_path):
 
     stage = PipelineDefinition.load(str(path)).stages[0]
     options = PipelineRunner._submission_options(stage, dependency=None)
-    assert options["joint_file_mode"] == "paired"
+    assert options["joint_file_mode"] == mode
+
+    assert options["joint_validate_trees"] is validate
 
 
 def test_pipeline_rejects_paired_mode_without_joint_sources(tmp_path):
@@ -786,6 +790,16 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             "in_place must be a boolean",
         ),
         (
+            {"name": "job", "config": "x.yaml", "joint_validate_trees": "yes"},
+            TypeError,
+            "joint_validate_trees must be a boolean",
+        ),
+        (
+            {"name": "job", "config": "x.yaml", "joint_validate_trees": True},
+            ValueError,
+            "joint_validate_trees requires balanced",
+        ),
+        (
             {"name": "job", "config": "x.yaml", "joint_file_mode": "other"},
             ValueError,
             "joint_file_mode must be",
@@ -1057,3 +1071,21 @@ def test_sparse_pipeline_stage_selection_rejects_boundaries():
             to_stage=None,
             select_stages=["stage"],
         )
+
+
+def test_sparse_selection_deduplicates_shared_ancestors():
+    """A selected diamond root yields one dependency despite two omitted paths."""
+    stages = [
+        {"name": "root", "depends_on": []},
+        {"name": "left", "depends_on": ["root"]},
+        {"name": "right", "depends_on": ["root"]},
+        {"name": "sink", "depends_on": ["left", "right"]},
+    ]
+    selected, omitted, trailing = PipelineRunner._select_stages(
+        stages, from_stage=None, to_stage=None, select_stages=["root", "sink"]
+    )
+    assert [stage["name"] for stage in selected] == ["root", "sink"]
+    assert selected[1]["depends_on"] == ["root"]
+    assert omitted == ["left", "right"]
+    assert trailing == []
+    assert stages[-1]["depends_on"] == ["left", "right"]

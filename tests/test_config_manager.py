@@ -654,3 +654,13 @@ def test_list_modifiers_accepts_path_outside_infer_tree(manager, tmp_path):
 
     assert result["base_version"] is None
     assert result["modifiers"]["data"]["paths"] == [modifier]
+
+
+@pytest.mark.parametrize(
+    "config_request,expected",
+    [("convert/icarus/latest", "convert"), ("custom.yaml", "infer")],
+)
+def test_config_family_without_config_directory(manager, config_request, expected):
+    """Recognized families and the inference fallback work before config setup."""
+    assert not (manager.basedir / "config").exists()
+    assert manager.detect_config_family(config_request) == expected

@@ -90,6 +90,13 @@ source configure.sh
 ./submit.py --config infer/nd-lar/latest --apply-mods joint \
   --source-list primary=primary.txt secondary=secondary.txt
 
+# Survey entries and give each group of up to two primary files a disjoint
+# range of secondary events; run at most four tasks concurrently
+./submit.py --config infer/nd-lar/latest --apply-mods joint \
+  --joint-file-mode balanced \
+  --source-list primary=primary.txt secondary=secondary.txt \
+  --files-per-task 2 --ntasks 4
+
 # Split the file list across 50 tasks as evenly as possible
 ./submit.py --config infer/icarus/latest --source data/*.root --ntasks 50
 
@@ -112,6 +119,43 @@ source configure.sh
 ./submit.py --interactive --config infer/icarus/latest --source test.root
 ./submit.py -I --config infer/icarus/latest --source-list files.txt --task-id 2
 ```
+
+Balanced joint sharding currently supports local LArCV ROOT files and requires
+`uproot` or PyROOT on the submission host. Install the optional dependencies with
+`python3 -m pip install -r requirements-joint.txt`; PyROOT is not needed when
+uproot is installed. The survey runs where `submit.py` runs, so worker environments
+need no additional survey dependency. It surveys
+one reference `*_tree` per file (the first in sorted tree-name order), without
+loading the other products' tree metadata. Add `--joint-validate-trees` to check
+that all trees have equal counts, or set `joint_validate_trees: true` in a balanced
+pipeline stage. A full-validation request rescans cache entries that were counted
+using only a reference tree; validated counts can serve either mode.
+It pairs entries in sorted file-path order, processes the smaller source's total,
+and never reuses secondary entries. If secondary runs out, the last primary group
+is shortened and later groups are omitted. `--files-per-task` limits primary files;
+secondary files are selected as needed and may be shared through disjoint slices.
+`--num-files` limits the primary list before surveying. Without `--files-per-task`,
+`--ntasks` splits primary files as usual.
+
+Dry runs also survey inputs and write `joint_shards.json` in the attempt directory,
+including counts, ranges and unused totals. `entry_counts.json` in the run directory
+caches metadata for retries, invalidated by file size or modification time. Inputs
+must remain unchanged between survey and execution. Use an unfiltered joint dataset:
+custom dataset entry filters/selections are not supported by this mode. Balanced
+mode owns source ranges and uses sequential pairing with incomplete batches retained.
+
+Joint modifiers enable per-input output splitting with
+`base.split_output: true` and `io.writer.split_source: primary`. Each overlay is
+written once, to its primary input's output file, while both sources' provenance
+is preserved. For example, ten primary files in one task produce ten outputs if
+all ten have processed entries. Sharing secondary files across tasks does not
+change output routing. If secondary entries run out, the last processed primary
+file may have a partial output and subsequent files produce no output. Use
+`--set base.split_output=false` to combine a task's events into one output instead.
+
+The default runtime is SPINE 1.4.3, which includes the primary-only writer policy
+from [SPINE #186](https://github.com/DeepLearnPhysics/spine/pull/186). Explicit
+runtime overrides must also provide that policy.
 
 ### Interactive Mode
 

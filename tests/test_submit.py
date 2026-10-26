@@ -92,7 +92,8 @@ def test_list_modifiers_reports_lookup_errors(capsys):
     assert "ERROR: missing config" in capsys.readouterr().err
 
 
-def test_graceful_stop_routes_existing_job_without_configuration(capsys):
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_graceful_stop_routes_existing_job_without_configuration(capsys, dry_run):
     """Graceful completion should be a standalone scheduler operation."""
     submitter = Mock()
     submitter.graceful_stop.return_value = "slurm"
@@ -102,16 +103,19 @@ def test_graceful_stop_routes_existing_job_without_configuration(capsys):
         "12345",
         "--scheduler",
         "slurm",
+        *(["--dry-run"] if dry_run else []),
         submitter=submitter,
     )
 
     assert result == 0
     submitter.graceful_stop.assert_called_once_with(
-        "12345", scheduler="slurm", dry_run=False
+        "12345", scheduler="slurm", dry_run=dry_run
     )
-    assert "Graceful completion requested for slurm job 12345" in (
-        capsys.readouterr().out
-    )
+    output = capsys.readouterr().out
+    if dry_run:
+        assert "Graceful completion requested" not in output
+    else:
+        assert "Graceful completion requested for slurm job 12345" in output
 
 
 def test_graceful_stop_reports_control_failure(capsys):
@@ -375,7 +379,8 @@ def test_batch_mode_forwards_target_qualified_sources():
     }
 
 
-def test_batch_mode_forwards_paired_joint_file_mode():
+@pytest.mark.parametrize("mode,validate", [("paired", False), ("balanced", True)])
+def test_batch_mode_forwards_joint_survey_options(mode, validate):
     submitter = Mock()
     submitter.submit_job.return_value = []
 
@@ -388,12 +393,15 @@ def test_batch_mode_forwards_paired_joint_file_mode():
         "primary=primary.txt",
         "secondary=secondary.txt",
         "--joint-file-mode",
-        "paired",
+        mode,
+        *(["--joint-validate-trees"] if validate else []),
         submitter=submitter,
     )
 
     assert result == 0
-    assert submitter.submit_job.call_args.kwargs["joint_file_mode"] == "paired"
+    assert submitter.submit_job.call_args.kwargs["joint_file_mode"] == mode
+
+    assert submitter.submit_job.call_args.kwargs["joint_validate_trees"] is validate
 
 
 def test_pipeline_mode_prints_stage_jobs(capsys):
@@ -694,3 +702,11 @@ def test_non_batch_modes_reject_run_lifecycle_options(args):
 def test_non_batch_modes_reject_validation_sources(args):
     with pytest.raises(SystemExit, match="2"):
         run_main(*args)
+
+
+def test_tree_validation_requires_balanced_mode(capsys):
+    """Reject a survey-validation flag that otherwise would be ignored."""
+    with pytest.raises(SystemExit) as error:
+        run_main("--config", "infer/nd-lar/latest", "--joint-validate-trees")
+    assert error.value.code == 2
+    assert "requires --joint-file-mode balanced" in capsys.readouterr().err
