@@ -887,8 +887,9 @@ class TestSubmitterHelpers:
         with patch("src.runtime.shutil.which", return_value=None):
             assert mock_submitter.runtime.resolve_spine_cache_command() == (None, None)
 
+    @pytest.mark.parametrize("bind_paths", [None, "/existing"])
     def test_submit_filter_scan_builds_persistent_scheduler_job(
-        self, mock_submitter, tmp_path
+        self, mock_submitter, tmp_path, bind_paths
     ):
         """A scan job records its exact reusable counter-cache invocation."""
         run_dir = tmp_path / "filter-scan"
@@ -914,6 +915,7 @@ class TestSubmitterHelpers:
                 cache_dir=str(cache_dir),
                 run_dir=str(run_dir),
                 workers=16,
+                bind_paths=bind_paths,
                 force=True,
                 dependency="afterok:40",
             )
@@ -922,6 +924,8 @@ class TestSubmitterHelpers:
         attempt = (run_dir / "latest").resolve()
         script = (attempt / "submit.sbatch").read_text(encoding="utf-8")
         assert "spine-filter scan" in script
+        expected_bind = bind_paths or "/sdf/"
+        assert f'BIND_PATHS="{expected_bind},/checkout"' in script
         assert "--source '/data/input one.root' /data/input-two.root" in script
         assert "--workers 16 --force" in script
         assert "#SBATCH --dependency=afterok:40" in script
@@ -2719,13 +2723,86 @@ class TestBatchSpineOverride:
         metadata = json.loads((attempt / "job_metadata.json").read_text())
         assert metadata["num_files"] == 2
 
-    def test_submit_job_balances_joint_entries(self, mock_submitter, tmp_path):
+    @pytest.mark.parametrize(
+        "options,error,message",
+        [
+            ({"joint_validate_trees": "yes"}, TypeError, "must be a boolean"),
+            (
+                {"joint_validate_trees": True, "joint_file_mode": "broadcast"},
+                ValueError,
+                "requires balanced",
+            ),
+            (
+                {"named_sources": None},
+                ValueError,
+                "require named primary and secondary",
+            ),
+            ({"stage": "train"}, ValueError, "valid only for inference"),
+            ({"extra_source": True}, ValueError, "exactly primary and secondary"),
+            ({"allow_missing_inputs": True}, ValueError, "must survey existing inputs"),
+            ({"num_entries": 2}, ValueError, "entry selection overrides"),
+            (
+                {"entry_fraction_range": (0.0, 0.5)},
+                ValueError,
+                "entry selection overrides",
+            ),
+            (
+                {"set_overrides": ["io.loader.dataset.primary.n_skip=1"]},
+                ValueError,
+                "manages dataset and sampler",
+            ),
+            (
+                {"set_overrides": ["io.loader.sampler=joint_sequential"]},
+                ValueError,
+                "manages dataset and sampler",
+            ),
+        ],
+    )
+    def test_balanced_joint_rejects_conflicting_options(
+        self, mock_submitter, tmp_path, options, error, message
+    ):
+        """Reject unsupported combinations before surveying or submitting work."""
+        options = dict(options)
+        sources = {
+            "primary": {"source": ["primary.root"]},
+            "secondary": {"source": ["secondary.root"]},
+        }
+        if options.pop("extra_source", False):
+            sources["extra"] = {"source": ["extra.root"]}
+        kwargs = {
+            "joint_file_mode": "balanced",
+            "named_sources": sources,
+            "run_dir": str(tmp_path / "run"),
+        }
+        kwargs.update(options)
+        with patch("src.batch.survey_sources") as survey, patch.object(
+            mock_submitter.batch_client, "submit"
+        ) as submit:
+            with pytest.raises(error, match=message):
+                mock_submitter.submit_job(
+                    config="infer/nd-lar/full_chain_260409.yaml", **kwargs
+                )
+            survey.assert_not_called()
+            submit.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "spine_command",
+        ["spine", "/opt/spine/bin/spine", "python3 /opt/spine/bin/run.py"],
+    )
+    def test_submit_job_balances_joint_entries(
+        self, mock_submitter, tmp_path, spine_command
+    ):
         run_dir = tmp_path / "run"
         primary = [tmp_path / f"p-{index}.root" for index in range(5)]
         secondary = [tmp_path / "secondary.root"]
         for path in primary + secondary:
             path.touch()
         with (
+            patch.object(
+                mock_submitter.runtime,
+                "resolve_spine_command",
+                return_value=(spine_command, None),
+            ),
             patch.object(
                 mock_submitter.batch,
                 "get_batch_client",
@@ -2735,7 +2812,7 @@ class TestBatchSpineOverride:
             patch(
                 "src.batch.survey_sources",
                 return_value={"primary": [5] * 5, "secondary": [200]},
-            ),
+            ) as survey,
         ):
             mock_submitter.submit_job(
                 config="infer/nd-lar/full_chain_260409.yaml",
@@ -2746,9 +2823,14 @@ class TestBatchSpineOverride:
                 apply_mods=["joint:240819"],
                 run_dir=str(run_dir),
                 joint_file_mode="balanced",
+                joint_validate_trees=True,
+                set_overrides=["base.seed=123"],
                 files_per_task=2,
                 ntasks=2,
             )
+        assert survey.call_args.kwargs["validate_trees"] is True
+        metadata = json.loads((run_dir / "latest" / "job_metadata.json").read_text())
+        assert metadata["joint_validate_trees"] is True
         attempt = run_dir / "latest"
         script = (attempt / "submit.sbatch").read_text()
         assert "#SBATCH --array=1-3%2" in script
@@ -2756,45 +2838,51 @@ class TestBatchSpineOverride:
             'io.loader.dataset.secondary.n_skip=$(cat "$TASK_DIR/secondary.skip")'
             in script
         )
-        assert "drop_last: false" in script
-        # Exercise the template's double-quoted command construction, then
-        # parse the resulting command as the container shell will.
-        import shlex
+        assert "io.loader.sampler.drop_last=false" in script
+        # Exercise both quoting layers with a fake container and executable.
         import subprocess
 
-        import yaml
-
+        assert f" exec {spine_command} " in script
         command_line = next(
             line
             for line in script.splitlines()
             if line.startswith('SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec ')
+        ).replace(f" exec {spine_command} ", " fake_spine ", 1)
+        container_line = next(
+            line for line in script.splitlines() if line.startswith("SINGULARITY_CMD=")
         )
         task = attempt / "tasks" / "000_2"
+        shell = r"""fake_spine() { printf '%s\0' "$@"; }
+export -f fake_spine
+singularity() {
+    while [ "$1" != bash ]; do shift; done
+    "$@"
+}
+TASK_DIR="$1"
+BIND_PATHS=/unused
+SPINE_CONTAINER_PATH=/unused.sif
+"""
         result = subprocess.run(
             [
                 "bash",
                 "-c",
-                'TASK_DIR="$1"\n'
+                shell
                 + command_line
-                + '\nprintf "%s" "$SINGULARITY_INNER_CMD"',
+                + "\n"
+                + container_line
+                + '\neval "$SINGULARITY_CMD"',
                 "bash",
                 str(task),
             ],
             check=True,
-            text=True,
             capture_output=True,
+            text=True,
         )
-        arguments = shlex.split(result.stdout)
+        arguments = result.stdout.split("\0")[:-1]
         assert "io.loader.dataset.secondary.n_skip=10" in arguments
-        sampler_value = next(
-            arg.split("=", 1)[1]
-            for arg in arguments
-            if arg.startswith("io.loader.sampler=")
-        )
-        assert yaml.safe_load(sampler_value) == {
-            "name": "joint_sequential",
-            "drop_last": False,
-        }
+        assert "io.loader.sampler={}" in arguments
+        assert "io.loader.sampler.name=joint_sequential" in arguments
+        assert "io.loader.sampler.drop_last=false" in arguments
         plan = json.loads((attempt / "joint_shards.json").read_text())
         assert [s["entries"] for s in plan["shards"]] == [10, 10, 5]
         for index, skip in enumerate((0, 10, 20), 1):
@@ -2804,6 +2892,104 @@ class TestBatchSpineOverride:
             )
             assert int((task / "secondary.skip").read_text()) == skip
             assert len((task / "primary.txt").read_text().splitlines()) <= 2
+
+    @pytest.mark.parametrize(
+        "files_per_task,ntasks,num_files,max_array_size,expected_entries",
+        [
+            (None, 2, None, 99, [8, 2]),
+            (2, 1, None, 1, [3, 7]),
+            (None, None, 2, 99, [3]),
+        ],
+    )
+    def test_balanced_submission_surveys_real_files_and_writes_disjoint_tasks(
+        self,
+        mock_submitter,
+        tmp_path,
+        monkeypatch,
+        files_per_task,
+        ntasks,
+        num_files,
+        max_array_size,
+        expected_entries,
+    ):
+        """Exercise real ROOT surveys through task manifests and scheduler chunks."""
+        uproot = pytest.importorskip("uproot")
+        import numpy as np
+
+        sizes = {"primary": [0, 3, 5, 4, 2], "secondary": [4, 4, 2]}
+        paths = {}
+        for role, counts in sizes.items():
+            paths[role] = []
+            for index, count in enumerate(counts):
+                path = tmp_path / f"{role}-{index:02d}.root"
+                with uproot.recreate(path) as source:
+                    for name in ("data_tree", "truth_tree"):
+                        source.mktree(name, {"entry": "int64"})
+                        if count:
+                            source[name].extend(
+                                {"entry": np.arange(count, dtype=np.int64)}
+                            )
+                paths[role].append(str(path))
+        run_dir = tmp_path / "run"
+        monkeypatch.setitem(
+            mock_submitter.profiles["defaults"], "max_array_size", max_array_size
+        )
+        with patch.object(
+            mock_submitter.batch,
+            "get_batch_client",
+            return_value=mock_submitter.batch_client,
+        ), patch.object(
+            mock_submitter.batch_client, "submit", return_value="joint"
+        ) as submit:
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                apply_mods=["joint:240819"],
+                joint_file_mode="balanced",
+                joint_validate_trees=True,
+                named_sources={
+                    role: {"source": values if num_files else list(reversed(values))}
+                    for role, values in paths.items()
+                },
+                run_dir=str(run_dir),
+                num_files=num_files,
+                files_per_task=files_per_task,
+                ntasks=ntasks,
+                dry_run=True,
+            )
+        attempt = run_dir / "latest"
+        plan = json.loads((attempt / "joint_shards.json").read_text())
+        assert [shard["entries"] for shard in plan["shards"]] == expected_entries
+        assert plan["counts"]["primary"] == sizes["primary"][:num_files]
+        tasks = sorted((attempt / "tasks").iterdir())
+        assert len(tasks) == len(expected_entries)
+        assert submit.call_count == (len(tasks) + max_array_size - 1) // max_array_size
+        consumed = {role: [] for role in paths}
+        for task, shard in zip(tasks, plan["shards"]):
+            count = int((task / "entries.count").read_text())
+            assert count == shard["entries"]
+            for role in paths:
+                files = (task / f"{role}.txt").read_text().splitlines()
+                assert files == shard[role]["files"]
+                skip = int((task / f"{role}.skip").read_text())
+                entries = [
+                    (path, entry)
+                    for path in files
+                    for entry in range(sizes[role][paths[role].index(path)])
+                ]
+                consumed[role].extend(entries[skip : skip + count])
+        for role in paths:
+            eligible = [
+                (path, entry)
+                for path, count in zip(paths[role], sizes[role])
+                for entry in range(count)
+            ]
+            assert consumed[role] == eligible[: sum(expected_entries)]
+        if num_files:
+            cache = json.loads((run_dir / "entry_counts.json").read_text())
+            assert all(path not in cache for path in paths["primary"][num_files:])
+        for script in attempt.glob("submit*.sbatch"):
+            if max_array_size == 1 or len(tasks) == 1:
+                assert "#SBATCH --array=" not in script.read_text()
 
     def test_submit_job_pairs_joint_files_up_to_shorter_list(
         self, mock_submitter, tmp_path, capsys
@@ -3340,8 +3526,9 @@ class TestBatchSpineOverride:
         assert metadata["stage"] == "train"
         assert metadata["resume_checkpoint"] == str(saved)
 
+    @pytest.mark.parametrize("tensorboard", [False, True])
     def test_submit_validation_selects_missing_checkpoints_and_noops(
-        self, mock_submitter, tmp_path, capsys
+        self, mock_submitter, tmp_path, capsys, tensorboard
     ):
         """Test validation submits only checkpoints without complete CSV logs."""
         run_dir = tmp_path / "experiments" / "deghost" / "default"
@@ -3371,7 +3558,7 @@ class TestBatchSpineOverride:
                 profile="s3df_ampere",
                 stage="validation",
                 run_dir=str(run_dir),
-                tensorboard=True,
+                tensorboard=tensorboard,
             ) == ["val-1"]
             submit.assert_called_once()
 
@@ -3382,10 +3569,14 @@ class TestBatchSpineOverride:
         assert f"--log-dir {run_dir}" in script
         assert f"--weight-list {(submission / 'weights.txt').resolve()}" in script
         assert "model.weight_path=null" in script
-        assert (
-            f"--tensorboard --tensorboard-dir {run_dir}/tensorboard/validation"
-            in script
-        )
+        if tensorboard:
+            assert (
+                f"--tensorboard --tensorboard-dir {run_dir}/tensorboard/validation"
+                in script
+            )
+        else:
+            assert "--tensorboard" not in script
+            assert not (run_dir / "tensorboard").exists()
 
         (run_dir / "inference_log-0000020.csv").write_text(
             "iter,loss\n0,1\n", encoding="utf-8"
@@ -5020,8 +5211,10 @@ class TestPipelineSubmission:
                 exclude="node01",
             )
 
+    @pytest.mark.parametrize("bind_paths", [None, "/existing"])
+    @pytest.mark.parametrize("job_id", ["42", None])
     def test_submit_report_adds_checkout_bind_account_and_dependency(
-        self, mock_submitter, tmp_path, capsys
+        self, mock_submitter, tmp_path, capsys, bind_paths, job_id
     ):
         """Report jobs derive omitted site resources and bind a source checkout."""
         source = tmp_path / "report.yaml"
@@ -5030,6 +5223,7 @@ class TestPipelineSubmission:
             "site": "s3df",
             "scheduler": "slurm",
             "description": "Slurm test",
+            "bind_paths": bind_paths,
         }
 
         with (
@@ -5051,7 +5245,7 @@ class TestPipelineSubmission:
                 "get_batch_client",
                 return_value=mock_submitter.batch_client,
             ),
-            patch.object(mock_submitter.batch_client, "submit", return_value="42"),
+            patch.object(mock_submitter.batch_client, "submit", return_value=job_id),
         ):
             assert mock_submitter.submit_report(
                 config=str(source),
@@ -5059,11 +5253,14 @@ class TestPipelineSubmission:
                 output_dir=str(tmp_path / "output"),
                 run_dir=str(tmp_path / "run"),
                 dependency="afterok:41",
-            ) == ["42"]
+                dry_run=job_id is None,
+            ) == ([job_id] if job_id else [])
 
-        assert profile["bind_paths"] == "/sdf/,/checkout"
+        assert profile["bind_paths"] == f"{bind_paths or '/sdf/'},/checkout"
         assert profile["account"]
-        assert "Dependency: afterok:41" in capsys.readouterr().out
+        output = capsys.readouterr().out
+        assert "Dependency: afterok:41" in output
+        assert ("Job ID: 42" in output) is bool(job_id)
 
     def test_resolve_spine_report_command_path_forms_and_fallbacks(
         self, mock_submitter, tmp_path

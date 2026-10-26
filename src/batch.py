@@ -148,6 +148,7 @@ class BatchRunner(SubmissionComponent):
         ntasks: Optional[int] = None,
         files_per_task: Optional[int] = None,
         joint_file_mode: str = "broadcast",
+        joint_validate_trees: bool = False,
         dependency: Optional[str] = None,
         larcv_path: Optional[str] = None,
         flashmatch_path: Optional[str] = None,
@@ -248,6 +249,9 @@ class BatchRunner(SubmissionComponent):
             both ordered lists to the shorter length and partitions matching
             primary/secondary file indexes together. ``balanced`` surveys ROOT
             entry counts and assigns disjoint secondary slices to primary groups.
+        joint_validate_trees : bool, default False
+            Validate all LArCV tree entry counts during a balanced survey.
+            Otherwise use one reference tree per file.
         dependency : str, optional
             Batch scheduler dependency string, by default None
         larcv_path : str, optional
@@ -341,6 +345,11 @@ class BatchRunner(SubmissionComponent):
             raise ValueError(
                 "joint_file_mode must be either 'broadcast', 'paired' or 'balanced'"
             )
+
+        if not isinstance(joint_validate_trees, bool):
+            raise TypeError("joint_validate_trees must be a boolean")
+        if joint_validate_trees and joint_file_mode != "balanced":
+            raise ValueError("joint_validate_trees requires balanced joint sharding")
 
         if in_place and (output is not None or output_suffix is not None):
             raise ValueError(
@@ -992,7 +1001,9 @@ class BatchRunner(SubmissionComponent):
                     for target, paths in partitioned_sources.items()
                 }
                 counts = survey_sources(
-                    partitioned_sources, job_dir / "entry_counts.json"
+                    partitioned_sources,
+                    job_dir / "entry_counts.json",
+                    validate_trees=joint_validate_trees,
                 )
                 balanced_shards = plan_shards(
                     partitioned_sources, counts, effective_files_per_task
@@ -1162,9 +1173,11 @@ class BatchRunner(SubmissionComponent):
                             f' --set {prefix}.n_skip=$(cat "$TASK_DIR/{target}.skip")'
                             f' --set {prefix}.n_entry=$(cat "$TASK_DIR/entries.count")'
                         )
-                    sampler = "{name: joint_sequential, drop_last: false}"
-                    chunk_spine_overrides += " --set io.loader.sampler=" + shlex.quote(
-                        sampler
+                    # Separate scalar overrides survive both container shell layers.
+                    chunk_spine_overrides += (
+                        " --set io.loader.sampler={}"
+                        " --set io.loader.sampler.name=joint_sequential"
+                        " --set io.loader.sampler.drop_last=false"
                     )
                     chunk_spine_overrides += (
                         " --set io.loader.drop_last=false --set io.loader.shuffle=false"
@@ -1307,6 +1320,7 @@ class BatchRunner(SubmissionComponent):
             "named_sources": named_sources or {},
             "validation_named_sources": validation_named_sources or {},
             "joint_file_mode": joint_file_mode,
+            "joint_validate_trees": joint_validate_trees,
             "module_weights": effective_module_weights,
             "warm_start_path": warm_start_path,
             "warm_start_modules": warm_start_modules or {},

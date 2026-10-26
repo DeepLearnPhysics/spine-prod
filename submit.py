@@ -222,6 +222,12 @@ Examples:
         ),
     )
 
+    parser.add_argument(
+        "--joint-validate-trees",
+        action="store_true",
+        help="Validate all tree entry counts when surveying balanced joint inputs",
+    )
+
     # First-class SPINE runtime overrides
     parser.add_argument(
         "--world-size",
@@ -649,6 +655,8 @@ Examples:
     )
     if args.interactive and lifecycle_options:
         parser.error("run lifecycle options are currently supported in batch mode only")
+    if args.joint_validate_trees and args.joint_file_mode != "balanced":
+        parser.error("--joint-validate-trees requires --joint-file-mode balanced")
     if args.interactive and args.joint_file_mode != "broadcast":
         parser.error("--joint-file-mode is currently supported in batch mode only")
     if args.interactive and (
@@ -680,6 +688,7 @@ Examples:
             ("--ntasks", args.ntasks is not None),
             ("--files-per-task", args.files_per_task is not None),
             ("--joint-file-mode", args.joint_file_mode != "broadcast"),
+            ("--joint-validate-trees", args.joint_validate_trees),
             ("--job-name", args.job_name),
             ("--stage", args.stage is not None),
             ("--run-dir", args.run_dir),
@@ -846,6 +855,7 @@ Examples:
                 ntasks=args.ntasks,
                 files_per_task=args.files_per_task,
                 joint_file_mode=args.joint_file_mode,
+                joint_validate_trees=args.joint_validate_trees,
                 dependency=args.dependency,
                 larcv_path=args.larcv_path,
                 flashmatch_path=args.flashmatch_path,

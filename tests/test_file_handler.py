@@ -251,3 +251,8 @@ def test_duplicates_preserves_first_duplicate_order(handler):
 )
 def test_chunk_files(files, max_array_size, files_per_task, expected, handler):
     assert handler.chunk_files(files, max_array_size, files_per_task) == expected
+
+
+def test_unmatched_glob_does_not_become_an_input(handler, tmp_path):
+    """Ordinary submissions ignore unmatched patterns instead of staging them."""
+    assert handler.parse_files([str(tmp_path / "missing-*.root")]) == []
