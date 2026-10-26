@@ -1,0 +1,3 @@
+# Optional dependencies for --joint-file-mode balanced on the submission host.
+-r requirements.txt
+uproot>=5.0.0

@@ -2719,6 +2719,91 @@ class TestBatchSpineOverride:
         metadata = json.loads((attempt / "job_metadata.json").read_text())
         assert metadata["num_files"] == 2
 
+    def test_submit_job_balances_joint_entries(self, mock_submitter, tmp_path):
+        run_dir = tmp_path / "run"
+        primary = [tmp_path / f"p-{index}.root" for index in range(5)]
+        secondary = [tmp_path / "secondary.root"]
+        for path in primary + secondary:
+            path.touch()
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(mock_submitter.batch_client, "submit", return_value="joint"),
+            patch(
+                "src.batch.survey_sources",
+                return_value={"primary": [5] * 5, "secondary": [200]},
+            ),
+        ):
+            mock_submitter.submit_job(
+                config="infer/nd-lar/full_chain_260409.yaml",
+                named_sources={
+                    "primary": {"source": list(map(str, primary))},
+                    "secondary": {"source": list(map(str, secondary))},
+                },
+                apply_mods=["joint:240819"],
+                run_dir=str(run_dir),
+                joint_file_mode="balanced",
+                files_per_task=2,
+                ntasks=2,
+            )
+        attempt = run_dir / "latest"
+        script = (attempt / "submit.sbatch").read_text()
+        assert "#SBATCH --array=1-3%2" in script
+        assert (
+            'io.loader.dataset.secondary.n_skip=$(cat "$TASK_DIR/secondary.skip")'
+            in script
+        )
+        assert "drop_last: false" in script
+        # Exercise the template's double-quoted command construction, then
+        # parse the resulting command as the container shell will.
+        import shlex
+        import subprocess
+        import yaml
+
+        command_line = next(
+            line
+            for line in script.splitlines()
+            if line.startswith('SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec ')
+        )
+        task = attempt / "tasks" / "000_2"
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                'TASK_DIR="$1"\n'
+                + command_line
+                + '\nprintf "%s" "$SINGULARITY_INNER_CMD"',
+                "bash",
+                str(task),
+            ],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        arguments = shlex.split(result.stdout)
+        assert "io.loader.dataset.secondary.n_skip=10" in arguments
+        sampler_value = next(
+            arg.split("=", 1)[1]
+            for arg in arguments
+            if arg.startswith("io.loader.sampler=")
+        )
+        assert yaml.safe_load(sampler_value) == {
+            "name": "joint_sequential",
+            "drop_last": False,
+        }
+        plan = json.loads((attempt / "joint_shards.json").read_text())
+        assert [s["entries"] for s in plan["shards"]] == [10, 10, 5]
+        for index, skip in enumerate((0, 10, 20), 1):
+            task = attempt / "tasks" / f"000_{index}"
+            assert (task / "secondary.txt").read_text().splitlines() == list(
+                map(str, secondary)
+            )
+            assert int((task / "secondary.skip").read_text()) == skip
+            assert len((task / "primary.txt").read_text().splitlines()) <= 2
+
     def test_submit_job_pairs_joint_files_up_to_shorter_list(
         self, mock_submitter, tmp_path, capsys
     ):

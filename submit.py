@@ -212,12 +212,13 @@ Examples:
     )
     parser.add_argument(
         "--joint-file-mode",
-        choices=["broadcast", "paired"],
+        choices=["broadcast", "paired", "balanced"],
         default="broadcast",
         help=(
             "Joint-dataset file sharding: broadcast all secondary files to "
             "each primary task (default), or pair ordered files up to the "
-            "shorter source list"
+            "shorter source list; balanced surveys ROOT entries and assigns "
+            "disjoint secondary ranges to primary file groups"
         ),
     )
 
