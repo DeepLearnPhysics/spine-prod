@@ -2756,45 +2756,50 @@ class TestBatchSpineOverride:
             'io.loader.dataset.secondary.n_skip=$(cat "$TASK_DIR/secondary.skip")'
             in script
         )
-        assert "drop_last: false" in script
-        # Exercise the template's double-quoted command construction, then
-        # parse the resulting command as the container shell will.
-        import shlex
+        assert "io.loader.sampler.drop_last=false" in script
+        # Exercise both quoting layers with a fake container and executable.
         import subprocess
-
-        import yaml
 
         command_line = next(
             line
             for line in script.splitlines()
             if line.startswith('SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec ')
+        ).replace(" exec spine ", " fake_spine ")
+        container_line = next(
+            line for line in script.splitlines() if line.startswith("SINGULARITY_CMD=")
         )
         task = attempt / "tasks" / "000_2"
+        shell = r"""fake_spine() { printf '%s\0' "$@"; }
+export -f fake_spine
+singularity() {
+    while [ "$1" != bash ]; do shift; done
+    "$@"
+}
+TASK_DIR="$1"
+BIND_PATHS=/unused
+SPINE_CONTAINER_PATH=/unused.sif
+"""
         result = subprocess.run(
             [
                 "bash",
                 "-c",
-                'TASK_DIR="$1"\n'
+                shell
                 + command_line
-                + '\nprintf "%s" "$SINGULARITY_INNER_CMD"',
+                + "\n"
+                + container_line
+                + '\neval "$SINGULARITY_CMD"',
                 "bash",
                 str(task),
             ],
             check=True,
-            text=True,
             capture_output=True,
+            text=True,
         )
-        arguments = shlex.split(result.stdout)
+        arguments = result.stdout.split("\0")[:-1]
         assert "io.loader.dataset.secondary.n_skip=10" in arguments
-        sampler_value = next(
-            arg.split("=", 1)[1]
-            for arg in arguments
-            if arg.startswith("io.loader.sampler=")
-        )
-        assert yaml.safe_load(sampler_value) == {
-            "name": "joint_sequential",
-            "drop_last": False,
-        }
+        assert "io.loader.sampler={}" in arguments
+        assert "io.loader.sampler.name=joint_sequential" in arguments
+        assert "io.loader.sampler.drop_last=false" in arguments
         plan = json.loads((attempt / "joint_shards.json").read_text())
         assert [s["entries"] for s in plan["shards"]] == [10, 10, 5]
         for index, skip in enumerate((0, 10, 20), 1):

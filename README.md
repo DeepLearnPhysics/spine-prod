@@ -125,7 +125,11 @@ Balanced joint sharding currently supports local LArCV ROOT files and requires
 `python3 -m pip install -r requirements-joint.txt`; PyROOT is not needed when
 uproot is installed. The survey runs where `submit.py` runs, so worker environments
 need no additional survey dependency. It surveys
-`*_tree` entry counts, requiring consistent counts across products in each file.
+one reference `*_tree` per file (the first in sorted tree-name order), without
+loading the other products' tree metadata. Add `--joint-validate-trees` to check
+that all trees have equal counts, or set `joint_validate_trees: true` in a balanced
+pipeline stage. A full-validation request rescans cache entries that were counted
+using only a reference tree; validated counts can serve either mode.
 It pairs entries in sorted file-path order, processes the smaller source's total,
 and never reuses secondary entries. If secondary runs out, the last primary group
 is shortened and later groups are omitted. `--files-per-task` limits primary files;

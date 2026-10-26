@@ -6,8 +6,27 @@ import tempfile
 from pathlib import Path
 
 
-def count_root_entries(path):
-    """Read LArCV tree metadata without loading events (uproot or PyROOT)."""
+def count_root_entries(path, validate_trees=False):
+    """Read an entry count from ROOT metadata without loading events.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Local LArCV ROOT input file.
+    validate_trees : bool, default False
+        Check counts across all LArCV trees. Otherwise stop after the first
+        readable ``*_tree`` in sorted name order, used as the reference tree.
+
+    Returns
+    -------
+    int
+        Number of entries in the reference tree.
+
+    Raises
+    ------
+    ValueError
+        If no readable LArCV tree exists, or validation finds unequal counts.
+    """
     try:
         import uproot
     except ImportError:
@@ -21,28 +40,39 @@ def count_root_entries(path):
         if not source or source.IsZombie():
             raise ValueError(f"Cannot open ROOT file: {path}")
         try:
-            counts = [
-                int(source.Get(key.GetName()).GetEntries())
-                for key in source.GetListOfKeys()
-                if key.GetName().endswith("_tree")
-                and source.Get(key.GetName()).InheritsFrom("TTree")
-            ]
+            counts = []
+            for key in sorted(source.GetListOfKeys(), key=lambda key: key.GetName()):
+                if not key.GetName().endswith("_tree"):
+                    continue
+                tree = source.Get(key.GetName())
+                if tree.InheritsFrom("TTree"):
+                    counts.append(int(tree.GetEntries()))
+                    if not validate_trees:
+                        break
         finally:
             source.Close()
     else:
         with uproot.open(path) as source:
-            counts = [
-                int(source[key].num_entries)
-                for key in source.keys(cycle=False)
-                if key.endswith("_tree") and hasattr(source[key], "num_entries")
-            ]
+            counts = []
+            for key in sorted(source.keys(cycle=False)):
+                if not key.endswith("_tree"):
+                    continue
+                tree = source[key]
+                if hasattr(tree, "num_entries"):
+                    counts.append(int(tree.num_entries))
+                    if not validate_trees:
+                        break
     if not counts or len(set(counts)) != 1:
         raise ValueError(f"Expected equally sized LArCV *_tree products in {path}")
     return counts[0]
 
 
-def survey_sources(sources, cache_path):
-    """Cache counts by absolute path, file size and nanosecond modification time."""
+def survey_sources(sources, cache_path, validate_trees=False):
+    """Cache counts by path, size and modification time, recording validation.
+
+    Validated counts can serve reference-only surveys. A request to validate
+    all trees must resurvey counts cached without full validation.
+    """
     cache_path = Path(cache_path)
     try:
         cache = json.loads(cache_path.read_text())
@@ -61,9 +91,14 @@ def survey_sources(sources, cache_path):
                 record.get("signature") != signature
                 or type(count) is not int
                 or count < 0
+                or (validate_trees and not record.get("validated_trees", False))
             ):
-                count = count_root_entries(path)
-                cache[absolute] = {"signature": signature, "entries": count}
+                count = count_root_entries(path, validate_trees=validate_trees)
+                cache[absolute] = {
+                    "signature": signature,
+                    "entries": count,
+                    "validated_trees": validate_trees,
+                }
             counts[target].append(count)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     # Atomic replacement also keeps concurrent submissions from reading partial JSON.

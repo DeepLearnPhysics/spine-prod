@@ -76,6 +76,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "ntasks",
         "files_per_task",
         "joint_file_mode",
+        "joint_validate_trees",
         "depends_on",
         "cleanup",
         "apply_mods",
@@ -753,6 +754,16 @@ class PipelineDefinition:
             raise ValueError(
                 f"Pipeline stage '{name}' joint_file_mode must be "
                 "broadcast, paired or balanced"
+            )
+
+        joint_validate_trees = stage.get("joint_validate_trees", False)
+        if not isinstance(joint_validate_trees, bool):
+            raise TypeError(
+                f"Pipeline stage '{name}' joint_validate_trees must be a boolean"
+            )
+        if joint_validate_trees and joint_file_mode != "balanced":
+            raise ValueError(
+                f"Pipeline stage '{name}' joint_validate_trees requires balanced joint sharding"
             )
 
         cache_fields = PipelineDefinition._present(
@@ -1460,6 +1471,7 @@ class PipelineRunner(SubmissionComponent):
                 "ntasks": stage.get("ntasks"),
                 "files_per_task": stage.get("files_per_task"),
                 "joint_file_mode": stage.get("joint_file_mode", "broadcast"),
+                "joint_validate_trees": stage.get("joint_validate_trees", False),
                 "dependency": dependency,
                 "larcv_path": stage.get("larcv_path"),
                 "flashmatch_path": stage.get("flashmatch_path"),
