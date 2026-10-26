@@ -790,6 +790,16 @@ def test_pipeline_expands_tuples_and_rejects_conflicting_aliases():
             "in_place must be a boolean",
         ),
         (
+            {"name": "job", "config": "x.yaml", "joint_validate_trees": "yes"},
+            TypeError,
+            "joint_validate_trees must be a boolean",
+        ),
+        (
+            {"name": "job", "config": "x.yaml", "joint_validate_trees": True},
+            ValueError,
+            "joint_validate_trees requires balanced",
+        ),
+        (
             {"name": "job", "config": "x.yaml", "joint_file_mode": "other"},
             ValueError,
             "joint_file_mode must be",
