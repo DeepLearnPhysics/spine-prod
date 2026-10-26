@@ -114,7 +114,8 @@ include:
     assert dataset["base"]["provider"] == "larcv"
     assert excluded.isdisjoint(dataset["base"]["schema"])
     assert excluded.isdisjoint(config["io"]["writer"]["keys"])
-    assert config["base"]["split_output"] is False
+    assert config["base"]["split_output"] is True
+    assert config["io"]["writer"]["split_source"] == "primary"
     assert (
         dataset["base"]["schema"]["ppn_label"]["include_point_tagging"] is point_tagging
     )
@@ -153,6 +154,7 @@ include:
   - infer/nd-lar/modifier/joint/mod_joint_240819.yaml
 """,
         root_dir=str(config_root),
+        download=False,
     )
 
     dataset = config["io"]["loader"]["dataset"]
@@ -163,7 +165,8 @@ include:
     assert dataset["base"]["file_keys"] is None
     assert {"run_info", "flashes", "trigger"}.isdisjoint(dataset["base"]["schema"])
     assert {"run_info", "flashes", "trigger"}.isdisjoint(config["io"]["writer"]["keys"])
-    assert config["base"]["split_output"] is False
+    assert config["base"]["split_output"] is True
+    assert config["io"]["writer"]["split_source"] == "primary"
 
 
 @pytest.mark.skipif(not SPINE_AVAILABLE, reason="SPINE not available")
@@ -176,6 +179,7 @@ def test_nd_lar_dataset_refactor_preserves_standard_inference(
     config = load_config(
         "include: infer/nd-lar/full_chain_260409.yaml\n",
         root_dir=str(config_root),
+        download=False,
     )
 
     dataset = config["io"]["loader"]["dataset"]

@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flash matching.
 
 ### Changed
+- Joint inference modifiers now split output by primary input file with
+  `io.writer.split_source: primary`, retaining both sources' provenance. Requires
+  SPINE #186 and a tested patch-release runtime containing the new writer policy.
 - Restricted the SBND `mod_data_260501.yaml` data modifier to the 260501
   post-processing.
 
