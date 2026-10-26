@@ -23,9 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   avoiding the truncated `{name:` sampler name at runtime.
 
 ### Changed
+- Updated the default SPINE runtime and container to v1.4.3.
 - Joint inference modifiers now split output by primary input file with
   `io.writer.split_source: primary`, retaining both sources' provenance. Requires
-  SPINE #186 and a tested patch-release runtime containing the new writer policy.
+  SPINE v1.4.3 or a runtime containing the new writer policy from SPINE #186.
 - Balanced joint surveys now read one reference tree per ROOT file by default.
   Use `--joint-validate-trees` (pipeline: `joint_validate_trees: true`) to validate
   all tree counts. Full validation does not reuse reference-only cached counts.

@@ -153,10 +153,9 @@ change output routing. If secondary entries run out, the last processed primary
 file may have a partial output and subsequent files produce no output. Use
 `--set base.split_output=false` to combine a task's events into one output instead.
 
-This configuration requires the primary-only writer policy introduced in
-[SPINE #186](https://github.com/DeepLearnPhysics/spine/pull/186). Use a tested
-SPINE runtime containing that change. The production default must be updated to
-the corresponding patch release before this configuration is deployed.
+The default runtime is SPINE 1.4.3, which includes the primary-only writer policy
+from [SPINE #186](https://github.com/DeepLearnPhysics/spine/pull/186). Explicit
+runtime overrides must also provide that policy.
 
 ### Interactive Mode
 
