@@ -18,10 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Gen-II database calibration and sets the data drift-coordinate error used in
   flash matching.
 
+### Fixed
+- Balanced joint sampler overrides now survive both Singularity shell layers,
+  avoiding the truncated `{name:` sampler name at runtime.
+
 ### Changed
 - Joint inference modifiers now split output by primary input file with
   `io.writer.split_source: primary`, retaining both sources' provenance. Requires
   SPINE #186 and a tested patch-release runtime containing the new writer policy.
+- Balanced joint surveys now read one reference tree per ROOT file by default.
+  Use `--joint-validate-trees` (pipeline: `joint_validate_trees: true`) to validate
+  all tree counts. Full validation does not reuse reference-only cached counts.
 - Restricted the SBND `mod_data_260501.yaml` data modifier to the 260501
   post-processing.
 

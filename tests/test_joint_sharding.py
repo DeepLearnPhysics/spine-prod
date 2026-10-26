@@ -69,5 +69,75 @@ def test_root_survey_checks_tree_counts(tmp_path):
     assert count_root_entries(path) == 7
     with uproot.update(path) as source:
         source.mktree("bad_tree", {"entry": "int64"})
+    # A sorted reference tree is enough for sharding, even with other counts.
+    assert count_root_entries(path) == 0
     with pytest.raises(ValueError, match="equally sized"):
-        count_root_entries(path)
+        count_root_entries(path, validate_trees=True)
+
+
+def test_full_validation_upgrades_reference_cache(tmp_path):
+    """A cached reference count cannot satisfy a subsequent full validation."""
+    source = tmp_path / "input.root"
+    source.touch()
+    cache = tmp_path / "counts.json"
+    sources = {"primary": [str(source)]}
+    with patch("src.joint_sharding.count_root_entries", return_value=5) as count:
+        survey_sources(sources, cache)
+        survey_sources(sources, cache, validate_trees=True)
+        assert count.call_count == 2
+        count.assert_called_with(str(source), validate_trees=True)
+        survey_sources(sources, cache)
+        survey_sources(sources, cache, validate_trees=True)
+        assert count.call_count == 2
+
+
+@pytest.mark.parametrize("backend", ["uproot", "ROOT"])
+@pytest.mark.parametrize("validate", [False, True])
+def test_reference_survey_opens_only_one_tree(monkeypatch, backend, validate):
+    """Both backends stop at the sorted reference unless validation is requested."""
+    import sys
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from src.joint_sharding import count_root_entries
+
+    opened = []
+    counts = {"a_tree": 7, "b_tree": 9}
+
+    def get_tree(name):
+        opened.append(name)
+        return SimpleNamespace(
+            num_entries=counts[name],
+            GetEntries=lambda: counts[name],
+            InheritsFrom=lambda _: True,
+        )
+
+    source = MagicMock()
+    source.__enter__.return_value = source
+    if backend == "uproot":
+        source.keys.return_value = ["b_tree", "a_tree"]
+        source.__getitem__.side_effect = get_tree
+        monkeypatch.setitem(
+            sys.modules, "uproot", SimpleNamespace(open=lambda _: source)
+        )
+    else:
+        source.IsZombie.return_value = False
+        source.GetListOfKeys.return_value = [
+            SimpleNamespace(GetName=lambda name=name: name) for name in reversed(counts)
+        ]
+        source.Get.side_effect = get_tree
+        monkeypatch.setitem(sys.modules, "uproot", None)
+        monkeypatch.setitem(
+            sys.modules,
+            "ROOT",
+            SimpleNamespace(TFile=SimpleNamespace(Open=lambda *_: source)),
+        )
+    if validate:
+        with pytest.raises(ValueError, match="equally sized"):
+            count_root_entries("input.root", validate_trees=True)
+        assert opened == ["a_tree", "b_tree"]
+    else:
+        assert count_root_entries("input.root") == 7
+        assert opened == ["a_tree"]
+    if backend == "ROOT":
+        source.Close.assert_called_once()

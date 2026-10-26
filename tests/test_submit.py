@@ -375,7 +375,8 @@ def test_batch_mode_forwards_target_qualified_sources():
     }
 
 
-def test_batch_mode_forwards_paired_joint_file_mode():
+@pytest.mark.parametrize("mode,validate", [("paired", False), ("balanced", True)])
+def test_batch_mode_forwards_joint_survey_options(mode, validate):
     submitter = Mock()
     submitter.submit_job.return_value = []
 
@@ -388,12 +389,15 @@ def test_batch_mode_forwards_paired_joint_file_mode():
         "primary=primary.txt",
         "secondary=secondary.txt",
         "--joint-file-mode",
-        "paired",
+        mode,
+        *(["--joint-validate-trees"] if validate else []),
         submitter=submitter,
     )
 
     assert result == 0
-    assert submitter.submit_job.call_args.kwargs["joint_file_mode"] == "paired"
+    assert submitter.submit_job.call_args.kwargs["joint_file_mode"] == mode
+
+    assert submitter.submit_job.call_args.kwargs["joint_validate_trees"] is validate
 
 
 def test_pipeline_mode_prints_stage_jobs(capsys):

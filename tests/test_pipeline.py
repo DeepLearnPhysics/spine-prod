@@ -120,7 +120,8 @@ def test_collection_exact_substitution_preserves_scalar_type(tmp_path):
     assert definition.stages[0]["ntasks"] == 4
 
 
-def test_pipeline_forwards_paired_joint_file_mode(tmp_path):
+@pytest.mark.parametrize("mode,validate", [("paired", False), ("balanced", True)])
+def test_pipeline_forwards_joint_survey_options(tmp_path, mode, validate):
     path = write_pipeline(
         tmp_path,
         {
@@ -132,7 +133,8 @@ def test_pipeline_forwards_paired_joint_file_mode(tmp_path):
                         "primary": {"source_list": "primary.txt"},
                         "secondary": {"source_list": "secondary.txt"},
                     },
-                    "joint_file_mode": "paired",
+                    "joint_file_mode": mode,
+                    "joint_validate_trees": validate,
                 }
             ]
         },
@@ -140,7 +142,9 @@ def test_pipeline_forwards_paired_joint_file_mode(tmp_path):
 
     stage = PipelineDefinition.load(str(path)).stages[0]
     options = PipelineRunner._submission_options(stage, dependency=None)
-    assert options["joint_file_mode"] == "paired"
+    assert options["joint_file_mode"] == mode
+
+    assert options["joint_validate_trees"] is validate
 
 
 def test_pipeline_rejects_paired_mode_without_joint_sources(tmp_path):
