@@ -2761,6 +2761,7 @@ class TestBatchSpineOverride:
         # parse the resulting command as the container shell will.
         import shlex
         import subprocess
+
         import yaml
 
         command_line = next(
