@@ -144,13 +144,18 @@ must remain unchanged between survey and execution. Use an unfiltered joint data
 custom dataset entry filters/selections are not supported by this mode. Balanced
 mode owns source ranges and uses sequential pairing with incomplete batches retained.
 
-Joint modifiers disable per-input output splitting because overlay events contain
-both primary and secondary provenance. The default is one output per task. Use
-`--files-per-task 1` for one output per processed primary file; this also works
-when several tasks read disjoint slices of the same secondary file. If secondary
-entries run out, the final output may contain only part of its primary file and
-later primary files produce no output. Multiple primary files per task currently
-share one output; primary-only output routing would require writer support.
+Joint modifiers enable per-input output splitting with
+`base.split_output: true` and `io.writer.split_source: primary`. Each overlay is
+written once, to its primary input's output file, while both sources' provenance
+is preserved. For example, ten primary files in one task produce ten outputs if
+all ten have processed entries. Sharing secondary files across tasks does not
+change output routing. If secondary entries run out, the last processed primary
+file may have a partial output and subsequent files produce no output. Use
+`--set base.split_output=false` to combine a task's events into one output instead.
+
+The default runtime is SPINE 1.4.3, which includes the primary-only writer policy
+from [SPINE #186](https://github.com/DeepLearnPhysics/spine/pull/186). Explicit
+runtime overrides must also provide that policy.
 
 ### Interactive Mode
 

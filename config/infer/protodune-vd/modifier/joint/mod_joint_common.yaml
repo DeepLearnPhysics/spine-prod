@@ -3,10 +3,10 @@ __meta__:
   description: Run ProtoDUNE-VD inference on a primary/secondary joint dataset
 
 override:
-  # Joint events carry both primary and secondary file provenance. Until the
-  # writer has an explicit primary-routing policy, per-input splitting would
-  # write an overlaid event to both source file indexes.
-  base.split_output: false
+  # Route overlays by their primary input while preserving both sources'
+  # provenance. Requires SPINE's primary-only split writer policy.
+  base.split_output: true
+  io.writer.split_source: primary
 
   io.loader.dataset:
     provider: joint

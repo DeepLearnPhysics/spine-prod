@@ -6,8 +6,8 @@
 -r requirements-joint.txt
 
 # Production jobs run inside a tagged SPINE container. Some preload tests are
-# skipped unless SPINE >=1.4.0 is available locally. Install spine==1.4.0
-# to run configuration regressions and manager smoke tests against this release.
+# skipped unless SPINE >=1.4.0 is available locally. Install the version in
+# DEFAULT_SPINE_VERSION for configuration regressions and manager smoke tests.
 
 # Testing
 pytest>=6.0.0

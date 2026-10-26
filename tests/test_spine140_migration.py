@@ -39,7 +39,7 @@ def compose(*paths):
 
 @pytest.mark.parametrize("case", BASELINE, ids=lambda c: " + ".join(c["includes"]))
 def test_pre_migration_behavior(case):
-    """Compare providers, values, order, inputs and outputs, not YAML spelling."""
+    """Preserve legacy behavior except for explicit joint output routing changes."""
     if "rejected" in case:
         with pytest.raises(spine_config.errors.ConfigError, match=case["rejected"]):
             compose(*case["includes"])
@@ -52,6 +52,11 @@ def test_pre_migration_behavior(case):
                 )
         else:
             cfg = compose(*case["includes"])
+        if any("/modifier/joint/" in path for path in case["includes"]):
+            # Check the new policy, then isolate it from the historical contract.
+            assert cfg["base"]["split_output"] is True
+            assert cfg["io"]["writer"].pop("split_source") == "primary"
+            cfg["base"]["split_output"] = False
         assert fingerprint(cfg, ROOT) == case["sha256"]
 
 
