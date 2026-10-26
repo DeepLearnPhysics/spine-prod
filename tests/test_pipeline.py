@@ -1071,3 +1071,21 @@ def test_sparse_pipeline_stage_selection_rejects_boundaries():
             to_stage=None,
             select_stages=["stage"],
         )
+
+
+def test_sparse_selection_deduplicates_shared_ancestors():
+    """A selected diamond root yields one dependency despite two omitted paths."""
+    stages = [
+        {"name": "root", "depends_on": []},
+        {"name": "left", "depends_on": ["root"]},
+        {"name": "right", "depends_on": ["root"]},
+        {"name": "sink", "depends_on": ["left", "right"]},
+    ]
+    selected, omitted, trailing = PipelineRunner._select_stages(
+        stages, from_stage=None, to_stage=None, select_stages=["root", "sink"]
+    )
+    assert [stage["name"] for stage in selected] == ["root", "sink"]
+    assert selected[1]["depends_on"] == ["root"]
+    assert omitted == ["left", "right"]
+    assert trailing == []
+    assert stages[-1]["depends_on"] == ["left", "right"]

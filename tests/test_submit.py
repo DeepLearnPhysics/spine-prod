@@ -92,7 +92,8 @@ def test_list_modifiers_reports_lookup_errors(capsys):
     assert "ERROR: missing config" in capsys.readouterr().err
 
 
-def test_graceful_stop_routes_existing_job_without_configuration(capsys):
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_graceful_stop_routes_existing_job_without_configuration(capsys, dry_run):
     """Graceful completion should be a standalone scheduler operation."""
     submitter = Mock()
     submitter.graceful_stop.return_value = "slurm"
@@ -102,16 +103,19 @@ def test_graceful_stop_routes_existing_job_without_configuration(capsys):
         "12345",
         "--scheduler",
         "slurm",
+        *(["--dry-run"] if dry_run else []),
         submitter=submitter,
     )
 
     assert result == 0
     submitter.graceful_stop.assert_called_once_with(
-        "12345", scheduler="slurm", dry_run=False
+        "12345", scheduler="slurm", dry_run=dry_run
     )
-    assert "Graceful completion requested for slurm job 12345" in (
-        capsys.readouterr().out
-    )
+    output = capsys.readouterr().out
+    if dry_run:
+        assert "Graceful completion requested" not in output
+    else:
+        assert "Graceful completion requested for slurm job 12345" in output
 
 
 def test_graceful_stop_reports_control_failure(capsys):
