@@ -148,7 +148,10 @@ fi
 SHIFTER_MODULES+=("--module=cvmfs")
 {% endif %}
 
-RUN_CMD="srun -n 1 shifter ${SHIFTER_MODULES[*]} --image=$SPINE_CONTAINER_TAG bash -c \"$INNER_CMD\""
+# Slurm can adjust the allocated CPU count without updating the CPU entry in
+# SLURM_TRES_PER_TASK. Explicit -c overrides both environment options for srun.
+# Prefer the runtime allocation over the original request after adjustments.
+RUN_CMD="srun -n 1 -c ${SLURM_CPUS_PER_TASK:-{{ cpus_per_task }}} shifter ${SHIFTER_MODULES[*]} --image=$SPINE_CONTAINER_TAG bash -c \"$INNER_CMD\""
 
 {% if graceful_stop_file %}
 # Translate the scheduler signal into a filesystem request. SPINE rank zero
