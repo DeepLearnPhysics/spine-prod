@@ -232,6 +232,19 @@ checkpoint on the held-out dataset and runs a dependent CPU-only report stage:
 resolved report recipe records the dataset and hashes the composed checkpoint;
 `summary.json` and plots are written beneath the stable artifact directory.
 
+All maintained full-chain reporting pipelines share the SPINE 1.4.4 metric
+recipe. Their evaluators emit node-aligned `shower_primary_eval` records using
+the same target and purity policy as each model's shower objective. The report
+retains the historical matched group-primary metric separately. Older model
+revisions that disable closest-fragment targets keep that policy in evaluation.
+Ghost-aware confusion records also provide overall semantic recall alongside
+the existing conditional recall, without changing adapted-space clustering.
+
+After updating an existing workspace, rerun evaluation and then reporting to
+populate the new shower-node records; the existing weights remain usable.
+This applies to every existing reporting pipeline. Detector inference support
+alone does not imply a full-chain evaluation/report bundle is available.
+
 The generic pipelines declare `workspace: null`; choose the shared output root
 at launch with `--workspace /path/to/workflow`. They use SPINE's
 target-qualified source overrides for the mixed Graph-SPICE dataset and
@@ -372,11 +385,11 @@ after merging raw and cached products; validation remains unaugmented.
 
 The report reuses the latest shared metric recipe: five-class and collapsed
 shower/track semantic confusion, PPN distances in cm, fragment/particle/
-interaction clustering, and overlap-qualified shower-primary, particle PID,
-primary and orientation metrics. Those metrics were already inherited by the
-historical 2x2 pipelines; the new MPV/MPR truth correction makes their `nu_id`
-quality cuts meaningful for this sample rather than introducing new report
-formulas.
+interaction clustering, training-aligned shower-node primary classification,
+the separate matched group-primary comparison, particle PID, primary and
+orientation metrics. The MPV/MPR truth correction makes the neutrino-origin
+quality cuts meaningful for this sample. All 2x2 revisions use the shared
+reporting recipe while preserving their model-specific shower target policy.
 
 The v2 dataset, `mr5-0` geometry, five-stage chain, Graph-SPICE spatial size 320,
 2x2 graph-distance limits, six-class PID head, and shared training resources

@@ -15,6 +15,11 @@ ana:
       summary: true
       ghost: false
     - name: point_eval
+    # Match the maintained shower objective; older bundles override use_closest.
+    - name: shower_primary_eval
+      use_closest: true
+      high_purity: true
+      use_group_pred: true
     - name: cluster_eval
       obj_type: [fragment, particle, interaction]
       use_objects: true

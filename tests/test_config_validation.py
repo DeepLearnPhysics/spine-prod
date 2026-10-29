@@ -1393,6 +1393,71 @@ def load_config_with_includes(config_path):
         return module_parameter_view(load_config_file(str(config_path)))
 
 
+@pytest.mark.parametrize(
+    "config_path",
+    sorted((CONFIG_ROOT / "test").glob("*/full_chain/evaluate_*.yaml")),
+    ids=lambda path: str(path.relative_to(CONFIG_ROOT)),
+)
+def test_shower_reporting_policy_matches_trained_objective(config_path):
+    """Reports must use each model's actual node targets and purity cuts."""
+    config = load_config_with_includes(config_path)
+    analyzer = config["ana"]["shower_primary_eval"]
+    objective = config["model"]["modules"]["grappa_shower_loss"]["node_loss"]
+    for key in ("use_closest", "high_purity", "use_group_pred"):
+        assert analyzer.get(key, False) == objective.get(key, False)
+    for key in ("min_iou", "min_purity", "min_efficiency"):
+        assert analyzer.get(key) == objective.get(key)
+    assert analyzer.get("match_target", "group") == objective.get(
+        "match_target", "group"
+    )
+    if analyzer["use_closest"]:
+        assert "coord_label" in config["io"]["loader"]["dataset"]["schema"]
+    assert config["model"]["network_input"]["clust_label"] == "clust_label"
+
+
+def test_full_chain_report_separates_training_and_group_primary_targets():
+    """The new node metric must use its validity mask and retain the old task."""
+    report = load_config_with_includes(
+        CONFIG_ROOT / "test/common/full_chain/report_v1.yaml"
+    )
+    nodes = report["metrics"]["nodes"]
+    assert nodes["sources"]["shower_primary"] == "**/*shower_primary_eval_nodes.csv"
+    target = nodes["tasks"]["shower_fragment_primary"]
+    assert target["source"] == "shower_primary"
+    assert target["class_type"] == "primary"
+    assert target["truth_column"] == "target"
+    assert target["prediction_column"] == "prediction"
+    assert target["quality_cuts"] == {"column": "valid", "equals": True}
+    legacy = nodes["tasks"]["shower_fragment_group_primary"]
+    assert legacy["source"] == "fragment"
+    assert legacy["truth_column"] == "truth_group_primary"
+
+
+@pytest.mark.parametrize(
+    "pipeline_path",
+    sorted((CONFIG_ROOT.parent / "pipelines").glob("*/full_chain_*.yaml")),
+    ids=lambda path: str(path.relative_to(CONFIG_ROOT.parent)),
+)
+def test_reporting_pipelines_use_training_aligned_shower_records(pipeline_path):
+    """Every maintained detector pipeline must connect new analyzer records."""
+    pipeline = yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
+    stages = {stage["name"]: stage for stage in pipeline["stages"]}
+    evaluation = load_config_with_includes(
+        CONFIG_ROOT / stages["evaluate_full_chain"]["config"]
+    )
+    report = load_config_with_includes(
+        CONFIG_ROOT / stages["report_full_chain"]["config"]
+    )
+    assert "shower_primary_eval" in evaluation["ana"]
+    nodes = report["metrics"]["nodes"]
+    task = nodes["tasks"]["shower_fragment_primary"]
+    assert nodes["sources"][task["source"]] == "**/*shower_primary_eval_nodes.csv"
+    assert task["truth_column"] == "target"
+    assert task["prediction_column"] == "prediction"
+    assert task["quality_cuts"] == {"column": "valid", "equals": True}
+    assert "shower_fragment_group_primary" in nodes["tasks"]
+
+
 def test_protodune_sp_260210_model_is_shared_and_preserves_deployed_choices():
     """The inference wrapper adds weights to one reusable dated model."""
     for version in ("260210", "260906"):

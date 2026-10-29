@@ -153,9 +153,27 @@ change output routing. If secondary entries run out, the last processed primary
 file may have a partial output and subsequent files produce no output. Use
 `--set base.split_output=false` to combine a task's events into one output instead.
 
-The default runtime is SPINE 1.4.3, which includes the primary-only writer policy
-from [SPINE #186](https://github.com/DeepLearnPhysics/spine/pull/186). Explicit
-runtime overrides must also provide that policy.
+The default and minimum supported runtime is SPINE 1.4.4. It includes primary-only
+joint output routing, training-compatible shower-primary reporting, overall
+semantic recall, and initial validation/checkpoint selection before training.
+Explicit runtime overrides must provide SPINE 1.4.4 or newer.
+
+Full-chain evaluation now writes `shower_primary_eval_nodes.csv` records using
+the same closest-fragment and purity policy as the model's shower objective.
+Reports use these for `shower_fragment_primary` and retain the former matched
+group-primary comparison as `shower_fragment_group_primary`. Existing runs need
+evaluation followed by reporting again to populate the new metric; retraining
+is unnecessary. Old raw CSVs alone cannot supply the new shower-node records.
+
+SPINE 1.4.4 automatically adds overall semantic recall alongside conditional
+recall when reducing confusion CSVs. Ghost-aware evaluation bundles retain the
+ghost rows needed to include deghosting losses in the overall denominator.
+Existing CSVs with those rows can be reduced again for overall recall, but the
+updated strict report also requires the new shower-node CSVs.
+
+New training runs with validation configured evaluate and checkpoint the starting
+model before the first optimizer step. Resumed runs retain their validation
+history. Set `validation.initial: false` in the training configuration to opt out.
 
 ### Interactive Mode
 

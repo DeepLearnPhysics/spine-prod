@@ -12,7 +12,10 @@ from scripts import check_spine_version
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/check_spine_version.py"
 
 
-@pytest.mark.parametrize("version,code", [("1.3.0", 1), ("1.4.0", 0)])
+@pytest.mark.parametrize(
+    "version,code",
+    [("1.3.0", 1), ("1.4.3", 1), ("1.4.4rc1", 1), ("1.4.4", 0), ("1.5.0", 0)],
+)
 def test_selected_executable_version(tmp_path, version, code):
     executable = tmp_path / "selected spine.py"
     executable.write_text(
@@ -27,7 +30,7 @@ def test_selected_executable_version(tmp_path, version, code):
     )
     assert result.returncode == code
     if code:
-        assert "require SPINE >= 1.4.0" in result.stderr
+        assert "require SPINE >= 1.4.4" in result.stderr
 
 
 def test_unverifiable_executable_fails_closed(tmp_path):
@@ -43,7 +46,7 @@ def test_unverifiable_executable_fails_closed(tmp_path):
 @pytest.mark.parametrize(
     "output,expected_code",
     [
-        ("SPINE 1.4.0\n", 0),
+        ("SPINE 1.4.4\n", 0),
         ("SPINE 1.3.9\n", 1),
         ("SPINE unknown\n", 1),
         ("unexpected output\n", 1),
@@ -91,7 +94,7 @@ def test_version_check_script_entrypoint(monkeypatch):
         check_spine_version.subprocess,
         "run",
         lambda command, **_options: subprocess.CompletedProcess(
-            command, 0, stdout="SPINE 1.4.0\n"
+            command, 0, stdout="SPINE 1.4.4\n"
         ),
     )
     with pytest.raises(SystemExit, match="0"):

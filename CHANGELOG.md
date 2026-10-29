@@ -23,7 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   avoiding the truncated `{name:` sampler name at runtime.
 
 ### Changed
-- Updated the default SPINE runtime and container to v1.4.3.
+- Updated the default and minimum SPINE runtime to v1.4.4 for initial validation,
+  training-compatible shower-primary reporting, and overall semantic recall.
+- Full-chain reports consume new node-aligned shower-primary CSVs while retaining
+  the legacy group-primary comparison separately. Evaluation policies match each
+  model's objective, including older models that disable closest-fragment targets.
+  Regenerating the new metric requires rerunning evaluation and reporting.
 - Joint inference modifiers now split output by primary input file with
   `io.writer.split_source: primary`, retaining both sources' provenance. Requires
   SPINE v1.4.3 or a runtime containing the new writer policy from SPINE #186.

@@ -4290,6 +4290,35 @@ class TestCVMFSOption:
 
         assert 'SHIFTER_MODULES+=("--module=cvmfs")' in script
 
+    @pytest.mark.parametrize("allocated_cpus", [None, "16", "31", "32"])
+    def test_nersc_srun_uses_runtime_cpu_allocation(
+        self, mock_submitter, allocated_cpus
+    ):
+        """Explicit step CPUs take precedence over stale TRES environment values."""
+        script = self._render_template(
+            mock_submitter, "job_template_nersc.sbatch", cpus_per_task=16
+        )
+        # Exercise the rendered shell expansion without Slurm or a container.
+        assignment = next(
+            line for line in script.splitlines() if line.startswith('RUN_CMD="')
+        )
+        env = dict(os.environ, SLURM_TRES_PER_TASK="cpu=16")
+        env.pop("SLURM_CPUS_PER_TASK", None)
+        if allocated_cpus is not None:
+            env["SLURM_CPUS_PER_TASK"] = allocated_cpus
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                assignment + '\nset -- $RUN_CMD\nprintf "%s\\n" "$1" "$4" "$5"',
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert result.stdout.splitlines() == ["srun", "-c", allocated_cpus or "16"]
+
     @pytest.mark.parametrize(
         "template_name",
         [

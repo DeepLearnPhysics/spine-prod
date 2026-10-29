@@ -5,11 +5,11 @@ import re
 import subprocess
 import sys
 
-MINIMUM_VERSION = (1, 4, 0)
+MINIMUM_VERSION = (1, 4, 4)
 
 
 def validate_version(version):
-    """Require the released 1.4 configuration API, including for source installs."""
+    """Require maintained reporting/checkpoint APIs, including source installs."""
     match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)(.*)", version)
     required = ".".join(map(str, MINIMUM_VERSION))
     if match is None:

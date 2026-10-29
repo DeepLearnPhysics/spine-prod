@@ -14,3 +14,9 @@ include:
 override:
   io.writer: null
   model.network_input.clust_label: clust_label
+  # Preserve the original shower objective's group-primary target.
+  ana.stages~:
+    update:
+      name: shower_primary_eval
+      changes:
+        use_closest: false
