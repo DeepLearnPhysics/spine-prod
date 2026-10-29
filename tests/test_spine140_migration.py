@@ -39,7 +39,7 @@ def compose(*paths):
 
 @pytest.mark.parametrize("case", BASELINE, ids=lambda c: " + ".join(c["includes"]))
 def test_pre_migration_behavior(case):
-    """Preserve legacy behavior except for explicit joint output routing changes."""
+    """Preserve legacy behavior around explicit routing/reporting upgrades."""
     if "rejected" in case:
         with pytest.raises(spine_config.errors.ConfigError, match=case["rejected"]):
             compose(*case["includes"])
@@ -57,6 +57,31 @@ def test_pre_migration_behavior(case):
             assert cfg["base"]["split_output"] is True
             assert cfg["io"]["writer"].pop("split_source") == "primary"
             cfg["base"]["split_output"] = False
+        stages = cfg.get("ana", {}).get("stages", [])
+        if any(stage["name"] == "shower_primary_eval" for stage in stages):
+            # The 1.4.4 analyzer is additive. Keep the historical analyzer
+            # contract intact; model-specific target parity is checked by the
+            # reporting-policy tests in test_config_validation.py.
+            cfg["ana"]["stages"] = [
+                stage for stage in stages if stage["name"] != "shower_primary_eval"
+            ]
+        nodes = cfg.get("metrics", {}).get("nodes", {})
+        if "shower_primary" in nodes.get("sources", {}):
+            assert nodes["sources"].pop("shower_primary") == (
+                "**/*shower_primary_eval_nodes.csv"
+            )
+            task = nodes["tasks"].pop("shower_fragment_primary")
+            assert task == {
+                "source": "shower_primary",
+                "type": "classification",
+                "class_type": "primary",
+                "truth_column": "target",
+                "prediction_column": "prediction",
+                "quality_cuts": {"column": "valid", "equals": True},
+            }
+            nodes["tasks"]["shower_fragment_primary"] = nodes["tasks"].pop(
+                "shower_fragment_group_primary"
+            )
         assert fingerprint(cfg, ROOT) == case["sha256"]
 
 
@@ -71,14 +96,17 @@ def test_split_sbnd_data_modifier_has_time_containment():
     assert matching[0]["run_mode"] == "reco"
 
 
-@pytest.mark.parametrize("version", ["1.3.9", "1.4.0rc1", "1.4.0.dev1", "unknown"])
+@pytest.mark.parametrize(
+    "version",
+    ["1.3.9", "1.4.0", "1.4.3", "1.4.4rc1", "1.4.4.dev1", "unknown"],
+)
 def test_old_runtime_rejected(version):
     with pytest.raises(RuntimeError):
         validate_version(version)
 
 
 @pytest.mark.parametrize(
-    "version", ["1.4.0", "v1.4.0", "1.4.0+local", "1.4.1", "2.0.0"]
+    "version", ["1.4.4", "v1.4.4", "1.4.4+local", "1.4.5", "2.0.0"]
 )
 def test_released_runtime_accepted(version):
     validate_version(version)
