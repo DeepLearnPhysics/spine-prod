@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added staged DUNE-HD full-chain training, caching, evaluation and reporting
+  pipelines for revisions 260202, 260510, 260626 and 261022, including the
+  corrected-calibration training candidate used by the smoke test.
+- Added `scripts/pull_train_logs.sh` to download training logs, metrics, plots
+  and metadata while excluding weights, caches and bulk data.
 - Added the SBND Gen-II production chain `full_chain_co_261019.yaml`, with
   post-processing that replaces likelihood flash matching by the barycenter
   matcher configured as in sbndcode's TPCPMTBarycenterMatching. It also applies
