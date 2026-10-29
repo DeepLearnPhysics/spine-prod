@@ -455,52 +455,30 @@ def test_sbnd_starting_batches_and_s3df_profiles(revision):
         )
 
 
-def test_smoke_launcher_prepares_bounded_training_without_submitting(tmp_path):
-    import subprocess
-    import sys
-
-    import yaml
-
-    source = tmp_path / "sources.list"
-    files = []
-    for index in range(6):
-        path = tmp_path / f"input-{index}.root"
-        path.touch()
-        files.append(str(path))
-    source.write_text("\n".join(files) + "\n")
-    workspace = tmp_path / "smoke"
-    subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "scripts/smoke_sbnd.py"),
-            "--workspace",
-            str(workspace),
-            "--train-source-list",
-            str(source),
-            "--validation-source-list",
-            str(source),
-            "--spine-path",
-            str(tmp_path),
-            "--prepare-only",
-        ],
-        check=True,
+def test_cli_source_lists_propagate_to_every_sbnd_input_and_report():
+    train, validation = "/sdf/new/train.list", "/sdf/new/test.list"
+    pipeline = PipelineDefinition.load(
+        ROOT / "pipelines/sbnd/full_chain_261029.yaml",
+        workspace_override="/tmp/sbnd-cli-sources",
+        source_list=train,
+        val_source_list=validation,
     )
-    recipe = workspace / "smoke_inputs/pipeline.yaml"
-    pipeline = PipelineDefinition.load(recipe, workspace_override=str(workspace))
-    assert len(pipeline.stages) == 21
-    assert (workspace / "smoke_inputs/train.list").read_text().splitlines() == files[:4]
-    for stage in pipeline.stages:
-        if stage.get("stage") != "train":
-            continue
-        cfg = spine_config.apply_overrides(load(stage["config"]), stage["set"])
-        assert cfg["base"]["epochs"] is None
-        assert cfg["base"]["iterations"] == 20
-        assert cfg["train"]["save_epoch"] is None
-        assert cfg["train"]["save_step"] == 20
-        assert cfg["validation"]["initial"] is True
-        assert stage["time"] == "02:00:00"
-        assert not stage.get("apply_mods")
-    original = yaml.safe_load(
-        (ROOT / "pipelines/sbnd/full_chain_261029.yaml").read_text()
+    stages = {stage["name"]: stage for stage in pipeline.stages}
+    for split, source in [("train", train), ("validation", validation)]:
+        for operation in ["scan", "build"]:
+            assert stages[f"{operation}_{split}_filter"]["source_list"] == source
+        assert stages[f"cache_{split}_deghosting"]["source_list"] == source
+        for step in ["segmentation", "fragment_graphs", "particle_graphs"]:
+            assert (
+                stages[f"cache_{split}_{step}"]["sources"]["primary"]["source_list"]
+                == source
+            )
+    assert stages["train_uresnet_deghost"]["source_list"] == train
+    assert stages["train_uresnet_deghost"]["val_source_list"] == validation
+    assert stages["train_uresnet_ppn"]["sources"]["primary"]["source_list"] == train
+    assert (
+        stages["train_uresnet_ppn"]["validation_sources"]["primary"]["source_list"]
+        == validation
     )
-    assert original["stages"][2]["time"] == "5-00:00:00"
+    assert stages["evaluate_full_chain"]["source_list"] == validation
+    assert stages["report_full_chain"]["dataset"] == validation

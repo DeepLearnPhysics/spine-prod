@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added `scripts/smoke_sbnd.py` to launch a sampled, 20-update end-to-end SBND
-  smoke test on S3DF at the configured production batch sizes and GPU counts.
+- Pipeline launches now accept `--source-list` and `--val-source-list` to
+  override declared train/validation source-list variables across all stages.
 - Added SBND canonical models and staged training/cache/evaluation/reporting
   pipelines for eight maintained model revisions, with separate evaluators for
   all 12 inference chains and documented revision-specific datasets.

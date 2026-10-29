@@ -429,6 +429,8 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         select_stages=None,
         stage_module_weights=None,
         warm_start=None,
+        source_list=None,
+        val_source_list=None,
     )
     output = capsys.readouterr().out
     assert "reco: 42" in output
@@ -710,3 +712,30 @@ def test_tree_validation_requires_balanced_mode(capsys):
         run_main("--config", "infer/nd-lar/latest", "--joint-validate-trees")
     assert error.value.code == 2
     assert "requires --joint-file-mode balanced" in capsys.readouterr().err
+
+
+def test_pipeline_mode_forwards_source_list_overrides():
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--source-list",
+        "train.list",
+        "--val-source-list",
+        "val.list",
+        submitter=submitter,
+    )
+    assert result == 0
+    assert submitter.submit_pipeline.call_args.kwargs["source_list"] == "train.list"
+    assert submitter.submit_pipeline.call_args.kwargs["val_source_list"] == "val.list"
+
+
+@pytest.mark.parametrize("flag", ["--source-list", "--val-source-list"])
+@pytest.mark.parametrize("values", [["a.list", "b.list"], ["primary=a.list"]])
+def test_pipeline_source_list_overrides_require_one_unqualified_path(
+    flag, values, capsys
+):
+    with pytest.raises(SystemExit, match="2"):
+        run_main("--pipeline", "pipeline.yaml", flag, *values)
+    assert "requires exactly one unqualified list path" in capsys.readouterr().err

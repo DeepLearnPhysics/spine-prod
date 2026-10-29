@@ -1089,3 +1089,71 @@ def test_sparse_selection_deduplicates_shared_ancestors():
     assert omitted == ["left", "right"]
     assert trailing == []
     assert stages[-1]["depends_on"] == ["left", "right"]
+
+
+@pytest.mark.parametrize(
+    "flag, variable",
+    [
+        ("source_list", "train_source_list"),
+        ("val_source_list", "validation_source_list"),
+    ],
+)
+@pytest.mark.parametrize("value", ["", " ", 7])
+def test_pipeline_rejects_empty_or_non_string_source_list_override(
+    tmp_path, flag, variable, value
+):
+    path = write_pipeline(tmp_path, {"variables": {variable: "old.list"}, "stages": []})
+    with pytest.raises(ValueError, match="requires a non-empty list path"):
+        PipelineDefinition.load(path, **{flag: value})
+
+
+@pytest.mark.parametrize(
+    "flag, variable",
+    [
+        ("source_list", "train_source_list"),
+        ("val_source_list", "validation_source_list"),
+    ],
+)
+def test_pipeline_source_list_override_requires_declared_variable(
+    tmp_path, flag, variable
+):
+    path = write_pipeline(tmp_path, {"stages": []})
+    with pytest.raises(ValueError, match=f"must declare variables.{variable}"):
+        PipelineDefinition.load(path, **{flag: "new.list"})
+
+
+def test_pipeline_source_lists_override_before_alias_and_collection_expansion(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    path = write_pipeline(
+        tmp_path,
+        {
+            "variables": {
+                "train_source_list": "old-train.list",
+                "validation_source_list": "old-val.list",
+                "train_alias": "${train_source_list}",
+            },
+            "collections": {
+                "splits": [
+                    {"name": "train", "source": "${train_alias}"},
+                    {"name": "validation", "source": "${validation_source_list}"},
+                ]
+            },
+            "stages": [
+                {
+                    "name": "job_${split.name}",
+                    "for_each": {"collection": "splits", "as": "split"},
+                    "config": "test.yaml",
+                    "source_list": "${split.source}",
+                }
+            ],
+        },
+    )
+    definition = PipelineDefinition.load(
+        path, source_list="train.list", val_source_list="val.list"
+    )
+    assert [stage["source_list"] for stage in definition.stages] == [
+        str(tmp_path / "train.list"),
+        str(tmp_path / "val.list"),
+    ]

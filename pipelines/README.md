@@ -557,10 +557,10 @@ with the compensating gain removed.
 
 The source-list defaults are the exact train/test paths in
 [`config/infer/sbnd/README.md`](../config/infer/sbnd/README.md). The pipeline's
-`variables` block holds both paths; edit a copy for an alternate dataset/site.
+`variables` block holds both paths; override them with `--source-list` and
+`--val-source-list` for an alternate dataset/site.
 All pipelines currently target S3DF. The documented MPV/MPR v02 and Gen-II
-source lists are Polaris `/lus/eagle/` paths; replace both source-list variables
-with S3DF-accessible lists whose entries also point to local data before running.
+source lists are Polaris `/lus/eagle/` paths; override both with S3DF-accessible lists whose entries also point to local data before running.
 No S3DF mirror paths are assumed.
 Use a separate workspace for each revision. These recipes preserve released
 architectures and objectives while using the current staged training protocol;
@@ -643,34 +643,25 @@ validation, optional warm starts, held-out evaluation, overall recall and
 training-aligned shower reporting. No candidate weights are published and
 production latest selection remains on `261019`.
 
-### Launch an SBND smoke test on S3DF
+### Launch SBND on S3DF
 
-From the SBND feature branch, configure the environment and supply S3DF-local
-source lists and a SPINE 1.4.4-or-newer checkout:
+Use the standard submit entry point with S3DF-local source lists:
 
 ```bash
-source configure.sh
-python scripts/smoke_sbnd.py \
-  --workspace /path/to/runs/sbnd-261029-smoke \
-  --train-source-list /path/to/s3df/train.list \
-  --validation-source-list /path/to/s3df/test.list \
-  --spine-path /path/to/spine \
-  --warm-start /path/to/sbnd_co_snapshot_260521.ckpt
+python3 spine-prod/submit.py \
+  --pipeline spine-prod/pipelines/sbnd/full_chain_261029.yaml \
+  --workspace runs/smoke \
+  --source-list /sdf/data/neutrino/sbnd/simulation/mpvmpr_v02_train/train_file_list.txt \
+  --val-source-list /sdf/data/neutrino/sbnd/simulation/mpvmpr_v02_test/test_file_list.txt
 ```
 
-The warm start is optional. The launcher requires a fresh workspace, selects the
-first four files from each list, and submits the full pipeline with 20 optimizer
-updates per trainer and a two-hour limit for each training job. Production batch
-sizes, GPU counts, point filtering, initial validation, cache generation and
-held-out reporting remain enabled. Cache, validation and evaluation traverse the
-selected files; their existing time limits remain in place. This checks memory
-and workflow execution, not converged reconstruction performance. Use enough
-files to fill the largest global batch (200 events) in both validation halves.
-
-Use `--train-files N`, `--validation-files N`, or `--steps N` to adjust the smoke
-sample/budget. `--prepare-only` writes the sampled lists and pipeline without
-creating jobs; `--dry-run` generates job scripts without submitting them. The
-prepared recipe is saved under `<workspace>/smoke_inputs/pipeline.yaml`.
-To recover a failed stage, use that recipe with the normal `submit.py`
-`--from-stage`/`--resume` options, reusing the same workspace and software/warm-start
-arguments. The launcher itself refuses to overwrite an existing workspace.
+These flags override `variables.train_source_list` and
+`variables.validation_source_list` before collection/stage expansion, updating
+filtering, training, caching, evaluation and report provenance consistently.
+Each flag accepts one unqualified list path; pipelines must declare the
+corresponding variable. Add `--spine-path /path/to/spine` or
+`--warm-start /path/to/full_chain.ckpt` as needed. `--dry-run` generates jobs
+without submitting. This launches the pipeline's configured training budgets;
+`runs/smoke` is only the workspace name, not a shortened training mode.
+The supplied lists choose the dataset; these example paths select MPV/MPR v02
+rather than the candidate's default Gen-II dataset.
