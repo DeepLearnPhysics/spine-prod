@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND candidate with corrected simulation gain and overlap-aware targets
+include: model/sbnd/full_chain/model_260521.yaml
+override:
+  model.modules.calibration: !include "model/sbnd/calibration/calibration_261029.yaml"
+  model.modules.grappa_inter_loss: !include "model/sbnd/grappa_inter/loss_full_chain_261029.yaml"

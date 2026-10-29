@@ -100,3 +100,16 @@ released inference bundles and latest selection are unchanged.
 Historical FD-HD `260202` and `260510` compositions preserve the released
 networks, objectives, and calibration. The `260626` pipeline reuses `260510`
 training components and selects the June post-processing revision.
+
+SBND has eight canonical model compositions (`240720`, `240814`, `250328`,
+`250901`, `260304`, `260316`, `260501`, `260521`) supporting all 12 deployed
+chains. Identical network/loss leaves are shared across revisions. Inference
+wrappers add only deployed weights. All models retain five interaction PID
+classes and orientation supervision. Geometry changes from `sbndv2-4` to
+`sbndv2-6` in May 2026; historical charge rescaling, calibration, PPN policies,
+GrapPA radii and grouping remain pinned to the released definitions.
+
+The SBND `261029` candidate retains May networks and moves the simulation gain
+correction before recombination. Reconstructed-particle PID/primary objectives
+use group IoU filtering and closest-primary supervision, with orientation targets
+retained. Its standalone interaction objective remains distinct.

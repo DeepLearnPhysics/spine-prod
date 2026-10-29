@@ -1,0 +1,25 @@
+__meta__:
+  kind: bundle
+  version: "250328"
+  date: "2025-03-28"
+  description: SBND deghosted point cache
+include: cache/sbnd/uresnet_deghost/base_v1.yaml
+geo:
+  detector: sbnd
+  tag: sbndv2-4
+model:
+  modules:
+    uresnet_deghost: !include "model/sbnd/uresnet_deghost/network_240720.yaml"
+override:
+  model.modules.chain.stages:
+    - name: deghosting
+      provider: deghost
+      uses: uresnet_deghost
+      config:
+        mode: uresnet
+        charge_rescaling: collection
+    - name: calibration
+      config:
+        mode: apply
+        calibration:
+          stages: []

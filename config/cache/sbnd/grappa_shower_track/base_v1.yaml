@@ -1,0 +1,33 @@
+__meta__:
+  kind: fragment
+  description: Append SBND particle graphs and interaction supervision
+
+include: cache/common/grappa_shower_track/base_v1.yaml
+
+override:
+  io.loader.minibatch_size: 256
+  io.loader.dataset:
+    provider: mixed
+    primary:
+      provider: larcv
+      file_keys:
+      schema:
+        coord_label:
+          provider: particle_coords
+          particle_event: particle_corrected
+          cluster_event: cluster3d_pcluster
+    cache:
+      path:
+      stage: fragmentation
+      stage_map:
+        data_calib: deghosting
+        ppn_points: segmentation
+        clust_label_adapt: segmentation
+      keep_open: true
+      keys:
+        - data_calib
+        - ppn_points
+        - clust_label_adapt
+        - fragment_clusts
+        - fragment_shapes
+  model.network_input.data: data_calib

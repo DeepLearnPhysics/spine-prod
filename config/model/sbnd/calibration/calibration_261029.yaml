@@ -1,0 +1,12 @@
+__meta__:
+  kind: fragment
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND simulation collection-charge calibration
+include: model/sbnd/calibration/calibration_260501.yaml
+override:
+  stages~:
+    update:
+      name: gain
+      changes:
+        gain: 49.52947003467063

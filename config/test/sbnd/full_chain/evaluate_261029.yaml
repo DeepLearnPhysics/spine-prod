@@ -1,0 +1,47 @@
+__meta__:
+  kind: bundle
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND candidate full-chain evaluation
+include:
+  - infer/sbnd/base/base_260501.yaml
+  - infer/sbnd/io/io_260218.yaml
+  - model/sbnd/full_chain/model_261029.yaml
+  - infer/sbnd/post/candidate/post_261029.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+override:
+  io.writer: null
+  model.network_input.clust_label: clust_label
+  post.stages~:
+    - remove:
+        name: flash_match
+    - update:
+        name: match
+        changes:
+          ghost: true
+  ana.stages~:
+    - update:
+        name: segment_eval
+        changes:
+          ghost: true
+    - update:
+        name: shower_primary_eval
+        changes:
+          use_closest: true
+          high_purity: true
+          use_group_pred: true
+  io.loader.dataset.schema.clust_label:
+    provider: cluster3d
+    cluster_event: cluster3d_pcluster
+    sparse_semantics_event: sparse3d_pcluster_semantics
+    clean_data: true
+    particle_info:
+      particle_event: particle_corrected
+      neutrino_event: neutrino_mpv
+      type_include_secondary: false
+      type_include_mpr: false
+      primary_include_mpr: false
+remove:
+  - io.loader.dataset.schema.flashes
+  - io.loader.dataset.schema.crthits
+  - io.loader.dataset.schema.run_info

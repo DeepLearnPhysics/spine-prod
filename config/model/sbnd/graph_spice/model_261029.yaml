@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND graph_spice candidate model
+include: model/sbnd/graph_spice/model_260521.yaml

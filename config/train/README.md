@@ -116,3 +116,8 @@ Trained model weights are stored separately and referenced in the corresponding 
 - Links to weight storage locations
 
 Refer to the checked-in configuration files for detector-specific training details and dataset information.
+
+SBND recipes under `sbnd/` cover every maintained model revision. The complete
+filter/train/cache/export/evaluate/report workflows and the dataset mapping from
+the SBND inference README are documented in
+[`pipelines/README.md`](../../pipelines/README.md#sbnd-staged-pipelines).

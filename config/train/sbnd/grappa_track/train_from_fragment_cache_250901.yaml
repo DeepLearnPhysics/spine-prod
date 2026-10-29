@@ -1,0 +1,8 @@
+__meta__:
+  kind: bundle
+  version: "250901"
+  date: "2025-09-01"
+  description: SBND grappa_track training
+include:
+  - model/sbnd/grappa_track/model_250901.yaml
+  - train/sbnd/grappa_track/from_fragment_cache_v1.yaml

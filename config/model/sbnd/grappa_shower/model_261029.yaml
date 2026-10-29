@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND grappa_shower candidate model
+include: model/sbnd/grappa_shower/model_260521.yaml

@@ -1,0 +1,13 @@
+__meta__:
+  kind: bundle
+  version: "260316"
+  date: "2026-03-16"
+  description: SBND fragment graphs
+include: cache/sbnd/graph_spice/base_v1.yaml
+model:
+  modules:
+    graph_spice: !include "model/sbnd/graph_spice/network_250328.yaml"
+    grappa_shower: !include "model/sbnd/grappa_shower/network_260304.yaml"
+    grappa_shower_loss: !include "model/sbnd/grappa_shower/loss_250328.yaml"
+    grappa_track: !include "model/sbnd/grappa_track/network_full_chain_260304.yaml"
+    grappa_track_loss: !include "model/sbnd/grappa_track/loss_240720.yaml"

@@ -1,0 +1,16 @@
+__meta__:
+  kind: fragment
+  description: SBND calibration calibration 260501
+
+stages:
+  - name: gain
+    gain: 47.551
+  - name: recombination
+    model: mbox_ell
+    efield: 0.5
+    mbox_alpha: 0.904
+    mbox_beta: 0.204
+    mbox_ell_r: 1.25
+  - name: lifetime
+    lifetime: 35000
+    driftv: 0.1563

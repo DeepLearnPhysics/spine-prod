@@ -1,0 +1,37 @@
+__meta__:
+  kind: bundle
+  version: "250328"
+  date: "2025-03-28"
+  description: Evaluate the SBND 250328 full chain
+include:
+  - infer/sbnd/base/base_240720.yaml
+  - infer/sbnd/io/io_250328.yaml
+  - model/sbnd/full_chain/model_250328.yaml
+  - infer/sbnd/post/post_250328.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+override:
+  io.writer: null
+  model.network_input.clust_label: clust_label
+  post.stages~:
+    - remove:
+        name: flash_match
+    - update:
+        name: match
+        changes:
+          ghost: true
+  ana.stages~:
+    - update:
+        name: segment_eval
+        changes:
+          ghost: true
+    - update:
+        name: shower_primary_eval
+        changes:
+          use_closest: true
+          high_purity: true
+          use_group_pred: true
+remove:
+  - io.loader.dataset.schema.flashes
+  - io.loader.dataset.schema.flashes_xa
+  - io.loader.dataset.schema.crthits
+  - io.loader.dataset.schema.run_info

@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added `scripts/smoke_sbnd.py` to launch a sampled, 20-update end-to-end SBND
+  smoke test on S3DF at the configured production batch sizes and GPU counts.
+- Added SBND canonical models and staged training/cache/evaluation/reporting
+  pipelines for eight maintained model revisions, with separate evaluators for
+  all 12 inference chains and documented revision-specific datasets.
+- Added the SBND 261029 training candidate with corrected upstream simulation
+  gain, overlap-aware interaction targets, aligned cached supervision and
+  current validation/reporting policies. Image augmentation modifiers are
+  available separately and disabled in the candidate pipeline.
 - Added staged DUNE-HD full-chain training, caching, evaluation and reporting
   pipelines for revisions 260202, 260510, 260626 and 261022, including the
   corrected-calibration training candidate used by the smoke test.
@@ -28,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   avoiding the truncated `{name:` sampler name at runtime.
 
 ### Changed
+- SBND pipelines now target S3DF and use historical SBND training batches as
+  starting estimates: 4/25/50/32/32/128 events per GPU for the six trainers.
+  Polaris dataset-list paths remain documented placeholders pending S3DF copies.
+  Training budgets are five days for deghosting and three days for other trainers,
+  anchored to existing detector pipelines and historical SBND job scripts.
 - Updated the default and minimum SPINE runtime to v1.4.4 for initial validation,
   training-compatible shower-primary reporting, and overall semantic recall.
 - Full-chain reports consume new node-aligned shower-primary CSVs while retaining

@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  version: "240720"
+  date: "2024-07-20"
+  description: SBND uresnet_deghost standalone model
+include: model/common/uresnet_deghost/base_v1.yaml
+override:
+  model.modules.uresnet: !include "model/sbnd/uresnet_deghost/network_240720.yaml"
+  model.modules.uresnet_loss: !include "model/sbnd/uresnet_deghost/loss_240720.yaml"

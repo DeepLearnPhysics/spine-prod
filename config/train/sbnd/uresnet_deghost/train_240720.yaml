@@ -1,0 +1,8 @@
+__meta__:
+  kind: bundle
+  version: "240720"
+  date: "2024-07-20"
+  description: SBND uresnet_deghost training
+include:
+  - model/sbnd/uresnet_deghost/model_240720.yaml
+  - train/sbnd/uresnet_deghost/base_v1.yaml

@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND standalone interaction objectives
+include: model/common/grappa_inter/loss_v1.yaml

@@ -536,3 +536,141 @@ orientation loss. February defaults to
 `/sdf/data/neutrino/dune/sim/mpvmpr_v0/`; the v1 recipes use
 `/sdf/data/neutrino/dune/sim/hd/mpvmpr_v1/`. Keep separate workspaces for
 calibration revisions.
+
+## SBND staged pipelines
+
+`sbnd/full_chain_<model revision>.yaml` provides one training pipeline per model:
+eight released model revisions and the `261029` candidate. I/O and post-processing
+variants retain separate evaluation configs without duplicating training.
+
+| Model/pipeline revisions | Dataset documented in the SBND inference README | Default site |
+| --- | --- | --- |
+| 240720, 240814 | MPV/MPR v01 | S3DF |
+| 250328, 250901, 260304, 260316 | MPV/MPR v02 | S3DF |
+| 260501, 260521, 261029 candidate | Gen-II sbndcode v10_14_02 | S3DF |
+
+Inference-only revisions `240918`, `250818`, `260218`, and `261019` have evaluators
+under `config/test/sbnd/full_chain/`, selecting models `240814`, `250328`,
+`250901`, and `260521` respectively. Each historical pipeline evaluates the
+same-dated inference recipe. The candidate evaluates October post-processing
+with the compensating gain removed.
+
+The source-list defaults are the exact train/test paths in
+[`config/infer/sbnd/README.md`](../config/infer/sbnd/README.md). The pipeline's
+`variables` block holds both paths; edit a copy for an alternate dataset/site.
+All pipelines currently target S3DF. The documented MPV/MPR v02 and Gen-II
+source lists are Polaris `/lus/eagle/` paths; replace both source-list variables
+with S3DF-accessible lists whose entries also point to local data before running.
+No S3DF mirror paths are assumed.
+Use a separate workspace for each revision. These recipes preserve released
+architectures and objectives while using the current staged training protocol;
+they do not reproduce the original optimizer history.
+
+```bash
+./submit.py --pipeline pipelines/sbnd/full_chain_261029.yaml \
+  --workspace /path/to/sbnd-training --spine-path /path/to/spine
+```
+
+All recipes filter events with 500,000 or more reconstructed points, train six
+components, export a full-chain checkpoint, and evaluate/report held-out events.
+Training validation uses `[0.0, 0.5)` of the accepted validation domain; final
+evaluation uses `[0.5, 1.0)` of the validation source. Optional warm starts use
+the same module mapping as the other detector pipelines. SPINE 1.4.4 evaluates
+the starting model before training by default.
+
+The starting batches follow the historical
+[SBND training configs](https://github.com/bear-is-asleep/sbnd_spine_train/tree/master),
+normalizing their four-GPU global batches to per-GPU minibatches:
+
+| Trainer | S3DF A100 GPUs | Batch per GPU | Global batch |
+| --- | ---: | ---: | ---: |
+| Deghosting | 4 | 4 | 16 |
+| UResNet-PPN | 4 | 25 | 100 |
+| Graph-SPICE | 4 | 50 | 200 |
+| Shower GrapPA | 1 | 32 | 32 |
+| Track GrapPA | 1 | 32 | 32 |
+| Interaction GrapPA | 1 | 128 | 128 |
+
+These are rough starting settings without a new SBND memory/throughput benchmark.
+The cached training protocol and Gen-II dataset differ from the reference.
+Image trainers use `s3df_ampere_full`, GrapPA/cache/evaluation stages use
+`s3df_ampere`, and CPU utility stages use `s3df_milano`. Cache batches are unchanged.
+Trainers use Adam at 0.001, up to 50 epochs (100 for candidate PPN), validation-loss
+early stopping and best-checkpoint selection. Deghosting allows five days, matching
+the existing ProtoDUNE/FD pipeline budgets. All other trainers allow three days,
+anchored to the 72-hour requests in the reference SBND `train_*_full.sh` scripts.
+These are initial scheduler budgets, not measured completion times; cached
+GrapPA training also differs from the reference four-GPU training jobs.
+Cache/evaluation allow eight hours and export/report allow 30 minutes.
+
+Early models retain average charge rescaling; collection-only models retain
+collection rescaling. Before May 2026, the deghosting cache's `data_calib` stores
+rescaled charge through an identity calibration. May models retain their
+original in-model calibration. October evaluation retains its compensating
+post-processing gain. All versions retain five PID classes and orientation
+supervision, including cached orientation targets.
+
+Evaluation adds ghost-aware semantic confusion (including overall recall) and
+training-aligned shower-primary records. The `240720`, `240814`, and `240918` evaluators retain
+`use_closest: false`. Training evaluators omit optical/CRT input products and
+flash/CRT matching, so these reports measure charge reconstruction rather than
+optical matching performance. Production inference and latest selection remain
+unchanged.
+
+### SBND 261029 candidate
+
+The candidate retains the May 21 networks, five PID classes, collection charge
+rescaling, 5-voxel GrapPA features, track-based interaction grouping, current
+restricted PPN/shower-primary objectives, and orientation supervision. It moves
+the simulation gain correction before recombination: `1 / 0.02019` electrons/ADC
+replaces the data gain 47.551. Candidate post-processing removes October's
+compensating gain, while preserving the remaining reconstruction settings.
+
+Reconstructed-particle PID/primary targets require truth-group IoU of at least
+0.5. Primary supervision uses the closest matched piece and labels other pieces
+secondary. The same objective produces cached targets and trains from them;
+standalone truth-particle objectives remain separate. Candidate labels exclude
+secondary/MPR PID and MPR primary labels consistently in training, caches and
+evaluation, matching the other current detector recipes.
+
+Image augmentation is disabled in the candidate pipeline pending further
+validation. Optional SBND reflection/lattice modifiers remain available for
+later use; none is applied by default. The PPN modifier preserves raw-to-cache
+indices by moving the image frame with the reflected points. Cache production
+and validation remain unaugmented. Candidate PPN has a 100-epoch
+ceiling, and loaders use eight workers. The pipeline keeps filtering, initial
+validation, optional warm starts, held-out evaluation, overall recall and
+training-aligned shower reporting. No candidate weights are published and
+production latest selection remains on `261019`.
+
+### Launch an SBND smoke test on S3DF
+
+From the SBND feature branch, configure the environment and supply S3DF-local
+source lists and a SPINE 1.4.4-or-newer checkout:
+
+```bash
+source configure.sh
+python scripts/smoke_sbnd.py \
+  --workspace /path/to/runs/sbnd-261029-smoke \
+  --train-source-list /path/to/s3df/train.list \
+  --validation-source-list /path/to/s3df/test.list \
+  --spine-path /path/to/spine \
+  --warm-start /path/to/sbnd_co_snapshot_260521.ckpt
+```
+
+The warm start is optional. The launcher requires a fresh workspace, selects the
+first four files from each list, and submits the full pipeline with 20 optimizer
+updates per trainer and a two-hour limit for each training job. Production batch
+sizes, GPU counts, point filtering, initial validation, cache generation and
+held-out reporting remain enabled. Cache, validation and evaluation traverse the
+selected files; their existing time limits remain in place. This checks memory
+and workflow execution, not converged reconstruction performance. Use enough
+files to fill the largest global batch (200 events) in both validation halves.
+
+Use `--train-files N`, `--validation-files N`, or `--steps N` to adjust the smoke
+sample/budget. `--prepare-only` writes the sampled lists and pipeline without
+creating jobs; `--dry-run` generates job scripts without submitting them. The
+prepared recipe is saved under `<workspace>/smoke_inputs/pipeline.yaml`.
+To recover a failed stage, use that recipe with the normal `submit.py`
+`--from-stage`/`--resume` options, reusing the same workspace and software/warm-start
+arguments. The launcher itself refuses to overwrite an existing workspace.

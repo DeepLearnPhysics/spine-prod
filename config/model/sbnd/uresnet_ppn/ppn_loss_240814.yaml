@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  description: SBND ppn_loss 240814
+mask_loss: CE
+resolution: 5.0
+restrict_to_clusters: true

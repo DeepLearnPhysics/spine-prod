@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  version: "260304"
+  date: "2026-03-04"
+  description: SBND segmentation
+include: cache/sbnd/uresnet_ppn/base_v1.yaml
+model:
+  modules:
+    uresnet_ppn: !include "model/sbnd/uresnet_ppn/network_240814.yaml"

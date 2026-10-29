@@ -1,0 +1,12 @@
+__meta__:
+  kind: bundle
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND candidate post-processing with upstream simulation calibration
+  compatible_with:
+    model: ">=261029"
+include: infer/sbnd/post/post_261019.yaml
+override:
+  post.stages~:
+    remove:
+      name: apply_calibrations

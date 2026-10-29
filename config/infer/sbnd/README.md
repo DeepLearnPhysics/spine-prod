@@ -310,3 +310,14 @@ Description:
 
 Known issue(s):
   - Includes flash matching
+
+## Staged retraining and evaluation
+
+Each maintained model revision has one staged workflow under `pipelines/sbnd/`, using
+the train/test lists documented above. See the
+[pipeline guide](../../../pipelines/README.md#sbnd-staged-pipelines) for the
+revision mapping, resources, held-out split and reporting policy.
+
+The `261029` retraining candidate uses the Gen-II dataset listed above. Its
+corrected simulation gain and overlap-aware objectives are documented in the
+pipeline guide; it does not replace the deployed October checkpoint.

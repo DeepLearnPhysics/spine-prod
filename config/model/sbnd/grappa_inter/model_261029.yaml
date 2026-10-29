@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND grappa_inter candidate model
+include: model/sbnd/grappa_inter/model_260521.yaml
+override:
+  model.modules.grappa_loss: !include "model/sbnd/grappa_inter/loss_261029.yaml"

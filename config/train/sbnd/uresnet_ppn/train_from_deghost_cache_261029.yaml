@@ -1,0 +1,12 @@
+__meta__:
+  kind: bundle
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND uresnet_ppn candidate training
+include: train/sbnd/uresnet_ppn/train_from_deghost_cache_260521.yaml
+override:
+  base.epochs: 100.0
+  io.loader.dataset.primary.schema.clust_label.particle_info.type_include_secondary: false
+  io.loader.dataset.primary.schema.clust_label.particle_info.type_include_mpr: false
+  io.loader.dataset.primary.schema.clust_label.particle_info.primary_include_mpr: false
+  io.loader.num_workers: 8

@@ -1,0 +1,71 @@
+__meta__:
+  kind: fragment
+  version: "250328"
+  date: "2025-03-28"
+  description: SBND released full-chain architecture and objectives
+geo:
+  detector: sbnd
+  tag: sbndv2-4
+model:
+  provider: full_chain
+  to_numpy: true
+  network_input:
+    data: data
+    sources: sources
+    seg_label: seg_label
+  modules:
+    chain:
+      stages:
+        - name: deghosting
+          provider: deghost
+          uses: uresnet_deghost
+          loss: uresnet_deghost_loss
+          config:
+            mode: uresnet
+            charge_rescaling: collection
+        - name: segmentation
+          uses: uresnet_ppn
+          loss: uresnet_ppn_loss
+          config:
+            mode: uresnet
+            point_proposal: ppn
+        - name: fragmentation
+          uses: graph_spice
+          loss:
+            graph_spice: graph_spice_loss
+          config:
+            mode: graph_spice
+        - name: particle_aggregation
+          uses:
+            - grappa_shower
+            - grappa_track
+          loss:
+            shower: grappa_shower_loss
+            track: grappa_track_loss
+          config:
+            shower_aggregation: grappa
+            shower_primary: grappa
+            track_aggregation: grappa
+            particle_aggregation: null
+        - name: interaction_aggregation
+          uses: grappa_inter
+          loss: grappa_inter_loss
+          config:
+            mode: grappa
+            task_modes:
+              type: grappa
+              primary: grappa
+              orient: grappa
+    uresnet_deghost: !include "model/sbnd/uresnet_deghost/network_240720.yaml"
+    uresnet_deghost_loss: !include "model/sbnd/uresnet_deghost/loss_240720.yaml"
+    uresnet_ppn: !include "model/sbnd/uresnet_ppn/network_240814.yaml"
+    uresnet_ppn_loss: !include "model/sbnd/uresnet_ppn/loss_240814.yaml"
+    graph_spice: !include "model/sbnd/graph_spice/network_250328.yaml"
+    graph_spice_loss: !include "model/sbnd/graph_spice/loss_240720.yaml"
+    grappa_shower: !include "model/sbnd/grappa_shower/network_240720.yaml"
+    grappa_shower_loss: !include "model/sbnd/grappa_shower/loss_250328.yaml"
+    grappa_track: !include "model/sbnd/grappa_track/network_full_chain_240720.yaml"
+    grappa_track_loss: !include "model/sbnd/grappa_track/loss_240720.yaml"
+    grappa_inter: !include "model/sbnd/grappa_inter/network_full_chain_240720.yaml"
+    grappa_inter_loss: !include "model/sbnd/grappa_inter/loss_240720.yaml"
+  weight_path: null

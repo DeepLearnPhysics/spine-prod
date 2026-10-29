@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND uresnet_ppn candidate model
+include: model/sbnd/uresnet_ppn/model_260521.yaml
