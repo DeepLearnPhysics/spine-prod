@@ -214,6 +214,12 @@ to run `/path/to/spine/bin/run.py` (or `/path/to/spine/bin/spine` if present)
 instead of the `spine` executable on `PATH`. The checkout root is added to
 container bind paths automatically where supported.
 
+Batch jobs and forced interactive container runs resolve SPINE executables inside
+the container, without selecting installations from the submission host's `PATH`.
+This also applies to report, filter, and cache jobs. Explicit `--spine-path` or
+`SPINE_LOCAL_PATH` overrides still select a custom installation. Regenerate
+existing batch scripts to apply this behavior.
+
 ```bash
 ./submit.py --spine-path /path/to/spine -I --interactive-runtime local --config infer/generic/latest --source test.root --world-size 0
 ```
