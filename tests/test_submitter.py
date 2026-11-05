@@ -847,7 +847,7 @@ class TestSubmitterHelpers:
 
         with patch("src.runtime.shutil.which", return_value="/usr/bin/spine-filter"):
             assert mock_submitter.runtime.resolve_spine_filter_command() == (
-                "/usr/bin/spine-filter",
+                None,
                 None,
             )
         with patch("src.runtime.shutil.which", return_value=None):
@@ -881,7 +881,7 @@ class TestSubmitterHelpers:
 
         with patch("src.runtime.shutil.which", return_value="/usr/bin/spine-cache"):
             assert mock_submitter.runtime.resolve_spine_cache_command() == (
-                "/usr/bin/spine-cache",
+                None,
                 None,
             )
         with patch("src.runtime.shutil.which", return_value=None):
@@ -5294,7 +5294,7 @@ class TestPipelineSubmission:
     def test_resolve_spine_report_command_path_forms_and_fallbacks(
         self, mock_submitter, tmp_path
     ):
-        """Report resolution supports executable-like paths and PATH fallback."""
+        """Report resolution supports overrides and ignores the host PATH."""
         checkout = tmp_path / "checkout"
         report_module = checkout / "src" / "spine" / "bin" / "report.py"
         report_module.parent.mkdir(parents=True)
@@ -5312,7 +5312,7 @@ class TestPipelineSubmission:
 
         with patch("src.runtime.shutil.which", return_value="/usr/bin/spine-report"):
             assert mock_submitter.runtime.resolve_spine_report_command() == (
-                "/usr/bin/spine-report",
+                None,
                 None,
             )
 

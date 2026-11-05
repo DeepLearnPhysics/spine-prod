@@ -57,8 +57,10 @@ class RuntimeResolver(SubmissionComponent):
     @staticmethod
     def resolve_spine_command(
         spine_path: Optional[str] = None,
+        *,
+        allow_host_path: bool = False,
     ) -> Tuple[Optional[str], Optional[str]]:
-        """Resolve the SPINE command and any extra bind root it requires."""
+        """Resolve explicit overrides; discover host installs only for local use."""
         configured = spine_path or os.environ.get("SPINE_LOCAL_PATH")
         if configured:
             configured_path = Path(configured).expanduser()
@@ -89,7 +91,7 @@ class RuntimeResolver(SubmissionComponent):
                 "bin/run.py."
             )
 
-        local_spine = shutil.which("spine")
+        local_spine = shutil.which("spine") if allow_host_path else None
         if local_spine:
             return shlex.quote(local_spine), None
 
@@ -127,10 +129,6 @@ class RuntimeResolver(SubmissionComponent):
             )
             return command, str(root)
 
-        local_report = shutil.which("spine-report")
-        if local_report:
-            return shlex.quote(local_report), None
-
         # Batch execution occurs inside the configured SPINE container, where
         # the release entry point is expected even if it is absent on the host.
         return None, None
@@ -162,10 +160,6 @@ class RuntimeResolver(SubmissionComponent):
             )
             return command, str(root)
 
-        local_filter = shutil.which("spine-filter")
-        if local_filter:
-            return shlex.quote(local_filter), None
-
         return None, None
 
     @staticmethod
@@ -194,10 +188,6 @@ class RuntimeResolver(SubmissionComponent):
                 f"env PYTHONPATH={src_dir}:$PYTHONPATH " "python3 -m spine.bin.cache"
             )
             return command, str(root)
-
-        local_cache = shutil.which("spine-cache")
-        if local_cache:
-            return shlex.quote(local_cache), None
 
         # Scheduled execution uses the entry point in the release container.
         return None, None

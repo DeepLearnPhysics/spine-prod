@@ -299,7 +299,7 @@ class InteractiveRunner(SubmissionComponent):
         num_entry_options = self.context.spine_cli.format_num_entries(num_entries)
         entry_filter_options = self.context.spine_cli.format_entry_filters(entry_filter)
         local_spine_cmd, extra_bind_root = self.context.runtime.resolve_spine_command(
-            spine_path
+            spine_path, allow_host_path=interactive_runtime != "container"
         )
         extra_bind_roots = [
             root
