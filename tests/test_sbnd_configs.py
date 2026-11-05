@@ -441,7 +441,7 @@ def test_sbnd_starting_batches_and_s3df_profiles(revision):
         ("uresnet_deghost", 16, "s3df_ampere_full"),
         ("uresnet_ppn", 25, "s3df_ampere_full"),
         ("graph_spice", 50, "s3df_ampere_full"),
-        ("grappa_shower", 32, "s3df_ampere"),
+        ("grappa_shower", 24, "s3df_ampere"),
         ("grappa_track", 32, "s3df_ampere"),
         ("grappa_inter", 128, "s3df_ampere"),
     ]:
