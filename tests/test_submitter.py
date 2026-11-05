@@ -5114,8 +5114,9 @@ class TestPipelineSubmission:
 
         submit_job.assert_not_called()
 
+    @pytest.mark.parametrize("skip", [False, True])
     def test_submit_pipeline_selects_sparse_stages_and_contracts_dependencies(
-        self, mock_submitter, tmp_path, capsys
+        self, mock_submitter, tmp_path, capsys, skip
     ):
         """Sparse retries retain order and nearest selected dependencies."""
         pipeline_path = tmp_path / "pipeline.yaml"
@@ -5161,12 +5162,17 @@ class TestPipelineSubmission:
         ) as submit_job:
             result = mock_submitter.submit_pipeline(
                 str(pipeline_path),
-                select_stages=[
-                    "particle_validation",
-                    "cache_validation",
-                    "particle_train",
-                    "cache_train",
-                ],
+                skip_stages=["source", "train"] if skip else None,
+                select_stages=(
+                    None
+                    if skip
+                    else [
+                        "particle_validation",
+                        "cache_validation",
+                        "particle_train",
+                        "cache_train",
+                    ]
+                ),
             )
 
         assert list(result) == [
@@ -5181,7 +5187,8 @@ class TestPipelineSubmission:
         assert submit_job.call_args_list[3].kwargs["dependency"] == "afterok:20:21"
         assert all(call.kwargs["retry"] for call in submit_job.call_args_list)
         output = capsys.readouterr().out
-        assert "Not selected: source, train" in output
+        label = "Skipped as completed" if skip else "Not selected"
+        assert f"{label}: source, train" in output
 
     def test_report_rejects_non_mapping_configuration(self, tmp_path):
         """Report recipes must be mappings before provenance is injected."""

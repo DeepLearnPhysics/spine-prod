@@ -427,6 +427,7 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         from_stage=None,
         to_stage=None,
         select_stages=None,
+        skip_stages=None,
         stage_module_weights=None,
         warm_start=None,
         source_list=None,
@@ -621,6 +622,47 @@ def test_pipeline_mode_forwards_selected_stages():
         "cache_train",
         "cache_validation",
     ]
+
+
+def test_pipeline_mode_forwards_skipped_stages_with_boundaries():
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--from-stage",
+        "shower",
+        "--to-stage",
+        "export",
+        "--skip-stage",
+        "track",
+        "report",
+        submitter=submitter,
+    )
+    assert result == 0
+    options = submitter.submit_pipeline.call_args.kwargs
+    assert options["skip_stages"] == ["track", "report"]
+    assert options["from_stage"] == "shower"
+    assert options["to_stage"] == "export"
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--config", "config.yaml", "--skip-stage", "track"],
+        [
+            "--pipeline",
+            "pipeline.yaml",
+            "--select-stage",
+            "shower",
+            "--skip-stage",
+            "track",
+        ],
+    ],
+)
+def test_skip_stage_rejects_incompatible_modes(args):
+    with pytest.raises(SystemExit, match="2"):
+        run_main(*args)
 
 
 def test_workspace_is_rejected_outside_pipeline_mode():

@@ -761,6 +761,23 @@ on skipped stages are considered satisfied by their existing artifacts.
 Use `--to-stage NAME` to stop at an inclusive boundary when only a bounded
 range should be regenerated.
 
+Use `--skip-stage NAME [NAME ...]` to reuse completed stages within that range:
+
+```bash
+./submit.py \
+  --pipeline pipelines/sbnd/full_chain_261029.yaml \
+  --workspace /path/to/production \
+  --from-stage train_grappa_shower \
+  --skip-stage train_grappa_track
+```
+
+Skipped stages reuse their existing artifacts; they are not submitted again.
+Dependencies are contracted through omitted stages, so particle caching still
+waits for shower training in this example. `--skip-stage` can also be used alone
+or with `--to-stage`, but cannot be combined with `--select-stage`. Unknown stage
+names and selections that exclude every stage are rejected. Skipping does not
+verify that the existing artifacts are complete or compatible.
+
 For a sparse repair, select multiple stages in one option:
 
 ```bash

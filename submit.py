@@ -347,6 +347,14 @@ Examples:
             "are contracted through omitted stages."
         ),
     )
+    parser.add_argument(
+        "--skip-stage",
+        nargs="+",
+        help=(
+            "Exclude these pipeline stages, reusing their existing artifacts. "
+            "Can be combined with --from-stage and --to-stage."
+        ),
+    )
     resume_group = parser.add_mutually_exclusive_group()
     resume_group.add_argument(
         "--resume",
@@ -558,6 +566,10 @@ Examples:
         parser.error("--to-stage is only supported with --pipeline")
     if args.select_stage is not None and not args.pipeline:
         parser.error("--select-stage is only supported with --pipeline")
+    if args.skip_stage is not None and not args.pipeline:
+        parser.error("--skip-stage is only supported with --pipeline")
+    if args.skip_stage is not None and args.select_stage is not None:
+        parser.error("--skip-stage cannot be combined with --select-stage")
     if args.select_stage is not None and (
         args.from_stage is not None or args.to_stage is not None
     ):
@@ -776,6 +788,7 @@ Examples:
                 from_stage=args.from_stage,
                 to_stage=args.to_stage,
                 select_stages=args.select_stage,
+                skip_stages=args.skip_stage,
                 stage_module_weights=args.stage_module_weight,
                 warm_start=args.warm_start,
                 source_list=args.source_list[0] if args.source_list else None,

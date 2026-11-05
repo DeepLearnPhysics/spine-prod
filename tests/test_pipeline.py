@@ -1073,6 +1073,60 @@ def test_sparse_pipeline_stage_selection_rejects_boundaries():
         )
 
 
+@pytest.mark.parametrize(
+    "skipped, message",
+    [
+        ([], "must not be empty"),
+        ([""], "non-empty strings"),
+        (["track", "track"], "duplicates"),
+        (["missing"], "Unknown skipped"),
+        (["track", "shower"], "no stages selected"),
+    ],
+)
+def test_skip_stage_rejects_invalid_selection(skipped, message):
+    with pytest.raises(ValueError, match=message):
+        PipelineRunner._select_stages(
+            [{"name": "shower"}, {"name": "track"}],
+            None,
+            None,
+            skip_stages=skipped,
+        )
+
+
+def test_skip_stage_rejects_sparse_selection():
+    with pytest.raises(ValueError, match="cannot be combined"):
+        PipelineRunner._select_stages(
+            [{"name": "shower"}, {"name": "track"}],
+            None,
+            None,
+            select_stages=["shower"],
+            skip_stages=["track"],
+        )
+
+
+@pytest.mark.parametrize("start, stop", [(None, None), ("shower", "cache")])
+def test_skip_stage_preserves_dependencies_and_range(start, stop):
+    stages = [
+        {"name": "input", "depends_on": []},
+        {"name": "shower", "depends_on": ["input"]},
+        {"name": "track", "depends_on": ["input"]},
+        {"name": "bridge", "depends_on": ["shower", "track"]},
+        {"name": "cache", "depends_on": ["bridge", "track"]},
+        {"name": "report", "depends_on": ["cache"]},
+    ]
+    selected, omitted, deferred = PipelineRunner._select_stages(
+        stages, start, stop, skip_stages=["track", "bridge"]
+    )
+    assert [stage["name"] for stage in selected] == (
+        ["shower", "cache"] if start else ["input", "shower", "cache", "report"]
+    )
+    cache = next(stage for stage in selected if stage["name"] == "cache")
+    assert cache["depends_on"] == (["shower"] if start else ["shower", "input"])
+    assert omitted == (["input", "track", "bridge"] if start else ["track", "bridge"])
+    assert deferred == (["report"] if stop else [])
+    assert stages[4]["depends_on"] == ["bridge", "track"]
+
+
 def test_sparse_selection_deduplicates_shared_ancestors():
     """A selected diamond root yields one dependency despite two omitted paths."""
     stages = [
