@@ -437,22 +437,28 @@ def test_sbnd_starting_batches_and_s3df_profiles(revision):
         assert "gpus_per_node" not in stage
         if stage["name"].startswith(("scan_", "build_", "export_", "report_")):
             assert stage["profile"] == "s3df_milano"
-    for component, batch, profile in [
-        ("uresnet_deghost", 16, "s3df_ampere_full"),
-        ("uresnet_ppn", 25, "s3df_ampere_full"),
-        ("graph_spice", 50, "s3df_ampere_full"),
-        ("grappa_shower", 24, "s3df_ampere"),
-        ("grappa_track", 32, "s3df_ampere"),
-        ("grappa_inter", 128, "s3df_ampere"),
+    for component, batch, profile, time in [
+        ("uresnet_deghost", 16, "s3df_ampere_full", "5-00:00:00"),
+        ("uresnet_ppn", 25, "s3df_ampere_full", "2-00:00:00"),
+        ("graph_spice", 50, "s3df_ampere_full", "1-00:00:00"),
+        ("grappa_shower", 24, "s3df_ampere", "2-00:00:00"),
+        ("grappa_track", 32, "s3df_ampere", "1-00:00:00"),
+        ("grappa_inter", 128, "s3df_ampere", "06:00:00"),
     ]:
         stage = stages[f"train_{component}"]
         loader = load(stage["config"])["io"]["loader"]
         key = "batch_size" if component == "uresnet_deghost" else "minibatch_size"
         assert loader[key] == batch
         assert stage["profile"] == profile
-        assert stage["time"] == (
-            "5-00:00:00" if component == "uresnet_deghost" else "3-00:00:00"
-        )
+        assert stage["time"] == time
+    for stage in pipeline.stages:
+        if stage["name"].startswith("cache_"):
+            assert stage["time"] == "06:00:00"
+        elif stage["name"].startswith("scan_"):
+            assert stage["time"] == "00:30:00"
+        elif stage["name"].startswith("build_"):
+            assert stage["time"] == "00:10:00"
+    assert stages["evaluate_full_chain"]["time"] == "04:00:00"
 
 
 def test_cli_source_lists_propagate_to_every_sbnd_input_and_report():

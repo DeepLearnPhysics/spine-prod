@@ -33,6 +33,7 @@ defaults:
 stages:
   # Measure raw product sizes once per source, reusing compatible scan records.
   - name: scan_${split.name}_filter
+    time: "00:30:00"
     for_each:
       collection: splits
       as: split
@@ -48,6 +49,7 @@ stages:
 
   # Build file-aware manifests accepting events with fewer than 500k points.
   - name: build_${split.name}_filter
+    time: "00:10:00"
     for_each:
       collection: splits
       as: split
@@ -81,7 +83,7 @@ stages:
 
   # Materialize only calibrated deghosted data and its raw-index mapping.
   - name: cache_${split.name}_deghosting
-    time: "08:00:00"
+    time: "06:00:00"
     for_each:
       collection: splits
       as: split
@@ -106,7 +108,7 @@ stages:
     warm_start:
       uresnet_ppn: uresnet_ppn
     profile: s3df_ampere_full
-    time: "3-00:00:00"
+    time: "2-00:00:00"
     run_dir: ${workspace}/train/uresnet_ppn
     tensorboard: true
     sources:
@@ -125,7 +127,7 @@ stages:
 
   # Append segmentation predictions and adapted cluster labels to each cache.
   - name: cache_${split.name}_segmentation
-    time: "08:00:00"
+    time: "06:00:00"
     for_each:
       collection: splits
       as: split
@@ -153,7 +155,7 @@ stages:
     warm_start:
       graph_spice: graph_spice
     profile: s3df_ampere_full
-    time: "3-00:00:00"
+    time: "1-00:00:00"
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
@@ -162,7 +164,7 @@ stages:
 
   # Append fragment graphs and static supervision for both particle branches.
   - name: cache_${split.name}_fragment_graphs
-    time: "08:00:00"
+    time: "06:00:00"
     for_each:
       collection: splits
       as: split
@@ -190,7 +192,7 @@ stages:
     warm_start:
       grappa: grappa_shower
     profile: s3df_ampere
-    time: "3-00:00:00"
+    time: "2-00:00:00"
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
@@ -204,7 +206,7 @@ stages:
     stage: train
     warm_start:
       grappa: grappa_track
-    time: "3-00:00:00"
+    time: "1-00:00:00"
     source: ${workspace}/cache/train.spine-cache
     val_source: ${workspace}/cache/validation.spine-cache
     val_entry_fraction_range: [0.0, 0.5]
@@ -213,7 +215,7 @@ stages:
 
   # Append particle graphs and static interaction supervision to each cache.
   - name: cache_${split.name}_particle_graphs
-    time: "08:00:00"
+    time: "06:00:00"
     for_each:
       collection: splits
       as: split
@@ -236,7 +238,7 @@ stages:
 
   # Train interaction aggregation and particle classifiers from cached graphs.
   - name: train_grappa_inter
-    time: "3-00:00:00"
+    time: "06:00:00"
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
     config: train/sbnd/grappa_inter/train_from_particle_cache_260521.yaml
     stage: train
@@ -268,7 +270,7 @@ stages:
   - name: evaluate_full_chain
     depends_on: [export_full_chain_weights]
     config: test/sbnd/full_chain/evaluate_260521.yaml
-    time: "08:00:00"
+    time: "04:00:00"
     source_list: ${validation_source_list}
     entry_fraction_range: [0.5, 1.0]
     run_dir: ${workspace}/metrics/full_chain/raw
