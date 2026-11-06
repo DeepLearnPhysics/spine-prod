@@ -183,6 +183,7 @@ class BatchRunner(SubmissionComponent):
         tensorboard: bool = False,
         allow_missing_inputs: bool = False,
         retry: bool = False,
+        continuation: Optional[Dict] = None,
         **profile_overrides,
     ) -> List[str]:
         """Submit batch job for SPINE processing.
@@ -696,6 +697,20 @@ class BatchRunner(SubmissionComponent):
         if site != "s3df" and "gpus" in profile_overrides:
             raise ValueError(f"--gpus is not valid for {site.upper()} profiles")
         profile_config.update(profile_overrides)
+        continuation_policy = None
+        if continuation is not None:
+            from .continuation import policy
+
+            if stage != "train" or ntasks is not None or files_per_task is not None:
+                raise ValueError("Continuation supports ordinary training jobs only")
+            if not run_dir:
+                raise ValueError("Continuation requires run_dir")
+            continuation_policy = policy(
+                continuation,
+                profile_config["time"],
+                scheduler,
+                profile_config.pop("continuation_defaults", None),
+            )
         world_size = self.context.spine_cli.align_world_size(profile_config, world_size)
         spine_runtime_options = self.context.spine_cli.format_runtime_options(
             world_size,
@@ -788,6 +803,68 @@ class BatchRunner(SubmissionComponent):
         # Every scheduler submission gets the same immutable attempt layout,
         # including the first inference attempt. This keeps retries uniform.
         attempt_dir = RunManager.create_attempt_dir(job_dir)
+        continuation_attempt = None
+        if continuation_policy is not None:
+            import hashlib
+
+            from .continuation import next_request, reserve
+
+            # Include every scientific CLI override and resolved input selection,
+            # but keep allocation policy and per-attempt paths out of identity.
+            identity_values = dict(
+                config=RunManager.config_digest(config),
+                world_size=world_size,
+                runtime=spine_runtime_options,
+                overrides=set_overrides,
+                sources=effective_named_sources,
+                files=file_list,
+                validation_sources=effective_validation_named_sources,
+                validation_files=validation_file_list,
+                entry_options=entry_fraction_options,
+                num_entry_options=num_entry_options,
+                entry_filter_options=entry_filter_options,
+                module_weights=module_weights,
+                weight_path=weight_path,
+                warm_start_path=warm_start_path,
+                warm_start_modules=warm_start_modules,
+            )
+            identity = hashlib.sha256(
+                json.dumps(identity_values, sort_keys=True).encode()
+            ).hexdigest()
+            if dry_run:
+                request = next_request(continuation_policy, 0)
+                if request is None:
+                    raise ValueError(
+                        "Continuation budget cannot fit a useful allocation"
+                    )
+                continuation_attempt = {"token": "dry-run", "request": request}
+            else:
+                continuation_attempt = reserve(
+                    job_dir, identity, continuation_policy, scheduler, attempt_dir
+                )
+            profile_config["time"] = continuation_attempt["request"]["time"]
+            print(
+                "  Continuation: submission-host controller; downstream deferred until completed"
+            )
+            print(
+                f"  Runtime budget: {continuation_policy['runtime_budget']}s; "
+                f"allocation: {continuation_attempt['request']}; "
+                f"checkpoint margin: {continuation_policy['checkpoint_margin']}s"
+            )
+            # Contract variables explicitly cross both Shifter and Apptainer.
+            spine_cmd = (
+                "env "
+                + " ".join(
+                    f"{key}={shlex.quote(str(value))}"
+                    for key, value in {
+                        "SPINE_CONTINUATION_TOKEN": continuation_attempt["token"],
+                        "SPINE_PAUSE_FILE": attempt_dir / "pause",
+                        "SPINE_OUTCOME_FILE": attempt_dir / "outcome.json",
+                    }.items()
+                )
+                + " "
+                + (spine_cmd or "spine")
+            )
         graceful_stop_file = None
         if stage == "train":
             # Keep the request marker scoped to one immutable submission. A
@@ -1205,9 +1282,16 @@ class BatchRunner(SubmissionComponent):
             )
 
             script_content = template.render(
+                continuation_attempt=continuation_attempt,
+                continuation_policy=continuation_policy,
+                continuation_run_dir=str(job_dir),
                 array_spec=array_spec,
                 job_name=(
-                    f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
+                    continuation_attempt["token"]
+                    if continuation_attempt
+                    else (
+                        f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
+                    )
                 ),
                 log_dir=str(attempt_dir),
                 stdout_path=(
@@ -1296,6 +1380,10 @@ class BatchRunner(SubmissionComponent):
                 print(f"  Dependency: {chunk_dependency}")
 
             job_id = batch_client.submit(script_path, dry_run)
+            if continuation_attempt and not dry_run:
+                from .continuation import submitted
+
+                submitted(job_dir, continuation_attempt["token"], job_id)
             if job_id:
                 job_ids.append(job_id)
                 print(f"  Job ID: {job_id}")

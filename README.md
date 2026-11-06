@@ -10,6 +10,10 @@ A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPIN
 
 SPINE is a deep learning-based reconstruction framework for liquid argon time projection chamber (LArTPC) detectors. This production system provides tools for running SPINE at scale on large datasets using scheduler-managed job arrays.
 
+For opt-in training across scheduler allocations, see the
+[continuation test guide](docs/training-continuation.md), including NERSC and
+Polaris examples, the required SPINE runtime patch, and controller operations.
+
 ## Quick Start
 
 ### 1. Environment Setup

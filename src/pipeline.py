@@ -85,6 +85,7 @@ STAGE_FIELDS = GLOBAL_FIELDS | frozenset(
         "run_dir",
         "resume",
         "resume_from",
+        "continuation",
         "validation_name",
         "rerun_validation",
         "tensorboard",
@@ -837,6 +838,11 @@ class PipelineDefinition:
     def _validate_lifecycle(cls, name: str, stage: Mapping[str, Any]) -> None:
         """Validate train, validation, and inference-only controls."""
         kind = stage.get("kind", "spine")
+        if "continuation" in stage:
+            if kind != "spine" or stage.get("stage") != "train":
+                raise ValueError("continuation is supported only for training stages")
+            if not isinstance(stage["continuation"], dict):
+                raise ValueError("continuation must be a mapping")
         if kind == "filter":
             cls._validate_filter(name, stage)
             return
@@ -1263,6 +1269,17 @@ class PipelineRunner(SubmissionComponent):
         if definition.workspace is not None:
             self._prepare_log_index(definition.workspace, stages)
 
+        if any("continuation" in stage for stage in all_stages):
+            from .continuation_pipeline import start
+
+            if from_stage or select_stages or skip_stages or to_stage:
+                raise ValueError(
+                    "Continuation pipelines use the durable controller; stage slicing is unsupported"
+                )
+            return start(
+                self.context, stages, definition.workspace, dry_run, preload, warm_start
+            )
+
         job_map: Dict[str, List[str]] = {}
         cleanup_map: Dict[str, List[str]] = {}
         for stage in stages:
@@ -1558,6 +1575,11 @@ class PipelineRunner(SubmissionComponent):
                 "run_dir": stage.get("run_dir"),
                 "resume": stage.get("resume", False),
                 "resume_from": stage.get("resume_from"),
+                **(
+                    {"continuation": stage["continuation"]}
+                    if "continuation" in stage
+                    else {}
+                ),
                 "validation_name": stage.get("validation_name"),
                 "rerun_validation": stage.get("rerun_validation", False),
                 "tensorboard": stage.get("tensorboard", False),
