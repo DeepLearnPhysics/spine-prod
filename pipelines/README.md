@@ -665,3 +665,67 @@ without submitting. This launches the pipeline's configured training budgets;
 `runs/smoke` is only the workspace name, not a shortened training mode.
 The supplied lists choose the dataset; these example paths select MPV/MPR v02
 rather than the candidate's default Gen-II dataset.
+
+## ICARUS staged training
+
+`pipelines/icarus/` contains one pipeline for each of the 12 deployed chains and
+one additional candidate, `full_chain_261106.yaml`. The candidate incorporates
+current overlap-aware interaction targets, explicit orientation supervision,
+training-aligned reports, best-checkpoint export, and grouped evaluation. It
+retains the documented May 2026 calibration constants and databases rather than
+borrowing another detector's gain correction.
+
+```bash
+./submit.py \
+  --pipeline pipelines/icarus/full_chain_261106.yaml \
+  --workspace /path/to/icarus/run \
+  --source-list /path/to/train_file_list.txt \
+  --val-source-list /path/to/test_file_list.txt
+```
+
+The checked-in source lists follow the deployed-model dataset documentation:
+
+| Pipelines | Dataset under `/sdf/data/neutrino/icarus/sim/` |
+| --- | --- |
+| `240719`, `240812`, `co_240812` | `mpvmpr_v2` |
+| `250115`, `co_250115`, `co_250303` | `mpvmpr_v3` |
+| `co_250625`, `co_260212`, `co_260325` | `mpvmpr_v4` |
+| `co_260306`, `co_260410`, `co_260501`, `261106` | `mpvmpr_v5` |
+
+Each directory uses `train_file_list.txt` and `test_file_list.txt`. Source-list
+CLI overrides propagate to filtering, mixed raw/cache readers, evaluation and
+report provenance. Define `ICARUS_DATA_DIR` for the calibration databases used
+by `co_260410`, `co_260501`, and the candidate.
+
+Training and cache stages operate on complete logical events containing both
+cryostats. They deliberately use unsplit collation: splitting coordinate tensors
+again while retaining event-level `orig_index` and graph-index products would
+break their shared index domain. Raw charge and source parsers read both East
+and West products. Deghosting caches also pass `meta` and `run_info` into the
+run-dependent calibration. Evaluation retains the released cryostat-splitting
+collator and geometry. Events are rejected if either cryostat has 500,000 or
+more reconstructed points; this is a per-cryostat bound, not a combined bound.
+
+Starting event batches are conservative relative to SBND because each entry
+contains two cryostats: deghosting total batch 8, PPN minibatch 12, Graph-SPICE
+25, shower 12, track 16, and interaction 64. Cache minibatches are respectively
+2, 8, 8, and 128. The first three trainers use four A100s; GrapPA trainers use
+one. Training caches use four tasks and validation caches one; evaluation groups
+files into four tasks. ICARUS retains generous initial wall times (five days for
+deghosting, three days for other trainers, eight hours for caches/evaluation)
+until measured on an ICARUS run. SBND's measured runtimes are not assumed to
+transfer directly. Numba's existing 64-thread compatibility cap is unchanged.
+
+The candidate keeps both validation halves in its caches, uses `[0.0, 0.5)` for
+training validation, and `[0.5, 1.0)` for final evaluation. Its raw and cached
+cluster-label policies agree on secondary/MPR truth treatment. Historical
+pipelines preserve their released objectives, including the absence of
+orientation supervision. The candidate supplies both orientation target and
+validity products to the cached interaction trainer.
+
+Optional `augment_uresnet`, `augment_ppn`, and `augment_graph_spice` modifiers
+live under `config/train/icarus/modifier/` and are disabled by default. They
+combine detector-centered reflections with lattice augmentation. The PPN
+modifier moves the metadata frame with reflections to preserve raw-to-cached
+point correspondence through `orig_index`; validate augmentation on ICARUS
+before enabling it for a production run.

@@ -1,0 +1,6 @@
+__meta__:
+  kind: bundle
+  description: ICARUS standalone interaction objectives
+  version: "261106"
+  date: "2026-11-06"
+include: model/common/grappa_inter/loss_v1.yaml

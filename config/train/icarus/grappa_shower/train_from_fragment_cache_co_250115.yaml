@@ -1,0 +1,8 @@
+__meta__:
+  kind: bundle
+  description: ICARUS grappa_shower training
+  version: "250115"
+  date: "2025-01-15"
+include:
+  - model/icarus/grappa_shower/model_co_250115.yaml
+  - train/icarus/grappa_shower/from_fragment_cache_v1.yaml

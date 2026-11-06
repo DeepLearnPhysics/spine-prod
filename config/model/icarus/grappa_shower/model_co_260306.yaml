@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  description: ICARUS grappa_shower standalone model
+  version: "260306"
+  date: "2026-03-06"
+include: model/common/grappa_shower/base_v1.yaml
+override:
+  model.modules.grappa: !include "model/icarus/grappa_shower/network_co_260212.yaml"
+  model.modules.grappa_loss: !include "model/icarus/grappa_shower/loss_co_250625.yaml"

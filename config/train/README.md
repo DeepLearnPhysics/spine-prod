@@ -121,3 +121,11 @@ SBND recipes under `sbnd/` cover every maintained model revision. The complete
 filter/train/cache/export/evaluate/report workflows and the dataset mapping from
 the SBND inference README are documented in
 [`pipelines/README.md`](../../pipelines/README.md#sbnd-staged-pipelines).
+
+ICARUS training bundles cover all 12 deployed average/collection-charge models
+and the additional `261106` candidate. Cached training keeps complete East/West
+logical events unsplit to preserve raw-to-cached and graph index domains.
+Candidate-only interaction supervision adds orientation and overlap-aware target
+selection; historical objectives remain pinned. Optional detector reflection and
+lattice modifiers are disabled by default. See `pipelines/README.md` for the
+staged workflow, datasets, calibration requirements, and starting resource limits.

@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  description: ICARUS graph_spice loss
+  version: "240719"
+  date: "2024-07-19"
+provider: edge
+loss: binary_log_dice_ce

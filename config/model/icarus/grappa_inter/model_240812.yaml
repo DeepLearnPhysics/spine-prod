@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  description: ICARUS grappa_inter standalone model
+  version: "240812"
+  date: "2024-08-12"
+include: model/common/grappa_inter/base_v1.yaml
+override:
+  model.modules.grappa: !include "model/icarus/grappa_inter/network_240719.yaml"
+  model.modules.grappa_loss: !include "model/icarus/grappa_inter/loss_240719.yaml"

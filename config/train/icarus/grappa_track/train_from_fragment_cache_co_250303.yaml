@@ -1,0 +1,8 @@
+__meta__:
+  kind: bundle
+  description: ICARUS grappa_track training
+  version: "250303"
+  date: "2025-03-03"
+include:
+  - model/icarus/grappa_track/model_co_250303.yaml
+  - train/icarus/grappa_track/from_fragment_cache_v1.yaml

@@ -1,0 +1,13 @@
+__meta__:
+  kind: bundle
+  description: ICARUS overlap-aware reconstructed-particle targets
+  version: "261106"
+  date: "2026-11-06"
+include: model/icarus/grappa_inter/loss_261106.yaml
+override:
+  node_loss.type.min_iou: 0.5
+  node_loss.type.match_target: group
+  node_loss.primary.use_closest: true
+  node_loss.primary.secondary_label: 0
+  node_loss.primary.min_iou: 0.5
+  node_loss.primary.match_target: group

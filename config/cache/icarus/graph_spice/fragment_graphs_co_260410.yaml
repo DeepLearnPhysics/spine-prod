@@ -1,0 +1,13 @@
+__meta__:
+  kind: bundle
+  description: ICARUS fragment_graphs cache
+  version: "260410"
+  date: "2026-04-10"
+include: cache/icarus/graph_spice/base_v1.yaml
+model:
+  modules:
+    graph_spice: !include "model/icarus/graph_spice/network_240719.yaml"
+    grappa_shower: !include "model/icarus/grappa_shower/network_co_260212.yaml"
+    grappa_shower_loss: !include "model/icarus/grappa_shower/loss_co_250625.yaml"
+    grappa_track: !include "model/icarus/grappa_track/network_full_chain_co_260212.yaml"
+    grappa_track_loss: !include "model/icarus/grappa_track/loss_240719.yaml"

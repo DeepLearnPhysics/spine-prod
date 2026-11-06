@@ -1,0 +1,19 @@
+__meta__:
+  kind: fragment
+  description: ICARUS grappa_inter loss
+  version: "240719"
+  date: "2024-07-19"
+node_loss:
+  type:
+    provider: class
+    target: pid
+    loss: ce
+    balance_loss: true
+  primary:
+    provider: class
+    target: inter_primary
+    loss: ce
+    balance_loss: true
+edge_loss:
+  provider: channel
+  target: interaction

@@ -1,0 +1,10 @@
+__meta__:
+  kind: bundle
+  description: ICARUS grappa_inter training
+  version: "261106"
+  date: "2026-11-06"
+include:
+  - model/icarus/grappa_inter/model_261106.yaml
+  - train/icarus/grappa_inter/from_particle_cache_v1.yaml
+override:
+  io.loader.num_workers: 8

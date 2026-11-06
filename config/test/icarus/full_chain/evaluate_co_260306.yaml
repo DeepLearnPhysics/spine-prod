@@ -1,0 +1,35 @@
+__meta__:
+  kind: bundle
+  description: Evaluate ICARUS full chain
+  version: "260306"
+  date: "2026-03-06"
+include:
+  - infer/icarus/base/base_240719.yaml
+  - infer/icarus/io/io_240812.yaml
+  - infer/icarus/post/post_250625.yaml
+  - model/icarus/full_chain/model_co_260306.yaml
+  - test/common/full_chain/analyzers_v1.yaml
+override:
+  io.writer: null
+  model.network_input.clust_label: clust_label
+  post.stages~:
+    - remove:
+        name: flash_match
+    - update:
+        name: match
+        changes:
+          ghost: true
+  ana.stages~:
+    - update:
+        name: segment_eval
+        changes:
+          ghost: true
+    - update:
+        name: shower_primary_eval
+        changes:
+          use_closest: true
+          high_purity: true
+          use_group_pred: true
+remove:
+  - io.loader.dataset.schema.flashes
+  - io.loader.dataset.schema.crthits

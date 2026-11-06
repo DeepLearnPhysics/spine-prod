@@ -1,0 +1,14 @@
+__meta__:
+  kind: bundle
+  description: ICARUS graph_spice training
+  version: "250303"
+  date: "2025-03-03"
+include:
+  - model/icarus/graph_spice/model_co_250303.yaml
+  - train/icarus/graph_spice/from_segmentation_cache_v1.yaml
+override:
+  model.network_input.data: data_calib
+  model.network_input.seg_label: seg_pred
+  model.loss_input.seg_label: seg_pred
+  model.loss_input.clust_label: clust_label_adapt
+  model.modules.graph_spice.make_clusters: false

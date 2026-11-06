@@ -1,0 +1,10 @@
+__meta__:
+  kind: bundle
+  description: ICARUS grappa_shower training
+  version: "261106"
+  date: "2026-11-06"
+include:
+  - model/icarus/grappa_shower/model_261106.yaml
+  - train/icarus/grappa_shower/from_fragment_cache_v1.yaml
+override:
+  io.loader.num_workers: 8

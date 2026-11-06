@@ -1,0 +1,8 @@
+__meta__:
+  kind: bundle
+  description: ICARUS grappa_track training
+  version: "240812"
+  date: "2024-08-12"
+include:
+  - model/icarus/grappa_track/model_240812.yaml
+  - train/icarus/grappa_track/from_fragment_cache_v1.yaml

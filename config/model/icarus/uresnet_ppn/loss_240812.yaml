@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  description: ICARUS uresnet_ppn loss
+  version: "240812"
+  date: "2024-08-12"
+uresnet_loss:
+  balance_loss: false
+ppn_loss:
+  mask_loss: CE
+  resolution: 5.0
+  restrict_to_clusters: true

@@ -1,0 +1,17 @@
+__meta__:
+  kind: bundle
+  description: ICARUS uresnet_ppn training
+  version: "261106"
+  date: "2026-11-06"
+include: train/icarus/uresnet_ppn/from_deghost_cache_v1.yaml
+model:
+  modules:
+    uresnet_ppn: !include "model/icarus/uresnet_ppn/network_240812.yaml"
+    uresnet_ppn_loss: !include "model/icarus/uresnet_ppn/loss_240812.yaml"
+override:
+  io.loader.dataset.primary.schema.ppn_label.include_point_tagging: false
+  io.loader.num_workers: 8
+  base.epochs: 100.0
+  io.loader.dataset.primary.schema.clust_label.particle_info.type_include_secondary: false
+  io.loader.dataset.primary.schema.clust_label.particle_info.type_include_mpr: false
+  io.loader.dataset.primary.schema.clust_label.particle_info.primary_include_mpr: false

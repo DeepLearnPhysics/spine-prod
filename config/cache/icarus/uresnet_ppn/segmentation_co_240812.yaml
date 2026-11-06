@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  description: ICARUS segmentation cache
+  version: "240812"
+  date: "2024-08-12"
+include: cache/icarus/uresnet_ppn/base_v1.yaml
+model:
+  modules:
+    uresnet_ppn: !include "model/icarus/uresnet_ppn/network_240812.yaml"

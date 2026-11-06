@@ -1,0 +1,9 @@
+__meta__:
+  kind: bundle
+  description: ICARUS uresnet_deghost standalone model
+  version: "240719"
+  date: "2024-07-19"
+include: model/common/uresnet_deghost/base_v1.yaml
+override:
+  model.modules.uresnet: !include "model/icarus/uresnet_deghost/network_240719.yaml"
+  model.modules.uresnet_loss: !include "model/icarus/uresnet_deghost/loss_240719.yaml"

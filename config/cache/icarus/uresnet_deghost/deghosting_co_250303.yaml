@@ -1,0 +1,24 @@
+__meta__:
+  kind: bundle
+  description: ICARUS deghosting cache
+  version: "250303"
+  date: "2025-03-03"
+include: cache/icarus/uresnet_deghost/base_v1.yaml
+model:
+  modules:
+    uresnet_deghost: !include "model/icarus/uresnet_deghost/network_240719.yaml"
+geo:
+  detector: icarus
+  tag: icarus_v4
+override:
+  model.modules.chain.stages:
+    - name: deghosting
+      provider: deghost
+      uses: uresnet_deghost
+      config:
+        mode: uresnet
+        charge_rescaling: collection
+    - name: calibration
+      config:
+        mode: apply
+        calibration: !include "model/icarus/calibration/calibration_co_250303.yaml"

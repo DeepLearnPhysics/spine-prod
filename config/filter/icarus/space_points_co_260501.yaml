@@ -1,0 +1,21 @@
+__meta__:
+  kind: bundle
+  description: Reject ICARUS events with 500k or more points in either cryostat
+  version: "260501"
+  date: "2026-05-01"
+input:
+  provider: larcv
+measurements:
+  sparse3d_reco_cryoE:
+    kind: product_size
+  sparse3d_reco_cryoW:
+    kind: product_size
+  sparse3d_pcluster:
+    kind: product_size
+  particle_corrected:
+    kind: product_size
+filters:
+  sparse3d_reco_cryoE:
+    max_count: 500000
+  sparse3d_reco_cryoW:
+    max_count: 500000

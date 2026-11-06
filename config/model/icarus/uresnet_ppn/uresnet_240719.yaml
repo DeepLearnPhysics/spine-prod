@@ -1,0 +1,18 @@
+__meta__:
+  kind: fragment
+  description: ICARUS uresnet_ppn uresnet
+  version: "240719"
+  date: "2024-07-19"
+num_input: 1
+num_classes: 5
+filters: 32
+depth: 5
+reps: 2
+allow_bias: false
+activation:
+  provider: lrelu
+  negative_slope: 0.33
+norm_layer:
+  provider: batch_norm
+  eps: 0.0001
+  momentum: 0.01

@@ -20,53 +20,9 @@ __meta__:
     ]
   training_set: "v4"
 
-include: model_common.yaml
+include: model/icarus/full_chain/model_co_260212.yaml
 
 override:
-  # Path to the v4 (mixed lifetime) restricted, collection-only, calibrated model weights, with GrapPA feature engineering fix
   model.weight_path: !download
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/icarus/icarus_co_snapshot_260212.ckpt
     hash: db36f89b6b6e0370a2ce69f0b0a89dda79fb2a68e5c3fcc61e258d00e42bba01
-
-  # Calibration handled before the semantic segmentation stage
-  model.modules.chain.stages~:
-    - update:
-        name: deghosting
-        changes:
-          config:
-            charge_rescaling: collection
-    - insert:
-        before: segmentation
-        value:
-          name: calibration_before_segmentation
-          provider: calibration
-          uses: calibration
-          config:
-            mode: apply
-  model.modules.uresnet_ppn.ppn.classify_endpoints: false
-  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
-  model.modules.grappa_shower_loss.node_loss.use_closest: true
-
-  # Direction and dE/dx radii settings for GrapPA modules
-  model.modules.grappa_shower.node_encoder.dir_max_dist: 5
-  model.modules.grappa_shower.node_encoder.dedx_max_dist: 5
-  model.modules.grappa_track.node_encoder.dir_max_dist: 5
-  model.modules.grappa_track.node_encoder.dedx_max_dist: 5
-  model.modules.grappa_inter.node_encoder.dir_max_dist: 5
-  model.modules.grappa_inter.node_encoder.dedx_max_dist: 5
-
-  # Interaction grouping restriction applied
-  model.modules.grappa_inter.nodes.grouping_through_track: true
-  model.modules.calibration:
-    gain:
-      gain: 82.03 # e-/ADC
-    recombination:
-      model: mbox
-      efield: 0.4938 # kV/cm
-      mip_dedx: 2.105168 # MeV/cm
-    lifetime:
-      lifetime: 3000 # us
-      driftv: 0.157565 # cm/us
-
-
-  # Older PPN/GrapPA loss settings

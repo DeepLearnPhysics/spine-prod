@@ -1,0 +1,8 @@
+__meta__:
+  kind: bundle
+  description: ICARUS grappa_inter candidate
+  version: "261106"
+  date: "2026-11-06"
+include: model/icarus/grappa_inter/model_co_260501.yaml
+override:
+  model.modules.grappa_loss: !include "model/icarus/grappa_inter/loss_261106.yaml"

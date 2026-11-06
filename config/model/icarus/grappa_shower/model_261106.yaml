@@ -1,0 +1,6 @@
+__meta__:
+  kind: bundle
+  description: ICARUS grappa_shower candidate
+  version: "261106"
+  date: "2026-11-06"
+include: model/icarus/grappa_shower/model_co_260501.yaml

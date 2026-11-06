@@ -1,0 +1,14 @@
+__meta__:
+  kind: fragment
+  description: ICARUS calibration calibration
+  version: "250303"
+  date: "2025-03-03"
+gain:
+  gain: 82.03
+recombination:
+  model: mbox
+  efield: 0.4938
+  mip_dedx: 2.105168
+lifetime:
+  lifetime: 3000
+  driftv: 0.157565

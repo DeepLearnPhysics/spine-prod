@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  description: ICARUS uresnet_ppn ppn
+  version: "240719"
+  date: "2024-07-19"
+classify_endpoints: true

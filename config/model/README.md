@@ -113,3 +113,18 @@ The SBND `261029` candidate retains May networks and moves the simulation gain
 correction before recombination. Reconstructed-particle PID/primary objectives
 use group IoU filtering and closest-primary supervision, with orientation targets
 retained. Its standalone interaction objective remains distinct.
+
+ICARUS now owns canonical compositions for all 12 deployed average-charge and
+collection-only chains, from `240719` through `co_260501`. Identical network and
+loss leaves are shared; the `co_` qualifier is retained where it distinguishes a
+released model. The geometry remains `icarus_v4`, with five interaction PID
+classes. Historical inference wrappers retain their checkpoint URLs and hashes.
+The August 2024 collection-only deghosting input is owned by its dated IO bundle.
+
+The additional ICARUS `261106` candidate retains the May 2026 networks and
+run-dependent calibration databases. It adds group-IoU-filtered PID/primary
+supervision, closest-primary selection, and an explicit orientation objective.
+Released ICARUS models have an orientation head but no orientation loss; that
+historical distinction is preserved. Standalone cached-graph losses remain
+separate from the full-chain target-generation policy. There is no new released
+inference checkpoint or change to latest inference selection.

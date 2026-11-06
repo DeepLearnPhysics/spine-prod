@@ -1,0 +1,8 @@
+__meta__:
+  kind: fragment
+  description: ICARUS grappa_track loss
+  version: "240719"
+  date: "2024-07-19"
+edge_loss:
+  provider: channel
+  target: group

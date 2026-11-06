@@ -1,0 +1,24 @@
+__meta__:
+  kind: bundle
+  description: ICARUS August 2024 collection-only deghosting input
+  version: "240812"
+  date: "2024-08-12"
+include: infer/icarus/io/io_240812.yaml
+override:
+  io.loader.dataset.schema.data.sparse_event_list:
+    - sparse3d_reco_cryoE_hit_charge2
+    - sparse3d_reco_cryoE_chi2
+    - sparse3d_reco_cryoE_hit_charge0
+    - sparse3d_reco_cryoE_hit_charge1
+    - sparse3d_reco_cryoE_hit_charge2
+    - sparse3d_reco_cryoE_hit_key0
+    - sparse3d_reco_cryoE_hit_key1
+    - sparse3d_reco_cryoE_hit_key2
+    - sparse3d_reco_cryoW_hit_charge2
+    - sparse3d_reco_cryoW_chi2
+    - sparse3d_reco_cryoW_hit_charge0
+    - sparse3d_reco_cryoW_hit_charge1
+    - sparse3d_reco_cryoW_hit_charge2
+    - sparse3d_reco_cryoW_hit_key0
+    - sparse3d_reco_cryoW_hit_key1
+    - sparse3d_reco_cryoW_hit_key2

@@ -1,0 +1,14 @@
+__meta__:
+  kind: bundle
+  description: ICARUS particle_graphs cache
+  version: "261106"
+  date: "2026-11-06"
+include: cache/icarus/grappa_shower_track/base_v1.yaml
+model:
+  modules:
+    grappa_shower: !include "model/icarus/grappa_shower/network_co_260212.yaml"
+    grappa_track: !include "model/icarus/grappa_track/network_full_chain_co_260212.yaml"
+    grappa_inter: !include "model/icarus/grappa_inter/network_full_chain_co_260212.yaml"
+    grappa_inter_loss: !include "model/icarus/grappa_inter/loss_full_chain_261106.yaml"
+override:
+  io.loader.num_workers: 8

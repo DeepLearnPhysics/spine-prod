@@ -1,0 +1,16 @@
+__meta__:
+  kind: fragment
+  description: ICARUS calibration calibration
+  version: "260410"
+  date: "2026-04-10"
+gain:
+  gain: 79.9169
+recombination:
+  model: mbox
+  efield: 0.4938
+  mip_dedx: 2.105168
+lifetime:
+  lifetime_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_elifetime_data.db
+  driftv_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
+transparency:
+  transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db

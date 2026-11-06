@@ -1,0 +1,14 @@
+__meta__:
+  kind: bundle
+  description: ICARUS segmentation cache
+  version: "261106"
+  date: "2026-11-06"
+include: cache/icarus/uresnet_ppn/base_v1.yaml
+model:
+  modules:
+    uresnet_ppn: !include "model/icarus/uresnet_ppn/network_240812.yaml"
+override:
+  io.loader.num_workers: 8
+  io.loader.dataset.primary.schema.clust_label.particle_info.type_include_secondary: false
+  io.loader.dataset.primary.schema.clust_label.particle_info.type_include_mpr: false
+  io.loader.dataset.primary.schema.clust_label.particle_info.primary_include_mpr: false

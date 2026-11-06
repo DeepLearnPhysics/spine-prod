@@ -1,0 +1,23 @@
+__meta__:
+  kind: bundle
+  description: ICARUS particle_graphs cache
+  version: "240812"
+  date: "2024-08-12"
+include: cache/icarus/grappa_shower_track/base_v1.yaml
+model:
+  modules:
+    grappa_shower: !include "model/icarus/grappa_shower/network_240719.yaml"
+    grappa_track: !include "model/icarus/grappa_track/network_full_chain_240719.yaml"
+    grappa_inter: !include "model/icarus/grappa_inter/network_full_chain_240719.yaml"
+    grappa_inter_loss: !include "model/icarus/grappa_inter/loss_240719.yaml"
+override:
+  io.writer.keys:
+    - particle_graph_edge_index
+    - particle_graph_node_features
+    - particle_graph_edge_features
+    - particle_graph_node_type_target
+    - particle_graph_node_type_valid
+    - particle_graph_node_primary_target
+    - particle_graph_node_primary_valid
+    - particle_graph_edge_target
+    - particle_graph_edge_valid

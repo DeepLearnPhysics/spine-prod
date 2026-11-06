@@ -244,3 +244,18 @@ Description:
 
 Known issue(s):
   - The shower start point prediction of electron showers is problematic due to the way PPN labeling is trained
+
+## Shared models and staged retraining
+
+Inference wrappers now obtain their architecture and objectives from
+`config/model/icarus/`. All 12 released inference configurations retain their
+resolved behavior, including historical input-product choices, calibration,
+checkpoint hashes, and post-processing. The August 2024 collection-only input
+selection lives in `io/io_co_240812.yaml`.
+
+Matching staged pipelines are available under `pipelines/icarus/`. The additional
+`full_chain_261106.yaml` training candidate starts from the May 2026 model and
+MPV/MPR v5 dataset, with current interaction-target policies and orientation
+supervision. It does not replace the released `full_chain_co_260501.yaml` selected
+by `latest`. See `pipelines/README.md` for datasets, cryostat/index handling,
+resource starting points, optional augmentation, and the calibration environment.

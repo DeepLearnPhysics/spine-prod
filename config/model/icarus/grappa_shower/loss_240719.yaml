@@ -1,0 +1,14 @@
+__meta__:
+  kind: fragment
+  description: ICARUS grappa_shower loss
+  version: "240719"
+  date: "2024-07-19"
+node_loss:
+  provider: shower_primary
+  high_purity: true
+  use_group_pred: true
+  use_closest: false
+edge_loss:
+  provider: channel
+  target: group
+  high_purity: true

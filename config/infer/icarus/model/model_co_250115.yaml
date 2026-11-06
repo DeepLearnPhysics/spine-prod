@@ -12,38 +12,9 @@ __meta__:
   tags: [collection-only, ppn-restrict, grouping-through-track]
   training_set: "v3"
 
-include: model_common.yaml
+include: model/icarus/full_chain/model_co_250115.yaml
 
 override:
-  # Path to the v3 restricted, collection-only model weights
   model.weight_path: !download
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/icarus/icarus_co_snapshot_250115.ckpt
     hash: 3f3f3d3e4b6f4c8e2b8f4c6d5e7a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a
-
-  # No calibration applied in the chain, handled in post-processing
-  model.modules.chain.stages~:
-    - update:
-        name: deghosting
-        changes:
-          config:
-            charge_rescaling: collection
-  model.network_input-:
-    - meta
-    - run_info
-
-  # Older PPN/GrapPA loss settings
-  model.modules.uresnet_ppn.ppn.classify_endpoints: false
-  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
-  model.modules.grappa_shower_loss.node_loss.use_closest: false
-
-  # Direction and dE/dx radii settings for GrapPA modules
-  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
-  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_track.node_encoder.dir_max_dist: -1
-  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1
-
-  # Interaction grouping restriction applied
-  model.modules.grappa_inter.nodes.grouping_through_track: true
-  model.modules.calibration:
