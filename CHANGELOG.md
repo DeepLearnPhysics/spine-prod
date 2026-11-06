@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flash matching.
 
 ### Fixed
+- Container jobs disable Python user-site packages so home-directory installs
+  cannot override the SPINE version and dependencies supplied by the image.
 - Container jobs no longer embed SPINE executables discovered on the submission
   host's PATH. Explicit source overrides and local interactive discovery remain
   supported; regenerate existing batch scripts to pick up the fix.

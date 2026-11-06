@@ -128,6 +128,8 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (larcv_path ~ '/configur
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; "
 {% endif %}
 {% endif %}
+# Ignore Python packages installed in the mounted user home.
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD export PYTHONNOUSERSITE=1; "
 # Validate the configuration API inside the selected runtime.
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {{ spine_cmd|default('spine', true) }} || exit \$?; "
 {% if cache_repository %}

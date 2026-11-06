@@ -218,7 +218,10 @@ Batch jobs and forced interactive container runs resolve SPINE executables insid
 the container, without selecting installations from the submission host's `PATH`.
 This also applies to report, filter, and cache jobs. Explicit `--spine-path` or
 `SPINE_LOCAL_PATH` overrides still select a custom installation. Regenerate
-existing batch scripts to apply this behavior.
+existing batch scripts to apply this behavior. Container jobs also set
+`PYTHONNOUSERSITE=1` to ignore Python user-site packages in mounted home
+directories. Dependencies must be available in the image or through explicit
+source/PYTHONPATH overrides; local interactive execution is unchanged.
 
 ```bash
 ./submit.py --spine-path /path/to/spine -I --interactive-runtime local --config infer/generic/latest --source test.root --world-size 0
