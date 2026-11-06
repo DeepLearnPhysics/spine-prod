@@ -6,6 +6,23 @@ when the logical training outcome is `completed` **and** the last scheduler job
 has finished successfully. Paused jobs exit zero but do not release consumers.
 Existing pipelines without `continuation` keep their scheduler dependencies.
 
+## Submission-host Python
+
+Use Python 3.9 or newer for `submit.py` and the continuation controller. On
+Perlmutter, the default system `python3` may be too old. Load the Python module
+before running the submission commands:
+
+```bash
+module load python
+python3 --version
+python3 -c 'import yaml, jinja2'
+```
+
+If the dependencies are missing, install `requirements.txt` into your own Python
+environment. Use this environment for periodic controller invocations as well.
+This host-side Python requirement is separate from SPINE inside the container.
+See [NERSC Python setup](https://docs.nersc.gov/development/languages/python/using-python-perlmutter/).
+
 ## Install the SPINE runtime contract
 
 Unmodified SPINE 1.4.4 does not distinguish a pause from successful graceful

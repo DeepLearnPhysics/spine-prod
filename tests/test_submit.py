@@ -781,3 +781,24 @@ def test_pipeline_source_list_overrides_require_one_unqualified_path(
     with pytest.raises(SystemExit, match="2"):
         run_main("--pipeline", "pipeline.yaml", flag, *values)
     assert "requires exactly one unqualified list path" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("version", [(3, 6, 15), (3, 8, 20)])
+def test_old_python_reports_requirement_before_submission_imports(version):
+    """Unsupported hosts must not fail with a misleading missing Submitter."""
+    import subprocess
+    from pathlib import Path
+
+    package = Path(__file__).resolve().parents[1] / "src" / "__init__.py"
+    probe = (
+        "import runpy, sys; "
+        f"sys.version_info = {version!r}; "
+        f"runpy.run_path({str(package)!r})"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True
+    )
+    assert result.returncode != 0
+    assert "spine-prod requires Python 3.9 or newer" in result.stderr
+    assert "module load python" in result.stderr
+    assert "cannot import name 'Submitter'" not in result.stderr
