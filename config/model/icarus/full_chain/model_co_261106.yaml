@@ -5,4 +5,4 @@ __meta__:
   date: "2026-11-06"
 include: model/icarus/full_chain/model_co_260501.yaml
 override:
-  model.modules.grappa_inter_loss: !include "model/icarus/grappa_inter/loss_full_chain_261106.yaml"
+  model.modules.grappa_inter_loss: !include "model/icarus/grappa_inter/loss_full_chain_co_261106.yaml"

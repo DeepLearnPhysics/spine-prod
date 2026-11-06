@@ -156,7 +156,7 @@ def test_standalone_networks_preserve_released_parameters(revision):
         assert standalone[key + "_loss"] == modules[component + "_loss"]
 
 
-@pytest.mark.parametrize("revision", [*REVISIONS, "261106"])
+@pytest.mark.parametrize("revision", [*REVISIONS, "co_261106"])
 def test_pipeline_alignment_sources_and_resources(revision):
     stages = {
         s["name"]: s
@@ -200,7 +200,7 @@ def test_pipeline_alignment_sources_and_resources(revision):
         keys = configs[consumer]["io"]["loader"]["dataset"]["keys"]
         assert set(keys) <= set(configs[producer]["io"]["writer"]["keys"])
         assert any("orient" in key for key in keys) == (
-            revision == "261106" and consumer == "train_grappa_inter"
+            revision == "co_261106" and consumer == "train_grappa_inter"
         )
     raw = configs["cache_train_deghosting"]
     schema = raw["io"]["loader"]["dataset"]["schema"]
@@ -228,7 +228,7 @@ def test_pipeline_alignment_sources_and_resources(revision):
 
 
 def test_candidate_targets_calibration_and_augmentation():
-    stages = {s["name"]: s for s in pipeline("261106").stages}
+    stages = {s["name"]: s for s in pipeline("co_261106").stages}
     configs = {name: load(s["config"]) for name, s in stages.items()}
     latest = load("model/icarus/full_chain/model_co_260501.yaml")["model"]["modules"]
     candidate = configs["export_full_chain_weights"]["model"]["modules"]
@@ -279,7 +279,7 @@ def test_candidate_targets_calibration_and_augmentation():
         assert not stage.get("apply_mods")
         assert "augment" not in configs[f"train_{component}"]["io"]["loader"]["dataset"]
         cfg = spine_config.load_config(
-            f"include:\n  - {stage['config']}\n  - train/icarus/modifier/{mod}/mod_{mod}_261106.yaml\n",
+            f"include:\n  - {stage['config']}\n  - train/icarus/modifier/{mod}/mod_{mod}_co_261106.yaml\n",
             root_dir=str(CONFIG),
             download=False,
         )
@@ -353,7 +353,7 @@ def test_unsplit_cache_collation_keeps_both_cryostats_in_raw_index_domain(monkey
         ("co_260306", 5),
         ("co_260410", 5),
         ("co_260501", 5),
-        ("261106", 5),
+        ("co_261106", 5),
     ],
 )
 def test_pipeline_pins_documented_dataset(revision, dataset):
@@ -374,7 +374,7 @@ def test_candidate_ppn_reflection_preserves_both_cryostat_index_domains(monkeypa
     from spine.io.augment import AugmentManager
 
     cfg = spine_config.load_config(
-        "include:\n  - train/icarus/uresnet_ppn/train_from_deghost_cache_261106.yaml\n  - train/icarus/modifier/augment_ppn/mod_augment_ppn_261106.yaml\n",
+        "include:\n  - train/icarus/uresnet_ppn/train_from_deghost_cache_co_261106.yaml\n  - train/icarus/modifier/augment_ppn/mod_augment_ppn_co_261106.yaml\n",
         root_dir=str(CONFIG),
         download=False,
     )

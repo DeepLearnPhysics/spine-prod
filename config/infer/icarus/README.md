@@ -254,7 +254,7 @@ checkpoint hashes, and post-processing. The August 2024 collection-only input
 selection lives in `io/io_co_240812.yaml`.
 
 Matching staged pipelines are available under `pipelines/icarus/`. The additional
-`full_chain_261106.yaml` training candidate starts from the May 2026 model and
+`full_chain_co_261106.yaml` training candidate starts from the May 2026 model and
 MPV/MPR v5 dataset, with current interaction-target policies and orientation
 supervision. It does not replace the released `full_chain_co_260501.yaml` selected
 by `latest`. See `pipelines/README.md` for datasets, cryostat/index handling,

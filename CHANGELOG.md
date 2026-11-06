@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added ICARUS canonical models and staged training/cache/evaluation/reporting
-  pipelines for all 12 deployed chains, plus the 261106 candidate with
+  pipelines for all 12 deployed chains, plus the co_261106 candidate with
   overlap-aware interaction targets and explicit orientation supervision.
   Preserve released inference, both cryostat inputs, and run-dependent
   calibration; provide optional reflection/lattice augmentation modifiers.

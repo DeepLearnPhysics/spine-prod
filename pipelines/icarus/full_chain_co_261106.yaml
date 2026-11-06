@@ -1,4 +1,4 @@
-# Staged training of every learned component used by the ICARUS 261106
+# Staged training of every learned component used by the ICARUS co_261106
 # training configuration. Supply its destination with CLI --workspace.
 # Each split owns one sharded cache repository; stages publish immutable shards.
 
@@ -39,7 +39,7 @@ stages:
       as: split
     kind: filter
     operation: scan
-    config: filter/icarus/space_points_261106.yaml
+    config: filter/icarus/space_points_co_261106.yaml
     source_list: ${split.source_list}
     cache_dir: ${filter_cache_dir}
     run_dir: ${workspace}/filter/${split.name}/scan
@@ -56,7 +56,7 @@ stages:
     kind: filter
     operation: build
     depends_on: ["scan_${split.name}_filter"]
-    config: filter/icarus/space_points_261106.yaml
+    config: filter/icarus/space_points_co_261106.yaml
     source_list: ${split.source_list}
     cache_dir: ${filter_cache_dir}
     output: ${split.entry_filter}
@@ -67,7 +67,7 @@ stages:
   # Train binary deghosting directly from the raw charge and chi-squared views.
   - name: train_uresnet_deghost
     depends_on: [build_train_filter, build_validation_filter]
-    config: train/icarus/uresnet_deghost/train_261106.yaml
+    config: train/icarus/uresnet_deghost/train_co_261106.yaml
     stage: train
     warm_start:
       uresnet: uresnet_deghost
@@ -88,7 +88,7 @@ stages:
       collection: splits
       as: split
     depends_on: [train_uresnet_deghost]
-    config: cache/icarus/uresnet_deghost/deghosting_261106.yaml
+    config: cache/icarus/uresnet_deghost/deghosting_co_261106.yaml
     source_list: ${split.source_list}
     entry_filter: ${split.entry_filter}
     run_dir: ${split.cache_dir}/deghosting
@@ -103,7 +103,7 @@ stages:
   # Train semantic segmentation and point proposal on the cached point domain.
   - name: train_uresnet_ppn
     depends_on: [cache_train_deghosting, cache_validation_deghosting]
-    config: train/icarus/uresnet_ppn/train_from_deghost_cache_261106.yaml
+    config: train/icarus/uresnet_ppn/train_from_deghost_cache_co_261106.yaml
     stage: train
     warm_start:
       uresnet_ppn: uresnet_ppn
@@ -132,7 +132,7 @@ stages:
       collection: splits
       as: split
     depends_on: [train_uresnet_ppn]
-    config: cache/icarus/uresnet_ppn/segmentation_261106.yaml
+    config: cache/icarus/uresnet_ppn/segmentation_co_261106.yaml
     run_dir: ${split.cache_dir}/segmentation
     in_place: true
     cache_repository: ${split.cache_repository}
@@ -150,7 +150,7 @@ stages:
   # Train Graph-SPICE entirely from cached deghosted points and adapted truth.
   - name: train_graph_spice
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
-    config: train/icarus/graph_spice/train_from_segmentation_cache_261106.yaml
+    config: train/icarus/graph_spice/train_from_segmentation_cache_co_261106.yaml
     stage: train
     warm_start:
       graph_spice: graph_spice
@@ -169,7 +169,7 @@ stages:
       collection: splits
       as: split
     depends_on: [train_graph_spice]
-    config: cache/icarus/graph_spice/fragment_graphs_261106.yaml
+    config: cache/icarus/graph_spice/fragment_graphs_co_261106.yaml
     run_dir: ${split.cache_dir}/fragmentation
     in_place: true
     cache_repository: ${split.cache_repository}
@@ -187,7 +187,7 @@ stages:
   # Train shower aggregation and shower-primary identification from cache.
   - name: train_grappa_shower
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
-    config: train/icarus/grappa_shower/train_from_fragment_cache_261106.yaml
+    config: train/icarus/grappa_shower/train_from_fragment_cache_co_261106.yaml
     stage: train
     warm_start:
       grappa: grappa_shower
@@ -202,7 +202,7 @@ stages:
   # Train track aggregation concurrently from the same fragment cache.
   - name: train_grappa_track
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
-    config: train/icarus/grappa_track/train_from_fragment_cache_261106.yaml
+    config: train/icarus/grappa_track/train_from_fragment_cache_co_261106.yaml
     stage: train
     warm_start:
       grappa: grappa_track
@@ -220,7 +220,7 @@ stages:
       collection: splits
       as: split
     depends_on: [train_grappa_shower, train_grappa_track]
-    config: cache/icarus/grappa_shower_track/particle_graphs_261106.yaml
+    config: cache/icarus/grappa_shower_track/particle_graphs_co_261106.yaml
     run_dir: ${split.cache_dir}/particle_aggregation
     in_place: true
     cache_repository: ${split.cache_repository}
@@ -240,7 +240,7 @@ stages:
   - name: train_grappa_inter
     time: "3-00:00:00"
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
-    config: train/icarus/grappa_inter/train_from_particle_cache_261106.yaml
+    config: train/icarus/grappa_inter/train_from_particle_cache_co_261106.yaml
     stage: train
     warm_start:
       grappa: grappa_inter
@@ -253,11 +253,11 @@ stages:
   # Export all six learned modules as one inference checkpoint.
   - name: export_full_chain_weights
     depends_on: [train_grappa_inter]
-    config: model/icarus/full_chain/model_261106.yaml
+    config: model/icarus/full_chain/model_co_261106.yaml
     profile: s3df_milano
     time: "00:30:00"
     run_dir: ${workspace}/weights/export
-    export_weights: ${workspace}/weights/full_chain_261106.ckpt
+    export_weights: ${workspace}/weights/full_chain_co_261106.ckpt
     module_weight:
       uresnet_deghost: ${workspace}/train/uresnet_deghost/weights/snapshot-best.ckpt
       uresnet_ppn: ${workspace}/train/uresnet_ppn/weights/snapshot-best.ckpt
@@ -269,13 +269,13 @@ stages:
   # Evaluate held-out events with the assembled full-chain checkpoint.
   - name: evaluate_full_chain
     depends_on: [export_full_chain_weights]
-    config: test/icarus/full_chain/evaluate_261106.yaml
+    config: test/icarus/full_chain/evaluate_co_261106.yaml
     time: "08:00:00"
     source_list: ${validation_source_list}
     entry_fraction_range: [0.5, 1.0]
     run_dir: ${workspace}/metrics/full_chain/raw
     in_place: true
-    weight_path: ${workspace}/weights/full_chain_261106.ckpt
+    weight_path: ${workspace}/weights/full_chain_co_261106.ckpt
     num_workers: 8
     ntasks: 4
 
@@ -287,7 +287,7 @@ stages:
     input_dir: ${workspace}/metrics/full_chain/raw/latest
     output_dir: ${workspace}/metrics/full_chain/report/artifacts
     run_dir: ${workspace}/metrics/full_chain/report
-    checkpoint: ${workspace}/weights/full_chain_261106.ckpt
+    checkpoint: ${workspace}/weights/full_chain_co_261106.ckpt
     dataset: ${validation_source_list}
     dataset_selection:
       entry_fraction_range: [0.5, 1.0]

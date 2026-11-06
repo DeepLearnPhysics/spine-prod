@@ -669,7 +669,7 @@ rather than the candidate's default Gen-II dataset.
 ## ICARUS staged training
 
 `pipelines/icarus/` contains one pipeline for each of the 12 deployed chains and
-one additional candidate, `full_chain_261106.yaml`. The candidate incorporates
+one additional candidate, `full_chain_co_261106.yaml`. The candidate incorporates
 current overlap-aware interaction targets, explicit orientation supervision,
 training-aligned reports, best-checkpoint export, and grouped evaluation. It
 retains the documented May 2026 calibration constants and databases rather than
@@ -677,7 +677,7 @@ borrowing another detector's gain correction.
 
 ```bash
 ./submit.py \
-  --pipeline pipelines/icarus/full_chain_261106.yaml \
+  --pipeline pipelines/icarus/full_chain_co_261106.yaml \
   --workspace /path/to/icarus/run \
   --source-list /path/to/train_file_list.txt \
   --val-source-list /path/to/test_file_list.txt
@@ -690,7 +690,7 @@ The checked-in source lists follow the deployed-model dataset documentation:
 | `240719`, `240812`, `co_240812` | `mpvmpr_v2` |
 | `250115`, `co_250115`, `co_250303` | `mpvmpr_v3` |
 | `co_250625`, `co_260212`, `co_260325` | `mpvmpr_v4` |
-| `co_260306`, `co_260410`, `co_260501`, `261106` | `mpvmpr_v5` |
+| `co_260306`, `co_260410`, `co_260501`, `co_261106` | `mpvmpr_v5` |
 
 Each directory uses `train_file_list.txt` and `test_file_list.txt`. Source-list
 CLI overrides propagate to filtering, mixed raw/cache readers, evaluation and

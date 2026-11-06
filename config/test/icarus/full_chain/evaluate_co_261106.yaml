@@ -7,7 +7,7 @@ include:
   - infer/icarus/base/base_240719.yaml
   - infer/icarus/io/io_240812.yaml
   - infer/icarus/post/post_260501.yaml
-  - model/icarus/full_chain/model_261106.yaml
+  - model/icarus/full_chain/model_co_261106.yaml
   - test/common/full_chain/analyzers_v1.yaml
 override:
   io.writer: null

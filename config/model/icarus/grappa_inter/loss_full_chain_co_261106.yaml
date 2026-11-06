@@ -3,7 +3,7 @@ __meta__:
   description: ICARUS overlap-aware reconstructed-particle targets
   version: "261106"
   date: "2026-11-06"
-include: model/icarus/grappa_inter/loss_261106.yaml
+include: model/icarus/grappa_inter/loss_co_261106.yaml
 override:
   node_loss.type.min_iou: 0.5
   node_loss.type.match_target: group

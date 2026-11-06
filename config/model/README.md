@@ -121,7 +121,7 @@ released model. The geometry remains `icarus_v4`, with five interaction PID
 classes. Historical inference wrappers retain their checkpoint URLs and hashes.
 The August 2024 collection-only deghosting input is owned by its dated IO bundle.
 
-The additional ICARUS `261106` candidate retains the May 2026 networks and
+The additional ICARUS `co_261106` candidate retains the May 2026 networks and
 run-dependent calibration databases. It adds group-IoU-filtered PID/primary
 supervision, closest-primary selection, and an explicit orientation objective.
 Released ICARUS models have an orientation head but no orientation loss; that

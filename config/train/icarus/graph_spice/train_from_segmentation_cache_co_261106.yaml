@@ -4,7 +4,7 @@ __meta__:
   version: "261106"
   date: "2026-11-06"
 include:
-  - model/icarus/graph_spice/model_261106.yaml
+  - model/icarus/graph_spice/model_co_261106.yaml
   - train/icarus/graph_spice/from_segmentation_cache_v1.yaml
 override:
   model.network_input.data: data_calib
