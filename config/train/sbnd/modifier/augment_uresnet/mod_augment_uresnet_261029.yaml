@@ -1,0 +1,12 @@
+__meta__:
+  kind: mod
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND augment_uresnet reflection and lattice augmentation
+  name: augment_uresnet
+  applies_to:
+    - mc
+include: train/sbnd/modifier/augment/mod_augment_common.yaml
+override:
+  model.modules.uresnet.lattice:
+    period: auto

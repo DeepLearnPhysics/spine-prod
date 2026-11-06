@@ -1,0 +1,8 @@
+__meta__:
+  kind: bundle
+  version: "260316"
+  date: "2026-03-16"
+  description: SBND grappa_track training
+include:
+  - model/sbnd/grappa_track/model_260316.yaml
+  - train/sbnd/grappa_track/from_fragment_cache_v1.yaml

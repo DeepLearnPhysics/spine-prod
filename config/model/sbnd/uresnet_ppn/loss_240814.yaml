@@ -1,0 +1,10 @@
+__meta__:
+  kind: fragment
+  description: SBND uresnet_ppn loss 240814
+
+uresnet_loss:
+  balance_loss: false
+ppn_loss:
+  mask_loss: CE
+  resolution: 5.0
+  restrict_to_clusters: true

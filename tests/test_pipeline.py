@@ -1073,6 +1073,60 @@ def test_sparse_pipeline_stage_selection_rejects_boundaries():
         )
 
 
+@pytest.mark.parametrize(
+    "skipped, message",
+    [
+        ([], "must not be empty"),
+        ([""], "non-empty strings"),
+        (["track", "track"], "duplicates"),
+        (["missing"], "Unknown skipped"),
+        (["track", "shower"], "no stages selected"),
+    ],
+)
+def test_skip_stage_rejects_invalid_selection(skipped, message):
+    with pytest.raises(ValueError, match=message):
+        PipelineRunner._select_stages(
+            [{"name": "shower"}, {"name": "track"}],
+            None,
+            None,
+            skip_stages=skipped,
+        )
+
+
+def test_skip_stage_rejects_sparse_selection():
+    with pytest.raises(ValueError, match="cannot be combined"):
+        PipelineRunner._select_stages(
+            [{"name": "shower"}, {"name": "track"}],
+            None,
+            None,
+            select_stages=["shower"],
+            skip_stages=["track"],
+        )
+
+
+@pytest.mark.parametrize("start, stop", [(None, None), ("shower", "cache")])
+def test_skip_stage_preserves_dependencies_and_range(start, stop):
+    stages = [
+        {"name": "input", "depends_on": []},
+        {"name": "shower", "depends_on": ["input"]},
+        {"name": "track", "depends_on": ["input"]},
+        {"name": "bridge", "depends_on": ["shower", "track"]},
+        {"name": "cache", "depends_on": ["bridge", "track"]},
+        {"name": "report", "depends_on": ["cache"]},
+    ]
+    selected, omitted, deferred = PipelineRunner._select_stages(
+        stages, start, stop, skip_stages=["track", "bridge"]
+    )
+    assert [stage["name"] for stage in selected] == (
+        ["shower", "cache"] if start else ["input", "shower", "cache", "report"]
+    )
+    cache = next(stage for stage in selected if stage["name"] == "cache")
+    assert cache["depends_on"] == (["shower"] if start else ["shower", "input"])
+    assert omitted == (["input", "track", "bridge"] if start else ["track", "bridge"])
+    assert deferred == (["report"] if stop else [])
+    assert stages[4]["depends_on"] == ["bridge", "track"]
+
+
 def test_sparse_selection_deduplicates_shared_ancestors():
     """A selected diamond root yields one dependency despite two omitted paths."""
     stages = [
@@ -1089,3 +1143,71 @@ def test_sparse_selection_deduplicates_shared_ancestors():
     assert omitted == ["left", "right"]
     assert trailing == []
     assert stages[-1]["depends_on"] == ["left", "right"]
+
+
+@pytest.mark.parametrize(
+    "flag, variable",
+    [
+        ("source_list", "train_source_list"),
+        ("val_source_list", "validation_source_list"),
+    ],
+)
+@pytest.mark.parametrize("value", ["", " ", 7])
+def test_pipeline_rejects_empty_or_non_string_source_list_override(
+    tmp_path, flag, variable, value
+):
+    path = write_pipeline(tmp_path, {"variables": {variable: "old.list"}, "stages": []})
+    with pytest.raises(ValueError, match="requires a non-empty list path"):
+        PipelineDefinition.load(path, **{flag: value})
+
+
+@pytest.mark.parametrize(
+    "flag, variable",
+    [
+        ("source_list", "train_source_list"),
+        ("val_source_list", "validation_source_list"),
+    ],
+)
+def test_pipeline_source_list_override_requires_declared_variable(
+    tmp_path, flag, variable
+):
+    path = write_pipeline(tmp_path, {"stages": []})
+    with pytest.raises(ValueError, match=f"must declare variables.{variable}"):
+        PipelineDefinition.load(path, **{flag: "new.list"})
+
+
+def test_pipeline_source_lists_override_before_alias_and_collection_expansion(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    path = write_pipeline(
+        tmp_path,
+        {
+            "variables": {
+                "train_source_list": "old-train.list",
+                "validation_source_list": "old-val.list",
+                "train_alias": "${train_source_list}",
+            },
+            "collections": {
+                "splits": [
+                    {"name": "train", "source": "${train_alias}"},
+                    {"name": "validation", "source": "${validation_source_list}"},
+                ]
+            },
+            "stages": [
+                {
+                    "name": "job_${split.name}",
+                    "for_each": {"collection": "splits", "as": "split"},
+                    "config": "test.yaml",
+                    "source_list": "${split.source}",
+                }
+            ],
+        },
+    )
+    definition = PipelineDefinition.load(
+        path, source_list="train.list", val_source_list="val.list"
+    )
+    assert [stage["source_list"] for stage in definition.stages] == [
+        str(tmp_path / "train.list"),
+        str(tmp_path / "val.list"),
+    ]

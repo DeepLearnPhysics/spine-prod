@@ -1,51 +1,18 @@
-# SBND model configuration
-# Revision date: August 14, 2024
-
 __meta__:
   kind: bundle
   version: "240814"
   date: "2024-08-14"
-  description: "SBND model with average charge rescaling"
+  description: SBND model with average charge rescaling
   compatible_with:
     base: ">=240720"
     io: ">=240720"
-  tags: [average-charge, ppn-restrict, graph-spice-knn]
-  training_set: "v1"
-
-include: model_common.yaml
-
+  tags:
+    - average-charge
+    - ppn-restrict
+    - graph-spice-knn
+  training_set: v1
+include: model/sbnd/full_chain/model_240814.yaml
 override:
-  # Path to the v1 restrcited model weights
   model.weight_path: !download
     url: https://s3df.slac.stanford.edu/data/neutrino/spine/weights/sbnd/sbnd_snapshot_240814.ckpt
     hash: 7c41a49d75addccecaa4813777dee4b86762da3dce83630ce24818395a9d3527
-
-  # Configure deghosting charge rescaling
-  model.modules.chain.stages~:
-    - update:
-        name: deghosting
-        changes:
-          config:
-            charge_rescaling: average
-
-  # Older PPN/GrapPA loss settings
-  model.modules.uresnet_ppn.ppn.classify_endpoints: false
-  model.modules.uresnet_ppn_loss.ppn_loss.restrict_to_clusters: true
-  model.modules.grappa_shower_loss.node_loss.use_closest: false
-
-  # Graph-SPICE uses a kNN graph with k=10
-  model.modules.graph_spice.embedder.uresnet.spatial_size: 1728
-  model.modules.graph_spice.constructor.graph:
-    provider: knn
-    k: 10
-
-  # Direction and dE/dx radii settings for GrapPA modules
-  model.modules.grappa_shower.node_encoder.dir_max_dist: -1
-  model.modules.grappa_shower.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_track.node_encoder.dir_max_dist: -1
-  model.modules.grappa_track.node_encoder.dedx_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dir_max_dist: -1
-  model.modules.grappa_inter.node_encoder.dedx_max_dist: -1
-
-  # Interaction grouping restriction not applied
-  model.modules.grappa_inter.nodes.grouping_through_track: false

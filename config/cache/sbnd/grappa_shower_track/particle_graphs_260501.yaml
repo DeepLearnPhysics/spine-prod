@@ -1,0 +1,12 @@
+__meta__:
+  kind: bundle
+  version: "260501"
+  date: "2026-05-01"
+  description: SBND particle graphs
+include: cache/sbnd/grappa_shower_track/base_v1.yaml
+model:
+  modules:
+    grappa_shower: !include "model/sbnd/grappa_shower/network_260304.yaml"
+    grappa_track: !include "model/sbnd/grappa_track/network_full_chain_260304.yaml"
+    grappa_inter: !include "model/sbnd/grappa_inter/network_full_chain_260501.yaml"
+    grappa_inter_loss: !include "model/sbnd/grappa_inter/loss_240720.yaml"

@@ -144,7 +144,7 @@ Examples:
         nargs="+",
         help=(
             "Text file containing input paths, or target-qualified lists for "
-            "a composite dataset"
+            "a composite dataset. With --pipeline, override variables.train_source_list"
         ),
     )
 
@@ -158,7 +158,7 @@ Examples:
     val_source_group.add_argument(
         "--val-source-list",
         nargs="+",
-        help="Validation input list, optionally written as TARGET=PATH",
+        help="Validation input list, optionally TARGET=PATH; with --pipeline, override variables.validation_source_list",
     )
 
     # Configuration modifiers
@@ -345,6 +345,14 @@ Examples:
         help=(
             "Submit only these pipeline stages, in pipeline order. Dependencies "
             "are contracted through omitted stages."
+        ),
+    )
+    parser.add_argument(
+        "--skip-stage",
+        nargs="+",
+        help=(
+            "Exclude these pipeline stages, reusing their existing artifacts. "
+            "Can be combined with --from-stage and --to-stage."
         ),
     )
     resume_group = parser.add_mutually_exclusive_group()
@@ -558,6 +566,10 @@ Examples:
         parser.error("--to-stage is only supported with --pipeline")
     if args.select_stage is not None and not args.pipeline:
         parser.error("--select-stage is only supported with --pipeline")
+    if args.skip_stage is not None and not args.pipeline:
+        parser.error("--skip-stage is only supported with --pipeline")
+    if args.skip_stage is not None and args.select_stage is not None:
+        parser.error("--skip-stage cannot be combined with --select-stage")
     if args.select_stage is not None and (
         args.from_stage is not None or args.to_stage is not None
     ):
@@ -672,9 +684,17 @@ Examples:
         )
 
     if args.pipeline:
+        for flag, values in [
+            ("--source-list", args.source_list),
+            ("--val-source-list", args.val_source_list),
+        ]:
+            if values and (len(values) != 1 or "=" in values[0]):
+                parser.error(
+                    f"{flag} with --pipeline requires exactly one unqualified list path"
+                )
         stage_specific_options = [
-            ("--source/--source-list", args.source or args.source_list),
-            ("--val-source/--val-source-list", args.val_source or args.val_source_list),
+            ("--source", args.source),
+            ("--val-source", args.val_source),
             ("--entry-fraction-range", args.entry_fraction_range),
             ("--val-entry-fraction-range", args.val_entry_fraction_range),
             ("--num-entries", args.num_entries is not None),
@@ -768,8 +788,13 @@ Examples:
                 from_stage=args.from_stage,
                 to_stage=args.to_stage,
                 select_stages=args.select_stage,
+                skip_stages=args.skip_stage,
                 stage_module_weights=args.stage_module_weight,
                 warm_start=args.warm_start,
+                source_list=args.source_list[0] if args.source_list else None,
+                val_source_list=(
+                    args.val_source_list[0] if args.val_source_list else None
+                ),
             )
             print("\n=== Pipeline submitted ===")
             for stage, job_ids in job_map.items():

@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  version: "260304"
+  date: "2026-03-04"
+  description: SBND grappa_shower standalone model
+include: model/common/grappa_shower/base_v1.yaml
+override:
+  model.modules.grappa: !include "model/sbnd/grappa_shower/network_260304.yaml"
+  model.modules.grappa_loss: !include "model/sbnd/grappa_shower/loss_250328.yaml"

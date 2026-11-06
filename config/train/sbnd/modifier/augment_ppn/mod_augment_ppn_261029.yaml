@@ -1,0 +1,27 @@
+__meta__:
+  kind: mod
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND augment_ppn reflection and lattice augmentation
+  name: augment_ppn
+  applies_to:
+    - mc
+include: train/sbnd/modifier/augment/mod_augment_common.yaml
+override:
+  model.modules.uresnet_ppn.uresnet.lattice:
+    period: auto
+  # PPN joins raw labels with a deghosted subset through orig_index. Move the
+  # image frame with each reflection so cropping cannot invalidate that mapping.
+  io.loader.dataset.augment.stages~:
+    - update:
+        name: flip_x
+        changes:
+          keep_meta: false
+    - update:
+        name: flip_y
+        changes:
+          keep_meta: false
+    - update:
+        name: flip_z
+        changes:
+          keep_meta: false

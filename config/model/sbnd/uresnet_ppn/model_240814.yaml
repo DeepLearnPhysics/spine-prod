@@ -1,0 +1,11 @@
+__meta__:
+  kind: fragment
+  version: "240814"
+  date: "2024-08-14"
+  description: SBND standalone UResNet-PPN
+include: model/common/uresnet_ppn/base_v1.yaml
+override:
+  model.modules.uresnet: !include "model/sbnd/uresnet/network_240720.yaml"
+  model.modules.ppn: !include "model/sbnd/uresnet_ppn/ppn_240814.yaml"
+  model.modules.uresnet_loss: !include "model/sbnd/uresnet/loss_240720.yaml"
+  model.modules.ppn_loss: !include "model/sbnd/uresnet_ppn/ppn_loss_240814.yaml"

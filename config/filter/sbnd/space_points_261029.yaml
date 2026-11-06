@@ -1,0 +1,6 @@
+__meta__:
+  kind: bundle
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND candidate raw point limit
+include: filter/sbnd/space_points_260521.yaml

@@ -1,0 +1,6 @@
+__meta__:
+  kind: bundle
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND candidate full-chain report
+include: test/sbnd/full_chain/report_v1.yaml

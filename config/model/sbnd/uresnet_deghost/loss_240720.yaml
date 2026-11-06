@@ -1,0 +1,5 @@
+__meta__:
+  kind: fragment
+  description: SBND uresnet_deghost loss 240720
+
+balance_loss: false

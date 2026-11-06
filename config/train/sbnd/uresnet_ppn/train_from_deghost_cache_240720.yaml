@@ -1,0 +1,10 @@
+__meta__:
+  kind: bundle
+  version: "240720"
+  date: "2024-07-20"
+  description: SBND PPN training from deghost cache
+include: train/sbnd/uresnet_ppn/from_deghost_cache_v1.yaml
+model:
+  modules:
+    uresnet_ppn: !include "model/sbnd/uresnet_ppn/network_240720.yaml"
+    uresnet_ppn_loss: !include "model/sbnd/uresnet_ppn/loss_240720.yaml"

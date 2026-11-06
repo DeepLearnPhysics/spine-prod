@@ -1,0 +1,8 @@
+__meta__:
+  kind: bundle
+  version: "261029"
+  date: "2026-10-29"
+  description: SBND fragment_graphs candidate cache
+include: cache/sbnd/graph_spice/fragment_graphs_260521.yaml
+override:
+  io.loader.num_workers: 8

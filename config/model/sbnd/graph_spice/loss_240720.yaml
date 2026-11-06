@@ -1,0 +1,6 @@
+__meta__:
+  kind: fragment
+  description: SBND graph_spice loss 240720
+
+provider: edge
+loss: binary_log_dice_ce

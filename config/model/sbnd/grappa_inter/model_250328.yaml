@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  version: "250328"
+  date: "2025-03-28"
+  description: SBND grappa_inter standalone model
+include: model/common/grappa_inter/base_v1.yaml
+override:
+  model.modules.grappa: !include "model/sbnd/grappa_inter/network_240720.yaml"
+  model.modules.grappa_loss: !include "model/sbnd/grappa_inter/loss_240720.yaml"

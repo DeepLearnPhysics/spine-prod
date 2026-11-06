@@ -1,0 +1,8 @@
+__meta__:
+  kind: bundle
+  version: "250328"
+  date: "2025-03-28"
+  description: SBND grappa_inter training
+include:
+  - model/sbnd/grappa_inter/model_250328.yaml
+  - train/sbnd/grappa_inter/from_particle_cache_v1.yaml

@@ -1,0 +1,13 @@
+__meta__:
+  kind: fragment
+  description: SBND grappa_shower loss 250328
+
+node_loss:
+  provider: shower_primary
+  high_purity: true
+  use_group_pred: true
+  use_closest: true
+edge_loss:
+  provider: channel
+  target: group
+  high_purity: true

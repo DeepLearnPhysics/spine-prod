@@ -1,0 +1,20 @@
+__meta__:
+  kind: bundle
+  version: "240720"
+  date: "2024-07-20"
+  description: Reject pathological SBND tomographic events
+
+input:
+  provider: larcv
+measurements:
+  sparse3d_reco:
+    kind: product_size
+  sparse3d_pcluster:
+    kind: product_size
+  particle_corrected:
+    kind: product_size
+
+filters:
+  # max_count is exclusive: accepted entries contain fewer than 500k points.
+  sparse3d_reco:
+    max_count: 500000

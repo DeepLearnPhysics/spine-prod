@@ -1,0 +1,7 @@
+__meta__:
+  kind: fragment
+  description: SBND grappa_track loss 240720
+
+edge_loss:
+  provider: channel
+  target: group

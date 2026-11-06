@@ -164,6 +164,8 @@ class PipelineDefinition:
         overrides: Optional[Mapping[str, Any]] = None,
         workspace_override: Optional[str] = None,
         stage_module_weights: Optional[Mapping[str, Mapping[str, str]]] = None,
+        source_list: Optional[str] = None,
+        val_source_list: Optional[str] = None,
     ) -> "PipelineDefinition":
         """Load and validate a pipeline without contacting a scheduler.
 
@@ -188,7 +190,23 @@ class PipelineDefinition:
             raise ValueError("Unknown pipeline field(s): " + ", ".join(sorted(unknown)))
 
         workspace = cls._resolve_workspace(document, workspace_override)
-        variables = cls._resolve_variables(workspace, document.get("variables", {}))
+        raw_variables = dict(
+            cls._require_mapping(document.get("variables", {}), "Pipeline variables")
+        )
+        for flag, name, value in [
+            ("--source-list", "train_source_list", source_list),
+            ("--val-source-list", "validation_source_list", val_source_list),
+        ]:
+            if value is None:
+                continue
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"Pipeline {flag} requires a non-empty list path")
+            if name not in raw_variables:
+                raise ValueError(
+                    f"Pipeline must declare variables.{name} to use {flag}"
+                )
+            raw_variables[name] = os.path.abspath(os.path.expanduser(value))
+        variables = cls._resolve_variables(workspace, raw_variables)
         collections = cls._resolve_collections(
             document.get("collections", {}), variables
         )
@@ -1141,6 +1159,9 @@ class PipelineRunner(SubmissionComponent):
         select_stages: Optional[Sequence[str]] = None,
         stage_module_weights: Optional[Sequence[Sequence[str]]] = None,
         warm_start: Optional[str] = None,
+        source_list: Optional[str] = None,
+        val_source_list: Optional[str] = None,
+        skip_stages: Optional[Sequence[str]] = None,
     ) -> Dict[str, List[str]]:
         """Submit an ordered multi-stage production pipeline.
 
@@ -1172,6 +1193,9 @@ class PipelineRunner(SubmissionComponent):
         select_stages : sequence of str, optional
             Submit only these named stages. Their pipeline order is retained,
             and dependencies are contracted through omitted stages.
+        skip_stages : sequence of str, optional
+            Exclude these stages from the selected range, reusing existing
+            artifacts and contracting dependencies through omitted stages.
         stage_module_weights : sequence, optional
             Repeated launch-time ``STAGE MODULE=PATH`` assignments. These
             override matching module weights in the pipeline document.
@@ -1179,11 +1203,17 @@ class PipelineRunner(SubmissionComponent):
             Full-chain checkpoint used to initialize every selected training
             stage that declares a ``warm_start`` module mapping.
 
+        source_list : str, optional
+            Override the declared ``train_source_list`` pipeline variable.
+        val_source_list : str, optional
+            Override the declared ``validation_source_list`` pipeline variable.
+
         Returns
         -------
         dict
             Mapping from stage names to scheduler job IDs.
         """
+        # Source-list overrides expand with variables before any stage is submitted.
         parsed_stage_weights = PipelineDefinition.parse_stage_module_weights(
             stage_module_weights
         )
@@ -1192,6 +1222,8 @@ class PipelineRunner(SubmissionComponent):
             overrides,
             workspace_override=workspace,
             stage_module_weights=parsed_stage_weights,
+            source_list=source_list,
+            val_source_list=val_source_list,
         )
         all_stages = definition.stages
         if warm_start is not None:
@@ -1207,6 +1239,7 @@ class PipelineRunner(SubmissionComponent):
             from_stage,
             to_stage,
             select_stages,
+            skip_stages,
         )
         selected_names = {stage["name"] for stage in stages}
         inactive_weight_stages = set(parsed_stage_weights) - selected_names
@@ -1250,7 +1283,11 @@ class PipelineRunner(SubmissionComponent):
             options = self._submission_options(
                 stage,
                 dependency,
-                retry=from_stage is not None or select_stages is not None,
+                retry=(
+                    from_stage is not None
+                    or select_stages is not None
+                    or skip_stages is not None
+                ),
                 warm_start_path=warm_start,
             )
             kind = stage.get("kind", "spine")
@@ -1310,9 +1347,44 @@ class PipelineRunner(SubmissionComponent):
         from_stage: Optional[str],
         to_stage: Optional[str],
         select_stages: Optional[Sequence[str]] = None,
+        skip_stages: Optional[Sequence[str]] = None,
     ) -> Tuple[Sequence[Mapping[str, Any]], List[str], List[str]]:
         """Select an ordered range or dependency-aware sparse stage set."""
         names = [stage["name"] for stage in stages]
+        if skip_stages is not None:
+            if select_stages is not None:
+                raise ValueError(
+                    "Pipeline skip_stages cannot be combined with select_stages"
+                )
+            if not skip_stages:
+                raise ValueError("Pipeline skip_stages must not be empty")
+            if any(not isinstance(name, str) or not name for name in skip_stages):
+                raise ValueError("Pipeline skip_stages must contain non-empty strings")
+            if len(set(skip_stages)) != len(skip_stages):
+                raise ValueError("Pipeline skip_stages must not contain duplicates")
+            unknown = set(skip_stages) - set(names)
+            if unknown:
+                raise ValueError(
+                    "Unknown skipped pipeline stage(s): " + ", ".join(sorted(unknown))
+                )
+            stage_range, _, deferred = PipelineRunner._select_stages(
+                stages, from_stage, to_stage
+            )
+            selected_names = [
+                stage["name"]
+                for stage in stage_range
+                if stage["name"] not in skip_stages
+            ]
+            if not selected_names:
+                raise ValueError("Pipeline skip_stages leaves no stages selected")
+            selected, omitted, _ = PipelineRunner._select_stages(
+                stages, None, None, select_stages=selected_names
+            )
+            return (
+                selected,
+                [name for name in omitted if name not in deferred],
+                deferred,
+            )
         if select_stages is not None:
             if from_stage is not None or to_stage is not None:
                 raise ValueError(

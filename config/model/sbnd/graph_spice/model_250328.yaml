@@ -1,0 +1,9 @@
+__meta__:
+  kind: fragment
+  version: "250328"
+  date: "2025-03-28"
+  description: SBND graph_spice standalone model
+include: model/common/graph_spice/base_v1.yaml
+override:
+  model.modules.graph_spice: !include "model/sbnd/graph_spice/network_250328.yaml"
+  model.modules.graph_spice_loss: !include "model/sbnd/graph_spice/loss_240720.yaml"
