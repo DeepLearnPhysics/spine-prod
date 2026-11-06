@@ -31,6 +31,19 @@ def main():
         # Probe the actual executable (which may use a different Python or a
         # source checkout), not whichever package this helper can import.
         command = sys.argv[1:] or ["spine"]
+        require_continuation = "--require-continuation" in command
+        if require_continuation:
+            command.remove("--require-continuation")
+            capability = subprocess.run(
+                [*command, "--continuation-contract"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            if capability.stdout.strip() != "1":
+                raise RuntimeError(
+                    "SPINE must support continuation contract 1; apply the supplied SPINE patch"
+                )
         result = subprocess.run(
             [*command, "--version"], capture_output=True, text=True, check=True
         )

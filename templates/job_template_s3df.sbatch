@@ -10,6 +10,12 @@
 #SBATCH --cpus-per-task={{ cpus_per_task }}
 #SBATCH --mem-per-cpu={{ mem_per_cpu }}
 #SBATCH --time={{ time }}
+{% if continuation_attempt %}
+{% if continuation_attempt.request.min_time %}
+#SBATCH --time-min={{ continuation_attempt.request.min_time }}
+{% endif %}
+#SBATCH --signal=B:USR2@{{ continuation_policy.checkpoint_margin }}
+{% endif %}
 {% if exclusive %}
 #SBATCH --exclusive
 {% endif %}
@@ -129,7 +135,7 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD source {{ (flashmatch_path ~ '/con
 {% endif %}
 {% endif %}
 # Validate the configuration API inside the selected runtime.
-SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {{ spine_cmd|default('spine', true) }} || exit \$?; "
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {% if continuation_attempt %}--require-continuation {% endif %}{{ spine_cmd|default('spine', true) }} || exit \$?; "
 {% if cache_repository %}
 # Fence this logical cache stage before any task publishes a shard. Every
 # array task repeats the same idempotent registration with one shared ID.
@@ -143,7 +149,27 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ spine_cmd|default('spine',
 SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
 RUN_CMD="$SINGULARITY_CMD"
 
-{% if graceful_stop_file %}
+{% if continuation_attempt %}
+# Keep the batch shell responsive and forward only to the supervisor.
+python3 {{ (basedir ~ '/scripts/continuation_runtime.py')|tojson }} \
+    {{ continuation_run_dir|tojson }} {{ continuation_attempt.token|tojson }} \
+    -- bash -c "$RUN_CMD" &
+CONTINUATION_PID=$!
+CONTINUATION_INTERRUPTED=0
+trap 'CONTINUATION_INTERRUPTED=1; kill -USR2 "$CONTINUATION_PID"' USR2
+trap 'CONTINUATION_INTERRUPTED=1; kill -USR1 "$CONTINUATION_PID"' USR1
+trap 'CONTINUATION_INTERRUPTED=1; kill -TERM "$CONTINUATION_PID"' TERM INT
+while true; do
+    CONTINUATION_INTERRUPTED=0
+    wait "$CONTINUATION_PID"
+    EXIT_STATUS=$?
+    if [[ $CONTINUATION_INTERRUPTED -eq 1 && $EXIT_STATUS -gt 128 ]]; then
+        continue
+    fi
+    break
+done
+trap - USR1 USR2 TERM INT
+{% elif graceful_stop_file %}
 # Translate the scheduler signal into a filesystem request. SPINE rank zero
 # polls this marker at safe minibatch boundaries; no signal crosses the
 # container boundary or reaches DDP/DataLoader children.

@@ -1,0 +1,33 @@
+# Edit the source-list defaults, or supply --source-list and --val-source-list.
+# Use --spine-path with the patched SPINE checkout and --account for your project.
+workspace: null
+variables:
+  train_source_list: /path/to/train.txt
+  validation_source_list: /path/to/validation.txt
+defaults:
+  profile: nersc_gpu_full
+  time: "00:20:00"
+stages:
+  - name: train_uresnet_ppn
+    stage: train
+    warm_start:
+      uresnet: uresnet_ppn.uresnet
+      ppn: uresnet_ppn.ppn
+    config: train/generic/uresnet_ppn/train_240805.yaml
+    run_dir: ${workspace}/train
+    source_list: ${train_source_list}
+    val_source_list: ${validation_source_list}
+    continuation:
+      runtime_budget: "01:00:00"
+      checkpoint_margin: "00:02:00"
+      startup_allowance: "00:02:00"
+      site_min_time: "00:05:00"
+      max_attempts: 10
+      # Enable after the fixed-duration smoke check:
+      # min_time: "00:10:00"
+  - name: validate_completed_training
+    stage: validation
+    depends_on: [train_uresnet_ppn]
+    config: train/generic/uresnet_ppn/train_240805.yaml
+    run_dir: ${workspace}/train
+    source_list: ${validation_source_list}
