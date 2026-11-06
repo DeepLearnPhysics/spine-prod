@@ -275,7 +275,6 @@ stages:
     in_place: true
     weight_path: ${workspace}/weights/full_chain_260304.ckpt
     num_workers: 8
-    files_per_task: 1
     ntasks: 4
 
   # Reduce completed metric shards into checksummed JSON and plots.
