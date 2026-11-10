@@ -1,0 +1,8 @@
+# Training samples contain only cryoE; full-detector filtering stays separate.
+__meta__:
+  kind: bundle
+  description: CryoE-only ICARUS training scan and filter
+include: space_points_240719.yaml
+remove:
+  - measurements.sparse3d_reco_cryoW
+  - filters.sparse3d_reco_cryoW

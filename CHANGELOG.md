@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- ICARUS training MC contains only cryoE. Apply single-cryostat inputs to raw
+  training, cache generation and held-out evaluation across all 13 pipeline
+  revisions; use cryoE-only scan/filter bundles. Preserve historical feature
+  order, model/loss settings and full-detector inference configurations.
+
 ### Added
 - Added ICARUS canonical models and staged training/cache/evaluation/reporting
   pipelines for all 12 deployed chains, plus the co_261106 candidate with

@@ -31,7 +31,8 @@ defaults:
   time: "08:00:00"
 
 stages:
-  # Measure raw product sizes once per source, reusing compatible scan records.
+  # Training MC contains cryoE only, including validation and evaluation.
+  # Measure cryoE product sizes once per source, reusing compatible records.
   - name: scan_${split.name}_filter
     time: "02:00:00"
     for_each:
@@ -39,7 +40,7 @@ stages:
       as: split
     kind: filter
     operation: scan
-    config: filter/icarus/space_points_co_240812.yaml
+    config: filter/icarus/space_points_co_240812_single.yaml
     source_list: ${split.source_list}
     cache_dir: ${filter_cache_dir}
     run_dir: ${workspace}/filter/${split.name}/scan
@@ -56,7 +57,7 @@ stages:
     kind: filter
     operation: build
     depends_on: ["scan_${split.name}_filter"]
-    config: filter/icarus/space_points_co_240812.yaml
+    config: filter/icarus/space_points_co_240812_single.yaml
     source_list: ${split.source_list}
     cache_dir: ${filter_cache_dir}
     output: ${split.entry_filter}

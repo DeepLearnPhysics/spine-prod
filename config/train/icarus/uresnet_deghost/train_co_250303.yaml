@@ -6,3 +6,4 @@ __meta__:
 include:
   - model/icarus/uresnet_deghost/model_co_250303.yaml
   - train/icarus/uresnet_deghost/base_v1.yaml
+  - train/icarus/modifier/single/mod_single_common.yaml

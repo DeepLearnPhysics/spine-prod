@@ -1,0 +1,8 @@
+# Raw cache generation and evaluation also read point-to-TPC provenance.
+__meta__:
+  kind: fragment
+include: mod_single_common.yaml
+override:
+  io.loader.dataset.schema.sources.sparse_event_list-:
+    - sparse3d_reco_cryoW_cryo
+    - sparse3d_reco_cryoW_tpc

@@ -6,9 +6,8 @@ __meta__:
 include:
   - model/icarus/uresnet_deghost/model_co_240812.yaml
   - train/icarus/uresnet_deghost/base_v1.yaml
+  - train/icarus/modifier/single/mod_single_common.yaml
 override:
   io.loader.dataset.schema.data.sparse_event_list:
     - sparse3d_reco_cryoE_hit_charge2
     - sparse3d_reco_cryoE_chi2
-    - sparse3d_reco_cryoW_hit_charge2
-    - sparse3d_reco_cryoW_chi2

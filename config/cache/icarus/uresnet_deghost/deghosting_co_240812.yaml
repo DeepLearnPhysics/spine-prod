@@ -3,7 +3,9 @@ __meta__:
   description: ICARUS deghosting cache
   version: "240812"
   date: "2024-08-12"
-include: cache/icarus/uresnet_deghost/base_v1.yaml
+include:
+  - cache/icarus/uresnet_deghost/base_v1.yaml
+  - train/icarus/modifier/single/io_single_sources.yaml
 model:
   modules:
     uresnet_deghost: !include "model/icarus/uresnet_deghost/network_240719.yaml"
@@ -32,11 +34,3 @@ override:
     - sparse3d_reco_cryoE_hit_key0
     - sparse3d_reco_cryoE_hit_key1
     - sparse3d_reco_cryoE_hit_key2
-    - sparse3d_reco_cryoW_hit_charge2
-    - sparse3d_reco_cryoW_chi2
-    - sparse3d_reco_cryoW_hit_charge0
-    - sparse3d_reco_cryoW_hit_charge1
-    - sparse3d_reco_cryoW_hit_charge2
-    - sparse3d_reco_cryoW_hit_key0
-    - sparse3d_reco_cryoW_hit_key1
-    - sparse3d_reco_cryoW_hit_key2

@@ -668,6 +668,15 @@ rather than the candidate's default Gen-II dataset.
 
 ## ICARUS staged training
 
+ICARUS training MC simulates **cryoE only**, including the validation sample.
+The training bundles and raw cache readers include the training `single` I/O
+modifier; it preserves each revision's feature order and model/loss settings.
+The scan/build stages use `space_points_*_single.yaml`, and evaluation uses
+cryoE inputs without cryostat splitting or two-cryostat primary thresholds.
+Cached training stages consume this same unsplit event domain. No extra
+`--apply-mods single` is needed when running these pipelines. Full-detector
+inference bundles and the original two-cryostat filter configs remain available.
+
 `pipelines/icarus/` contains one pipeline for each of the 12 deployed chains and
 one additional candidate, `full_chain_co_261106.yaml`. The candidate incorporates
 current overlap-aware interaction targets, explicit orientation supervision,

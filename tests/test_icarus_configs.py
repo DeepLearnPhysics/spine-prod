@@ -1,4 +1,4 @@
-"""ICARUS deployed parity and two-cryostat staged training contracts."""
+"""ICARUS deployed parity and single-cryostat staged training contracts."""
 
 import copy
 import json
@@ -101,10 +101,12 @@ def test_historical_model_and_cache_parity(revision):
     assert chain[1]["config"]["calibration"] == (
         modules.get("calibration") or {"stages": []}
     )
-    assert (
-        deghost["io"]["loader"]["dataset"]["schema"]["data"]
-        == released["io"]["loader"]["dataset"]["schema"]["data"]
-    )
+    expected_data = copy.deepcopy(released["io"]["loader"]["dataset"]["schema"]["data"])
+    expected_data["sparse_event_list"] = [
+        key for key in expected_data["sparse_event_list"] if "cryoW" not in key
+    ]
+    assert deghost["io"]["loader"]["dataset"]["schema"]["data"] == expected_data
+    assert evaluation["io"]["loader"]["dataset"]["schema"]["data"] == expected_data
     assert (
         configs["train_grappa_inter"]["model"]["modules"]["grappa_loss"]
         == modules["grappa_inter_loss"]
@@ -113,13 +115,15 @@ def test_historical_model_and_cache_parity(revision):
     assert "orient" in modules["grappa_inter"]["gnn_model"]["node_pred"]
     assert "orient" not in modules["grappa_inter_loss"]["node_loss"]
     expected = copy.deepcopy(released["post"]["stages"])
-    expected = [s for s in expected if s["name"] != "flash_match"]
+    expected = [
+        s for s in expected if s["name"] not in ("flash_match", "particle_threshold")
+    ]
     for s in expected:
         if s["name"] == "match":
             s.update(ghost=True, truth_point_mode="points_adapt", fragment=True)
     assert evaluation["post"]["stages"] == expected + [{"name": "ppn"}]
     assert evaluation["io"]["writer"] is None
-    assert evaluation["io"]["loader"]["collate_fn"]["split"] is True
+    assert evaluation["io"]["loader"]["collate_fn"] == "all"
     assert "run_info" in evaluation["io"]["loader"]["dataset"]["schema"]
     assert not {"flashes", "crthits"} & set(
         evaluation["io"]["loader"]["dataset"]["schema"]
@@ -205,7 +209,7 @@ def test_pipeline_alignment_sources_and_resources(revision):
     raw = configs["cache_train_deghosting"]
     schema = raw["io"]["loader"]["dataset"]["schema"]
     assert schema["data"]["num_features"] == 8
-    assert len(schema["data"]["sparse_event_list"]) == 16
+    assert len(schema["data"]["sparse_event_list"]) == 8
     assert schema["sources"]["num_features"] == 2
     assert raw["model"]["network_input"]["run_info"] == "run_info"
     assert "run_info" in schema
@@ -214,7 +218,6 @@ def test_pipeline_alignment_sources_and_resources(revision):
     filt = configs["build_train_filter"]["filters"]
     assert filt == {
         "sparse3d_reco_cryoE": {"max_count": 500000},
-        "sparse3d_reco_cryoW": {"max_count": 500000},
     }
     evaluation = stages["evaluate_full_chain"]
     assert evaluation["source_list"] == "/inputs/test.list"
@@ -415,3 +418,45 @@ def test_candidate_ppn_reflection_preserves_both_cryostat_index_domains(monkeypa
         result["data_calib"].coords, result["seg_label"].coords[indices]
     )
     assert len(result["seg_label"]) == 4
+
+
+@pytest.mark.parametrize("revision", [*REVISIONS, "co_261106"])
+def test_training_pipeline_requires_only_east_cryostat(revision):
+    from spine.io.filter.manager import load_filter_config
+
+    stages = {s["name"]: s for s in pipeline(revision).stages}
+    for name, stage in stages.items():
+        cfg = load(stage["config"])
+        # Check the resolved reader inputs, including mixed raw/cache readers.
+        assert "cryoW" not in json.dumps(cfg.get("io", {})), name
+        if "filter" in name:
+            scan = load_filter_config(CONFIG / stage["config"])
+            assert "cryoW" not in json.dumps(scan)
+            assert scan["filters"] == {"sparse3d_reco_cryoE": {"max_count": 500000}}
+    raw = load(stages["train_uresnet_deghost"]["config"])
+    assert (
+        len(raw["io"]["loader"]["dataset"]["schema"]["data"]["sparse_event_list"]) == 2
+    )
+    for name in (
+        "cache_train_deghosting",
+        "cache_validation_deghosting",
+        "evaluate_full_chain",
+    ):
+        cfg = load(stages[name]["config"])
+        schema = cfg["io"]["loader"]["dataset"]["schema"]
+        assert schema["sources"]["sparse_event_list"] == [
+            "sparse3d_reco_cryoE_cryo",
+            "sparse3d_reco_cryoE_tpc",
+        ]
+        assert cfg["io"]["loader"]["collate_fn"] == "all"
+    evaluation = load(stages["evaluate_full_chain"]["config"])
+    assert evaluation["io"]["loader"]["dataset"]["schema"]["charge_label"] == {
+        "provider": "sparse3d",
+        "sparse_event": "sparse3d_reco_cryoE_rescaled",
+    }
+
+
+def test_full_detector_filter_remains_available():
+    cfg = load("filter/icarus/space_points_co_261106.yaml")
+    assert "sparse3d_reco_cryoW" in cfg["measurements"]
+    assert "sparse3d_reco_cryoW" in cfg["filters"]

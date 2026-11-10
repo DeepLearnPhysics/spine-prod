@@ -9,10 +9,16 @@ include:
   - infer/icarus/post/post_260501.yaml
   - model/icarus/full_chain/model_co_261106.yaml
   - test/common/full_chain/analyzers_v1.yaml
+  - train/icarus/modifier/single/io_single_sources.yaml
 override:
+  io.loader.dataset.schema.charge_label:
+    provider: sparse3d
+    sparse_event: sparse3d_reco_cryoE_rescaled
   io.writer: null
   model.network_input.clust_label: clust_label
   post.stages~:
+    - remove:
+        name: particle_threshold
     - remove:
         name: flash_match
     - update:

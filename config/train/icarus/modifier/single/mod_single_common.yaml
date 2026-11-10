@@ -1,0 +1,17 @@
+# Training MC simulates cryoE only. Preserve feature order and model/loss policy.
+__meta__:
+  kind: mod
+  name: single
+  description: CryoE-only ICARUS training inputs
+  applies_to: [mc]
+override:
+  io.loader.collate_fn: all
+  io.loader.dataset.schema.data.sparse_event_list-:
+    - sparse3d_reco_cryoW
+    - sparse3d_reco_cryoW_chi2
+    - sparse3d_reco_cryoW_hit_charge0
+    - sparse3d_reco_cryoW_hit_charge1
+    - sparse3d_reco_cryoW_hit_charge2
+    - sparse3d_reco_cryoW_hit_key0
+    - sparse3d_reco_cryoW_hit_key1
+    - sparse3d_reco_cryoW_hit_key2
