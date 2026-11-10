@@ -153,7 +153,8 @@ change output routing. If secondary entries run out, the last processed primary
 file may have a partial output and subsequent files produce no output. Use
 `--set base.split_output=false` to combine a task's events into one output instead.
 
-The default and minimum supported runtime is SPINE 1.4.4. It includes primary-only
+The default runtime is SPINE 1.4.5; the minimum supported version remains 1.4.4.
+The supported runtime includes primary-only
 joint output routing, training-compatible shower-primary reporting, overall
 semantic recall, and initial validation/checkpoint selection before training.
 Explicit runtime overrides must provide SPINE 1.4.4 or newer.

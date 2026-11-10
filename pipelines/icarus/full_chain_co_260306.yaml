@@ -33,7 +33,7 @@ defaults:
 stages:
   # Measure raw product sizes once per source, reusing compatible scan records.
   - name: scan_${split.name}_filter
-    time: "00:30:00"
+    time: "02:00:00"
     for_each:
       collection: splits
       as: split
