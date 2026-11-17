@@ -700,17 +700,15 @@ class BatchRunner(SubmissionComponent):
         profile_config.update(profile_overrides)
         continuation_policy = None
         if continuation is not None:
-            from .continuation import policy
+            from .continuation import profile_policy, validate_storage
 
             if stage != "train" or ntasks is not None or files_per_task is not None:
                 raise ValueError("Continuation supports ordinary training jobs only")
             if not run_dir:
                 raise ValueError("Continuation requires run_dir")
-            continuation_policy = policy(
-                continuation,
-                profile_config["time"],
-                scheduler,
-                profile_config.pop("continuation_defaults", None),
+            validate_storage(run_dir, site)
+            continuation_policy = profile_policy(
+                self.profiles, profile_config, continuation
             )
 
         validate_allocation(self.profiles, profile_config)
@@ -810,7 +808,7 @@ class BatchRunner(SubmissionComponent):
         if continuation_policy is not None:
             import hashlib
 
-            from .continuation import next_request, reserve
+            from .continuation import describe_policy, next_request, reserve
 
             # Include every scientific CLI override and resolved input selection,
             # but keep allocation policy and per-attempt paths out of identity.
@@ -843,17 +841,19 @@ class BatchRunner(SubmissionComponent):
                 continuation_attempt = {"token": "dry-run", "request": request}
             else:
                 continuation_attempt = reserve(
-                    job_dir, identity, continuation_policy, scheduler, attempt_dir
+                    job_dir,
+                    identity,
+                    continuation_policy,
+                    scheduler,
+                    attempt_dir,
+                    site=site,
                 )
             profile_config["time"] = continuation_attempt["request"]["time"]
+            validate_allocation(self.profiles, profile_config)
             print(
                 "  Continuation: submission-host controller; downstream deferred until completed"
             )
-            print(
-                f"  Runtime budget: {continuation_policy['runtime_budget']}s; "
-                f"allocation: {continuation_attempt['request']}; "
-                f"checkpoint margin: {continuation_policy['checkpoint_margin']}s"
-            )
+            print("  " + describe_policy(continuation_policy))
             # Contract variables explicitly cross both Shifter and Apptainer.
             spine_cmd = (
                 "env "

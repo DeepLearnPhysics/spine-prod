@@ -36,7 +36,7 @@ def test_invalid_duration():
 )
 def test_vd_mapping(catalog, workspace_root, site, prefix):
     definition = PipelineDefinition.load(
-        str(workspace_root / "pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml"),
+        str(workspace_root / "tests/fixtures/dune_vd_pipeline_261117.yaml"),
         workspace_override="/tmp/vd",
     )
     stages = [

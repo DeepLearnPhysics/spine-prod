@@ -1260,6 +1260,12 @@ class PipelineRunner(SubmissionComponent):
             profile = self.config_mgr.get_profile(stage.get("profile", "auto"))
             profile.update({key: stage[key] for key in PROFILE_FIELDS if key in stage})
             try:
+                if stage.get("continuation") is not None:
+                    from .continuation import profile_policy, validate_storage
+
+                    profile_policy(self.profiles, profile, stage["continuation"])
+                    validate_storage(stage["run_dir"], profile.get("site"))
+                    validate_storage(definition.workspace, profile.get("site"))
                 validate_allocation(self.profiles, profile)
             except ValueError as exc:
                 raise ValueError(f"Stage {stage['name']}: {exc}") from exc

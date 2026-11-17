@@ -498,3 +498,391 @@ def test_runtime_probes_actual_executable_contract(tmp_path, capability, expecte
         text=True,
     )
     assert result.returncode == expected
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/global/cfs/cdirs/m5252/run",
+        "/global/homes/d/user/run",
+        "/global/u2/u/user/run",
+        "/dvs_ro/cfs/cdirs/m5252/run",
+    ],
+)
+def test_nersc_dvs_workspace_rejected_before_submission(path):
+    with pytest.raises(ValueError, match=r"\$SCRATCH"):
+        c.validate_storage(path, "nersc")
+
+
+def test_nersc_symlink_into_cfs_rejected(tmp_path):
+    link = tmp_path / "workspace"
+    link.symlink_to("/global/cfs/cdirs/m5252/run")
+    with pytest.raises(ValueError, match="DVS"):
+        c.validate_storage(link, "nersc")
+
+
+def test_dvs_errno_has_actionable_message_and_never_enters_lock(tmp_path, monkeypatch):
+    def unsupported(*_):
+        raise OSError(524, "Unknown error 524")
+
+    monkeypatch.setattr(c.fcntl, "flock", unsupported)
+    with pytest.raises(RuntimeError, match="Do not disable locking"):
+        with c.locked(tmp_path / "manifest.json"):
+            pytest.fail("An unsupported lock must not be bypassed")
+
+
+def test_storage_preflight_leaves_scientific_state_unchanged(tmp_path):
+    path = c.manifest_path(tmp_path)
+    c.atomic_json(path, {"sentinel": 1})
+    c.preflight_storage(tmp_path, "nersc")
+    assert c.read(path) == {"sentinel": 1}
+    assert not list(path.parent.glob("preflight-*.json"))
+
+
+def test_preferred_chunk_and_site_minimum():
+    import yaml
+
+    catalog = yaml.safe_load(Path("templates/profiles.yaml").read_text())
+    profile = dict(
+        catalog["profiles"]["nersc_gpu_full"], time="48:00:00", qos="preempt"
+    )
+    cfg = c.profile_policy(
+        catalog,
+        profile,
+        {
+            "runtime_budget": "120:00:00",
+            "preferred_time": "24:00:00",
+            "site_min_time": "00:01:00",
+            "checkpoint_margin": "00:15:00",
+        },
+    )
+    assert cfg["site_min_time"] == 7200
+    assert c.next_request(cfg, 0)["seconds"] == 86400
+    assert c.next_request(cfg, 119 * 3600) is None
+    assert c.next_request(cfg, 118 * 3600)["seconds"] == 7200
+    assert cfg["runtime_budget"] == 120 * 3600
+    with pytest.raises(ValueError, match="max_time"):
+        c.profile_policy(
+            catalog, dict(profile, time="120:00:00"), {"runtime_budget": "240:00:00"}
+        )
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"preferred_time": "00:05:00"},
+        {"preferred_time": "00:01:00", "min_time": "00:02:00"},
+        {"max_infrastructure_retries": -1},
+        {"max_infrastructure_retries": True},
+    ],
+)
+def test_invalid_chunk_and_retry_policy(values):
+    with pytest.raises(ValueError):
+        config(**values)
+
+
+@pytest.mark.parametrize(
+    "scheduler_state,expected,recoverable",
+    [
+        ("PREEMPTED", "preemption", True),
+        ("NODE_FAIL", "node_failure", True),
+        ("TIMEOUT", "allocation_expiry", True),
+        ("FAILED", "application_failure", False),
+        ("OUT_OF_MEMORY", "out_of_memory", False),
+        ("CANCELLED", "user_cancelled", False),
+    ],
+)
+def test_bounded_infrastructure_recovery_never_retries_application_errors(
+    tmp_path, monkeypatch, scheduler_state, expected, recoverable
+):
+    attempt = allocation(tmp_path, 1)
+    Path(
+        attempt["directory"], "outcome.json"
+    ).unlink()  # hard kill, periodic artifact survives
+    path = c.manifest_path(tmp_path)
+    state = c.read(path)
+    state["policy"]["max_infrastructure_retries"] = 1
+    c.atomic_json(path, state)
+    monkeypatch.setattr(
+        c,
+        "accounting",
+        lambda *_: {"status": scheduler_state, "success": False, "seconds": 240},
+    )
+    result = c.reconcile(tmp_path)
+    assert result["used_seconds"] == 240
+    assert result["reason"] == expected
+    assert result["state"] == (
+        "paused"
+        if recoverable
+        else "cancelled" if scheduler_state == "CANCELLED" else "failed"
+    )
+    assert c.reconcile(tmp_path)["used_seconds"] == 240
+    if recoverable:
+        directory = tmp_path / "attempts/2"
+        directory.mkdir()
+        second = c.reserve(
+            tmp_path,
+            "scientific-identity",
+            config(max_infrastructure_retries=1),
+            "slurm",
+            directory,
+        )
+        c.submitted(tmp_path, second["token"], "2")
+        checkpoint(tmp_path, 20)
+        result = c.reconcile(tmp_path)
+        assert result["state"] == "failed"
+        assert result["infrastructure_retries"] == 1
+        assert result["used_seconds"] == 480
+
+
+def test_preemption_without_new_checkpoint_stops(tmp_path, monkeypatch):
+    allocation(tmp_path, 1)
+    path = c.manifest_path(tmp_path)
+    state = c.read(path)
+    state["policy"]["max_infrastructure_retries"] = 2
+    state["attempts"][0]["start_progress"] = 10
+    c.atomic_json(path, state)
+    monkeypatch.setattr(
+        c,
+        "accounting",
+        lambda *_: {"status": "PREEMPTED", "success": False, "seconds": 120},
+    )
+    state = c.reconcile(tmp_path)
+    assert state["state"] == "failed"
+    assert "No new verified" in state["detail"]
+    assert state["attempts"][0]["reason"] == "preemption"
+
+
+def test_periodic_controller_script_runs_with_minimal_environment(
+    tmp_path, monkeypatch
+):
+    import os
+    import subprocess
+    import sys
+
+    basedir = tmp_path / "repo with spaces"
+    scripts = basedir / "scripts"
+    scripts.mkdir(parents=True)
+    # Use the real configure.sh, which legitimately reads unset shell variables.
+    (basedir / "configure.sh").write_text(Path("configure.sh").read_text())
+    (basedir / "DEFAULT_SPINE_VERSION").write_text("1.4.4\n")
+    (scripts / "continue_training.py").write_text(
+        "import os, sys\nassert sys.argv[1] == 'advance'\nassert os.environ['SPINE_CONTAINER_TAG'] == 'custom-tag'\n"
+    )
+    manifest = tmp_path / "run/.spine-prod/continuation_pipeline.json"
+    manifest.parent.mkdir(parents=True)
+    monkeypatch.setenv("SPINE_CONTAINER_TAG", "custom-tag")
+    pipeline.write_tick_script(manifest, basedir)
+    script = manifest.parent / "advance.sh"
+    result = subprocess.run(
+        ["bash", str(script)],
+        env={"PATH": os.environ["PATH"]},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert sys.executable in script.read_text()
+    assert (script.stat().st_mode & 0o777) == 0o700
+
+
+def test_all_training_stages_report_policy_in_dry_run(tmp_path, capsys):
+    from unittest.mock import Mock
+
+    from src.submitter import Submitter
+
+    context = Submitter()
+    context.submit_job = Mock(return_value=[])
+    stages = [
+        {
+            "name": name,
+            "stage": "train",
+            "config": "train.yaml",
+            "run_dir": str(tmp_path / name),
+            "profile": "nersc_gpu_full",
+            "time": "48:00:00",
+            "continuation": {
+                "runtime_budget": "120:00:00",
+                "preferred_time": "24:00:00",
+            },
+        }
+        for name in ["first", "second"]
+    ]
+    pipeline.start(context, stages, str(tmp_path), dry_run=True)
+    output = capsys.readouterr().out
+    assert output.count("budget=120:00:00") == 2
+    assert "preferred=24:00:00" in output
+    assert "exhaustion=stop and block consumers" in output
+    context.submit_job.assert_called_once()
+    assert not (tmp_path / ".spine-prod/continuation_pipeline.json").exists()
+
+
+def test_unknown_submission_reconciles_token_and_charges_once(tmp_path, monkeypatch):
+    attempt = allocation(tmp_path, 1)
+    path = c.manifest_path(tmp_path)
+    state = c.read(path)
+    state["attempts"][0]["job_id"] = None
+    state["state"] = "submitting"
+    c.atomic_json(path, state)
+    commands = []
+
+    def query(argv):
+        commands.append(argv)
+        if any(arg.startswith("--name=") for arg in argv):
+            return "42|" + attempt["token"] + "|\n"
+        return "42|COMPLETED|200|0:0|\n"
+
+    monkeypatch.setattr(c, "command", query)
+    result = c.reconcile(tmp_path)
+    assert result["attempts"][0]["job_id"] == "42"
+    assert result["state"] == "paused"
+    assert result["used_seconds"] == 200
+    c.reconcile(tmp_path)
+    assert len(commands) == 2
+
+
+def test_unknown_submission_with_no_match_never_resubmits(tmp_path, monkeypatch):
+    attempt = c.reserve(tmp_path, "identity", config(), "slurm", tmp_path / "attempt")
+    monkeypatch.setattr(c, "command", lambda _: "")
+    state = c.reconcile(tmp_path)
+    assert state["state"] == "submitting"
+    assert state["attempts"][0]["token"] == attempt["token"]
+    with pytest.raises(ValueError, match="reconcile"):
+        c.reserve(tmp_path, "identity", config(), "slurm", tmp_path / "other")
+
+
+def test_recovery_rejects_ambiguous_scheduler_matches(monkeypatch):
+    token = "spc-" + "a" * 20
+    monkeypatch.setattr(c, "command", lambda _: f"1|{token}|\n2|{token}|\n")
+    with pytest.raises(RuntimeError, match="Multiple jobs"):
+        c.discover_submission("slurm", token)
+
+
+def test_flock_failure_emits_traceback_and_diagnostic_without_launch(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    attempt_dir = tmp_path / "attempt"
+    attempt_dir.mkdir()
+    attempt = c.reserve(tmp_path, "identity", config(), "slurm", attempt_dir)
+    c.submitted(tmp_path, attempt["token"], "123")
+    script = str(Path("scripts/continuation_runtime.py").resolve())
+    code = (
+        "import runpy, sys, src.continuation as c\n"
+        "def fail(*args): raise OSError(524, 'Unknown error 524')\n"
+        "c.fcntl.flock = fail\n"
+        f"sys.argv = [{script!r}, {str(tmp_path)!r}, {attempt['token']!r}, '--', 'does-not-exist']\n"
+        f"runpy.run_path({script!r}, run_name='__main__')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        env={**os.environ, "SLURM_JOB_ID": "123"},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "Traceback" in result.stderr
+    assert "Do not disable locking" in result.stderr
+    assert c.read(attempt_dir / "failure.json")["token"] == attempt["token"]
+    assert c.read(c.manifest_path(tmp_path))["state"] == "pending"
+
+
+def test_pipeline_stops_cfs_request_before_any_scheduler_call(tmp_path, mock_submitter):
+    from unittest.mock import Mock
+
+    import yaml
+
+    pipeline_file = tmp_path / "pipeline.yaml"
+    pipeline_file.write_text(
+        yaml.safe_dump(
+            {
+                "workspace": "/global/cfs/cdirs/m5252/run",
+                "stages": [
+                    {
+                        "name": "train",
+                        "stage": "train",
+                        "config": "train.yaml",
+                        "profile": "nersc_gpu_full",
+                        "run_dir": "${workspace}/train",
+                        "continuation": {"runtime_budget": "120:00:00"},
+                    }
+                ],
+            }
+        )
+    )
+    mock_submitter.submit_job = Mock()
+    with pytest.raises(ValueError, match="DVS"):
+        mock_submitter.submit_pipeline(str(pipeline_file), dry_run=True)
+    mock_submitter.submit_job.assert_not_called()
+
+
+@pytest.mark.parametrize("assigned,used", [(40, 0), (240, 680)])
+def test_watchdog_uses_actual_deadline_and_remaining_budget(
+    tmp_path, monkeypatch, assigned, used
+):
+    import importlib.util
+
+    attempt_dir = tmp_path / "attempt"
+    attempt_dir.mkdir()
+    attempt = c.reserve(tmp_path, "identity", config(), "slurm", attempt_dir)
+    c.submitted(tmp_path, attempt["token"], "123")
+    manifest = c.manifest_path(tmp_path)
+    state = c.read(manifest)
+    state["used_seconds"] = used
+    c.atomic_json(manifest, state)
+    spec = importlib.util.spec_from_file_location(
+        "continuation_runtime_test", "scripts/continuation_runtime.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    now = [1000.0]
+    monkeypatch.setattr(module.time, "time", lambda: now[0])
+    monkeypatch.setattr(module.time, "sleep", lambda _: now.__setitem__(0, now[0] + 1))
+    monkeypatch.setattr(module, "allocation", lambda *_: (1000, 1000 + assigned))
+    monkeypatch.setattr(module.signal, "signal", lambda *_: None)
+    monkeypatch.setenv("SLURM_JOB_ID", "123")
+
+    class Child:
+        returncode = None
+
+        def poll(self):
+            assert now[0] <= 1031, "Watchdog incorrectly used requested walltime"
+            if (attempt_dir / "pause").exists():
+                self.returncode = 0
+            return self.returncode
+
+    monkeypatch.setattr(module.subprocess, "Popen", lambda *args, **kwargs: Child())
+    assert module.run(str(tmp_path), attempt["token"], ["fake-launcher"]) == 0
+    state = c.read(manifest)
+    assert state["attempts"][0]["pause_requested_at"] == 1030
+    assert state["attempts"][0]["assigned_seconds"] == assigned
+    assert state["state"] == "pausing"
+
+
+def test_vd_training_budgets_survive_nersc_site_mapping(tmp_path):
+    import yaml
+
+    from src.pipeline import PipelineDefinition
+    from src.site_resources import map_stage
+
+    catalog = yaml.safe_load(Path("templates/profiles.yaml").read_text())
+    definition = PipelineDefinition.load(
+        "tests/fixtures/dune_vd_pipeline_261117.yaml", workspace_override=str(tmp_path)
+    )
+    training = [stage for stage in definition.stages if stage.get("stage") == "train"]
+    assert len(training) >= 5
+    for stage in training:
+        mapped = map_stage(
+            catalog, stage, "nersc", {"account": "project", "time": "48:00:00"}
+        )
+        effective = dict(catalog["profiles"][mapped["profile"]], time=mapped["time"])
+        config = c.profile_policy(
+            catalog,
+            effective,
+            {"runtime_budget": "120:00:00", "preferred_time": "24:00:00"},
+        )
+        assert config["runtime_budget"] == 432000
+        assert config["maximum"] == 172800
+        assert c.next_request(config, 0)["seconds"] == 86400
+        assert c.next_request(config, 4 * 86400)["seconds"] == 86400
+        assert c.next_request(config, 5 * 86400) is None
