@@ -15,12 +15,24 @@ from pathlib import Path
 from . import continuation as c
 
 
-def start(context, stages, workspace, dry_run=False, preload=False, warm_start=None):
+def start(
+    context,
+    stages,
+    workspace,
+    dry_run=False,
+    preload=False,
+    warm_start=None,
+    continuation_dir=None,
+):
     from .pipeline import PipelineRunner
 
     if not workspace:
         raise ValueError("Continuation pipelines require a workspace")
-    path = Path(workspace) / ".spine-prod" / "continuation_pipeline.json"
+    path = (
+        Path(continuation_dir or workspace).expanduser().resolve()
+        / ".spine-prod"
+        / "continuation_pipeline.json"
+    )
     records = []
     for stage in stages:
         if stage.get("cleanup"):
@@ -34,6 +46,13 @@ def start(context, stages, workspace, dry_run=False, preload=False, warm_start=N
         options = PipelineRunner._submission_options(
             stage, None, warm_start_path=warm_start
         )
+        if options.get("continuation") is not None and continuation_dir is not None:
+            run_key = hashlib.sha256(
+                str(Path(options["run_dir"]).resolve()).encode()
+            ).hexdigest()
+            options["continuation_dir"] = str(
+                Path(continuation_dir).expanduser().resolve() / "runs" / run_key
+            )
         records.append(
             {
                 "name": stage["name"],
@@ -55,8 +74,7 @@ def start(context, stages, workspace, dry_run=False, preload=False, warm_start=N
             profile.update(
                 {key: options[key] for key in PROFILE_FIELDS if key in options}
             )
-            c.validate_storage(workspace, profile.get("site"))
-            c.validate_storage(options["run_dir"], profile.get("site"))
+            c.validate_storage(continuation_dir, profile.get("site"))
             config = c.profile_policy(
                 context.profiles, profile, options["continuation"]
             )
@@ -124,10 +142,14 @@ def advance(path, context=None):
             options = dict(record["options"])
             is_continuation = options.get("continuation") is not None
             run_manifest = (
-                c.manifest_path(options["run_dir"]) if is_continuation else None
+                c.manifest_path(options["run_dir"], options.get("continuation_dir"))
+                if is_continuation
+                else None
             )
             if run_manifest and run_manifest.exists():
-                logical = c.reconcile(options["run_dir"])
+                logical = c.reconcile(
+                    options["run_dir"], options.get("continuation_dir")
+                )
                 if not logical["attempts"]:
                     raise RuntimeError(
                         "Continuation manifest has no submission attempt; inspect its failure state"
@@ -207,7 +229,7 @@ def operate(path, action, stage=None, value=None):
         for record in records:
             options = record["options"]
             run_path = (
-                c.manifest_path(options["run_dir"])
+                c.manifest_path(options["run_dir"], options.get("continuation_dir"))
                 if options.get("continuation") is not None
                 else None
             )
@@ -322,12 +344,12 @@ def status(path):
     for record in state["records"]:
         options = record["options"]
         path = (
-            c.manifest_path(options["run_dir"])
+            c.manifest_path(options["run_dir"], options.get("continuation_dir"))
             if options.get("continuation") is not None
             else None
         )
         if path and path.exists():
-            logical = c.reconcile(options["run_dir"])
+            logical = c.reconcile(options["run_dir"], options.get("continuation_dir"))
             print(f"{record['name']}: {logical['state']} ({logical.get('reason', '')})")
             if logical.get("detail"):
                 print(f"  detail: {logical['detail']}")
@@ -374,10 +396,10 @@ def metrics(path, stream=None):
         options = record["options"]
         if options.get("continuation") is None:
             continue
-        run_path = c.manifest_path(options["run_dir"])
+        run_path = c.manifest_path(options["run_dir"], options.get("continuation_dir"))
         if not run_path.exists():
             continue
-        logical = c.reconcile(options["run_dir"])
+        logical = c.reconcile(options["run_dir"], options.get("continuation_dir"))
         for attempt in logical["attempts"]:
             outcome = attempt.get("outcome", {})
             latency = ""

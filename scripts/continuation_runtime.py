@@ -21,8 +21,8 @@ from src.continuation import (  # noqa: E402
 )
 
 
-def run(run_dir, token, argv):
-    path = manifest_path(run_dir)
+def run(run_dir, token, argv, continuation_dir=None):
+    path = manifest_path(run_dir, continuation_dir)
     state = read(path)
     attempt = state["attempts"][-1]
     if attempt["token"] != token or state["state"] not in ("submitting", "pending"):
@@ -48,6 +48,7 @@ def run(run_dir, token, argv):
     preflight_storage(
         run_dir,
         attempt.get("site") or ("nersc" if os.environ.get("NERSC_HOST") else None),
+        continuation_dir=continuation_dir,
     )
     error = None
     for retry in range(3):
@@ -140,6 +141,7 @@ def run(run_dir, token, argv):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--continuation-dir")
     parser.add_argument("run_dir")
     parser.add_argument("token")
     parser.add_argument("command", nargs=argparse.REMAINDER)
@@ -150,6 +152,7 @@ if __name__ == "__main__":
                 args.run_dir,
                 args.token,
                 args.command[1:] if args.command[0] == "--" else args.command,
+                continuation_dir=args.continuation_dir,
             )
         )
     except Exception as error:
@@ -158,7 +161,7 @@ if __name__ == "__main__":
         # Diagnostic publication does not require the manifest lock that may
         # itself have failed. Never rewrite scientific/controller state here.
         try:
-            state = read(manifest_path(args.run_dir))
+            state = read(manifest_path(args.run_dir, args.continuation_dir))
             attempt = state["attempts"][-1]
             if attempt["token"] == args.token:
                 atomic_json(

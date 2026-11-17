@@ -424,6 +424,7 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         preload=True,
         overrides={},
         workspace="/runs/benchmark",
+        continuation_dir=None,
         from_stage=None,
         to_stage=None,
         select_stages=None,
@@ -816,3 +817,26 @@ def test_pipeline_forwards_site():
     mock.submit_pipeline.return_value = {}
     run_main("--pipeline", "pipeline.yaml", "--site", "nersc", submitter=mock)
     assert mock.submit_pipeline.call_args.kwargs["site"] == "nersc"
+
+
+def test_pipeline_continuation_directory_forwarded():
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--workspace",
+        "/global/cfs/cdirs/project/run",
+        "--continuation-dir",
+        "/pscratch/sd/u/user/state",
+        submitter=submitter,
+    )
+    assert result == 0
+    assert (
+        submitter.submit_pipeline.call_args.kwargs["continuation_dir"]
+        == "/pscratch/sd/u/user/state"
+    )
+    assert (
+        submitter.submit_pipeline.call_args.kwargs["workspace"]
+        == "/global/cfs/cdirs/project/run"
+    )

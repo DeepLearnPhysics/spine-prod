@@ -185,6 +185,7 @@ class BatchRunner(SubmissionComponent):
         allow_missing_inputs: bool = False,
         retry: bool = False,
         continuation: Optional[Dict] = None,
+        continuation_dir: Optional[str] = None,
         **profile_overrides,
     ) -> List[str]:
         """Submit batch job for SPINE processing.
@@ -706,7 +707,7 @@ class BatchRunner(SubmissionComponent):
                 raise ValueError("Continuation supports ordinary training jobs only")
             if not run_dir:
                 raise ValueError("Continuation requires run_dir")
-            validate_storage(run_dir, site)
+            validate_storage(continuation_dir, site)
             continuation_policy = profile_policy(
                 self.profiles, profile_config, continuation
             )
@@ -740,6 +741,7 @@ class BatchRunner(SubmissionComponent):
                 flashmatch_bind_root,
                 extra_bind_root,
                 cache_bind_root,
+                continuation_dir,
             ]
             if root
         ]
@@ -805,11 +807,20 @@ class BatchRunner(SubmissionComponent):
         # including the first inference attempt. This keeps retries uniform.
         attempt_dir = RunManager.create_attempt_dir(job_dir)
         continuation_attempt = None
+        control_dir = attempt_dir
         if continuation_policy is not None:
             import hashlib
 
             from .continuation import describe_policy, next_request, reserve
 
+            if continuation_dir is not None:
+                control_dir = (
+                    Path(continuation_dir)
+                    / ".spine-prod"
+                    / "attempts"
+                    / attempt_dir.name
+                )
+                control_dir.mkdir(parents=True, exist_ok=True)
             # Include every scientific CLI override and resolved input selection,
             # but keep allocation policy and per-attempt paths out of identity.
             identity_values = dict(
@@ -845,8 +856,9 @@ class BatchRunner(SubmissionComponent):
                     identity,
                     continuation_policy,
                     scheduler,
-                    attempt_dir,
+                    control_dir,
                     site=site,
+                    continuation_dir=continuation_dir,
                 )
             profile_config["time"] = continuation_attempt["request"]["time"]
             validate_allocation(self.profiles, profile_config)
@@ -861,8 +873,8 @@ class BatchRunner(SubmissionComponent):
                     f"{key}={shlex.quote(str(value))}"
                     for key, value in {
                         "SPINE_CONTINUATION_TOKEN": continuation_attempt["token"],
-                        "SPINE_PAUSE_FILE": attempt_dir / "pause",
-                        "SPINE_OUTCOME_FILE": attempt_dir / "outcome.json",
+                        "SPINE_PAUSE_FILE": control_dir / "pause",
+                        "SPINE_OUTCOME_FILE": control_dir / "outcome.json",
                     }.items()
                 )
                 + " "
@@ -872,7 +884,7 @@ class BatchRunner(SubmissionComponent):
         if stage == "train":
             # Keep the request marker scoped to one immutable submission. A
             # retry therefore cannot inherit a completed attempt's request.
-            graceful_stop_file = attempt_dir / "graceful_stop"
+            graceful_stop_file = control_dir / "graceful_stop"
             lifecycle_args.extend(
                 [
                     "--graceful-stop-file",
@@ -1288,6 +1300,7 @@ class BatchRunner(SubmissionComponent):
                 continuation_attempt=continuation_attempt,
                 continuation_policy=continuation_policy,
                 continuation_run_dir=str(job_dir),
+                continuation_dir=continuation_dir,
                 array_spec=array_spec,
                 job_name=(
                     continuation_attempt["token"]
@@ -1386,7 +1399,9 @@ class BatchRunner(SubmissionComponent):
             if continuation_attempt and not dry_run:
                 from .continuation import submitted
 
-                submitted(job_dir, continuation_attempt["token"], job_id)
+                submitted(
+                    job_dir, continuation_attempt["token"], job_id, continuation_dir
+                )
             if job_id:
                 job_ids.append(job_id)
                 print(f"  Job ID: {job_id}")
@@ -1403,6 +1418,7 @@ class BatchRunner(SubmissionComponent):
             "job_name": job_name,
             "stage": stage,
             "run_dir": str(job_dir),
+            "continuation_dir": continuation_dir,
             "detector": detector,
             "config": config,
             "original_config": original_config if apply_mods else config,

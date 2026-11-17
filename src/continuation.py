@@ -136,37 +136,34 @@ def next_request(config, used):
 
 
 def validate_storage(path, site):
-    """Reject NERSC DVS workspaces before paying for a queued allocation.
+    """Require explicit Scratch continuation storage on NERSC before submission.
 
     Check canonical paths as well as the provided spelling (symlinks included).
     This is not a substitute for compute-host preflight on other filesystems.
     """
     if site != "nersc":
         return
-    path = Path(path).expanduser().resolve()
-    prefixes = (
-        "/global/cfs",
-        "/global/homes",
-        "/global/u1",
-        "/global/u2",
-        "/global/common",
-        "/dvs_ro",
-    )
-    if any(
-        str(path) == prefix or str(path).startswith(prefix + "/") for prefix in prefixes
-    ):
+    if not path:
         raise ValueError(
-            f"NERSC continuation workspace {path} is on DVS, which does not support "
-            "compute-node file locking. Use a new --workspace on $SCRATCH. "
-            "Controller state and every training run_dir must be on that filesystem."
+            "NERSC continuation requires an explicit --continuation-dir on $SCRATCH"
+        )
+    resolved = Path(path).expanduser().resolve()
+    roots = ("/pscratch", "/global/cscratch1", "/global/cscratch2")
+    if not any(str(resolved).startswith(root + "/") for root in roots):
+        raise ValueError(
+            f"NERSC --continuation-dir {resolved} must be on Scratch ($SCRATCH); "
+            "CFS and other DVS paths cannot hold continuation locks. "
+            "The workspace, training logs and checkpoints may remain on CFS."
         )
 
 
-def preflight_storage(run_dir, site=None):
-    validate_storage(run_dir, site)
+def preflight_storage(run_dir, site=None, continuation_dir=None):
+    validate_storage(
+        continuation_dir if continuation_dir is not None else run_dir, site
+    )
     # Use the actual run's lock. Test publication on a unique probe without
     # modifying the manifest or deleting another process's probe.
-    path = manifest_path(run_dir)
+    path = manifest_path(run_dir, continuation_dir)
     with locked(path):
         probe = path.parent / ("preflight-" + uuid.uuid4().hex + ".json")
         try:
@@ -247,7 +244,7 @@ def locked(path):
             if exc.errno in (524, errno.ENOSYS, errno.ENOTSUP, errno.EOPNOTSUPP):
                 raise RuntimeError(
                     f"Continuation cannot lock {path}: this filesystem does not support "
-                    "file locking from this host. On NERSC use a new --workspace on "
+                    "file locking from this host. On NERSC set --continuation-dir on "
                     "$SCRATCH, not CFS or Global Homes. Do not disable locking."
                 ) from exc
             raise
@@ -258,13 +255,19 @@ def read(path):
     return json.loads(Path(path).read_text())
 
 
-def manifest_path(run_dir):
-    return Path(run_dir) / ".spine-prod" / "continuation.json"
+def manifest_path(run_dir, continuation_dir=None):
+    return (
+        Path(continuation_dir if continuation_dir is not None else run_dir)
+        / ".spine-prod"
+        / "continuation.json"
+    )
 
 
-def reserve(run_dir, identity, config, scheduler, attempt_dir, site=None):
+def reserve(
+    run_dir, identity, config, scheduler, attempt_dir, site=None, continuation_dir=None
+):
     """Commit submission intent before contacting a scheduler. Never retry ambiguity."""
-    path = manifest_path(run_dir)
+    path = manifest_path(run_dir, continuation_dir)
     with locked(path):
         state = (
             read(path)
@@ -326,8 +329,8 @@ def reserve(run_dir, identity, config, scheduler, attempt_dir, site=None):
         return attempt
 
 
-def submitted(run_dir, token, job_id):
-    path = manifest_path(run_dir)
+def submitted(run_dir, token, job_id, continuation_dir=None):
+    path = manifest_path(run_dir, continuation_dir)
     with locked(path):
         state = read(path)
         attempt = state["attempts"][-1]
@@ -529,9 +532,9 @@ def failure_reason(result):
     }.get(result["status"], "application_failure")
 
 
-def reconcile(run_dir):
+def reconcile(run_dir, continuation_dir=None):
     """Charge terminal accounting exactly once; retries require proven recovery."""
-    path = manifest_path(run_dir)
+    path = manifest_path(run_dir, continuation_dir)
     with locked(path):
         state = read(path)
         if not state["attempts"]:

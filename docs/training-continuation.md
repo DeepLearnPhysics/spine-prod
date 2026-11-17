@@ -63,28 +63,42 @@ No decision is inferred from logs.
 
 ## First site test
 
-On NERSC, put the workspace and all training run directories on **Scratch**.
-The failed `cont_debug` run used CFS: the compute-side manifest lock failed
-with errno 524 before training started. NERSC DVS mounts do not support this
-locking contract. Submission now rejects known DVS paths (including symlinks);
-the supervisor also tests locking, atomic publication and fsync before launching.
-Keep locking enabled: it prevents duplicate jobs and lost accounting.
-See [NERSC DVS file-locking restrictions](https://docs.nersc.gov/performance/io/dvs/#do-not-use-file-locking).
-Scratch is subject to site retention policies; preserve checkpoints and manifests
-as appropriate for a long-running campaign.
+The workspace and training `run_dir` keep their existing meaning: data, training
+logs, job scripts, outputs and checkpoints can stay on **CFS**. By default,
+continuation state shares the workspace. Use `--continuation-dir` to move only
+controller manifests/locks, per-attempt control/outcome files and the controller
+tick script to a separate shared directory.
+
+**NERSC requires an explicit `--continuation-dir "$SCRATCH/..."`.** Missing
+options, CFS/Home paths and paths outside recognized Scratch mounts fail before
+submission, including dry-run. Symlinks are resolved before validation; even a
+workspace already on Scratch requires the explicit option. Other sites retain
+the colocated default and can also opt into a separate state directory.
+
+The failed `cont_debug` run hit errno 524 on a compute-side manifest lock on CFS,
+before training started. Moving these locks fixes that storage assumption without
+moving scientific outputs. See
+[NERSC DVS file-locking restrictions](https://docs.nersc.gov/performance/io/dvs/#do-not-use-file-locking).
+The supervisor also tests locking, atomic publication and fsync in the state
+directory before launching. Keep this directory available for the entire run:
+Scratch retention policies apply to controller state too. Do not change or delete
+it to restart an existing pipeline; that would discard its job/accounting history.
 
 Start a **new** workspace with a small, known-good dataset and the example:
 
 ```bash
 python submit.py --pipeline pipelines/continuation/nersc.yaml \
-  --workspace "$SCRATCH/continuation-test" \
+  --workspace /global/cfs/cdirs/YOUR_PROJECT/continuation-test \
+  --continuation-dir "$SCRATCH/continuation-test-state" \
   --spine-path /shared/path/spine-continuation-checkout \
   --account YOUR_ACCOUNT \
   --source-list /shared/path/train.txt \
   --val-source-list /shared/path/validation.txt --dry-run
 ```
 
-For Polaris, substitute `pipelines/continuation/polaris.yaml`. Inspect the generated
+For Polaris, use a workspace on its shared filesystem and omit
+`--continuation-dir` to keep state there, or supply a separate shared path. Substitute
+`pipelines/continuation/polaris.yaml`. Inspect the generated
 scripts, then repeat without `--dry-run`. Profiles and queue limits must be suitable
 for your allocation; sample timings are experimental, not production tuning.
 Set the scientific epoch/iteration limit and validation policy in your training
@@ -98,7 +112,7 @@ After initial submission, invoke this bounded command periodically from a
 site-approved submission service (for example an approved user timer/cron job):
 
 ```bash
-bash "$SCRATCH/continuation-test/.spine-prod/advance.sh"
+bash "$SCRATCH/continuation-test-state/.spine-prod/advance.sh"
 ```
 
 It queries accounting, commits state, submits at most one ready allocation/stage,
@@ -107,18 +121,19 @@ The generated script pins the submission Python, sources the repository's
 `configure.sh`, and preserves explicitly selected SPINE container/checkout settings.
 Keep that environment and repository available for every invocation. The script
 is generated on real submission, not dry-run; it does not install a timer.
-You can test workspace storage independently with:
+You can test continuation storage independently with:
 
 ```bash
-python scripts/continue_training.py preflight "$SCRATCH/continuation-test" --site nersc
+python scripts/continue_training.py preflight "$SCRATCH/continuation-test-state" --site nersc
 ```
 
 A submission-host preflight alone cannot prove compute-host filesystem support.
 A one-minute timer is generally sufficient; arrange the timer through the site's
 approved mechanism. No timer or cluster jobs are installed by this repository.
-All controller/run paths must be shared across compute and submission nodes and
-support POSIX file locks, atomic rename and fsync. Compute-node submission is not
-required. Slurm requeue is deliberately not used.
+Both roots must be shared across compute and submission nodes. Continuation
+storage must support POSIX file locks, atomic rename and fsync; training storage
+must support committed checkpoint publication and integrity checks. Compute-node
+submission is not required. Slurm requeue is deliberately not used.
 
 For variable NERSC allocations, enable `min_time` after fixed-chunk testing.
 Slurm receives `--time-min` and `--signal=B:USR2@<margin>`; USR1 retains explicit
@@ -214,7 +229,10 @@ Do not delete a manifest to force a retry while any allocation may still exist.
 Cancellation of a submission with an unknown ID still inhibits future jobs; find
 and cancel its token-matching scheduler job as well. Keep the controller inactive.
 
-The run manifest is `RUN/.spine-prod/continuation.json`. It contains a scientific
+With colocated state, the run manifest is `RUN/.spine-prod/continuation.json`.
+With a separate state root, it is
+`CONTINUATION_DIR/runs/<run-path-hash>/.spine-prod/continuation.json`; the pipeline
+manifest and `advance.sh` are in `CONTINUATION_DIR/.spine-prod/`. It contains a scientific
 configuration/input/topology digest, generation, state, verified checkpoint,
 budget, attempts, submission intent, requested bounds, rounding, assigned deadline,
 provisional wrapper elapsed time, and confirmed scheduler accounting. Queue waits
