@@ -21,14 +21,24 @@ def main():
             "adopt",
             "retry",
             "metrics",
+            "preflight",
         ],
     )
     parser.add_argument("manifest")
     parser.add_argument("--stage")
     parser.add_argument(
+        "--site", choices=["nersc", "s3df", "anl"], help="Site for preflight"
+    )
+    parser.add_argument(
         "--value", help="New total budget (extend), or scheduler job ID (adopt)"
     )
     args = parser.parse_args()
+    if args.action == "preflight":
+        from src.continuation import preflight_storage
+
+        preflight_storage(args.manifest, args.site)
+        print("Continuation storage preflight passed on this host: " + args.manifest)
+        return
     if args.action == "metrics":
         metrics(args.manifest)
         return

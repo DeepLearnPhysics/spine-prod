@@ -63,11 +63,21 @@ No decision is inferred from logs.
 
 ## First site test
 
-Start with a small, known-good training dataset and the appropriate example:
+On NERSC, put the workspace and all training run directories on **Scratch**.
+The failed `cont_debug` run used CFS: the compute-side manifest lock failed
+with errno 524 before training started. NERSC DVS mounts do not support this
+locking contract. Submission now rejects known DVS paths (including symlinks);
+the supervisor also tests locking, atomic publication and fsync before launching.
+Keep locking enabled: it prevents duplicate jobs and lost accounting.
+See [NERSC DVS file-locking restrictions](https://docs.nersc.gov/performance/io/dvs/#do-not-use-file-locking).
+Scratch is subject to site retention policies; preserve checkpoints and manifests
+as appropriate for a long-running campaign.
+
+Start a **new** workspace with a small, known-good dataset and the example:
 
 ```bash
 python submit.py --pipeline pipelines/continuation/nersc.yaml \
-  --workspace /shared/path/continuation-test \
+  --workspace "$SCRATCH/continuation-test" \
   --spine-path /shared/path/spine-continuation-checkout \
   --account YOUR_ACCOUNT \
   --source-list /shared/path/train.txt \
@@ -88,13 +98,22 @@ After initial submission, invoke this bounded command periodically from a
 site-approved submission service (for example an approved user timer/cron job):
 
 ```bash
-python scripts/continue_training.py advance \
-  /shared/path/continuation-test/.spine-prod/continuation_pipeline.json
+bash "$SCRATCH/continuation-test/.spine-prod/advance.sh"
 ```
 
 It queries accounting, commits state, submits at most one ready allocation/stage,
 and exits. It does not need a terminal or spend GPU time waiting for later chunks.
-Use the same configured submission environment and repository for every invocation.
+The generated script pins the submission Python, sources the repository's
+`configure.sh`, and preserves explicitly selected SPINE container/checkout settings.
+Keep that environment and repository available for every invocation. The script
+is generated on real submission, not dry-run; it does not install a timer.
+You can test workspace storage independently with:
+
+```bash
+python scripts/continue_training.py preflight "$SCRATCH/continuation-test" --site nersc
+```
+
+A submission-host preflight alone cannot prove compute-host filesystem support.
 A one-minute timer is generally sufficient; arrange the timer through the site's
 approved mechanism. No timer or cluster jobs are installed by this repository.
 All controller/run paths must be shared across compute and submission nodes and
@@ -115,6 +134,45 @@ queue/routing validation. This flag is an operator assertion, not evidence of
 Polaris support. Startup queries retry three times, then fail closed. Missing
 accounting/history blocks advancement; retain job history on the submission host.
 
+## Multi-day VD training
+
+Keep scientific stopping criteria in the model configuration. The continuation
+budget is cumulative **allocated runtime**, excluding queue wait; it can exceed
+the site's single-allocation maximum. For example, add this to each training
+stage in the VD pipeline (inference/export stages do not need continuation):
+
+```yaml
+time: "48:00:00"
+continuation:
+  runtime_budget: "120:00:00"
+  preferred_time: "24:00:00"
+  checkpoint_margin: "00:15:00"
+  startup_allowance: "00:05:00"
+  max_infrastructure_retries: 2
+  max_attempts: 100
+```
+
+Use `--site nersc --account YOUR_ACCOUNT` with portable pipeline roles.
+Here `time` is the allocation ceiling, `preferred_time` is the requested chunk
+length, and `runtime_budget` is the stage's total allowance. Set preferred time
+to 48 hours if you want full-length allocations. Optional `min_time` allows
+shorter grants; actual assigned deadlines always drive checkpoint timing.
+Site profile minimums cannot be lowered by stage overrides. A final fragment
+is submitted only if the site minimum, startup allowance and checkpoint margin
+fit; otherwise the stage becomes `budget_exhausted` and blocks consumers.
+Use `extend` to raise the total budget, or explicitly `accept` a verified result.
+
+Dry-run prints each training stage's total budget, allocation bounds, preferred
+chunk, checkpoint margin, startup allowance, site minimum, retry/attempt limits
+and exhaustion policy, including stages deferred behind earlier work.
+
+The controller records distinct outcome/failure reasons for early stopping,
+training limits, allocation deadlines, budget exhaustion, Slurm preemption and
+application failure. Scheduler accounting is charged exactly once. The same run
+directory and weights directory persist across allocations, retaining the best
+checkpoint as well as the latest restart checkpoint. Downstream stages remain
+blocked until logical completion and successful terminal accounting.
+
 ## Operations and recovery
 
 ```bash
@@ -134,13 +192,20 @@ submissions, then cancels known jobs. `accept` intentionally releases consumers
 using an inactive, verified result. It does not invent a best checkpoint if no
 scheduled validation has produced one. `retry` is explicit recovery after a
 confirmed failed allocation; it selects the latest checksum-valid periodic
-checkpoint. No automatic infrastructure retries occur. Attempts are bounded by
+checkpoint. Automatic infrastructure recovery is opt-in through
+`max_infrastructure_retries` (default 0). Slurm preemption, node/boot failure,
+and allocation timeout/deadline can resume only from a checksum-valid periodic
+checkpoint newer than the attempt's starting progress. Application errors, OOM
+and cancellation never trigger automatic retries. PBS nonzero exit statuses
+remain failures requiring explicit recovery until site-specific termination
+classification is validated. Attempts are bounded by
 `max_attempts` (default 100); paused attempts making no progress fail.
 
 Every scheduler call has a durable intent and unique `spc-...` job-name token.
-If a response is lost, subsequent invocations do **not** resubmit. Find the token
-in scheduler history and use `adopt` for training; it validates the job name before
-recording the ID. Runtime startup can also record its own ID after validating the
+If a response is lost, subsequent invocations do **not** resubmit. For training,
+the controller queries scheduler history for the exact token and adopts a unique
+matching job. No match blocks advancement; multiple matches require intervention.
+The explicit `adopt` operation also validates the job name before recording the ID. Runtime startup can also record its own ID after validating the
 token. If no job was accepted, or a non-training consumer's response was lost,
 leave the controller stopped for operator reconciliation; automatic retry of
 uncertain/non-training submissions is intentionally unavailable in this rollout.
@@ -185,7 +250,7 @@ On each site, verify all of the following before production use:
    Nondeterministic GPU kernels may prevent bitwise equivalence.
 4. Test USR2 pause, USR1 successful completion, cancellation during checkpointing,
    a hard timeout, and corrupt/incomplete checkpoint rejection. Confirm runtime
-   charging from scheduler accounting and that no automatic retry occurs on failure.
+   charging from scheduler accounting; verify only the configured recoverable failures retry, within their limit.
 5. For variable allocations, capture a grant shorter than the maximum and a full
    grant. Verify the assigned deadline in the manifest against scheduler output.
 6. Record queue wait, startup overhead, checkpoint latency, allocated runtime,

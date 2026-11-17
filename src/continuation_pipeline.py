@@ -6,6 +6,9 @@ submitted against an intermediate allocation's successful exit code.
 
 import hashlib
 import json
+import os
+import shlex
+import sys
 import uuid
 from pathlib import Path
 
@@ -47,16 +50,17 @@ def start(context, stages, workspace, dry_run=False, preload=False, warm_start=N
             profile = context.config_mgr.get_profile(
                 options.get("profile", "auto"), None
             )
-            scheduler = profile.get(
-                "scheduler",
-                "pbs" if profile.get("site") in ("anl", "polaris") else "slurm",
+            from .pipeline import PROFILE_FIELDS
+
+            profile.update(
+                {key: options[key] for key in PROFILE_FIELDS if key in options}
             )
-            c.policy(
-                options["continuation"],
-                options.get("time", profile["time"]),
-                scheduler,
-                profile.get("continuation_defaults"),
+            c.validate_storage(workspace, profile.get("site"))
+            c.validate_storage(options["run_dir"], profile.get("site"))
+            config = c.profile_policy(
+                context.profiles, profile, options["continuation"]
             )
+            print(f"{record['name']}: {c.describe_policy(config)}")
     digest = hashlib.sha256(json.dumps(records, sort_keys=True).encode()).hexdigest()
     if dry_run:
         print(
@@ -93,7 +97,11 @@ def start(context, stages, workspace, dry_run=False, preload=False, warm_start=N
                     "generation": 0,
                 },
             )
+    write_tick_script(path, context.basedir)
     print(f"Durable controller: {path}")
+    print(
+        f"Unattended tick script: {path.parent / 'advance.sh'} (schedule once per minute)"
+    )
     print(
         f"Advance periodically on submission host: python3 scripts/continue_training.py advance {path}"
     )
@@ -120,6 +128,10 @@ def advance(path, context=None):
             )
             if run_manifest and run_manifest.exists():
                 logical = c.reconcile(options["run_dir"])
+                if not logical["attempts"]:
+                    raise RuntimeError(
+                        "Continuation manifest has no submission attempt; inspect its failure state"
+                    )
                 attempt = logical["attempts"][-1]
                 if attempt.get("job_id"):
                     record["jobs"] = [attempt["job_id"]]
@@ -317,6 +329,8 @@ def status(path):
         if path and path.exists():
             logical = c.reconcile(options["run_dir"])
             print(f"{record['name']}: {logical['state']} ({logical.get('reason', '')})")
+            if logical.get("detail"):
+                print(f"  detail: {logical['detail']}")
             print(
                 f"  runtime: {c.duration(logical['used_seconds'])} / {c.duration(logical['policy']['runtime_budget'])}"
             )
@@ -391,6 +405,49 @@ def metrics(path, stream=None):
                     pause_to_commit_seconds=latency,
                     iteration=outcome.get("iteration", ""),
                     checkpoint=outcome.get("checkpoint", ""),
-                    reason=outcome.get("reason", ""),
+                    reason=attempt.get("reason", outcome.get("reason", "")),
                 )
             )
+
+
+def write_tick_script(manifest, basedir):
+    """Pin the submission interpreter and container selection for periodic ticks.
+
+    The caller installs this in a site-approved timer; no login terminal or
+    compute-node scheduler submission is required. Script and manifest share
+    filesystem permissions. No credentials or general shell environment are saved.
+    """
+    manifest = Path(manifest).resolve()
+    basedir = Path(basedir).resolve()
+    script = manifest.parent / "advance.sh"
+    lines = ["#!/bin/bash", "set -e", "cd " + shlex.quote(str(basedir))]
+    for key in (
+        "PATH",
+        "SPINE_CONTAINER_TAG",
+        "SPINE_CONTAINER_PATH",
+        "SPINE_CONTAINER_VERSION",
+        "SPINE_LOCAL_PATH",
+    ):
+        if os.environ.get(key):
+            lines.append(f"export {key}={shlex.quote(os.environ[key])}")
+    lines.append("source " + shlex.quote(str(basedir / "configure.sh")))
+    lines.append(
+        "exec "
+        + shlex.join(
+            [
+                sys.executable,
+                str(basedir / "scripts/continue_training.py"),
+                "advance",
+                str(manifest),
+            ]
+        )
+    )
+    # Same controller lock prevents concurrent setup from truncating the launcher.
+    with c.locked(manifest):
+        temporary = script.with_name("advance-" + uuid.uuid4().hex + ".tmp")
+        try:
+            temporary.write_text("\n".join(lines) + "\n")
+            temporary.chmod(0o700)
+            os.replace(temporary, script)
+        finally:
+            temporary.unlink(missing_ok=True)

@@ -5,6 +5,7 @@ All walltimes are seconds internally; queue wait is never charged to the budget.
 """
 
 import contextlib
+import errno
 import fcntl
 import json
 import math
@@ -52,6 +53,8 @@ def policy(values, maximum, scheduler, defaults=None):
         "startup_allowance",
         "allow_pbs_shrink_to_fit",
         "max_attempts",
+        "preferred_time",
+        "max_infrastructure_retries",
     }
     if set(merged) - allowed:
         raise ValueError(
@@ -63,6 +66,8 @@ def policy(values, maximum, scheduler, defaults=None):
         raise ValueError("continuation requires runtime_budget")
     result = {
         "maximum": seconds(maximum),
+        "preferred": seconds(merged.get("preferred_time", maximum)),
+        "max_infrastructure_retries": merged.get("max_infrastructure_retries", 0),
         "runtime_budget": seconds(merged["runtime_budget"]),
         "checkpoint_margin": seconds(merged.get("checkpoint_margin", "00:15:00")),
         "site_min_time": seconds(merged.get("site_min_time", "00:01:00")),
@@ -75,7 +80,14 @@ def policy(values, maximum, scheduler, defaults=None):
         raise ValueError("max_attempts must be a positive integer")
     if scheduler == "slurm" and result["checkpoint_margin"] > 65535:
         raise ValueError("Slurm checkpoint_margin must be at most 65535 seconds")
-    minimum = result["minimum"] or result["maximum"]
+    retries = result["max_infrastructure_retries"]
+    if type(retries) is not int or retries < 0:
+        raise ValueError("max_infrastructure_retries must be a non-negative integer")
+    if result["preferred"] > result["maximum"]:
+        raise ValueError("preferred_time must not exceed time")
+    minimum = result["minimum"] or result["preferred"]
+    if minimum > result["preferred"]:
+        raise ValueError("min_time must not exceed preferred_time")
     if minimum > result["maximum"]:
         raise ValueError("min_time must not exceed time")
     if result["checkpoint_margin"] + result["startup_allowance"] >= minimum:
@@ -101,7 +113,10 @@ def next_request(config, used):
     """Round down to avoid overspending; allow a usable final short allocation."""
     remaining = config["runtime_budget"] - used
     granularity = config["granularity"]
-    maximum = int(min(config["maximum"], remaining) // granularity) * granularity
+    maximum = (
+        int(min(config.get("preferred", config["maximum"]), remaining) // granularity)
+        * granularity
+    )
     threshold = max(
         config["site_min_time"],
         config["checkpoint_margin"] + config["startup_allowance"] + 1,
@@ -115,8 +130,88 @@ def next_request(config, used):
         "time": duration(maximum),
         "min_time": duration(minimum) if minimum else None,
         "seconds": maximum,
-        "rounding_seconds": min(config["maximum"], remaining) - maximum,
+        "rounding_seconds": min(config.get("preferred", config["maximum"]), remaining)
+        - maximum,
     }
+
+
+def validate_storage(path, site):
+    """Reject NERSC DVS workspaces before paying for a queued allocation.
+
+    Check canonical paths as well as the provided spelling (symlinks included).
+    This is not a substitute for compute-host preflight on other filesystems.
+    """
+    if site != "nersc":
+        return
+    path = Path(path).expanduser().resolve()
+    prefixes = (
+        "/global/cfs",
+        "/global/homes",
+        "/global/u1",
+        "/global/u2",
+        "/global/common",
+        "/dvs_ro",
+    )
+    if any(
+        str(path) == prefix or str(path).startswith(prefix + "/") for prefix in prefixes
+    ):
+        raise ValueError(
+            f"NERSC continuation workspace {path} is on DVS, which does not support "
+            "compute-node file locking. Use a new --workspace on $SCRATCH. "
+            "Controller state and every training run_dir must be on that filesystem."
+        )
+
+
+def preflight_storage(run_dir, site=None):
+    validate_storage(run_dir, site)
+    # Use the actual run's lock. Test publication on a unique probe without
+    # modifying the manifest or deleting another process's probe.
+    path = manifest_path(run_dir)
+    with locked(path):
+        probe = path.parent / ("preflight-" + uuid.uuid4().hex + ".json")
+        try:
+            atomic_json(probe, {"probe": True})
+            if read(probe) != {"probe": True}:
+                raise RuntimeError(
+                    "Continuation filesystem publication verification failed"
+                )
+        finally:
+            probe.unlink(missing_ok=True)
+
+
+def profile_policy(catalog, profile, values):
+    """Merge site minimums, validate allocation bounds, keep total budget separate."""
+    from .site_resources import allocation_limits, validate_allocation
+
+    defaults = dict(profile.get("continuation_defaults") or {})
+    limits = allocation_limits(catalog, profile)
+    site_min = limits.get("min_time")
+    if site_min:
+        defaults["site_min_time"] = site_min
+    scheduler = profile.get(
+        "scheduler", "pbs" if profile.get("site") in ("anl", "polaris") else "slurm"
+    )
+    result = policy(values, profile["time"], scheduler, defaults)
+    if site_min:
+        result["site_min_time"] = max(result["site_min_time"], seconds(site_min))
+    validate_allocation(catalog, profile)
+    validate_allocation(
+        catalog, dict(profile, time=duration(result["minimum"] or result["preferred"]))
+    )
+    if next_request(result, 0) is None:
+        raise ValueError("Runtime budget cannot fit the site's minimum allocation")
+    return result
+
+
+def describe_policy(config):
+    return (
+        f"budget={duration(config['runtime_budget'])}; allocation="
+        f"{duration(config['minimum']) if config['minimum'] else 'fixed'}..{duration(config['maximum'])}; "
+        f"preferred={duration(config['preferred'])}; margin={duration(config['checkpoint_margin'])}; "
+        f"startup={duration(config['startup_allowance'])}; site minimum={duration(config['site_min_time'])}; "
+        f"infrastructure retries={config['max_infrastructure_retries']}; max attempts={config['max_attempts']}; "
+        "exhaustion=stop and block consumers; final chunk=only if startup+margin+site minimum fit"
+    )
 
 
 def atomic_json(path, data):
@@ -146,7 +241,16 @@ def locked(path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(str(path) + ".lock", "a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        except OSError as exc:
+            if exc.errno in (524, errno.ENOSYS, errno.ENOTSUP, errno.EOPNOTSUPP):
+                raise RuntimeError(
+                    f"Continuation cannot lock {path}: this filesystem does not support "
+                    "file locking from this host. On NERSC use a new --workspace on "
+                    "$SCRATCH, not CFS or Global Homes. Do not disable locking."
+                ) from exc
+            raise
         yield
 
 
@@ -158,7 +262,7 @@ def manifest_path(run_dir):
     return Path(run_dir) / ".spine-prod" / "continuation.json"
 
 
-def reserve(run_dir, identity, config, scheduler, attempt_dir):
+def reserve(run_dir, identity, config, scheduler, attempt_dir, site=None):
     """Commit submission intent before contacting a scheduler. Never retry ambiguity."""
     path = manifest_path(run_dir)
     with locked(path):
@@ -198,7 +302,9 @@ def reserve(run_dir, identity, config, scheduler, attempt_dir):
             raise ValueError("Continuation max_attempts reached")
         if request is None:
             state.update(
-                state="budget_exhausted", reason="No usable allocation remains"
+                state="budget_exhausted",
+                reason="runtime_budget_exhausted",
+                generation=state["generation"] + 1,
             )
             atomic_json(path, state)
             raise ValueError("Continuation runtime budget exhausted")
@@ -208,6 +314,8 @@ def reserve(run_dir, identity, config, scheduler, attempt_dir):
             "directory": str(attempt_dir),
             "scheduler": scheduler,
             "number": len(state["attempts"]) + 1,
+            "site": site,
+            "start_progress": state.get("progress", -1),
             "request": request,
             "intent_time": time.time(),
             "job_id": None,
@@ -240,6 +348,47 @@ def command(argv):
     return subprocess.run(
         argv, check=True, capture_output=True, text=True, timeout=30
     ).stdout
+
+
+def discover_submission(scheduler, token):
+    """Reconcile an uncertain submission by its unique, exact scheduler name.
+
+    No match is not proof of rejection (accounting can lag): leave the intent
+    pending, never blindly submit again. Multiple matches require intervention.
+    """
+    if not re.fullmatch(r"spc-[a-f0-9]{20}", token):
+        raise ValueError("Invalid continuation submission token")
+    matches = set()
+    if scheduler == "slurm":
+        output = command(
+            [
+                "sacct",
+                "-X",
+                "-n",
+                "-P",
+                "--starttime=1970-01-01",
+                "--name=" + token,
+                "--format=JobIDRaw,JobName%100",
+            ]
+        )
+        for line in output.splitlines():
+            fields = line.split("|")
+            if (
+                len(fields) >= 2
+                and fields[1].strip() == token
+                and fields[0].strip().isdigit()
+            ):
+                matches.add(fields[0].strip())
+    else:
+        jobs = json.loads(command(["qstat", "-xf", "-F", "json"]))["Jobs"]
+        matches.update(
+            job_id for job_id, data in jobs.items() if data.get("Job_Name") == token
+        )
+    if len(matches) > 1:
+        raise RuntimeError(
+            f"Multiple jobs match submission intent {token}: {sorted(matches)}; reconcile manually"
+        )
+    return next(iter(matches), None)
 
 
 def allocation(scheduler, job_id):
@@ -281,6 +430,7 @@ def accounting(scheduler, job_id):
                 "-P",
                 "-j",
                 job_id,
+                "--starttime=1970-01-01",
                 "--format=JobIDRaw,State,ElapsedRaw,ExitCode",
             ]
         )
@@ -304,6 +454,7 @@ def accounting(scheduler, job_id):
                         "status": status,
                         "seconds": int(fields[2]),
                         "success": status == "COMPLETED" and fields[3] == "0:0",
+                        "exit_code": fields[3],
                     }
     else:
         data = json.loads(command(["qstat", "-xf", "-F", "json", job_id]))["Jobs"].get(
@@ -323,64 +474,149 @@ def accounting(scheduler, job_id):
     return None
 
 
+def verify_outcome(run_dir, attempt):
+    outcome = read(Path(attempt["directory"]) / "outcome.json")
+    if outcome.get("contract") != CONTRACT or outcome.get("token") != attempt["token"]:
+        raise ValueError("Missing or stale SPINE continuation outcome")
+    if outcome.get("state") not in ("paused", "completed"):
+        raise ValueError("Invalid SPINE continuation outcome")
+    checkpoint = Path(outcome["checkpoint"]).resolve()
+    if checkpoint.parent != (Path(run_dir) / "weights").resolve():
+        raise ValueError("Continuation checkpoint is outside the run weights directory")
+    digest = RunManager.checkpoint_digest(checkpoint)
+    if not digest or digest != outcome["sha256"]:
+        raise ValueError(
+            "Continuation requires a committed checkpoint and matching SHA256"
+        )
+    if type(outcome.get("iteration")) is not int or outcome["iteration"] < 0:
+        raise ValueError("Invalid checkpoint progress")
+    return outcome
+
+
+def recovery_checkpoint(run_dir, attempt):
+    """Only use integrity-checked snapshots from the interrupted allocation.
+
+    Native SPINE enforces the full-state contract on resume. Never recover from
+    best.ckpt or infer terminal success from a periodic checkpoint.
+    """
+    failures = []
+    for iteration, path in reversed(RunManager.checkpoints(Path(run_dir))):
+        if iteration <= attempt.get("start_progress", -1):
+            continue
+        try:
+            digest = RunManager.checkpoint_digest(path)
+            if digest:
+                return dict(
+                    checkpoint=str(path.resolve()), sha256=digest, progress=iteration
+                )
+        except (OSError, ValueError) as exc:
+            failures.append(str(exc))
+    raise ValueError(
+        "No new verified periodic checkpoint for recovery"
+        + (": " + "; ".join(failures) if failures else "")
+    )
+
+
+def failure_reason(result):
+    return {
+        "PREEMPTED": "preemption",
+        "NODE_FAIL": "node_failure",
+        "BOOT_FAIL": "node_failure",
+        "TIMEOUT": "allocation_expiry",
+        "DEADLINE": "allocation_expiry",
+        "CANCELLED": "user_cancelled",
+        "OUT_OF_MEMORY": "out_of_memory",
+    }.get(result["status"], "application_failure")
+
+
 def reconcile(run_dir):
-    """Charge even hard-killed allocations; release only a verified terminal outcome."""
+    """Charge terminal accounting exactly once; retries require proven recovery."""
     path = manifest_path(run_dir)
     with locked(path):
         state = read(path)
         if not state["attempts"]:
             return state
         attempt = state["attempts"][-1]
-        if attempt.get("accounted") or not attempt.get("job_id"):
+        if attempt.get("accounted"):
             return state
+        if not attempt.get("job_id"):
+            job_id = discover_submission(attempt["scheduler"], attempt["token"])
+            if job_id is None:
+                return state
+            attempt["job_id"] = job_id
+            attempt["submission_reconciled_at"] = time.time()
+            if state["state"] == "submitting":
+                state["state"] = "pending"
+            state["generation"] += 1
+            atomic_json(path, state)
         result = accounting(attempt["scheduler"], attempt["job_id"])
         if result is None:
             return state
+        if type(result["seconds"]) is not int or result["seconds"] < 0:
+            raise ValueError("Invalid scheduler runtime accounting")
         attempt.update(accounted=True, accounting=result)
         state["used_seconds"] += result["seconds"]
         if state["state"] != "cancelled":
-            outcome_path = Path(attempt["directory"]) / "outcome.json"
             try:
-                if not result["success"]:
-                    raise ValueError(
-                        f"Allocation failed: {result['status']}; automatic infrastructure retries disabled"
+                if result["success"]:
+                    outcome = verify_outcome(run_dir, attempt)
+                    previous = state.get("progress", -1)
+                    if (
+                        outcome["state"] == "paused"
+                        and outcome["iteration"] <= previous
+                    ):
+                        raise ValueError("Paused allocation made no training progress")
+                    attempt["outcome"] = outcome
+                    reason = outcome.get("reason") or (
+                        "allocation_deadline"
+                        if outcome["state"] == "paused"
+                        else "training_limit"
                     )
-                outcome = read(outcome_path)
-                if (
-                    outcome.get("contract") != CONTRACT
-                    or outcome.get("token") != attempt["token"]
-                ):
-                    raise ValueError("Missing or stale SPINE continuation outcome")
-                if outcome.get("state") not in ("paused", "completed"):
-                    raise ValueError("Invalid SPINE continuation outcome")
-                checkpoint = Path(outcome["checkpoint"]).resolve()
-                if checkpoint.parent != (Path(run_dir) / "weights").resolve():
-                    raise ValueError(
-                        "Continuation checkpoint is outside the run weights directory"
+                    state.update(
+                        state=outcome["state"],
+                        reason=reason,
+                        checkpoint=outcome["checkpoint"],
+                        sha256=outcome["sha256"],
+                        progress=outcome["iteration"],
                     )
-                digest = RunManager.checkpoint_digest(checkpoint)
-                if not digest or digest != outcome["sha256"]:
-                    raise ValueError(
-                        "Continuation requires a committed checkpoint and matching SHA256"
+                    attempt["reason"] = reason
+                else:
+                    reason = failure_reason(result)
+                    attempt["reason"] = reason
+                    state.update(
+                        state="cancelled" if reason == "user_cancelled" else "failed",
+                        reason=reason,
                     )
-                attempt["outcome"] = outcome
-                previous = state.get("progress", -1)
-                if outcome["state"] == "paused" and outcome["iteration"] <= previous:
-                    raise ValueError("Paused allocation made no training progress")
-                state.update(
-                    state=outcome["state"],
-                    reason=outcome.get("reason"),
-                    checkpoint=str(checkpoint),
-                    sha256=digest,
-                    progress=outcome["iteration"],
-                )
-                if (
-                    state["state"] == "paused"
-                    and next_request(state["policy"], state["used_seconds"]) is None
-                ):
-                    state["state"] = "budget_exhausted"
+                    failure_file = Path(attempt["directory"]) / "failure.json"
+                    if failure_file.exists():
+                        details = read(failure_file)
+                        if details.get("token") == attempt["token"]:
+                            attempt["failure"] = details
+                    retries = state.get("infrastructure_retries", 0)
+                    limit = state["policy"].get("max_infrastructure_retries", 0)
+                    # Application failures/OOM/cancellation are never automatic retries.
+                    if (
+                        reason in ("preemption", "node_failure", "allocation_expiry")
+                        and retries < limit
+                    ):
+                        recovered = recovery_checkpoint(run_dir, attempt)
+                        state.update(
+                            recovered,
+                            state="paused",
+                            infrastructure_retries=retries + 1,
+                        )
+                        attempt["recovery"] = recovered
+                if state["state"] == "paused":
+                    if next_request(state["policy"], state["used_seconds"]) is None:
+                        state.update(
+                            state="budget_exhausted", reason="runtime_budget_exhausted"
+                        )
+                    elif len(state["attempts"]) >= state["policy"]["max_attempts"]:
+                        state.update(state="failed", reason="max_attempts_reached")
             except (OSError, ValueError, KeyError, TypeError) as error:
-                state.update(state="failed", reason=str(error))
+                state.update(
+                    state="failed", reason="invalid_restart_state", detail=str(error)
+                )
         state["generation"] += 1
         atomic_json(path, state)
         return state

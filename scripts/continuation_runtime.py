@@ -7,6 +7,7 @@ import signal
 import subprocess
 import sys
 import time
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -15,6 +16,7 @@ from src.continuation import (  # noqa: E402
     atomic_json,
     locked,
     manifest_path,
+    preflight_storage,
     read,
 )
 
@@ -43,6 +45,10 @@ def run(run_dir, token, argv):
 
     for signum in (signal.SIGUSR1, signal.SIGUSR2, signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, receive)
+    preflight_storage(
+        run_dir,
+        attempt.get("site") or ("nersc" if os.environ.get("NERSC_HOST") else None),
+    )
     error = None
     for retry in range(3):
         try:
@@ -76,8 +82,10 @@ def run(run_dir, token, argv):
         end, start + state["policy"]["runtime_budget"] - state["used_seconds"]
     )
     pause_at = deadline - state["policy"]["checkpoint_margin"]
-    if pause_at <= time.time():
-        raise ValueError("No useful allocation time remains after startup")
+    if pause_at - time.time() < state["policy"]["startup_allowance"]:
+        raise ValueError(
+            "Assigned allocation cannot fit remaining startup_allowance plus checkpoint_margin"
+        )
     requested = False
 
     def pause(*_):
@@ -145,5 +153,27 @@ if __name__ == "__main__":
             )
         )
     except Exception as error:
-        print(f"Continuation runtime failed: {error}", file=sys.stderr)
+        trace = traceback.format_exc()
+        print(f"Continuation runtime failed: {error}\n{trace}", file=sys.stderr)
+        # Diagnostic publication does not require the manifest lock that may
+        # itself have failed. Never rewrite scientific/controller state here.
+        try:
+            state = read(manifest_path(args.run_dir))
+            attempt = state["attempts"][-1]
+            if attempt["token"] == args.token:
+                atomic_json(
+                    Path(attempt["directory"]) / "failure.json",
+                    {
+                        "token": args.token,
+                        "reason": "runtime_supervisor_failure",
+                        "error": str(error),
+                        "traceback": trace,
+                        "time": time.time(),
+                    },
+                )
+        except Exception as diagnostic_error:
+            print(
+                f"Could not publish failure diagnostics: {diagnostic_error}",
+                file=sys.stderr,
+            )
         sys.exit(1)
