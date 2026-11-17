@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from .component import SubmissionComponent
 from .run_manager import RunManager
+from .site_resources import validate_allocation
 
 
 class FilterRunner(SubmissionComponent):
@@ -68,6 +69,7 @@ class FilterRunner(SubmissionComponent):
         if scheduler == "pbs" and profile_overrides.get("exclude"):
             raise ValueError("--exclude is only supported by Slurm profiles")
         profile_config.update(profile_overrides)
+        validate_allocation(self.profiles, profile_config)
         if not profile_config.get("account") and detector in self.profiles["detectors"]:
             profile_config["account"] = self.profiles["detectors"][detector].get(
                 "account", self.profiles["defaults"]["account"]

@@ -181,6 +181,11 @@ Examples:
 
     # Resource configuration
     parser.add_argument(
+        "--site",
+        choices=["s3df", "nersc", "alcf", "polaris", "anl"],
+        help="Map pipeline allocation roles to this site",
+    )
+    parser.add_argument(
         "--profile",
         "-p",
         help="Resource profile (default: auto-detect)",
@@ -558,6 +563,9 @@ Examples:
     if args.scheduler is not None and args.graceful_stop is None:
         parser.error("--scheduler is only supported with --graceful-stop")
 
+    if args.site is not None and not args.pipeline:
+        parser.error("--site is only supported with --pipeline")
+
     if args.workspace is not None and not args.pipeline:
         parser.error("--workspace is only supported with --pipeline")
     if args.from_stage is not None and not args.pipeline:
@@ -789,6 +797,7 @@ Examples:
                 to_stage=args.to_stage,
                 select_stages=args.select_stage,
                 skip_stages=args.skip_stage,
+                site=args.site,
                 stage_module_weights=args.stage_module_weight,
                 warm_start=args.warm_start,
                 source_list=args.source_list[0] if args.source_list else None,

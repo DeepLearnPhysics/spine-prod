@@ -687,6 +687,39 @@ stages:
     ntasks: 20
 ```
 
+Switch an existing pipeline between sites with `--site s3df`, `--site nersc`,
+or `--site alcf` (Polaris). The correspondence in `templates/profiles.yaml`
+maps CPU, single-GPU, and full-GPU-node profiles while preserving stage times,
+scan parallelism, model settings, and dependencies. Launch resource overrides
+apply last. Profiles requiring more GPU memory than the destination provides
+are rejected; allocation correspondence does not imply identical performance.
+
+```bash
+./submit.py --pipeline pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml \
+  --site nersc --account YOUR_PROJECT --workspace /path/to/vd-run \
+  --source-list /path/to/train_file_list.txt \
+  --val-source-list /path/to/test_file_list.txt --dry-run
+```
+
+Preflight checks every selected stage before submitting any jobs, including in
+`--dry-run`. The VD five-day and three-day training requests exceed NERSC's
+48-hour regular-QOS limit: explicitly choose shorter requests with `--time`
+(which overrides every selected stage), or use allocation continuation when
+that feature is integrated. Site selection never truncates training time or
+resubmits jobs. Selecting only the scan stages allows testing data access first.
+
+The central `sites` table records queue/QOS allocation limits and their sources.
+Known limits also apply to ordinary batch, filter, and report submissions.
+S3DF limits are currently unknown (`null`), not unlimited; populate them from
+local scheduler policy. These static checks do not replace live scheduler policy,
+account eligibility, or queue availability. Polaris capacity currently allows
+168 hours but limits each user to two queued/running jobs and one running job;
+site selection does not throttle submissions. Portable jobs use one node each.
+Accounts, data lists, software paths, and workspaces must be valid at the target
+site; no files are transferred. NERSC requires an explicit account; Polaris
+uses its configured project unless overridden. CPU stages on Polaris use its
+GPU-equipped nodes.
+
 `workspace` defines the pipeline's shared output root and is available as the
 reserved `${workspace}` variable. Declaring `workspace: null` keeps a checked-in
 pipeline independent of its launch location and requires an explicit

@@ -428,6 +428,7 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         to_stage=None,
         select_stages=None,
         skip_stages=None,
+        site=None,
         stage_module_weights=None,
         warm_start=None,
         source_list=None,
@@ -781,3 +782,15 @@ def test_pipeline_source_list_overrides_require_one_unqualified_path(
     with pytest.raises(SystemExit, match="2"):
         run_main("--pipeline", "pipeline.yaml", flag, *values)
     assert "requires exactly one unqualified list path" in capsys.readouterr().err
+
+
+def test_site_requires_pipeline():
+    with pytest.raises(SystemExit):
+        run_main("--site", "nersc")
+
+
+def test_pipeline_forwards_site():
+    mock = Mock()
+    mock.submit_pipeline.return_value = {}
+    run_main("--pipeline", "pipeline.yaml", "--site", "nersc", submitter=mock)
+    assert mock.submit_pipeline.call_args.kwargs["site"] == "nersc"

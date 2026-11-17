@@ -11,7 +11,13 @@
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node={{ gpus_per_node }}
 #SBATCH --cpus-per-task={{ cpus_per_task }}
+{% if mem_per_node is defined %}
+#SBATCH --mem={{ mem_per_node }}
+{% elif mem_per_cpu is defined %}
+#SBATCH --mem-per-cpu={{ mem_per_cpu }}
+{% else %}
 #SBATCH --mem={{ mem }}
+{% endif %}
 #SBATCH --time={{ time }}
 {% if exclusive %}
 #SBATCH --exclusive

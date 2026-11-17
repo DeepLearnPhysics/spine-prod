@@ -13,6 +13,7 @@ from .client import PBSClient, SlurmClient
 from .component import SubmissionComponent
 from .joint_sharding import plan_shards, survey_sources
 from .run_manager import RunManager
+from .site_resources import validate_allocation
 
 
 class BatchRunner(SubmissionComponent):
@@ -696,6 +697,7 @@ class BatchRunner(SubmissionComponent):
         if site != "s3df" and "gpus" in profile_overrides:
             raise ValueError(f"--gpus is not valid for {site.upper()} profiles")
         profile_config.update(profile_overrides)
+        validate_allocation(self.profiles, profile_config)
         world_size = self.context.spine_cli.align_world_size(profile_config, world_size)
         spine_runtime_options = self.context.spine_cli.format_runtime_options(
             world_size,
