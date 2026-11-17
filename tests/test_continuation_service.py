@@ -303,3 +303,37 @@ def test_two_pipelines_share_one_schedule(service_environment, monkeypatch):
     assert len(c.read(registry)["pipelines"]) == 2
     assert schedule[0].count("# BEGIN spine-prod") == 1
     assert calls.count(["scrontab", "-"]) == 1
+
+
+@pytest.mark.parametrize("stream", ["stdout", "stderr"])
+@pytest.mark.parametrize(
+    "message", ["no crontab for drielsma\n", "scrontab: no scrontab for drielsma\n"]
+)
+def test_first_use_scrontab_diagnostic_on_either_stream(monkeypatch, stream, message):
+    result = SimpleNamespace(returncode=1, stdout="", stderr="")
+    setattr(result, stream, message)
+    monkeypatch.setattr(service.subprocess, "run", lambda *a, **k: result)
+    assert service.read_schedule() == ""
+
+
+@pytest.mark.parametrize(
+    "stdout,stderr",
+    [
+        ("permission denied", ""),
+        ("no crontab for drielsma", "connection failed"),
+        ("* * * * * /existing/task", "no crontab for drielsma"),
+        ("", ""),
+    ],
+)
+def test_scrontab_unexpected_failure_is_not_empty(monkeypatch, stdout, stderr):
+    monkeypatch.setattr(
+        service.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=1, stdout=stdout, stderr=stderr),
+    )
+    with pytest.raises(RuntimeError) as error:
+        service.read_schedule()
+    assert stdout in str(error.value)
+    assert stderr in str(error.value)
+    if not stdout and not stderr:
+        assert "exit status 1" in str(error.value)

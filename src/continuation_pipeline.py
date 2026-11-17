@@ -92,7 +92,7 @@ def start(
         account = next(iter(automation_accounts))
         service_paths(account)
         print(
-            "Automation: NERSC scrontab, every minute; registration verified before training submission"
+            "Automation plan: NERSC scrontab, every minute; will register and verify before training submission"
         )
     digest = hashlib.sha256(json.dumps(records, sort_keys=True).encode()).hexdigest()
     if dry_run:

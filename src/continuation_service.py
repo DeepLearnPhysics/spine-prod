@@ -37,10 +37,20 @@ def read_schedule():
         ["scrontab", "-l"], capture_output=True, text=True, timeout=30, check=False
     )
     if result.returncode:
-        message = result.stderr.strip()
-        if not result.stdout and re.search(r"no (?:s)?crontab for\b", message.lower()):
+        # Slurm versions emit the first-use diagnostic on either stream.
+        # Only that complete diagnostic means an empty schedule: do not hide
+        # permission/network errors or overwrite a partially returned schedule.
+        message = "\n".join(
+            value.strip() for value in (result.stdout, result.stderr) if value.strip()
+        )
+        if re.fullmatch(
+            r"(?:scrontab:\s*)?no s?crontab for \S+", message, re.IGNORECASE
+        ):
             return ""
-        raise RuntimeError("Cannot read scrontab: " + message)
+        raise RuntimeError(
+            "Cannot read scrontab: "
+            + (message or f"exit status {result.returncode}, no diagnostic output")
+        )
     return result.stdout
 
 
