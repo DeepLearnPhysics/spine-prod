@@ -805,9 +805,10 @@ def test_old_python_reports_requirement_before_submission_imports(version):
     assert "cannot import name 'Submitter'" not in result.stderr
 
 
-def test_site_requires_pipeline():
+def test_site_requires_pipeline(capsys):
     with pytest.raises(SystemExit):
-        run_main("--site", "nersc")
+        run_main("--config", "config.yaml", "--site", "nersc")
+    assert "--site is only supported with --pipeline" in capsys.readouterr().err
 
 
 def test_pipeline_forwards_site():
