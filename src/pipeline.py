@@ -9,6 +9,7 @@ import yaml
 
 from .component import SubmissionComponent
 from .run_manager import RunManager
+from .site_resources import allocation_limits, map_stage, validate_allocation
 from .spine_cli import SpineCLI
 
 GLOBAL_FIELDS = frozenset(
@@ -1168,6 +1169,7 @@ class PipelineRunner(SubmissionComponent):
         source_list: Optional[str] = None,
         val_source_list: Optional[str] = None,
         skip_stages: Optional[Sequence[str]] = None,
+        site: Optional[str] = None,
     ) -> Dict[str, List[str]]:
         """Submit an ordered multi-stage production pipeline.
 
@@ -1209,6 +1211,8 @@ class PipelineRunner(SubmissionComponent):
             Full-chain checkpoint used to initialize every selected training
             stage that declares a ``warm_start`` module mapping.
 
+        site : str, optional
+            Map allocation roles to a site before validating all selected requests.
         source_list : str, optional
             Override the declared ``train_source_list`` pipeline variable.
         val_source_list : str, optional
@@ -1247,6 +1251,27 @@ class PipelineRunner(SubmissionComponent):
             select_stages,
             skip_stages,
         )
+        # Validate every selected allocation before creating directories or jobs.
+        if site is not None:
+            stages = [
+                map_stage(self.profiles, stage, site, overrides) for stage in stages
+            ]
+        for stage in stages:
+            profile = self.config_mgr.get_profile(stage.get("profile", "auto"))
+            profile.update({key: stage[key] for key in PROFILE_FIELDS if key in stage})
+            try:
+                validate_allocation(self.profiles, profile)
+            except ValueError as exc:
+                raise ValueError(f"Stage {stage['name']}: {exc}") from exc
+            if site is not None:
+                print(
+                    f"{stage['name']}: {stage['profile']} "
+                    f"GPUs={profile.get('gpus', profile.get('gpus_per_node', 0))} "
+                    f"CPUs={profile['cpus_per_task']} time={profile['time']} "
+                    f"memory={profile.get('mem_per_node', profile.get('mem_per_cpu', profile.get('mem', 'node default')))} "
+                    f"queue={profile.get('queue', profile.get('qos', profile.get('partition')))} "
+                    f"max_time={allocation_limits(self.profiles, profile).get('max_time') or 'unknown'}"
+                )
         selected_names = {stage["name"] for stage in stages}
         inactive_weight_stages = set(parsed_stage_weights) - selected_names
         print(f"Loading pipeline: {pipeline_path}")

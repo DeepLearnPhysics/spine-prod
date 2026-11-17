@@ -428,6 +428,7 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         to_stage=None,
         select_stages=None,
         skip_stages=None,
+        site=None,
         stage_module_weights=None,
         warm_start=None,
         source_list=None,
@@ -802,3 +803,15 @@ def test_old_python_reports_requirement_before_submission_imports(version):
     assert "spine-prod requires Python 3.9 or newer" in result.stderr
     assert "module load python" in result.stderr
     assert "cannot import name 'Submitter'" not in result.stderr
+
+
+def test_site_requires_pipeline():
+    with pytest.raises(SystemExit):
+        run_main("--site", "nersc")
+
+
+def test_pipeline_forwards_site():
+    mock = Mock()
+    mock.submit_pipeline.return_value = {}
+    run_main("--pipeline", "pipeline.yaml", "--site", "nersc", submitter=mock)
+    assert mock.submit_pipeline.call_args.kwargs["site"] == "nersc"
