@@ -1,0 +1,78 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+__meta__:
+  kind: fragment
+  description: Common dune-vd-10kt-1x8x6 LArCV inference dataset
+
+provider: larcv
+file_keys:
+schema:
+  data:
+    provider: sparse3d
+    sparse_event_list:
+      - sparse3d_reco
+      - sparse3d_reco_chi2
+      - sparse3d_reco_hit_charge0
+      - sparse3d_reco_hit_charge1
+      - sparse3d_reco_hit_charge2
+      - sparse3d_reco_hit_key0
+      - sparse3d_reco_hit_key1
+      - sparse3d_reco_hit_key2
+  sources:
+    provider: sparse3d
+    sparse_event_list:
+      - sparse3d_reco_cryo
+      - sparse3d_reco_tpc
+    feature_only: true
+  seg_label:
+    provider: sparse3d
+    sparse_event: sparse3d_pcluster_semantics_ghost
+  ppn_label:
+    provider: particle_points
+    sparse_event: sparse3d_pcluster
+    particle_event: particle_corrected
+    include_point_tagging: false
+  clust_label:
+    provider: cluster3d
+    cluster_event: cluster3d_pcluster
+    particle_event: particle_corrected
+    neutrino_event: neutrino_mpv
+    sparse_semantics_event: sparse3d_pcluster_semantics
+    add_particle_info: true
+    clean_data: true
+  clust_label_g4:
+    provider: cluster3d
+    cluster_event: cluster3d_sed
+    particle_event: particle_corrected
+    add_particle_info: true
+  charge_label:
+    provider: sparse3d
+    sparse_event: sparse3d_reco_rescaled
+  coord_label:
+    provider: particle_coords
+    particle_event: particle_corrected
+    cluster_event: cluster3d_pcluster
+  graph_label:
+    provider: particle_graph
+    particle_event: particle_corrected
+  particles:
+    provider: particle
+    particle_event: particle_corrected
+    neutrino_event: neutrino_mpv
+    cluster_event: cluster3d_pcluster
+  neutrinos:
+    provider: neutrino
+    neutrino_event: neutrino_mpv
+    cluster_event: cluster3d_pcluster
+  flashes:
+    provider: flash
+    flash_event_list:
+      - opflash
+  crthits:
+    provider: crthit
+    crthit_event: crthit_crthit
+  meta:
+    provider: meta
+    sparse_event: sparse3d_pcluster
+  run_info:
+    provider: run_info
+    sparse_event: sparse3d_pcluster

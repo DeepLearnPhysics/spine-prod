@@ -1,0 +1,16 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+__meta__:
+  kind: fragment
+  description: DUNE-VD 10 kt module 1x8x6 Graph-SPICE training from cached segmentation products
+
+include: train/dune-vd-10kt-1x8x6/graph_spice/base_v1.yaml
+
+override:
+  io.loader.dataset:
+    provider: cache
+    path:
+    stage: segmentation
+    stage_map:
+      data_calib: deghosting
+    keep_open: true
+    keys: [data_calib, seg_pred, clust_label_adapt]

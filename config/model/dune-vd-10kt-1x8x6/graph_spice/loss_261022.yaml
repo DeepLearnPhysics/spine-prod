@@ -1,0 +1,8 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-VD candidate graph_spice loss
+provider: edge
+loss: binary_log_dice_ce
