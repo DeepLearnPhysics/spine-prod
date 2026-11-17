@@ -268,6 +268,8 @@ class RuntimeResolver(SubmissionComponent):
         self, inner_cmd: str, cvmfs: bool, bind_paths: Optional[str] = None
     ) -> str:
         """Build an interactive container command for local smoke tests."""
+        # Container workloads must not import packages from the mounted user home.
+        inner_cmd = f"export PYTHONNOUSERSITE=1; {inner_cmd}"
         container_path = os.environ.get(
             "SPINE_CONTAINER_PATH", self.default_container_path()
         )
