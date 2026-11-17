@@ -1161,6 +1161,7 @@ class PipelineRunner(SubmissionComponent):
         preload: bool = False,
         overrides: Optional[Mapping[str, Any]] = None,
         workspace: Optional[str] = None,
+        continuation_dir: Optional[str] = None,
         from_stage: Optional[str] = None,
         to_stage: Optional[str] = None,
         select_stages: Optional[Sequence[str]] = None,
@@ -1191,6 +1192,9 @@ class PipelineRunner(SubmissionComponent):
             Shared output root exposed to the pipeline as ``${workspace}``.
             This overrides a concrete YAML value and satisfies a required
             ``workspace: null`` declaration.
+        continuation_dir : str, optional
+            Separate shared continuation state root; NERSC requires Scratch.
+            Training logs, checkpoints and outputs stay in the workspace.
         from_stage : str, optional
             Restart at this stage in pipeline order. Earlier stages are
             treated as completed, and selected stage directories are retried
@@ -1264,8 +1268,7 @@ class PipelineRunner(SubmissionComponent):
                     from .continuation import profile_policy, validate_storage
 
                     profile_policy(self.profiles, profile, stage["continuation"])
-                    validate_storage(stage["run_dir"], profile.get("site"))
-                    validate_storage(definition.workspace, profile.get("site"))
+                    validate_storage(continuation_dir, profile.get("site"))
                 validate_allocation(self.profiles, profile)
             except ValueError as exc:
                 raise ValueError(f"Stage {stage['name']}: {exc}") from exc
@@ -1308,7 +1311,13 @@ class PipelineRunner(SubmissionComponent):
                     "Continuation pipelines use the durable controller; stage slicing is unsupported"
                 )
             return start(
-                self.context, stages, definition.workspace, dry_run, preload, warm_start
+                self.context,
+                stages,
+                definition.workspace,
+                dry_run,
+                preload,
+                warm_start,
+                continuation_dir,
             )
 
         job_map: Dict[str, List[str]] = {}

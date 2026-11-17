@@ -1,4 +1,6 @@
 # Edit the source-list defaults, or supply --source-list and --val-source-list.
+# NERSC requires --continuation-dir "$SCRATCH/<unique-run>-state".
+# The workspace and training logs/checkpoints may stay on CFS.
 # Use --spine-path with the patched SPINE checkout and --account for your project.
 workspace: null
 variables:

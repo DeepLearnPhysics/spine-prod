@@ -327,6 +327,10 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--continuation-dir",
+        help="Continuation state root (defaults to workspace; NERSC requires an explicit Scratch path). Training logs and checkpoints stay in the workspace.",
+    )
+    parser.add_argument(
         "--workspace",
         help=(
             "Pipeline-wide output root exposed as ${workspace}. Required when "
@@ -566,6 +570,8 @@ Examples:
     if args.site is not None and not args.pipeline:
         parser.error("--site is only supported with --pipeline")
 
+    if args.continuation_dir is not None and not args.pipeline:
+        parser.error("--continuation-dir is only supported with --pipeline")
     if args.workspace is not None and not args.pipeline:
         parser.error("--workspace is only supported with --pipeline")
     if args.from_stage is not None and not args.pipeline:
@@ -793,6 +799,7 @@ Examples:
                 preload=args.preload,
                 overrides=pipeline_overrides,
                 workspace=args.workspace,
+                continuation_dir=args.continuation_dir,
                 from_stage=args.from_stage,
                 to_stage=args.to_stage,
                 select_stages=args.select_stage,

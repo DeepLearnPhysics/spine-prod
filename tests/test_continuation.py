@@ -34,11 +34,18 @@ def checkpoint(run, iteration):
     return path, sha
 
 
-def allocation(run, number, outcome="paused", iteration=None):
-    attempt_dir = run / "attempts" / str(number)
+def allocation(run, number, outcome="paused", iteration=None, continuation_dir=None):
+    attempt_dir = (continuation_dir or run) / "attempts" / str(number)
     attempt_dir.mkdir(parents=True)
-    attempt = c.reserve(run, "scientific-identity", config(), "slurm", attempt_dir)
-    c.submitted(run, attempt["token"], str(number))
+    attempt = c.reserve(
+        run,
+        "scientific-identity",
+        config(),
+        "slurm",
+        attempt_dir,
+        continuation_dir=continuation_dir,
+    )
+    c.submitted(run, attempt["token"], str(number), continuation_dir)
     cp, sha = checkpoint(run, iteration if iteration is not None else number * 10)
     c.atomic_json(
         attempt_dir / "outcome.json",
@@ -204,10 +211,12 @@ def test_actual_slurm_deadline_typed_timestamps(monkeypatch):
     assert c.allocation("slurm", "1") == (1700000000, 1700000360)
 
 
+@pytest.mark.parametrize("split", [False, True])
 def test_two_pauses_then_completion_submits_consumer_exactly_once(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, split
 ):
     run = tmp_path / "train"
+    continuation_dir = tmp_path / "scratch" if split else None
     path = tmp_path / "controller.json"
     c.atomic_json(
         path,
@@ -223,6 +232,7 @@ def test_two_pauses_then_completion_submits_consumer_exactly_once(
                     "jobs": [],
                     "options": {
                         "run_dir": str(run),
+                        "continuation_dir": str(continuation_dir) if split else None,
                         "continuation": {},
                         "profile": "test",
                     },
@@ -243,7 +253,12 @@ def test_two_pauses_then_completion_submits_consumer_exactly_once(
         calls.append(options)
         if "continuation" in options:
             number = len([v for v in calls if "continuation" in v])
-            allocation(run, number, "completed" if number == 3 else "paused")
+            allocation(
+                run,
+                number,
+                "completed" if number == 3 else "paused",
+                continuation_dir=continuation_dir,
+            )
         return [str(len(calls))]
 
     context = SimpleNamespace(
@@ -278,6 +293,7 @@ def test_directives_and_shell_syntax(site, tmp_path):
         continuation_attempt={"token": "spc-test", "request": {"min_time": "00:10:00"}},
         continuation_policy={"checkpoint_margin": 60},
         continuation_run_dir=str(tmp_path),
+        continuation_dir="/scratch/control",
         basedir=str(Path.cwd()),
         graceful_stop_file="/tmp/graceful-stop",
         gpus_per_node=1,
@@ -294,6 +310,7 @@ def test_directives_and_shell_syntax(site, tmp_path):
         assert "--signal=B:USR2@60" in rendered
     assert "--require-continuation" in rendered
     assert "continuation_runtime.py" in rendered
+    assert '--continuation-dir "/scratch/control"' in rendered
     script = tmp_path / "job.sh"
     script.write_text(rendered)
     subprocess.run(["bash", "-n", str(script)], check=True)
@@ -534,7 +551,7 @@ def test_dvs_errno_has_actionable_message_and_never_enters_lock(tmp_path, monkey
 def test_storage_preflight_leaves_scientific_state_unchanged(tmp_path):
     path = c.manifest_path(tmp_path)
     c.atomic_json(path, {"sentinel": 1})
-    c.preflight_storage(tmp_path, "nersc")
+    c.preflight_storage(tmp_path, "anl")
     assert c.read(path) == {"sentinel": 1}
     assert not list(path.parent.glob("preflight-*.json"))
 
@@ -697,7 +714,7 @@ def test_all_training_stages_report_policy_in_dry_run(tmp_path, capsys):
             "name": name,
             "stage": "train",
             "config": "train.yaml",
-            "run_dir": str(tmp_path / name),
+            "run_dir": "/global/cfs/cdirs/project/" + name,
             "profile": "nersc_gpu_full",
             "time": "48:00:00",
             "continuation": {
@@ -707,12 +724,23 @@ def test_all_training_stages_report_policy_in_dry_run(tmp_path, capsys):
         }
         for name in ["first", "second"]
     ]
-    pipeline.start(context, stages, str(tmp_path), dry_run=True)
+    pipeline.start(
+        context,
+        stages,
+        str(tmp_path),
+        dry_run=True,
+        continuation_dir="/pscratch/sd/t/test/continuation",
+    )
     output = capsys.readouterr().out
     assert output.count("budget=120:00:00") == 2
     assert "preferred=24:00:00" in output
     assert "exhaustion=stop and block consumers" in output
     context.submit_job.assert_called_once()
+    options = context.submit_job.call_args.kwargs
+    assert options["run_dir"] == "/global/cfs/cdirs/project/first"
+    assert options["continuation_dir"].startswith(
+        "/pscratch/sd/t/test/continuation/runs/"
+    )
     assert not (tmp_path / ".spine-prod/continuation_pipeline.json").exists()
 
 
@@ -811,22 +839,31 @@ def test_pipeline_stops_cfs_request_before_any_scheduler_call(tmp_path, mock_sub
         )
     )
     mock_submitter.submit_job = Mock()
-    with pytest.raises(ValueError, match="DVS"):
+    with pytest.raises(ValueError, match="explicit --continuation-dir"):
         mock_submitter.submit_pipeline(str(pipeline_file), dry_run=True)
     mock_submitter.submit_job.assert_not_called()
 
 
+@pytest.mark.parametrize("split", [False, True])
 @pytest.mark.parametrize("assigned,used", [(40, 0), (240, 680)])
 def test_watchdog_uses_actual_deadline_and_remaining_budget(
-    tmp_path, monkeypatch, assigned, used
+    tmp_path, monkeypatch, assigned, used, split
 ):
     import importlib.util
 
-    attempt_dir = tmp_path / "attempt"
-    attempt_dir.mkdir()
-    attempt = c.reserve(tmp_path, "identity", config(), "slurm", attempt_dir)
-    c.submitted(tmp_path, attempt["token"], "123")
-    manifest = c.manifest_path(tmp_path)
+    continuation_dir = tmp_path / "scratch" if split else None
+    attempt_dir = (continuation_dir or tmp_path) / "attempt"
+    attempt_dir.mkdir(parents=True)
+    attempt = c.reserve(
+        tmp_path,
+        "identity",
+        config(),
+        "slurm",
+        attempt_dir,
+        continuation_dir=continuation_dir,
+    )
+    c.submitted(tmp_path, attempt["token"], "123", continuation_dir)
+    manifest = c.manifest_path(tmp_path, continuation_dir)
     state = c.read(manifest)
     state["used_seconds"] = used
     c.atomic_json(manifest, state)
@@ -852,7 +889,10 @@ def test_watchdog_uses_actual_deadline_and_remaining_budget(
             return self.returncode
 
     monkeypatch.setattr(module.subprocess, "Popen", lambda *args, **kwargs: Child())
-    assert module.run(str(tmp_path), attempt["token"], ["fake-launcher"]) == 0
+    assert (
+        module.run(str(tmp_path), attempt["token"], ["fake-launcher"], continuation_dir)
+        == 0
+    )
     state = c.read(manifest)
     assert state["attempts"][0]["pause_requested_at"] == 1030
     assert state["attempts"][0]["assigned_seconds"] == assigned
@@ -886,3 +926,67 @@ def test_vd_training_budgets_survive_nersc_site_mapping(tmp_path):
         assert c.next_request(config, 0)["seconds"] == 86400
         assert c.next_request(config, 4 * 86400)["seconds"] == 86400
         assert c.next_request(config, 5 * 86400) is None
+
+
+@pytest.mark.parametrize(
+    "path",
+    [None, "/tmp/state", "/global/cfs/cdirs/project/state", "/pscratch-looking/state"],
+)
+def test_nersc_requires_explicit_scratch_state(path):
+    with pytest.raises(ValueError, match="continuation-dir"):
+        c.validate_storage(path, "nersc")
+
+
+def test_nersc_scratch_state_and_symlink_accepted(tmp_path):
+    c.validate_storage("/pscratch/sd/u/user/continuation", "nersc")
+    link = tmp_path / "state"
+    link.symlink_to("/pscratch/sd/u/user/continuation")
+    c.validate_storage(link, "nersc")
+
+
+def test_split_batch_keeps_training_artifacts_and_moves_control_files(
+    tmp_path, mock_submitter, monkeypatch
+):
+    run = tmp_path / "cfs" / "train"
+    control = tmp_path / "scratch" / "state"
+    monkeypatch.setattr(
+        mock_submitter.batch, "get_batch_client", lambda *_: mock_submitter.batch_client
+    )
+    monkeypatch.setattr(mock_submitter.batch_client, "submit", lambda *_: "42")
+    mock_submitter.submit_job(
+        config="config/train/generic/uresnet/train_240718.yaml",
+        profile="s3df_ampere",
+        stage="train",
+        run_dir=str(run),
+        continuation={"runtime_budget": "06:00:00"},
+        continuation_dir=str(control),
+    )
+    assert not c.manifest_path(run).exists()
+    state = c.read(c.manifest_path(run, control))
+    attempt = state["attempts"][0]
+    assert attempt["job_id"] == "42"
+    assert Path(attempt["directory"]).is_relative_to(control)
+    script = (run / "latest" / "submit.sbatch").read_text()
+    assert f"--log-dir {run}" in script
+    assert f"--weight-prefix {run}/weights/snapshot" in script
+    assert f'--continuation-dir "{control}"' in script
+    assert f"SPINE_PAUSE_FILE={attempt['directory']}/pause" in script
+    assert f"SPINE_OUTCOME_FILE={attempt['directory']}/outcome.json" in script
+    assert f"--graceful-stop-file {attempt['directory']}/graceful_stop" in script
+    assert (run / "latest" / "job_metadata.json").exists()
+    assert not list(control.rglob("*.log"))
+
+
+def test_split_preflight_locks_only_control_storage(tmp_path, monkeypatch):
+    run, control = tmp_path / "cfs", tmp_path / "scratch"
+    paths = []
+    original = c.locked
+
+    def locked(path):
+        paths.append(path)
+        return original(path)
+
+    monkeypatch.setattr(c, "locked", locked)
+    c.preflight_storage(run, continuation_dir=control)
+    assert paths == [c.manifest_path(run, control)]
+    assert not run.exists()

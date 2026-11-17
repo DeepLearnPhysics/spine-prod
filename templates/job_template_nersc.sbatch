@@ -170,7 +170,7 @@ RUN_CMD="srun -n 1 -c ${SLURM_CPUS_PER_TASK:-{{ cpus_per_task }}} shifter ${SHIF
 {% if continuation_attempt %}
 # Keep the batch shell responsive and forward only to the supervisor.
 python3 {{ (basedir ~ '/scripts/continuation_runtime.py')|tojson }} \
-    {{ continuation_run_dir|tojson }} {{ continuation_attempt.token|tojson }} \
+    {% if continuation_dir %}--continuation-dir {{ continuation_dir|tojson }} {% endif %}{{ continuation_run_dir|tojson }} {{ continuation_attempt.token|tojson }} \
     -- bash -c "$RUN_CMD" &
 CONTINUATION_PID=$!
 CONTINUATION_INTERRUPTED=0
