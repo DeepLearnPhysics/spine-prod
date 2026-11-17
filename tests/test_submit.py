@@ -784,9 +784,10 @@ def test_pipeline_source_list_overrides_require_one_unqualified_path(
     assert "requires exactly one unqualified list path" in capsys.readouterr().err
 
 
-def test_site_requires_pipeline():
+def test_site_requires_pipeline(capsys):
     with pytest.raises(SystemExit):
-        run_main("--site", "nersc")
+        run_main("--config", "config.yaml", "--site", "nersc")
+    assert "--site is only supported with --pipeline" in capsys.readouterr().err
 
 
 def test_pipeline_forwards_site():
