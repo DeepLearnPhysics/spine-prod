@@ -1,0 +1,222 @@
+"""NERSC-managed periodic continuation; no SSH session or GPU allocation needed."""
+
+import hashlib
+import os
+import re
+import shlex
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+from . import continuation as c
+
+
+def clean_environment():
+    """Do not export the cron allocation's resource settings into training jobs."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("SLURM_", "SBATCH_", "SRUN_"))
+    }
+
+
+def service_paths(account):
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", account or ""):
+        raise ValueError("Automatic NERSC continuation requires a valid account")
+    scratch = os.environ.get("SCRATCH")
+    c.validate_storage(scratch, "nersc")
+    if re.search(r"[\s$%]", scratch):
+        raise ValueError("Unsupported character in Scratch automation root")
+    root = Path(scratch).resolve() / ".spine-prod" / "automation"
+    return root, root / account / "registry.json"
+
+
+def read_schedule():
+    result = subprocess.run(
+        ["scrontab", "-l"], capture_output=True, text=True, timeout=30, check=False
+    )
+    if result.returncode:
+        message = result.stderr.strip()
+        if not result.stdout and re.search(r"no (?:s)?crontab for\b", message.lower()):
+            return ""
+        raise RuntimeError("Cannot read scrontab: " + message)
+    return result.stdout
+
+
+def schedule_block(account, registry, basedir):
+    key = hashlib.sha256(account.encode()).hexdigest()[:16]
+    command = shlex.join(
+        [
+            sys.executable,
+            str(Path(basedir).resolve() / "scripts/continuation_service.py"),
+            str(registry),
+        ]
+    )
+    # scrontab expands $ itself, before the shell sees quotes.
+    if any(char in command for char in ("\n", "\r", "$", "%")):
+        raise ValueError("Unsupported character in automatic controller path")
+    return (
+        f"# BEGIN spine-prod continuation {key}\n"
+        "#SCRON -q cron\n"
+        "#SCRON -C cron\n"
+        f"#SCRON -A {account}\n"
+        "#SCRON -t 00:30:00\n"
+        f"#SCRON --job-name=spc-controller-{key}\n"
+        f"#SCRON --output={registry.parent}/controller.log\n"
+        "#SCRON --open-mode=append\n"
+        f"* * * * * {command}\n"
+        f"# END spine-prod continuation {key}\n"
+    )
+
+
+def merge_schedule(existing, block):
+    start, end = block.splitlines()[0], block.splitlines()[-1]
+    # Only replace our marked block; malformed/duplicated markers require review.
+    if existing.count(start) != existing.count(end) or existing.count(start) > 1:
+        raise RuntimeError("Ambiguous managed scrontab block; inspect scrontab -l")
+    if start in existing:
+        left, rest = existing.split(start, 1)
+        _, right = rest.split(end, 1)
+        if right.startswith("\n"):
+            right = right[1:]
+        return left + block + right
+    return existing + ("" if not existing or existing.endswith("\n") else "\n") + block
+
+
+def register(manifest, account, basedir):
+    """Install/read back the timer before enabling a pipeline or submitting work."""
+    manifest = Path(manifest).resolve()
+    root, registry = service_paths(account)
+    block = schedule_block(account, registry, basedir)
+    # All accounts share a lock because scrontab belongs to the user.
+    with c.locked(root / "registration"):
+        data = c.read(registry) if registry.exists() else {"pipelines": {}}
+        entry = data["pipelines"].setdefault(str(manifest), {})
+        entry.update(enabled=False)
+        c.atomic_json(registry, data)
+        existing = read_schedule()
+        desired = merge_schedule(existing, block)
+        if desired != existing:
+            backup = registry.parent / (
+                "scrontab-before-" + str(time.time_ns()) + ".txt"
+            )
+            backup.write_text(existing)
+            # Detect edits made while preparing the replacement.
+            if read_schedule() != existing:
+                raise RuntimeError(
+                    "scrontab changed during registration; retry submission"
+                )
+            subprocess.run(
+                ["scrontab", "-"],
+                input=desired,
+                text=True,
+                capture_output=True,
+                check=True,
+                timeout=30,
+            )
+        if read_schedule() != desired:
+            raise RuntimeError(
+                "scrontab registration could not be verified; training not submitted"
+            )
+        entry.update(enabled=True, registered_at=time.time())
+        with c.locked(manifest):
+            state = c.read(manifest)
+            state["automation"] = {
+                "backend": "nersc-scrontab",
+                "registry": str(registry),
+                "manifest": str(manifest),
+                "registered_at": entry["registered_at"],
+            }
+            c.atomic_json(manifest, state)
+        c.atomic_json(registry, data)
+    return registry
+
+
+def needs_tick(manifest):
+    state = c.read(manifest)
+    if state["state"] != "active":
+        return False
+    for record in state["records"]:
+        if record["status"] == "completed":
+            continue
+        if record["status"] == "failed":
+            return False
+        options = record["options"]
+        if options.get("continuation") is not None:
+            path = c.manifest_path(options["run_dir"], options.get("continuation_dir"))
+            if path.exists() and c.read(path)["state"] in (
+                "failed",
+                "cancelled",
+                "budget_exhausted",
+            ):
+                return False
+        return True
+    # One last tick marks the pipeline completed.
+    return True
+
+
+def tick_registry(registry):
+    """Bounded scan; each pipeline retains its own interpreter and environment."""
+    registry = Path(registry).resolve()
+    root = registry.parent.parent
+    with c.locked(root / "registration"):
+        data = c.read(registry)
+    # Scrontab does not overlap its own occurrences. This also serializes manual
+    # invocations without holding the registration lock during scheduler calls.
+    with c.locked(registry.parent / "tick"):
+        deadline = time.monotonic() + 25 * 60
+        entries = sorted(
+            data["pipelines"].items(), key=lambda item: item[1].get("last_checked", 0)
+        )
+        for name, entry in entries:
+            if time.monotonic() >= deadline:
+                break
+            if not entry.get("enabled"):
+                continue
+            manifest = Path(name)
+            error = None
+            checked = time.time()
+            try:
+                if needs_tick(manifest):
+                    with open(manifest.parent / "controller.log", "a") as stream:
+                        subprocess.run(
+                            ["bash", str(manifest.parent / "advance.sh")],
+                            env=clean_environment(),
+                            stdout=stream,
+                            stderr=subprocess.STDOUT,
+                            check=True,
+                            timeout=300,
+                        )
+            except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+                error = str(exc)
+                print(f"{manifest}: {error}", file=sys.stderr)
+            with c.locked(root / "registration"):
+                latest = c.read(registry)
+                if name in latest["pipelines"]:
+                    latest["pipelines"][name].update(
+                        last_checked=checked, last_error=error
+                    )
+                    c.atomic_json(registry, latest)
+
+
+def health(state):
+    automation = state.get("automation")
+    if not automation:
+        return "manual"
+    try:
+        entry = c.read(automation["registry"])["pipelines"][automation["manifest"]]
+        if not entry.get("enabled"):
+            return "disabled"
+        if entry.get("last_error"):
+            return "controller error: " + entry["last_error"]
+        last = entry.get("last_checked")
+        if last is None:
+            age = int(time.time() - entry["registered_at"])
+            return "registered; awaiting first scheduled check" + (
+                " (stale)" if age > 600 else ""
+            )
+        age = int(time.time() - last)
+        return f"last checked {age}s ago" + (" (stale)" if age > 600 else "")
+    except (OSError, ValueError, KeyError):
+        return "registry unavailable"

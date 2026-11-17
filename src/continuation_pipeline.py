@@ -62,6 +62,7 @@ def start(
                 "jobs": [],
             }
         )
+    automation_accounts = set()
     # Validate every operational policy before the first scheduler interaction.
     for record in records:
         options = record["options"]
@@ -75,10 +76,24 @@ def start(
                 {key: options[key] for key in PROFILE_FIELDS if key in options}
             )
             c.validate_storage(continuation_dir, profile.get("site"))
+            if profile.get("site") == "nersc":
+                automation_accounts.add(profile.get("account"))
             config = c.profile_policy(
                 context.profiles, profile, options["continuation"]
             )
             print(f"{record['name']}: {c.describe_policy(config)}")
+    if len(automation_accounts) > 1:
+        raise ValueError(
+            "Automatic continuation requires one NERSC account per pipeline"
+        )
+    if automation_accounts:
+        from .continuation_service import service_paths
+
+        account = next(iter(automation_accounts))
+        service_paths(account)
+        print(
+            "Automation: NERSC scrontab, every minute; registration verified before training submission"
+        )
     digest = hashlib.sha256(json.dumps(records, sort_keys=True).encode()).hexdigest()
     if dry_run:
         print(
@@ -117,11 +132,17 @@ def start(
             )
     write_tick_script(path, context.basedir)
     print(f"Durable controller: {path}")
+    if automation_accounts:
+        from .continuation_service import register
+
+        registry = register(path, account, context.basedir)
+        print(f"Automatic continuation registered: {registry}")
+    else:
+        print(
+            "Automatic hosting is not yet configured for this site; periodic advance calls are required."
+        )
     print(
-        f"Unattended tick script: {path.parent / 'advance.sh'} (schedule once per minute)"
-    )
-    print(
-        f"Advance periodically on submission host: python3 scripts/continue_training.py advance {path}"
+        f"Unattended tick script: {path.parent / 'advance.sh'} (manual recovery/debugging)"
     )
     return advance(path, context)
 
@@ -341,6 +362,9 @@ def operate(path, action, stage=None, value=None):
 def status(path):
     state = c.read(path)
     print(f"Pipeline: {state['state']}")
+    from .continuation_service import health
+
+    print("Automation: " + health(state))
     for record in state["records"]:
         options = record["options"]
         path = (
@@ -435,14 +459,20 @@ def metrics(path, stream=None):
 def write_tick_script(manifest, basedir):
     """Pin the submission interpreter and container selection for periodic ticks.
 
-    The caller installs this in a site-approved timer; no login terminal or
+    NERSC registration installs a managed timer; no login terminal or
     compute-node scheduler submission is required. Script and manifest share
     filesystem permissions. No credentials or general shell environment are saved.
     """
     manifest = Path(manifest).resolve()
     basedir = Path(basedir).resolve()
     script = manifest.parent / "advance.sh"
-    lines = ["#!/bin/bash", "set -e", "cd " + shlex.quote(str(basedir))]
+    lines = [
+        "#!/bin/bash",
+        "set -e",
+        # scrontab's resource environment must not leak into sbatch/srun.
+        'for key in ${!SLURM_@} ${!SBATCH_@} ${!SRUN_@}; do unset "$key"; done',
+        "cd " + shlex.quote(str(basedir)),
+    ]
     for key in (
         "PATH",
         "SPINE_CONTAINER_TAG",

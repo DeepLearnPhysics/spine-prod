@@ -684,7 +684,7 @@ def test_periodic_controller_script_runs_with_minimal_environment(
     (basedir / "configure.sh").write_text(Path("configure.sh").read_text())
     (basedir / "DEFAULT_SPINE_VERSION").write_text("1.4.4\n")
     (scripts / "continue_training.py").write_text(
-        "import os, sys\nassert sys.argv[1] == 'advance'\nassert os.environ['SPINE_CONTAINER_TAG'] == 'custom-tag'\n"
+        "import os, sys\nassert sys.argv[1] == 'advance'\nassert os.environ['SPINE_CONTAINER_TAG'] == 'custom-tag'\nassert 'SLURM_MEM_PER_CPU' not in os.environ\n"
     )
     manifest = tmp_path / "run/.spine-prod/continuation_pipeline.json"
     manifest.parent.mkdir(parents=True)
@@ -693,7 +693,7 @@ def test_periodic_controller_script_runs_with_minimal_environment(
     script = manifest.parent / "advance.sh"
     result = subprocess.run(
         ["bash", str(script)],
-        env={"PATH": os.environ["PATH"]},
+        env={"PATH": os.environ["PATH"], "SLURM_MEM_PER_CPU": "2048"},
         capture_output=True,
         text=True,
     )
@@ -702,11 +702,12 @@ def test_periodic_controller_script_runs_with_minimal_environment(
     assert (script.stat().st_mode & 0o777) == 0o700
 
 
-def test_all_training_stages_report_policy_in_dry_run(tmp_path, capsys):
+def test_all_training_stages_report_policy_in_dry_run(tmp_path, capsys, monkeypatch):
     from unittest.mock import Mock
 
     from src.submitter import Submitter
 
+    monkeypatch.setenv("SCRATCH", "/pscratch/sd/t/test")
     context = Submitter()
     context.submit_job = Mock(return_value=[])
     stages = [
@@ -716,6 +717,7 @@ def test_all_training_stages_report_policy_in_dry_run(tmp_path, capsys):
             "config": "train.yaml",
             "run_dir": "/global/cfs/cdirs/project/" + name,
             "profile": "nersc_gpu_full",
+            "account": "project",
             "time": "48:00:00",
             "continuation": {
                 "runtime_budget": "120:00:00",
