@@ -89,10 +89,6 @@ def test_config_inheritance_crosses_scopes_only_for_conversion_stopgaps():
     config_domains = {"cache", "convert", "filter", "infer", "model", "test", "train"}
     allowed = {
         (
-            "convert/dune-vd-10kt-1x8x6/truth_260911.yaml",
-            "convert/dune-hd-10kt-1x2x6/truth_260202.yaml",
-        ),
-        (
             "convert/protodune-hd/truth_260911.yaml",
             "convert/protodune-sp/truth_260210.yaml",
         ),

@@ -62,7 +62,7 @@ def test_calibration_is_shared_by_cache_export_and_evaluation(tmp_path, monkeypa
     configs = tmp_path / "config"
     shutil.copytree(CONFIG, configs)
     path = configs / f"model/{VD}/calibration/calibration_261117.yaml"
-    path.write_text(path.read_text().replace("198.21605550049554", "123.456"))
+    path.write_text(path.read_text().replace("188.9644746787604", "123.456"))
     monkeypatch.setenv("SPINE_CONFIG_PATH", str(configs))
 
     def local(path):
@@ -87,7 +87,9 @@ def test_calibration_is_shared_by_cache_export_and_evaluation(tmp_path, monkeypa
 def test_hd_networks_and_cached_objectives_are_preserved():
     model = load(f"model/{VD}/full_chain/model_261117.yaml")["model"]["modules"]
     hd = load(f"model/{HD}/full_chain/model_261022.yaml")["model"]["modules"]
-    assert model == hd  # Calibration is explicitly provisional HD baseline.
+    assert {k: v for k, v in model.items() if k != "calibration"} == {
+        k: v for k, v in hd.items() if k != "calibration"
+    }
     assert model["grappa_inter"]["gnn_model"]["node_pred"]["type"] == 6
     producer = load(f"cache/{VD}/grappa_shower_track/particle_graphs_261117.yaml")
     trainer = load(f"train/{VD}/grappa_inter/train_from_particle_cache_261117.yaml")
@@ -142,4 +144,32 @@ def test_default_inputs_do_not_silently_select_hd_data():
     assert (
         stages["scan_validation_filter"]["source_list"]
         == "/sdf/data/neutrino/dune/sim/vd/mpvmpr_v0/test_file_list.txt"
+    )
+
+
+@pytest.mark.parametrize(
+    "detector,revision,area_constant",
+    [(HD, "261022", 0.005045), (VD, "261117", 0.005292)],
+)
+def test_dune_calibration_matches_upstream_collection_mip_response(
+    detector, revision, area_constant
+):
+    """Check the physical conversion, not merely equality between YAML bundles."""
+    import math
+
+    import numpy as np
+    from spine.calib.recombination import RecombinationCalibrator
+
+    stages = load(f"model/{detector}/calibration/calibration_{revision}.yaml")["stages"]
+    gain, recombination, lifetime = stages
+    assert gain["gain"] == pytest.approx(1.0 / area_constant)
+    assert lifetime == {"name": "lifetime", "lifetime": 10400, "driftv": 0.160563}
+    cfg = {k: v for k, v in recombination.items() if k != "name"}
+    calibrator = RecombinationCalibrator(drift_dir=np.array([1.0, 0.0, 0.0]), **cfg)
+    # LArSoft alpha/beta, evaluated with the candidate's fixed-MIP approximation.
+    xi = 0.212 * 2.105168 / (1.396 * 0.5)
+    survival = math.log(0.930 + xi) / xi
+    expected = (100.0 / area_constant) * 23.6e-6 / survival
+    assert calibrator.process(np.array([100.0 * gain["gain"]]))[0] == pytest.approx(
+        expected
     )

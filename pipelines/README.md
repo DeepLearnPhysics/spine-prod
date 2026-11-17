@@ -665,12 +665,3 @@ without submitting. This launches the pipeline's configured training budgets;
 `runs/smoke` is only the workspace name, not a shortened training mode.
 The supplied lists choose the dataset; these example paths select MPV/MPR v02
 rather than the candidate's default Gen-II dataset.
-
-## DUNE-VD 10 kt module 1x8x6 candidate
-
-`dune-vd-10kt-1x8x6/full_chain_261117.yaml` adapts the latest DUNE-HD `261022`
-training candidate to the VD geometry. It retains the six-component training and
-cache chain, exports the best weights, and evaluates held-out events in four
-file groups. Defaults select VD MPV/MPR v0; calibration is an inherited HD
-baseline pending VD confirmation. See the [candidate review and launch guide](dune-vd-10kt-1x8x6/README.md)
-for geometry, charge, dataset, resource, and acceptance differences to review.

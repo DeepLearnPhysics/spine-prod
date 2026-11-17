@@ -5,7 +5,6 @@
 workspace: null
 
 # VD MPV/MPR v0 defaults; override with --source-list and --val-source-list.
-# Review detector/calibration assumptions in this directory's README before running.
 variables:
   train_source_list: /sdf/data/neutrino/dune/sim/vd/mpvmpr_v0/train_file_list.txt
   validation_source_list: /sdf/data/neutrino/dune/sim/vd/mpvmpr_v0/test_file_list.txt
