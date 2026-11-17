@@ -6,9 +6,12 @@
 {% if queue %}
 #PBS -q {{ queue }}
 {% endif %}
-#PBS -l select={{ nodes|default(1) }}:system={{ system|default("polaris") }}:ncpus={{ cpus_per_node|default(cpus_per_task) }}{% if gpus_per_node|default(0) %}:ngpus={{ gpus_per_node }}{% endif %}
+#PBS -l select={{ nodes|default(1) }}:system={{ system|default("polaris") }}:ncpus={{ cpus_per_task }}{% if gpus_per_node|default(0) %}:ngpus={{ gpus_per_node }}{% endif %}
 {% if place %}
 #PBS -l place={{ place }}
+{% endif %}
+{% if mem_per_node is defined %}
+#PBS -l mem={{ mem_per_node }}
 {% endif %}
 {% if continuation_attempt and continuation_attempt.request.min_time %}
 #PBS -l min_walltime={{ continuation_attempt.request.min_time }},max_walltime={{ time }}

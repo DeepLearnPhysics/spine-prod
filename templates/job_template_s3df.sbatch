@@ -8,7 +8,11 @@
 #SBATCH --ntasks=1
 #SBATCH --gpus={{ gpus }}
 #SBATCH --cpus-per-task={{ cpus_per_task }}
+{% if mem_per_node is defined %}
+#SBATCH --mem={{ mem_per_node }}
+{% else %}
 #SBATCH --mem-per-cpu={{ mem_per_cpu }}
+{% endif %}
 #SBATCH --time={{ time }}
 {% if continuation_attempt %}
 {% if continuation_attempt.request.min_time %}
