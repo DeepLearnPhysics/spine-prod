@@ -108,19 +108,50 @@ seed, data, batch size and rank topology. Do not shorten the scientific policy f
 each chunk. Normal best-checkpoint consumers/export stages can follow the training
 stage; the sample uses a validation stage as its completion-gate check.
 
-After initial submission, invoke this bounded command periodically from a
-site-approved submission service (for example an approved user timer/cron job):
+On **NERSC**, real submission automatically installs and verifies a managed
+`scrontab` entry before submitting training. You can log out after submission.
+There is one recurring task per user/account, checking registered pipelines
+approximately once per minute. Scheduling can add latency; this is not a
+guaranteed one-minute turnaround. No GPU allocation is used for monitoring.
+
+The account registry and timer log live under
+`$SCRATCH/.spine-prod/automation/ACCOUNT/`. Each pipeline retains its own
+`CONTINUATION_DIR/.spine-prod/advance.sh`, pinned submission Python and container
+settings, and `controller.log`. Keep the repository and Python environment
+available for the whole campaign. The controller clears inherited Slurm resource
+variables before submitting GPU jobs.
+
+Registration preserves unrelated scrontab entries, saves the previous schedule
+before edits, and verifies the installed schedule. Registration failure stops
+the launch before training is submitted. Rerunning the same launch repairs or
+verifies registration without duplicating a managed entry. Do not edit scrontab
+concurrently with registration. Dry-run prints the automation plan without
+registering a timer or submitting a job.
+
+Inspect automation with:
+
+```bash
+scrontab -l
+python scripts/continue_training.py status \
+  "$SCRATCH/continuation-test-state/.spine-prod/continuation_pipeline.json"
+```
+
+Status reports registration, controller errors and stale heartbeats. The timer
+stops advancing completed, cancelled, failed or budget-exhausted pipelines.
+It remains installed, idle except for scanning its registry; extending a budget
+or explicitly retrying an eligible failure lets automatic processing resume.
+To disable the service, remove only its marked block using `scrontab -e`.
+NERSC cancellation/maintenance can disable entries: inspect the schedule and
+rerun the launch to restore the managed block when needed.
+
+**Polaris and S3DF do not yet have automatic hosting implemented.** Submission
+prints this limitation; arrange an approved periodic invocation there. On any
+site, this command remains available for manual recovery and debugging:
 
 ```bash
 bash "$SCRATCH/continuation-test-state/.spine-prod/advance.sh"
 ```
 
-It queries accounting, commits state, submits at most one ready allocation/stage,
-and exits. It does not need a terminal or spend GPU time waiting for later chunks.
-The generated script pins the submission Python, sources the repository's
-`configure.sh`, and preserves explicitly selected SPINE container/checkout settings.
-Keep that environment and repository available for every invocation. The script
-is generated on real submission, not dry-run; it does not install a timer.
 You can test continuation storage independently with:
 
 ```bash
@@ -128,12 +159,13 @@ python scripts/continue_training.py preflight "$SCRATCH/continuation-test-state"
 ```
 
 A submission-host preflight alone cannot prove compute-host filesystem support.
-A one-minute timer is generally sufficient; arrange the timer through the site's
-approved mechanism. No timer or cluster jobs are installed by this repository.
 Both roots must be shared across compute and submission nodes. Continuation
 storage must support POSIX file locks, atomic rename and fsync; training storage
 must support committed checkpoint publication and integrity checks. Compute-node
 submission is not required. Slurm requeue is deliberately not used.
+
+See [NERSC scrontab](https://docs.nersc.gov/jobs/workflow/scrontab/), including
+its guidance on inherited Slurm variables and disabled entries.
 
 For variable NERSC allocations, enable `min_time` after fixed-chunk testing.
 Slurm receives `--time-min` and `--signal=B:USR2@<margin>`; USR1 retains explicit
@@ -252,7 +284,7 @@ stage slicing and automatic cleanup are rejected. GPU elasticity is unsupported.
 Local regression suite:
 
 ```bash
-.venv/bin/python -m pytest tests/test_continuation.py -o addopts='' -q
+.venv/bin/python -m pytest tests/test_continuation.py tests/test_continuation_service.py -o addopts='' -q
 PYTHONPATH=/path/to/patched-spine/src .venv/bin/python -m pytest \
   tests/test_spine_continuation_contract.py -o addopts='' -q
 ```
