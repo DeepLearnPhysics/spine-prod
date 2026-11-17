@@ -812,7 +812,11 @@ Examples:
                     args.val_source_list[0] if args.val_source_list else None
                 ),
             )
-            print("\n=== Pipeline submitted ===")
+            print(
+                "\n=== Pipeline dry-run complete ==="
+                if args.dry_run
+                else "\n=== Pipeline submitted ==="
+            )
             for stage, job_ids in job_map.items():
                 print(f"{stage}: {', '.join(job_ids)}")
 
