@@ -1,482 +1,198 @@
-# Testing training across allocations
+# Training across scheduler allocations
 
-This branch implements an opt-in, submission-host controller for Slurm and PBS.
-It submits new jobs and serializes the pipeline. Consumers are submitted only
-when the logical training outcome is `completed` **and** the last scheduler job
-has finished successfully. Paused jobs exit zero but do not release consumers.
-Existing pipelines without `continuation` keep their scheduler dependencies.
+Add `continuation` to a training stage to run it across multiple allocations.
+A submission-host controller accounts for completed jobs, verifies checkpoint
+outcomes, and resumes recoverable pauses. Downstream stages wait for logical
+training completion and successful scheduler accounting; a paused job's zero
+exit code does not release them. Pipelines without continuation keep their
+existing scheduler dependencies.
 
-## Submission-host Python
+## Runtime requirements
 
-Use Python 3.9 or newer for `submit.py` and the continuation controller. On
-Perlmutter, the default system `python3` may be too old. Load the Python module
-before running the submission commands:
+The submission host requires Python 3.9 or newer and `requirements.txt`. On
+NERSC, load the Python module before submitting. The controller retains that
+Python executable for unattended invocations.
+
+The training runtime must provide **SPINE continuation capability 2**, including
+pending-validation replay. This implementation is maintained in
+[SPINE](https://github.com/DeepLearnPhysics/spine/pull/194), not in spine-prod.
+Use a SPINE release/container that includes it, or select a source checkout with
+`--spine-path` while testing an unreleased implementation. Check the executable
+inside the selected training environment:
+
+```bash
+spine --continuation-contract
+# Expected output: 2
+```
+
+The launcher performs this check before continuation training. The repository's
+baseline SPINE version requirement alone does not establish continuation support.
+Keep both repositories and runtime environments fixed throughout a running
+campaign; updating a checkout does not update already queued scripts.
+
+## Configure a training stage
+
+Keep the scientific stopping criteria, validation cadence, and best-checkpoint
+policy in the SPINE model configuration. Add allocation policy to the pipeline
+stage, for example:
+
+```yaml
+- name: train
+  stage: train
+  profile: nersc_gpu_full
+  config: train/generic/uresnet_ppn/train_240805.yaml
+  run_dir: ${workspace}/train
+  source_list: ${train_source_list}
+  val_source_list: ${validation_source_list}
+  time: "48:00:00"
+  continuation:
+    runtime_budget: "120:00:00"
+    preferred_time: "24:00:00"
+    checkpoint_margin: "00:15:00"
+    startup_allowance: "00:05:00"
+    max_infrastructure_retries: 2
+    max_attempts: 100
+```
+
+`time` bounds one allocation, `preferred_time` selects the requested chunk, and
+`runtime_budget` limits cumulative allocated runtime. Queue waits are excluded;
+startup, validation, checkpointing, and shutdown consume the budget. Checkpoint
+margins can therefore cause a nominal 24-hour budget with six-hour requests to
+need more than four allocations. A final fragment is submitted only if the site
+minimum and startup/checkpoint allowances fit.
+
+Optional `min_time` permits shorter Slurm grants. The supervisor uses the actual
+assigned deadline, never a timer based on the requested maximum. Choose a margin
+that covers the slowest load/forward operation, checkpoint publication, and
+shutdown: a running batch cannot be interrupted safely. Site limits still apply.
+PBS shrink-to-fit additionally requires `allow_pbs_shrink_to_fit: true` and local
+queue validation; fixed-duration PBS allocations do not require this flag.
+
+Dry-run reports total budget, allocation bounds, preferred duration, checkpoint
+margin, startup allowance, retry limits, and exhaustion policy for every training
+stage, including stages deferred behind earlier work.
+
+## Storage and submission
+
+The workspace and `run_dir` retain their existing meaning: scientific data,
+logs, job scripts, outputs, and checkpoints. Continuation state defaults to the
+workspace; `--continuation-dir` moves controller manifests, locks, per-attempt
+control/outcome files, and the controller tick script to a separate shared root.
+
+**NERSC requires an explicit Scratch continuation directory**, even when the
+workspace is already on Scratch. CFS can still hold scientific outputs. Missing
+state-directory options and paths outside recognized Scratch mounts fail before
+submission, including dry-run. Symlinks are resolved before validation.
+
+For an existing pipeline containing continuation stages:
 
 ```bash
 module load python
-python3 --version
-python3 -c 'import yaml, jinja2'
+source configure.sh
+python3 submit.py --pipeline /path/to/pipeline.yaml \
+  --workspace /global/cfs/cdirs/YOUR_PROJECT/training-run \
+  --continuation-dir "$SCRATCH/training-run-state" \
+  --account YOUR_ACCOUNT --dry-run
 ```
 
-If the dependencies are missing, install `requirements.txt` into your own Python
-environment. Use this environment for periodic controller invocations as well.
-This host-side Python requirement is separate from SPINE inside the container.
-See [NERSC Python setup](https://docs.nersc.gov/development/languages/python/using-python-perlmutter/).
+Inspect the plan, then remove `--dry-run` to submit. For portable pipeline
+profiles, add `--site nersc`. Polaris and S3DF allow colocated state or a separate
+shared continuation directory.
 
-## Install the SPINE runtime contract
+Both storage roots must remain available to submission and compute nodes.
+Continuation storage needs POSIX locks, atomic rename, and fsync; checkpoint
+storage needs committed publication and integrity checks. The supervisor tests
+state storage before launching training. Keep manifests for the lifetime of the
+campaign, including while jobs are queued. Deleting them loses accounting and
+submission history.
 
-Unmodified SPINE 1.4.4 does not distinguish a pause from successful graceful
-completion. Apply the included patch to a **separate SPINE checkout** based on
-the 1.4.4 driver APIs inspected for this implementation:
+## Automatic advancement
 
-```bash
-cd /path/to/spine-continuation-checkout
-git apply --check /path/to/spine-prod/patches/spine-1.4.4-continuation-v4.patch
-git apply /path/to/spine-prod/patches/spine-1.4.4-continuation-v4.patch
-python bin/run.py --continuation-contract
-# Must print: 2
-```
-
-If the checkout already has the v1 patch (as in the first two site tests),
-apply the v1-to-v2 upgrade below, then the v2-to-v3 and v3-to-v4 upgrades:
-
-```bash
-cd /path/to/spine-continuation-checkout
-git apply --check /path/to/spine-prod/patches/spine-continuation-v1-to-v2.patch
-git apply /path/to/spine-prod/patches/spine-continuation-v1-to-v2.patch
-python bin/run.py --continuation-contract
-# Must print: 2
-```
-
-For a checkout already patched to v2 (including the third site test), apply the v2-to-v3 upgrade, followed by v3-to-v4:
-
-```bash
-cd /path/to/spine-continuation-checkout
-git apply --check /path/to/spine-prod/patches/spine-continuation-v2-to-v3.patch
-git apply /path/to/spine-prod/patches/spine-continuation-v2-to-v3.patch
-```
-
-For a checkout already patched to v3, apply only the latest upgrade:
-
-```bash
-cd /path/to/spine-continuation-checkout
-git apply --check /path/to/spine-prod/patches/spine-continuation-v3-to-v4.patch
-git apply /path/to/spine-prod/patches/spine-continuation-v3-to-v4.patch
-```
-
-Revision v4 changes the default for the existing `validation.initial` option:
-
-```yaml
-validation:
-  # Omit initial to validate loaded weights, but skip random initialization.
-  initial: false  # Explicitly skip baseline validation, including warm starts.
-```
-
-Set `initial: true` to request a baseline even for random initialization. The
-automatic default includes module-only weight imports. Continuation resumes do
-not repeat baseline validation; unfinished validation is always replayed before
-training, regardless of `initial`. Scheduled validation remains unchanged.
-
-Patch revision v3 fixes checkpoint/validation scheduling across resumes; the
-runtime capability contract remains **2**, since its interface is unchanged.
-Scheduled checkpoints count from global iteration zero. For example, with a
-980-step save period, a resume at iteration 526 still validates after iteration
-979, rather than waiting for 980 additional steps. Allocation-only snapshots do
-not shift this schedule or trigger extra validation.
-
-The NERSC and Polaris 20-minute smoke tests reserve two minutes for checkpointing.
-The scheduler warning and runtime deadline use the same `checkpoint_margin`.
-Longer production runs can choose a larger margin for their checkpoint sizes and
-filesystem performance. Existing manifests and queued scripts retain the policy
-with which they were created; pulling changes does not rewrite a running test.
-
-Use that checkout with `--spine-path`, or rebuild your container with the patch.
-The actual executable is capability-checked inside the container before training;
-a version number alone is insufficient. Submission hosts need not import SPINE.
-The patch is kept in this repository because the upstream SPINE repository is
-separate; it does not alter your installed SPINE or another working checkout.
-
-The patch uses the existing synchronous, collective checkpoint boundary. Pause-only
-snapshots skip validation, best-metric selection, patience updates and validation
-LR updates. Scheduled validation remains scheduled, and early stopping or reaching
-the total training limit wins over a simultaneous pause. Model/optimizer/LR state,
-validation history, per-rank RNG and loader state are saved by the existing
-checkpoint machinery. SPINE 1.4.4's inspected model manager has no AMP scaler;
-a future AMP implementation must serialize its scaler before declaring this
-contract supported. World-size changes and missing rank runtime state are rejected.
-If a pause arrives during scheduled validation, all ranks stop at a safe batch
-boundary and discard partial metrics. The full checkpoint records
-`validation.pending_validation` (iteration, epoch and scheduling context).
-Resume reruns that validation before any training step, even if the training
-limit was reached. Only a completed pass updates best selection, patience and
-the validation scheduler. Training RNG state is restored around validation;
-the training loader is separate and remains checkpointed. Partial validation
-CSV logs are archived with an `.interrupted-...` suffix before rerunning.
-
-A blocking load/forward cannot be interrupted safely mid-batch: the margin must
-cover the slowest such operation plus checkpointing and shutdown. The NERSC
-smoke example now uses five minutes; the second site test took approximately
-2m38s to reach its first scheduled-validation result, exceeding the previous
-two-minute margin. This is a test setting, not a universal production margin.
-
-Periodic checkpoints remain enabled. Resume uses the latest verified continuation
-snapshot; existing best-checkpoint promotion remains tied to scientific validation.
-
-Runtime capability 2 retains outcome schema 1 and uses `SPINE_CONTINUATION_TOKEN`, `SPINE_PAUSE_FILE`, and
-`SPINE_OUTCOME_FILE`, explicitly passed through the container launcher. Rank zero
-atomically publishes JSON with `contract`, `token`, `state` (`paused`/`completed`),
-`reason`, `checkpoint`, `sha256`, and zero-based `iteration`, after driver cleanup.
-An outcome is usable only after the launcher and scheduler finish successfully.
-No decision is inferred from logs.
-
-## First site test
-
-The workspace and training `run_dir` keep their existing meaning: data, training
-logs, job scripts, outputs and checkpoints can stay on **CFS**. By default,
-continuation state shares the workspace. Use `--continuation-dir` to move only
-controller manifests/locks, per-attempt control/outcome files and the controller
-tick script to a separate shared directory.
-
-**NERSC requires an explicit `--continuation-dir "$SCRATCH/..."`.** Missing
-options, CFS/Home paths and paths outside recognized Scratch mounts fail before
-submission, including dry-run. Symlinks are resolved before validation; even a
-workspace already on Scratch requires the explicit option. Other sites retain
-the colocated default and can also opt into a separate state directory.
-
-The failed `cont_debug` run hit errno 524 on a compute-side manifest lock on CFS,
-before training started. Moving these locks fixes that storage assumption without
-moving scientific outputs. See
-[NERSC DVS file-locking restrictions](https://docs.nersc.gov/performance/io/dvs/#do-not-use-file-locking).
-The supervisor also tests locking, atomic publication and fsync in the state
-directory before launching. Keep this directory available for the entire run:
-Scratch retention policies apply to controller state too. Do not change or delete
-it to restart an existing pipeline; that would discard its job/accounting history.
-
-Start a **new** workspace with a small, known-good dataset and the example:
-
-```bash
-python submit.py --pipeline pipelines/continuation/nersc.yaml \
-  --workspace /global/cfs/cdirs/YOUR_PROJECT/continuation-test \
-  --continuation-dir "$SCRATCH/continuation-test-state" \
-  --spine-path /shared/path/spine-continuation-checkout \
-  --account YOUR_ACCOUNT \
-  --source-list /shared/path/train.txt \
-  --val-source-list /shared/path/validation.txt --dry-run
-```
-
-For Polaris, use a workspace on its shared filesystem and omit
-`--continuation-dir` to keep state there, or supply a separate shared path. Substitute
-`pipelines/continuation/polaris.yaml`. Inspect the generated
-scripts, then repeat without `--dry-run`. Profiles and queue limits must be suitable
-for your allocation; sample timings are experimental, not production tuning.
-Set the scientific epoch/iteration limit and validation policy in your training
-configuration so the test lasts through at least two pauses and then completes.
-Use a separate reference workspace for an uninterrupted run with the same policy,
-seed, data, batch size and rank topology. Do not shorten the scientific policy for
-each chunk. Normal best-checkpoint consumers/export stages can follow the training
-stage; the sample uses a validation stage as its completion-gate check.
-
-On **NERSC**, real submission automatically installs and verifies a managed
-`scrontab` entry before submitting training. You can log out after submission.
-There is one recurring task per user/account, checking registered pipelines
-approximately once per minute. Scheduling can add latency; this is not a
-guaranteed one-minute turnaround. No GPU allocation is used for monitoring.
+NERSC submission installs and verifies a managed `scrontab` entry before launching
+training. One recurring task per user/account checks registered pipelines roughly
+every minute; scheduling can add latency. You can log out after submission.
 
 The account registry and timer log live under
-`$SCRATCH/.spine-prod/automation/ACCOUNT/`. Each pipeline retains its own
-`CONTINUATION_DIR/.spine-prod/advance.sh`, pinned submission Python and container
-settings, and `controller.log`. Keep the repository and Python environment
-available for the whole campaign. The controller clears inherited Slurm resource
-variables before submitting GPU jobs.
+`$SCRATCH/.spine-prod/automation/ACCOUNT/`. Each pipeline keeps its manifest,
+`advance.sh`, and controller log under `CONTINUATION_DIR/.spine-prod/`.
+Registration preserves unrelated schedule entries and fails before training if
+installation cannot be verified. Repeating the same launch verifies or repairs
+registration without duplicating the managed entry.
 
-Registration preserves unrelated scrontab entries, saves the previous schedule
-before edits, and verifies the installed schedule. Registration failure stops
-the launch before training is submitted. Rerunning the same launch repairs or
-verifies registration without duplicating a managed entry. Do not edit scrontab
-concurrently with registration. Dry-run prints the automation plan without
-registering a timer or submitting a job.
-
-Inspect automation with:
+When no registered pipeline needs monitoring, the controller removes its own
+scrontab block. Logs and registry state remain. A new launch or explicit recovery
+operation restores the timer. Missing or unreadable state delays retirement.
+Inspect registration and progress with:
 
 ```bash
 scrontab -l
-python scripts/continue_training.py status \
-  "$SCRATCH/continuation-test-state/.spine-prod/continuation_pipeline.json"
+python3 scripts/continue_training.py status \
+  "$SCRATCH/training-run-state/.spine-prod/continuation_pipeline.json"
 ```
 
-Status reports registration, controller errors and stale heartbeats. The timer
-stops advancing completed, cancelled, failed or budget-exhausted pipelines.
-When none of the account's registered pipelines needs monitoring, the controller
-automatically removes only its marked scrontab block. Other accounts and unrelated
-scheduled tasks are preserved. Registry state and logs remain available for review.
-Missing/unreadable pipeline state defers retirement rather than assuming completion.
-
-A new launch, budget extension, explicit retry, acceptance or job adoption restores
-and verifies the timer before changing the pipeline's operational state.
-Registration, reactivation and retirement share a lock, so cleanup cannot remove
-the timer during a concurrent reactivation. Status reports `stopped` after verified
-removal; it may report `retiring` if Slurm terminates the current cron invocation
-when its own entry is removed. No training restart is needed to deploy this change.
-
-To disable the service manually, remove only its marked block using `scrontab -e`.
-NERSC cancellation/maintenance can disable entries: inspect the schedule and
-rerun the launch to restore the managed block when needed.
-
-**Polaris and S3DF do not yet have automatic hosting implemented.** Submission
-prints this limitation; arrange an approved periodic invocation there. On any
-site, this command remains available for manual recovery and debugging:
+**Polaris and S3DF require an externally hosted periodic invocation**; automatic
+hosting is currently implemented only for NERSC. Their launch output explains
+this requirement. The generated tick script is also available for recovery:
 
 ```bash
-bash "$SCRATCH/continuation-test-state/.spine-prod/advance.sh"
+bash /path/to/continuation-dir/.spine-prod/advance.sh
 ```
 
-You can test continuation storage independently with:
+## Completion and recovery
+
+An allocation pause saves complete restart state without forcing validation.
+Scheduled checkpoints retain the global iteration cadence. Interrupted validation
+discards partial metrics and replays before further training; completed validation
+alone updates best-checkpoint selection, early-stopping patience, and validation
+schedulers. SPINE owns these semantics and checkpoint implementation.
+
+The controller distinguishes scientific completion, allocation expiry, budget
+exhaustion, preemption, and application failure. Budget exhaustion blocks
+consumers, even when a valid checkpoint exists. The best checkpoint and latest
+restart checkpoint remain available in the run directory.
 
 ```bash
-python scripts/continue_training.py preflight "$SCRATCH/continuation-test-state" --site nersc
+python3 scripts/continue_training.py status MANIFEST
+python3 scripts/continue_training.py advance MANIFEST
+python3 scripts/continue_training.py metrics MANIFEST > allocations.csv
+python3 scripts/continue_training.py extend MANIFEST --stage train --value 168:00:00
+python3 scripts/continue_training.py retry MANIFEST --stage train
+python3 scripts/continue_training.py accept MANIFEST --stage train
+python3 scripts/continue_training.py adopt MANIFEST --stage train --value JOB_ID
+python3 scripts/continue_training.py cancel MANIFEST
+python3 scripts/continue_training.py preflight STATE_DIRECTORY --site nersc
 ```
 
-A submission-host preflight alone cannot prove compute-host filesystem support.
-Both roots must be shared across compute and submission nodes. Continuation
-storage must support POSIX file locks, atomic rename and fsync; training storage
-must support committed checkpoint publication and integrity checks. Compute-node
-submission is not required. Slurm requeue is deliberately not used.
+- `extend` sets a larger **total** budget without changing scientific configuration.
+- `retry` requires a confirmed failed allocation and a checksum-valid checkpoint.
+- `accept` explicitly releases consumers using an inactive, verified result; it
+  does not invent a best checkpoint if validation has never produced one.
+- `adopt` resolves a lost submission response after verifying the job-name token.
+- `cancel` durably inhibits future submissions before cancelling known jobs.
+- `metrics` exports allocation timing, progress, and checkpoint latency.
 
-See [NERSC scrontab](https://docs.nersc.gov/jobs/workflow/scrontab/), including
-its guidance on inherited Slurm variables and disabled entries.
+Automatic infrastructure retries are opt-in (default zero). Slurm preemption,
+node/boot failure, and timeout/deadline can recover only from a verified periodic
+checkpoint newer than the attempt's starting progress. Application errors, OOM,
+and cancellation never trigger automatic retries. PBS nonzero exits require
+explicit recovery until site-specific failure classification is validated.
+All attempts, including clean pauses, obey `max_attempts`.
 
-For variable NERSC allocations, enable `min_time` after fixed-chunk testing.
-Slurm receives `--time-min` and `--signal=B:USR2@<margin>`; USR1 retains explicit
-successful graceful completion. The shell stays in an interruptible wait and
-forwards signals only to the supervisor. The supervisor queries assigned start/end
-from `scontrol show job --json`; a watchdog also covers warnings missed during
-startup. It never starts a timer based on requested maximum walltime.
+Submission intent and scheduler accounting are persisted durably. A lost scheduler
+response never triggers blind resubmission: training jobs are discovered by their
+unique token or left for operator reconciliation. Unknown non-training submissions
+also block progression. Never delete a manifest to force retry while a job may
+still exist. Cancellation with an unknown job ID requires the operator to find
+and cancel that scheduler job separately.
 
-Polaris fixed chunks use `walltime`; the supervisor queries `qstat -f -F json`
-for `stime` and assigned `Resource_List.walltime`. Optional PBS shrink-to-fit emits
-`min_walltime,max_walltime` and requires `allow_pbs_shrink_to_fit: true` after local
-queue/routing validation. This flag is an operator assertion, not evidence of
-Polaris support. Startup queries retry three times, then fail closed. Missing
-accounting/history blocks advancement; retain job history on the submission host.
+## Limits
 
-## Multi-day VD training
+Continuation pipelines currently serialize all stages. Explicit profiles are
+required; stage slicing, automatic cleanup, and changes in GPU world size are
+unsupported. Missing scheduler history blocks advancement. Polaris shrink-to-fit
+and multi-node restart behavior require site validation.
 
-Keep scientific stopping criteria in the model configuration. The continuation
-budget is cumulative **allocated runtime**, excluding queue wait; it can exceed
-the site's single-allocation maximum. For example, add this to each training
-stage in the VD pipeline (inference/export stages do not need continuation):
-
-```yaml
-time: "48:00:00"
-continuation:
-  runtime_budget: "120:00:00"
-  preferred_time: "24:00:00"
-  checkpoint_margin: "00:15:00"
-  startup_allowance: "00:05:00"
-  max_infrastructure_retries: 2
-  max_attempts: 100
-```
-
-Use `--site nersc --account YOUR_ACCOUNT` with portable pipeline roles.
-Here `time` is the allocation ceiling, `preferred_time` is the requested chunk
-length, and `runtime_budget` is the stage's total allowance. Set preferred time
-to 48 hours if you want full-length allocations. Optional `min_time` allows
-shorter grants; actual assigned deadlines always drive checkpoint timing.
-Site profile minimums cannot be lowered by stage overrides. A final fragment
-is submitted only if the site minimum, startup allowance and checkpoint margin
-fit; otherwise the stage becomes `budget_exhausted` and blocks consumers.
-Use `extend` to raise the total budget, or explicitly `accept` a verified result.
-
-Dry-run prints each training stage's total budget, allocation bounds, preferred
-chunk, checkpoint margin, startup allowance, site minimum, retry/attempt limits
-and exhaustion policy, including stages deferred behind earlier work.
-
-The controller records distinct outcome/failure reasons for early stopping,
-training limits, allocation deadlines, budget exhaustion, Slurm preemption and
-application failure. Scheduler accounting is charged exactly once. The same run
-directory and weights directory persist across allocations, retaining the best
-checkpoint as well as the latest restart checkpoint. Downstream stages remain
-blocked until logical completion and successful terminal accounting.
-
-## Comparing fixed and variable allocations
-
-Three pipelines give the same single-node workload a **12-hour cumulative
-runtime budget**:
-
-| Pipeline | Requested allocation |
-| --- | --- |
-| `pipelines/continuation/nersc_6h.yaml` | Fixed six hours |
-| `pipelines/continuation/nersc_12h.yaml` | Fixed twelve hours |
-| `pipelines/continuation/nersc_1-6h.yaml` | One-hour minimum, six-hour maximum |
-
-All use a two-minute checkpoint margin, identical validation cadence, and the
-same input/configuration defaults. In the variable case, Slurm can shorten an
-allocation to fit its schedule; the supervisor uses the actual assigned deadline.
-They disable early stopping and use a deliberately unreachable iteration limit
-so this experiment measures budget-limited throughput. Do not use these stopping
-settings for ordinary scientific training.
-
-Run all three from the same immutable spine-prod and patched SPINE revisions, with
-identical input lists, account, QoS, GPU resources, and seeds. Submit close together
-and repeat on another day, rotating submission order; a single three-case comparison is a pilot,
-not a reliable estimate of queue behavior. Concurrent runs can also influence one
-another through resource contention and account scheduling policies.
-
-From the directory containing `spine-prod`, this previews all three experiments:
-
-```bash
-source spine-prod/configure.sh
-for chunk in 6 12 1-6; do
-  python3 spine-prod/submit.py \
-    --pipeline "spine-prod/pipelines/continuation/nersc_${chunk}h.yaml" \
-    --workspace "$PWD/continuation-benchmark-${chunk}h" \
-    --continuation-dir "$SCRATCH/continuation-benchmark-${chunk}h" \
-    --spine-path "$PWD/spine-continuation-v4-checkout" \
-    --account m5252 \
-    --source-list "$PWD/train.list" \
-    --val-source-list "$PWD/test.list" \
-    --dry-run
-done
-```
-
-Replace the checkout/account as needed, then remove `--dry-run` to submit. Each
-case can consume up to 12 full-node hours (36 combined). For repeats, change both
-directory names. No downstream validation stage is submitted: `budget_exhausted`
-is the expected endpoint, not successful scientific completion. Checkpoint
-margins and unusable final fragments mean actual runtime can finish slightly
-below the budget; do not assume exactly two allocations versus one.
-
-Export each case on NERSC using:
-
-```bash
-python3 spine-prod/scripts/continue_training.py metrics \
-  "$SCRATCH/continuation-benchmark-6h/.spine-prod/continuation_pipeline.json" \
-  > allocations-6h.csv
-```
-
-Repeat for 12h and 1-6h. Compare total queue wait, submission-to-final-job-end elapsed time,
-confirmed allocated runtime, number of restarts, and final training progress.
-Report both time to reach common progress and progress achieved within the budget;
-allocation runtime includes startup, validation, checkpointing, and teardown, not
-just optimizer steps. The controller log supplies the eventual terminal state;
-retain scheduler submission/start/end records when collecting logs.
-
-NERSC describes requested walltime as a scheduling input and shorter jobs as
-better backfill candidates ([scheduling](https://docs.nersc.gov/jobs/scheduling/),
-[queue troubleshooting](https://docs.nersc.gov/jobs/troubleshooting/)). Shorter
-chunks may start sooner but must queue repeatedly. Therefore measure the whole
-campaign rather than declaring a winner from its first start time. NERSC's
-[best practices](https://docs.nersc.gov/jobs/best-practices/#time-limits) recommend
-short or variable-length jobs and checkpoint/restart chains, without prescribing
-one optimal duration. The one-to-six-hour bounds are experimental choices, not a NERSC
-recommendation. Record assigned durations as well as requested durations when
-comparing the variable case with the fixed cases.
-
-The 20-minute test can estimate restart overhead, but extrapolating its few queue
-samples assumes stable queue conditions and independent waits, neither of which
-is established. Its original early-stopping settings and v3's mixed software
-revisions also prevent a controlled comparison. A matched short-chunk experiment
-can use either fixed-duration benchmark file with `--time 00:20:00`, fresh directories, and the
-same 12-hour budget; this is an additional experiment, not part of the three-case
-launch above.
-
-## Operations and recovery
-
-```bash
-python scripts/continue_training.py status MANIFEST
-python scripts/continue_training.py metrics MANIFEST > allocations.csv
-python scripts/continue_training.py extend MANIFEST --stage train_uresnet_ppn --value 02:00:00
-python scripts/continue_training.py advance MANIFEST
-python scripts/continue_training.py cancel MANIFEST
-python scripts/continue_training.py accept MANIFEST --stage train_uresnet_ppn
-python scripts/continue_training.py retry MANIFEST --stage train_uresnet_ppn
-python scripts/continue_training.py adopt MANIFEST --stage train_uresnet_ppn --value JOB_ID
-```
-
-`extend` sets a new **total** budget; it does not change scientific configuration.
-`advance` resumes an accounted paused stage. `cancel` first durably inhibits
-submissions, then cancels known jobs. `accept` intentionally releases consumers
-using an inactive, verified result. It does not invent a best checkpoint if no
-scheduled validation has produced one. `retry` is explicit recovery after a
-confirmed failed allocation; it selects the latest checksum-valid periodic
-checkpoint. Automatic infrastructure recovery is opt-in through
-`max_infrastructure_retries` (default 0). Slurm preemption, node/boot failure,
-and allocation timeout/deadline can resume only from a checksum-valid periodic
-checkpoint newer than the attempt's starting progress. Application errors, OOM
-and cancellation never trigger automatic retries. PBS nonzero exit statuses
-remain failures requiring explicit recovery until site-specific termination
-classification is validated. Attempts are bounded by
-`max_attempts` (default 100); paused attempts making no progress fail.
-
-Every scheduler call has a durable intent and unique `spc-...` job-name token.
-If a response is lost, subsequent invocations do **not** resubmit. For training,
-the controller queries scheduler history for the exact token and adopts a unique
-matching job. No match blocks advancement; multiple matches require intervention.
-The explicit `adopt` operation also validates the job name before recording the ID. Runtime startup can also record its own ID after validating the
-token. If no job was accepted, or a non-training consumer's response was lost,
-leave the controller stopped for operator reconciliation; automatic retry of
-uncertain/non-training submissions is intentionally unavailable in this rollout.
-Do not delete a manifest to force a retry while any allocation may still exist.
-
-Cancellation of a submission with an unknown ID still inhibits future jobs; find
-and cancel its token-matching scheduler job as well. Keep the controller inactive.
-
-With colocated state, the run manifest is `RUN/.spine-prod/continuation.json`.
-With a separate state root, it is
-`CONTINUATION_DIR/runs/<run-path-hash>/.spine-prod/continuation.json`; the pipeline
-manifest and `advance.sh` are in `CONTINUATION_DIR/.spine-prod/`. It contains a scientific
-configuration/input/topology digest, generation, state, verified checkpoint,
-budget, attempts, submission intent, requested bounds, rounding, assigned deadline,
-provisional wrapper elapsed time, and confirmed scheduler accounting. Queue waits
-are excluded. `sacct ElapsedRaw` or PBS `resources_used.walltime` charges actual
-allocation runtime, including hard kills. A final request is rounded down to
-scheduler granularity (Slurm minutes, PBS seconds); it may be below `min_time`
-only when it meets `site_min_time` and leaves time beyond startup plus the margin.
-Budget exhaustion never releases a consumer.
-
-Profiles may supply `continuation_defaults`; explicit stage values win. Presence
-of a stage `continuation` mapping is always required to opt in. Specify explicit
-profiles for every stage. This first controller serializes independent stages too;
-stage slicing and automatic cleanup are rejected. GPU elasticity is unsupported.
-
-## Validation and measurement
-
-Local regression suite:
-
-```bash
-.venv/bin/python -m pytest tests/continuation/test_controller.py tests/continuation/test_service.py -o addopts='' -q
-PYTHONPATH=/path/to/patched-spine/src .venv/bin/python -m pytest \
-  tests/continuation/test_spine_contract.py -o addopts='' -q
-```
-
-On each site, verify all of the following before production use:
-
-1. Run through the actual shell, container and multi-rank launcher; obtain two
-   paused outcomes followed by terminal early stopping or the configured limit.
-2. Confirm that no consumer job exists while paused and that the consumer runs
-   exactly once after completion. Test explicit acceptance separately.
-3. Compare optimizer/LR state, global progress, RNG/loader state, validation
-   history, patience and best-checkpoint selection to the uninterrupted reference.
-   Nondeterministic GPU kernels may prevent bitwise equivalence.
-4. Test USR2 pause, USR1 successful completion, cancellation during checkpointing,
-   a hard timeout, and corrupt/incomplete checkpoint rejection. Confirm runtime
-   charging from scheduler accounting; verify only the configured recoverable failures retry, within their limit.
-5. For variable allocations, capture a grant shorter than the maximum and a full
-   grant. Verify the assigned deadline in the manifest against scheduler output.
-6. Record queue wait, startup overhead, checkpoint latency, allocated runtime,
-   steps advanced, and time to the same validation target. Compare fixed long,
-   fixed short and variable requests. Set the margin above the worst observed
-   multi-rank checkpoint/shutdown latency with an operational buffer.
-
-`metrics` exports one CSV row per allocation with requested/assigned duration,
-queue time, confirmed/provisional runtime, progress, and pause-to-checkpoint-commit
-latency. Queue time is measured from submission intent to scheduler start. Compare
-these exports between experiments alongside your validation curves.
-
-Local tests do not establish NERSC scheduling policy, Polaris shrink-to-fit support,
-real multi-rank termination, or training effectiveness. Those are explicit rollout
-checks, and no cluster execution has been performed by this implementation.
-
-Scheduler references: [Slurm sbatch](https://slurm.schedmd.com/sbatch.html),
-[NERSC scheduling guidance](https://docs.nersc.gov/jobs/best-practices/), and
-[Polaris running jobs](https://docs.alcf.anl.gov/polaris/running-jobs/).
+Regression tests live in `tests/continuation/`; native training and validation
+replay tests live in SPINE. Before a new deployment, exercise pause/resume and
+consumer release through the actual container and distributed launcher, verify
+checkpoint integrity, and measure checkpoint latency to choose a suitable margin.

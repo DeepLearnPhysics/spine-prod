@@ -862,33 +862,31 @@ def test_watchdog_uses_actual_deadline_and_remaining_budget(
     assert state["state"] == "pausing"
 
 
-def test_vd_training_budgets_survive_nersc_site_mapping(tmp_path):
+@pytest.mark.parametrize("profile", ["s3df_ampere", "s3df_ampere_full"])
+def test_training_budget_survives_nersc_site_mapping(profile):
+    """A site allocation ceiling must not truncate the logical training budget."""
     import yaml
 
-    from src.pipeline import PipelineDefinition
     from src.sites import map_stage
 
     catalog = yaml.safe_load(Path("templates/profiles.yaml").read_text())
-    definition = PipelineDefinition.load(
-        "tests/fixtures/dune_vd_pipeline_261117.yaml", workspace_override=str(tmp_path)
+    mapped = map_stage(
+        catalog,
+        {"stage": "train", "profile": profile},
+        "nersc",
+        {"account": "project", "time": "48:00:00"},
     )
-    training = [stage for stage in definition.stages if stage.get("stage") == "train"]
-    assert len(training) >= 5
-    for stage in training:
-        mapped = map_stage(
-            catalog, stage, "nersc", {"account": "project", "time": "48:00:00"}
-        )
-        effective = dict(catalog["profiles"][mapped["profile"]], time=mapped["time"])
-        config = policies.profile_policy(
-            catalog,
-            effective,
-            {"runtime_budget": "120:00:00", "preferred_time": "24:00:00"},
-        )
-        assert config["runtime_budget"] == 432000
-        assert config["maximum"] == 172800
-        assert policies.next_request(config, 0)["seconds"] == 86400
-        assert policies.next_request(config, 4 * 86400)["seconds"] == 86400
-        assert policies.next_request(config, 5 * 86400) is None
+    effective = dict(catalog["profiles"][mapped["profile"]], time=mapped["time"])
+    config = policies.profile_policy(
+        catalog,
+        effective,
+        {"runtime_budget": "120:00:00", "preferred_time": "24:00:00"},
+    )
+    assert config["runtime_budget"] == 432000
+    assert config["maximum"] == 172800
+    assert policies.next_request(config, 0)["seconds"] == 86400
+    assert policies.next_request(config, 4 * 86400)["seconds"] == 86400
+    assert policies.next_request(config, 5 * 86400) is None
 
 
 @pytest.mark.parametrize(

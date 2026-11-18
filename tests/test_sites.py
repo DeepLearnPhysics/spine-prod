@@ -1,11 +1,10 @@
-"""Cross-site allocation contracts, including the complete VD candidate."""
+"""Cross-site allocation contracts for CPU, GPU and full-node stages."""
 
 from unittest.mock import patch
 
 import pytest
 import yaml
 
-from src.pipeline import PipelineDefinition
 from src.sites import (
     allocation_limits,
     duration_seconds,
@@ -34,29 +33,30 @@ def test_invalid_duration():
 @pytest.mark.parametrize(
     "site,prefix", [("nersc", "nersc"), ("alcf", "anl_polaris"), ("s3df", "s3df")]
 )
-def test_vd_mapping(catalog, workspace_root, site, prefix):
-    definition = PipelineDefinition.load(
-        str(workspace_root / "tests/fixtures/dune_vd_pipeline_261117.yaml"),
-        workspace_override="/tmp/vd",
-    )
+def test_stage_mapping(catalog, site, prefix):
     stages = [
-        map_stage(catalog, stage, site, {"account": "project", "time": "24:00:00"})
-        for stage in definition.stages
+        {"name": "scan", "profile": "s3df_milano", "cpus_per_task": 16, "workers": 16},
+        {"name": "cache", "profile": "s3df_ampere"},
+        {"name": "train", "stage": "train", "profile": "s3df_ampere_full"},
     ]
-    assert len(stages) == 21
-    for stage in stages:
+    mapped = [
+        map_stage(catalog, stage, site, {"account": "project", "time": "24:00:00"})
+        for stage in stages
+    ]
+    for stage in mapped:
         assert stage["profile"].startswith(prefix)
         effective = dict(
             catalog["profiles"][stage["profile"]],
             **{k: v for k, v in stage.items() if k != "profile"},
         )
         validate_allocation(catalog, effective)
-    assert stages[0]["cpus_per_task"] == 16
-    assert stages[0]["workers"] == 16
-    train = next(s for s in stages if s["name"] == "train_uresnet_deghost")
-    assert catalog["profiles"][train["profile"]]["allocation_role"] == "full_gpu_node"
+    assert mapped[0]["cpus_per_task"] == 16
+    assert mapped[0]["workers"] == 16
+    assert (
+        catalog["profiles"][mapped[2]["profile"]]["allocation_role"] == "full_gpu_node"
+    )
     if site == "nersc":
-        assert stages[0]["mem_per_cpu"] == "4g"
+        assert mapped[0]["mem_per_cpu"] == "4g"
 
 
 @pytest.mark.parametrize(

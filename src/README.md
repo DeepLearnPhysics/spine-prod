@@ -59,6 +59,6 @@ are independent of the internal Python module layout.
 follow the source packages. Root tests cover configuration, files, runs, sites,
 CLI entry points, and detector configuration content. Submission integration tests
 are separated by configuration, input files, batch execution, interactive
-execution, and pipelines. Native SPINE checkpoint tests live in
-`tests/continuation/test_spine_contract.py` and require the patched SPINE checkout;
-see [training continuation](../docs/training-continuation.md).
+execution, and pipelines. Native checkpoint and validation-replay tests belong
+to SPINE; this repository tests the controller, scheduler adapters, and runtime
+contract boundary. See [training continuation](../docs/training-continuation.md).

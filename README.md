@@ -11,8 +11,8 @@ A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPIN
 SPINE is a deep learning-based reconstruction framework for liquid argon time projection chamber (LArTPC) detectors. This production system provides tools for running SPINE at scale on large datasets using scheduler-managed job arrays.
 
 For opt-in training across scheduler allocations, see the
-[continuation test guide](docs/training-continuation.md), including NERSC and
-Polaris examples, the required SPINE runtime patch, and controller operations.
+[continuation guide](docs/training-continuation.md) for runtime requirements,
+storage setup, scheduling policy, and controller operations.
 
 ## Quick Start
 
@@ -33,9 +33,10 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v1.4.0. Maintained configurations require SPINE
-v1.4.0 or later. Launchers check the selected executable after environment
-setup, inside the container when applicable. See the [migration notes](MIGRATION_1_4.md)
+Maintained configurations require SPINE v1.4.4 or later; continuation also
+requires the runtime capability described in the continuation guide. Launchers
+check the selected executable after environment setup, inside the container
+when applicable. See the [migration notes](MIGRATION_1_4.md)
 for ordered stages, named modifiers, and compatibility changes.
 
 **Alternative Container Location:** You can override the local `.sif` path or
