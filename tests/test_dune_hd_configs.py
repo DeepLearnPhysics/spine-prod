@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.config_manager import ConfigManager
+from src.config import ConfigManager
 from src.pipeline import PipelineDefinition
 from tests.config_migration import fingerprint
 

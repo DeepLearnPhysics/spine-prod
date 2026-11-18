@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.continuation_pipeline import advance, metrics, operate, status  # noqa: E402
+from src.continuation.controller import advance, metrics, operate, status  # noqa: E402
 
 
 def main():
@@ -34,7 +34,7 @@ def main():
     )
     args = parser.parse_args()
     if args.action == "preflight":
-        from src.continuation import preflight_storage
+        from src.continuation.state import preflight_storage
 
         preflight_storage(args.manifest, args.site)
         print("Continuation storage preflight passed on this host: " + args.manifest)

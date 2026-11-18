@@ -4,7 +4,7 @@ import shutil
 from typing import Optional
 
 from .client import PBSClient, SlurmClient
-from .component import SubmissionComponent
+from .submission.base import SubmissionComponent
 
 
 class JobController(SubmissionComponent):

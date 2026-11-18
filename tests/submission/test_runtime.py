@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.runtime import RuntimeResolver
+from src.submission.runtime import RuntimeResolver
 
 
 @pytest.mark.parametrize(
@@ -19,7 +19,8 @@ from src.runtime import RuntimeResolver
 def test_container_resolution_ignores_host_path(monkeypatch, resolver):
     monkeypatch.delenv("SPINE_LOCAL_PATH", raising=False)
     with patch(
-        "src.runtime.shutil.which", return_value="/home/student/.local/bin/spine"
+        "src.submission.runtime.shutil.which",
+        return_value="/home/student/.local/bin/spine",
     ) as which:
         assert getattr(RuntimeResolver, resolver)() == (None, None)
         which.assert_not_called()
@@ -28,7 +29,8 @@ def test_container_resolution_ignores_host_path(monkeypatch, resolver):
 def test_local_resolution_preserves_host_discovery(monkeypatch):
     monkeypatch.delenv("SPINE_LOCAL_PATH", raising=False)
     with patch(
-        "src.runtime.shutil.which", return_value="/home/student/.local/bin/spine"
+        "src.submission.runtime.shutil.which",
+        return_value="/home/student/.local/bin/spine",
     ):
         assert RuntimeResolver.resolve_spine_command(allow_host_path=True) == (
             "/home/student/.local/bin/spine",
@@ -59,7 +61,8 @@ def test_batch_script_uses_container_command(mock_submitter, monkeypatch, tmp_pa
     source.touch()
     with (
         patch(
-            "src.runtime.shutil.which", return_value="/home/student/.local/bin/spine"
+            "src.submission.runtime.shutil.which",
+            return_value="/home/student/.local/bin/spine",
         ),
         patch.object(
             mock_submitter.batch,
