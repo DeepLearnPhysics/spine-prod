@@ -164,9 +164,19 @@ python scripts/continue_training.py status \
 
 Status reports registration, controller errors and stale heartbeats. The timer
 stops advancing completed, cancelled, failed or budget-exhausted pipelines.
-It remains installed, idle except for scanning its registry; extending a budget
-or explicitly retrying an eligible failure lets automatic processing resume.
-To disable the service, remove only its marked block using `scrontab -e`.
+When none of the account's registered pipelines needs monitoring, the controller
+automatically removes only its marked scrontab block. Other accounts and unrelated
+scheduled tasks are preserved. Registry state and logs remain available for review.
+Missing/unreadable pipeline state defers retirement rather than assuming completion.
+
+A new launch, budget extension, explicit retry, acceptance or job adoption restores
+and verifies the timer before changing the pipeline's operational state.
+Registration, reactivation and retirement share a lock, so cleanup cannot remove
+the timer during a concurrent reactivation. Status reports `stopped` after verified
+removal; it may report `retiring` if Slurm terminates the current cron invocation
+when its own entry is removed. No training restart is needed to deploy this change.
+
+To disable the service manually, remove only its marked block using `scrontab -e`.
 NERSC cancellation/maintenance can disable entries: inspect the schedule and
 rerun the launch to restore the managed block when needed.
 

@@ -103,6 +103,7 @@ def test_schedule_edit_race_never_overwrites(service_environment, monkeypatch):
 def test_tick_runs_real_script_cleans_environment_and_skips_completed(
     service_environment, monkeypatch
 ):
+    monkeypatch.setattr(service, "read_schedule", lambda: "")
     _, registry, manifest = service_environment
     result = manifest.parent / "result"
     (manifest.parent / "advance.sh").write_text(
@@ -277,7 +278,14 @@ def test_service_drives_two_pauses_and_releases_consumer_once(
         lambda *_: {"success": True, "seconds": 200, "status": "COMPLETED"},
     )
 
+    schedule = [service.schedule_block("project", registry, Path.cwd())]
+
     def launch(argv, **kwargs):
+        if argv == ["scrontab", "-l"]:
+            return SimpleNamespace(returncode=0, stdout=schedule[0], stderr="")
+        if argv == ["scrontab", "-"]:
+            schedule[0] = kwargs["input"]
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
         assert argv == ["bash", str(manifest.parent / "advance.sh")]
         pipeline.advance(manifest, context)
         return SimpleNamespace(returncode=0)
@@ -291,6 +299,9 @@ def test_service_drives_two_pauses_and_releases_consumer_once(
     assert submissions[3]["config"] == "consumer"
     assert c.read(manifest)["state"] == "completed"
     assert c.read(c.manifest_path(run, control))["used_seconds"] == 600
+
+    assert schedule[0] == ""
+    assert c.read(registry)["schedule_state"] == "stopped"
 
 
 def test_two_pipelines_share_one_schedule(service_environment, monkeypatch):
@@ -337,3 +348,130 @@ def test_scrontab_unexpected_failure_is_not_empty(monkeypatch, stdout, stderr):
     assert stderr in str(error.value)
     if not stdout and not stderr:
         assert "exit status 1" in str(error.value)
+
+
+def test_retirement_preserves_unrelated_entries_and_relaunch_rearms(
+    service_environment, monkeypatch
+):
+    _, registry, manifest = service_environment
+    unrelated = "# user task\n0 * * * * /user/task\n"
+    schedule, calls = fake_scrontab(monkeypatch, unrelated)
+    service.register(manifest, "project", Path.cwd())
+    # The all-completed transition has yet to run, so still needs a tick.
+    assert not service.retire_if_idle(registry)
+    state = c.read(manifest)
+    state["state"] = "completed"
+    c.atomic_json(manifest, state)
+    assert service.retire_if_idle(registry)
+    assert schedule[0] == unrelated
+    assert "stopped" in service.health(c.read(manifest))
+    # Repeated cleanup is a no-op; a new launch installs one block again.
+    installed = calls.count(["scrontab", "-"])
+    assert service.retire_if_idle(registry)
+    assert calls.count(["scrontab", "-"]) == installed
+    service.register(manifest, "project", Path.cwd())
+    assert schedule[0].count("# BEGIN spine-prod") == 1
+    assert c.read(registry)["schedule_state"] == "active"
+
+
+def test_retirement_keeps_timer_for_other_active_pipeline(
+    service_environment, monkeypatch
+):
+    _, registry, manifest = service_environment
+    schedule, _ = fake_scrontab(monkeypatch)
+    service.register(manifest, "project", Path.cwd())
+    other = manifest.parent / "other.json"
+    c.atomic_json(other, {"state": "active", "records": []})
+    service.register(other, "project", Path.cwd())
+    c.atomic_json(manifest, {"state": "completed", "records": []})
+    assert not service.retire_if_idle(registry)
+    assert "# BEGIN spine-prod" in schedule[0]
+    other.unlink()
+    with pytest.raises(OSError):
+        service.retire_if_idle(registry)
+    assert "# BEGIN spine-prod" in schedule[0]
+
+
+@pytest.mark.parametrize(
+    "action,logical_state,value",
+    [
+        ("extend", "budget_exhausted", "00:24:00"),
+        ("retry", "failed", None),
+        ("accept", "paused", None),
+    ],
+)
+def test_operator_actions_rearm_stopped_service(
+    service_environment, monkeypatch, action, logical_state, value
+):
+    from tests.test_continuation import allocation
+
+    _, registry, manifest = service_environment
+    schedule, _ = fake_scrontab(monkeypatch)
+    run = manifest.parent / "train"
+    attempt = allocation(run, 1)
+    logical = c.read(c.manifest_path(run))
+    outcome = c.read(Path(attempt["directory"]) / "outcome.json")
+    logical.update(
+        state=logical_state, checkpoint=outcome["checkpoint"], sha256=outcome["sha256"]
+    )
+    logical["attempts"][0]["accounted"] = True
+    c.atomic_json(c.manifest_path(run), logical)
+    c.atomic_json(
+        manifest,
+        {
+            "state": "active",
+            "generation": 0,
+            "basedir": str(Path.cwd()),
+            "records": [
+                {
+                    "name": "train",
+                    "status": "submitted",
+                    "jobs": ["1"],
+                    "options": {"run_dir": str(run), "continuation": {}},
+                }
+            ],
+        },
+    )
+    service.register(manifest, "project", Path.cwd())
+    # accept can be invoked on a manually disabled timer too.
+    if action == "accept":
+        schedule[0] = ""
+    else:
+        assert service.retire_if_idle(registry)
+    assert schedule[0] == ""
+    pipeline.operate(manifest, action, stage="train", value=value)
+    assert schedule[0].count("# BEGIN spine-prod") == 1
+    assert c.read(registry)["schedule_state"] == "active"
+    assert c.read(c.manifest_path(run))["state"] == (
+        "completed" if action == "accept" else "paused"
+    )
+
+
+def test_retirement_waits_for_reactivation_state_change(
+    service_environment, monkeypatch
+):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    _, registry, manifest = service_environment
+    schedule, _ = fake_scrontab(monkeypatch)
+    c.atomic_json(
+        manifest, {"state": "completed", "records": [], "basedir": str(Path.cwd())}
+    )
+    service.register(manifest, "project", Path.cwd())
+    service.retire_if_idle(registry)
+    attempted = Event()
+
+    def cleanup():
+        attempted.set()
+        return service.retire_if_idle(registry)
+
+    with ThreadPoolExecutor() as pool:
+        with service.reactivating(c.read(manifest)):
+            future = pool.submit(cleanup)
+            assert attempted.wait(2)
+            state = c.read(manifest)
+            state["state"] = "active"
+            c.atomic_json(manifest, state)
+        assert future.result(timeout=2) is False
+    assert "# BEGIN spine-prod" in schedule[0]
