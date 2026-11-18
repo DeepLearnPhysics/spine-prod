@@ -31,14 +31,14 @@ the 1.4.4 driver APIs inspected for this implementation:
 
 ```bash
 cd /path/to/spine-continuation-checkout
-git apply --check /path/to/spine-prod/patches/spine-1.4.4-continuation-v2.patch
-git apply /path/to/spine-prod/patches/spine-1.4.4-continuation-v2.patch
+git apply --check /path/to/spine-prod/patches/spine-1.4.4-continuation-v3.patch
+git apply /path/to/spine-prod/patches/spine-1.4.4-continuation-v3.patch
 python bin/run.py --continuation-contract
 # Must print: 2
 ```
 
 If the checkout already has the v1 patch (as in the first two site tests),
-apply **only the upgrade patch**, not the full v2 patch:
+apply the v1-to-v2 upgrade below, then the v2-to-v3 upgrade:
 
 ```bash
 cd /path/to/spine-continuation-checkout
@@ -47,6 +47,27 @@ git apply /path/to/spine-prod/patches/spine-continuation-v1-to-v2.patch
 python bin/run.py --continuation-contract
 # Must print: 2
 ```
+
+For a checkout already patched to v2 (including the third site test), apply only:
+
+```bash
+cd /path/to/spine-continuation-checkout
+git apply --check /path/to/spine-prod/patches/spine-continuation-v2-to-v3.patch
+git apply /path/to/spine-prod/patches/spine-continuation-v2-to-v3.patch
+```
+
+Patch revision v3 fixes checkpoint/validation scheduling across resumes; the
+runtime capability contract remains **2**, since its interface is unchanged.
+Scheduled checkpoints count from global iteration zero. For example, with a
+980-step save period, a resume at iteration 526 still validates after iteration
+979, rather than waiting for 980 additional steps. Allocation-only snapshots do
+not shift this schedule or trigger extra validation.
+
+The NERSC and Polaris 20-minute smoke tests reserve two minutes for checkpointing.
+The scheduler warning and runtime deadline use the same `checkpoint_margin`.
+Longer production runs can choose a larger margin for their checkpoint sizes and
+filesystem performance. Existing manifests and queued scripts retain the policy
+with which they were created; pulling changes does not rewrite a running test.
 
 Use that checkout with `--spine-path`, or rebuild your container with the patch.
 The actual executable is capability-checked inside the container before training;
