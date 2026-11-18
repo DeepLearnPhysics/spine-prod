@@ -40,9 +40,9 @@ def main():
                 text=True,
                 check=True,
             )
-            if capability.stdout.strip() != "1":
+            if capability.stdout.strip() != "2":
                 raise RuntimeError(
-                    "SPINE must support continuation contract 1; apply the supplied SPINE patch"
+                    "SPINE must support continuation contract 2 (pending validation); apply the supplied SPINE v2 patch"
                 )
         result = subprocess.run(
             [*command, "--version"], capture_output=True, text=True, check=True
