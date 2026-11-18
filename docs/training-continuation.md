@@ -1,6 +1,7 @@
 # Training across scheduler allocations
 
-Add `continuation` to a training stage to run it across multiple allocations.
+Use `--site` to run pipeline training across allocations automatically, or add
+`continuation` explicitly to a training stage.
 A submission-host controller accounts for completed jobs, verifies checkpoint
 outcomes, and resumes recoverable pauses. Downstream stages wait for logical
 training completion and successful scheduler accounting; a paused job's zero
@@ -63,9 +64,12 @@ Optional `min_time` permits shorter Slurm grants. The supervisor uses the actual
 assigned deadline, never a timer based on the requested maximum. Choose a margin
 that covers the slowest load/forward operation, checkpoint publication, and
 shutdown: a running batch cannot be interrupted safely. Site limits still apply.
-When launching a portable pipeline with `--site`, an opted-in stage's allocation
-ceiling is bounded by the destination queue's hard limit while `runtime_budget`
-is preserved. Site-level `continuation_defaults` provide chunk preferences;
+When launching a portable pipeline with `--site`, training stages automatically
+use continuation. Their original YAML `time` (falling back to the source profile)
+becomes the total budget unless `continuation.runtime_budget` explicitly overrides
+it. Allocation ceilings are bounded by the destination queue's hard limit.
+CLI `--time` changes only the allocation ceiling; it does not replace the original
+budget. Without `--site`, continuation still requires an explicit mapping. Site-level `continuation_defaults` provide chunk preferences;
 profile defaults and explicit stage settings take precedence. Inherited chunk
 preferences shrink to fit shorter stage ceilings. Explicit CLI `--time` and
 stage chunk preferences are validated as supplied, so invalid requests fail.

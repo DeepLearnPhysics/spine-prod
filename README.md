@@ -709,16 +709,18 @@ are rejected; allocation correspondence does not imply identical performance.
 ```
 
 Preflight checks every selected stage before submitting any jobs, including in
-`--dry-run`. For training stages with an explicit `continuation.runtime_budget`,
-`--site` bounds the YAML allocation `time` by the destination queue's hard limit.
-The total budget is preserved. Site-level `continuation_defaults` supply chunk
-preferences, bounded by each stage's allocation ceiling. Explicit CLI `--time`
+`--dry-run`. With `--site`, training stages automatically use continuation:
+the original YAML `time` (or source profile time) becomes the total runtime budget.
+An explicit `continuation.runtime_budget` takes precedence. Allocation ceilings
+are bounded by the destination queue's hard limit; the total budget is preserved.
+CLI `--time` overrides only the allocation ceiling, not the inherited budget.
+Site-level `continuation_defaults` supply chunk preferences, bounded by each stage's allocation ceiling. Explicit CLI `--time`
 and stage continuation preferences are validated rather than silently shortened.
 Non-continuation stages retain their requested time and fail if it exceeds limits.
 
-The HD 261022 and VD 261117 candidates each opt all six training stages into
-continuation. On NERSC, the
-`--continuation-dir` in the command above must point to Scratch. Its 120-hour and
+The HD 261022 and VD 261117 candidates use this default for all six training stages.
+Without `--site`, ordinary submission semantics remain unchanged unless continuation
+is explicitly configured. On NERSC, `--continuation-dir` in the command above must point to Scratch. Its 120-hour and
 72-hour budgets become at most 48-hour allocations, requesting 4–24-hour grants
 by default. Shorter training stages retain their smaller ceilings. This is an
 initial scheduling policy, not a measured optimum. Budget exhaustion blocks

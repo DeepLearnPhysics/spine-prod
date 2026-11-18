@@ -91,9 +91,14 @@ class PipelineRunner(SubmissionComponent):
         parsed_stage_weights = PipelineDefinition.parse_stage_module_weights(
             stage_module_weights
         )
+        # Preserve source walltimes/profiles until site mapping captures training budgets.
         definition = PipelineDefinition.load(
             pipeline_path,
-            overrides,
+            {
+                key: value
+                for key, value in (overrides or {}).items()
+                if site is None or key not in ("time", "profile")
+            },
             workspace_override=workspace,
             stage_module_weights=parsed_stage_weights,
             source_list=source_list,
@@ -164,7 +169,7 @@ class PipelineRunner(SubmissionComponent):
         if definition.workspace is not None:
             self._prepare_log_index(definition.workspace, stages)
 
-        if any("continuation" in stage for stage in all_stages):
+        if any("continuation" in stage for stage in (*all_stages, *stages)):
             from ..continuation.controller import start
 
             if from_stage or select_stages or skip_stages or to_stage:

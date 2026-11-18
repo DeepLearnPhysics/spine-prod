@@ -1,7 +1,7 @@
 """Portable resource profiles and scheduler allocation limits.
 
-Limits describe one allocation, not a training runtime budget. Continuation can
-consume ``allocation_limits`` without changing these submission semantics.
+Limits describe one allocation, not a training runtime budget. Site-mapped
+training preserves source walltimes as cumulative continuation budgets.
 """
 
 import re
@@ -78,6 +78,10 @@ def map_stage(catalog, stage, site, overrides=None):
     source = profiles[source_name]
     result = dict(stage)
     result.setdefault("profile", source_name)
+    if stage.get("kind", "spine") == "spine" and stage.get("stage") == "train":
+        continuation = dict(stage.get("continuation", {}))
+        continuation.setdefault("runtime_budget", stage.get("time", source["time"]))
+        result["continuation"] = continuation
     if source["site"] != site:
         role = source.get("allocation_role")
         if role not in sites[site]["roles"]:

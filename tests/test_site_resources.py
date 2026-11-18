@@ -71,7 +71,7 @@ def test_dune_budgets_and_site_requests(catalog, workspace_root, site, pipeline_
         request = next_request(config, 0)
         assert request["seconds"] == min(hours, 24 if site == "nersc" else hours) * 3600
         assert request["min_time"] == ("04:00:00" if site == "nersc" else None)
-        assert stage["continuation"] == {"runtime_budget": stage["time"]}
+        assert "continuation" not in stage
         assert next_request(config, hours * 3600) is None
     scan = map_stage(catalog, definition.stages[0], site, {"account": "project"})
     assert scan["time"] == definition.stages[0]["time"]
@@ -168,3 +168,57 @@ def test_dune_nersc_dry_run_preflights_all_training_stages(
         "budget=08:00:00; allocation=04:00:00..08:00:00; preferred=08:00:00" in output
     )
     register.assert_not_called()
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_training_budget_precedes_allocation_overrides(catalog, explicit):
+    stage = {"stage": "train", "profile": "s3df_ampere_full", "time": "120:00:00"}
+    if explicit:
+        stage["continuation"] = {"runtime_budget": "144:00:00"}
+    result = map_stage(
+        catalog, stage, "nersc", {"account": "project", "time": "06:00:00"}
+    )
+    assert result["time"] == "06:00:00"
+    assert result["continuation"]["runtime_budget"] == (
+        "144:00:00" if explicit else "120:00:00"
+    )
+    assert stage.get("continuation", {}) == (
+        {"runtime_budget": "144:00:00"} if explicit else {}
+    )
+
+
+def test_training_budget_uses_source_profile_default(catalog):
+    stage = {"stage": "train", "profile": "s3df_ampere_full"}
+    result = map_stage(catalog, stage, "nersc", {"account": "project"})
+    assert (
+        result["continuation"]["runtime_budget"]
+        == catalog["profiles"][stage["profile"]]["time"]
+    )
+
+
+def test_site_cli_time_preserves_pipeline_budget(mock_submitter, tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    from src.continuation import controller
+
+    start = Mock(return_value={})
+    monkeypatch.setattr(controller, "start", start)
+    mock_submitter.submit_pipeline(
+        str(
+            mock_submitter.basedir
+            / "pipelines/dune-hd-10kt-1x2x6/full_chain_261022.yaml"
+        ),
+        workspace=str(tmp_path / "hd"),
+        site="nersc",
+        overrides={
+            "account": "project",
+            "time": "06:00:00",
+            "profile": "nersc_gpu_full",
+        },
+        continuation_dir="/pscratch/sd/u/user/hd-state",
+        dry_run=True,
+    )
+    stages = start.call_args.args[1]
+    train = next(s for s in stages if s["name"] == "train_uresnet_deghost")
+    assert train["time"] == "06:00:00"
+    assert train["continuation"]["runtime_budget"] == "5-00:00:00"
