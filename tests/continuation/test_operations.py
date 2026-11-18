@@ -427,3 +427,38 @@ def test_stale_failure_diagnostic_is_ignored(controlled, monkeypatch):
     )
     result = ctl.reconcile(runpath.parents[1])
     assert "failure" not in result["attempts"][0]
+
+
+@pytest.mark.parametrize(
+    "sibling, expected_status",
+    [("RUNNING", "submitted"), ("FAILED", "failed"), ("COMPLETED", "completed")],
+)
+def test_array_stage_gates_consumers(controlled, monkeypatch, sibling, expected_status):
+    """Only complete success of a cache array releases the next pipeline stage."""
+    from src.continuation import scheduler
+
+    path, _, _ = controlled
+    data = storage.read(path)
+    record = data["records"][0]
+    record["options"].pop("continuation")
+    record["jobs"] = ["42"]
+    data["records"].append(
+        dict(name="consumer", kind="filter", status="waiting", jobs=[], options={})
+    )
+    storage.atomic_json(path, data)
+    monkeypatch.setattr(
+        scheduler,
+        "command",
+        lambda _: f"42_1|COMPLETED|10|0:0\n42_2|{sibling}|20|0:0\n",
+    )
+    context = SimpleNamespace(
+        config_mgr=SimpleNamespace(get_profile=lambda *a: {"scheduler": "slurm"}),
+        submit_filter=Mock(return_value=["99"]),
+    )
+    ctl.advance(path, context)
+    result = storage.read(path)
+    assert result["records"][0]["status"] == expected_status
+    assert context.submit_filter.call_count == (sibling == "COMPLETED")
+    assert result["records"][1]["status"] == (
+        "submitted" if sibling == "COMPLETED" else "waiting"
+    )

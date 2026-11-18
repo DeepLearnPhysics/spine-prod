@@ -117,8 +117,9 @@ def accounting(scheduler, job_id):
     Returns
     -------
     dict or None
-        Status, allocated runtime in seconds and success flag. Live jobs or jobs
-        whose accounting has not arrived return None.
+        Status, allocated runtime in seconds and success flag. Array runtime
+        is summed across tasks; success requires every task to complete with
+        exit code zero. Live jobs or missing accounting return None.
     """
     if scheduler == "slurm":
         output = command(
@@ -130,31 +131,46 @@ def accounting(scheduler, job_id):
                 "-j",
                 job_id,
                 "--starttime=1970-01-01",
-                "--format=JobIDRaw,State,ElapsedRaw,ExitCode",
+                "--array",
+                "--format=JobID,State,ElapsedRaw,ExitCode",
             ]
         )
+        # JobID preserves ArrayJobID_ArrayTaskID, unlike per-task JobIDRaw.
+        # Expand arrays and inspect every allocation before declaring success.
+        terminal = {
+            "COMPLETED",
+            "FAILED",
+            "CANCELLED",
+            "TIMEOUT",
+            "NODE_FAIL",
+            "OUT_OF_MEMORY",
+            "PREEMPTED",
+            "BOOT_FAIL",
+            "DEADLINE",
+        }
+        results = []
         for line in output.splitlines():
             fields = line.split("|")
-            if len(fields) >= 4 and fields[0] == job_id:
-                status = fields[1].split()[0].rstrip("+")
-                terminal = {
-                    "COMPLETED",
-                    "FAILED",
-                    "CANCELLED",
-                    "TIMEOUT",
-                    "NODE_FAIL",
-                    "OUT_OF_MEMORY",
-                    "PREEMPTED",
-                    "BOOT_FAIL",
-                    "DEADLINE",
+            if len(fields) < 4 or not re.fullmatch(
+                re.escape(job_id) + r"(?:_\d+)?", fields[0]
+            ):
+                continue
+            status = fields[1].split()[0].rstrip("+")
+            if status not in terminal:
+                return None
+            results.append(
+                {
+                    "status": status,
+                    "seconds": int(fields[2]),
+                    "success": status == "COMPLETED" and fields[3] == "0:0",
+                    "exit_code": fields[3],
                 }
-                if status in terminal:
-                    return {
-                        "status": status,
-                        "seconds": int(fields[2]),
-                        "success": status == "COMPLETED" and fields[3] == "0:0",
-                        "exit_code": fields[3],
-                    }
+            )
+        if results:
+            # Preserve a failed task's status and exit code for diagnosis.
+            result = next((item for item in results if not item["success"]), results[0])
+            return dict(result, seconds=sum(item["seconds"] for item in results))
+
     else:
         data = json.loads(command(["qstat", "-xf", "-F", "json", job_id]))["Jobs"].get(
             job_id, {}

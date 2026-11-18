@@ -220,3 +220,69 @@ def test_site_minimum_cannot_be_bypassed_by_stage_budget(monkeypatch):
                 "startup_allowance": "00:00:10",
             },
         )
+
+
+@pytest.mark.parametrize(
+    "sibling, expected", [("RUNNING", None), ("FAILED", False), ("COMPLETED", True)]
+)
+def test_array_accounting_requires_all_tasks(monkeypatch, sibling, expected):
+    """An array's raw leader ID cannot establish success of its sibling tasks."""
+
+    def query(argv):
+        # Raw allocation IDs differ; JobID retains the shared array identity.
+        identifiers = (
+            ["42", "43"]
+            if "--format=JobIDRaw,State,ElapsedRaw,ExitCode" in argv
+            else ["42_1", "42_2"]
+        )
+        return f"{identifiers[0]}|COMPLETED|10|0:0\n{identifiers[1]}|{sibling}|20|0:0\n"
+
+    monkeypatch.setattr(scheduler, "command", query)
+    result = scheduler.accounting("slurm", "42")
+    if expected is None:
+        assert result is None
+    else:
+        assert result["success"] is expected
+        assert result["seconds"] == 30
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        "",
+        "42_0|COMPLETED|10|0:0\n42_7|PENDING|0|0:0",
+        "42_7|RUNNING|20|0:0\n42_0|COMPLETED|10|0:0",
+    ],
+)
+def test_array_accounting_waits_for_complete_terminal_records(monkeypatch, rows):
+    """Sparse and zero-based arrays remain pending while any task is live."""
+    monkeypatch.setattr(scheduler, "command", lambda _: rows)
+    assert scheduler.accounting("slurm", "42") is None
+
+
+def test_array_accounting_preserves_nonzero_exit_and_ignores_steps(monkeypatch):
+    """Task exit codes remain authoritative even when the state says completed."""
+    calls = []
+
+    def query(argv):
+        calls.append(argv)
+        return (
+            "42_0|COMPLETED|10|0:0\n42_7|COMPLETED|20|1:0\n"
+            "42_7.batch|FAILED|20|1:0\n420_1|RUNNING|100|0:0"
+        )
+
+    monkeypatch.setattr(scheduler, "command", query)
+    result = scheduler.accounting("slurm", "42")
+    assert result == dict(
+        status="COMPLETED", seconds=30, success=False, exit_code="1:0"
+    )
+    assert "--array" in calls[0]
+    assert "--format=JobID,State,ElapsedRaw,ExitCode" in calls[0]
+
+
+def test_single_array_task_query_does_not_include_siblings(monkeypatch):
+    """An explicitly selected task is reconciled independently of its siblings."""
+    monkeypatch.setattr(
+        scheduler, "command", lambda _: "42_0|COMPLETED|10|0:0\n42_7|RUNNING|20|0:0"
+    )
+    assert scheduler.accounting("slurm", "42_0")["seconds"] == 10
