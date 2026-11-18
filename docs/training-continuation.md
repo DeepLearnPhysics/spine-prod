@@ -298,27 +298,35 @@ directory and weights directory persist across allocations, retaining the best
 checkpoint as well as the latest restart checkpoint. Downstream stages remain
 blocked until logical completion and successful terminal accounting.
 
-## Comparing six-hour and twelve-hour allocations
+## Comparing fixed and variable allocations
 
-`pipelines/continuation/nersc_6h.yaml` and `nersc_12h.yaml` give the same
-single-node workload a **12-hour cumulative runtime budget**, with allocation
-ceilings of six and twelve hours respectively. Both use a two-minute checkpoint
-margin, identical validation cadence, and the same input/configuration defaults.
+Three pipelines give the same single-node workload a **12-hour cumulative
+runtime budget**:
+
+| Pipeline | Requested allocation |
+| --- | --- |
+| `pipelines/continuation/nersc_6h.yaml` | Fixed six hours |
+| `pipelines/continuation/nersc_12h.yaml` | Fixed twelve hours |
+| `pipelines/continuation/nersc_1-6h.yaml` | One-hour minimum, six-hour maximum |
+
+All use a two-minute checkpoint margin, identical validation cadence, and the
+same input/configuration defaults. In the variable case, Slurm can shorten an
+allocation to fit its schedule; the supervisor uses the actual assigned deadline.
 They disable early stopping and use a deliberately unreachable iteration limit
 so this experiment measures budget-limited throughput. Do not use these stopping
 settings for ordinary scientific training.
 
-Run both from the same immutable spine-prod and patched SPINE revisions, with
+Run all three from the same immutable spine-prod and patched SPINE revisions, with
 identical input lists, account, QoS, GPU resources, and seeds. Submit close together
-and repeat on another day, alternating submission order; a single pair is a pilot,
+and repeat on another day, rotating submission order; a single three-case comparison is a pilot,
 not a reliable estimate of queue behavior. Concurrent runs can also influence one
 another through resource contention and account scheduling policies.
 
-From the directory containing `spine-prod`, this previews both experiments:
+From the directory containing `spine-prod`, this previews all three experiments:
 
 ```bash
 source spine-prod/configure.sh
-for chunk in 6 12; do
+for chunk in 6 12 1-6; do
   python3 spine-prod/submit.py \
     --pipeline "spine-prod/pipelines/continuation/nersc_${chunk}h.yaml" \
     --workspace "$PWD/continuation-benchmark-${chunk}h" \
@@ -332,7 +340,7 @@ done
 ```
 
 Replace the checkout/account as needed, then remove `--dry-run` to submit. Each
-case can consume up to 12 full-node hours (24 combined). For repeats, change both
+case can consume up to 12 full-node hours (36 combined). For repeats, change both
 directory names. No downstream validation stage is submitted: `budget_exhausted`
 is the expected endpoint, not successful scientific completion. Checkpoint
 margins and unusable final fragments mean actual runtime can finish slightly
@@ -346,7 +354,7 @@ python3 spine-prod/scripts/continue_training.py metrics \
   > allocations-6h.csv
 ```
 
-Repeat for 12h. Compare total queue wait, submission-to-final-job-end elapsed time,
+Repeat for 12h and 1-6h. Compare total queue wait, submission-to-final-job-end elapsed time,
 confirmed allocated runtime, number of restarts, and final training progress.
 Report both time to reach common progress and progress achieved within the budget;
 allocation runtime includes startup, validation, checkpointing, and teardown, not
@@ -360,16 +368,16 @@ chunks may start sooner but must queue repeatedly. Therefore measure the whole
 campaign rather than declaring a winner from its first start time. NERSC's
 [best practices](https://docs.nersc.gov/jobs/best-practices/#time-limits) recommend
 short or variable-length jobs and checkpoint/restart chains, without prescribing
-one optimal duration. A later variable-duration case could set `min_time` to one
-hour with the six-hour ceiling; these bounds are experimental choices, not a
-NERSC recommendation. Keep that separate from the fixed-duration comparison.
+one optimal duration. The one-to-six-hour bounds are experimental choices, not a NERSC
+recommendation. Record assigned durations as well as requested durations when
+comparing the variable case with the fixed cases.
 
 The 20-minute test can estimate restart overhead, but extrapolating its few queue
 samples assumes stable queue conditions and independent waits, neither of which
 is established. Its original early-stopping settings and v3's mixed software
 revisions also prevent a controlled comparison. A matched short-chunk experiment
-can use either benchmark file with `--time 00:20:00`, fresh directories, and the
-same 12-hour budget; this is an additional experiment, not part of the two-case
+can use either fixed-duration benchmark file with `--time 00:20:00`, fresh directories, and the
+same 12-hour budget; this is an additional experiment, not part of the three-case
 launch above.
 
 ## Operations and recovery
