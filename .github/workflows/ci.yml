@@ -61,7 +61,7 @@ jobs:
         if: matrix.python-version == '3.11'
         run: >-
           python -m coverage report
-          --include='src/*,submit.py'
+          --include='src/*,scripts/*.py,submit.py'
           --fail-under=100
 
       - name: Upload coverage to Codecov
