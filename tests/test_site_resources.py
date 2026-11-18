@@ -1,10 +1,21 @@
-"""Exercise the actual VD pipeline across the supported sites."""
+"""Exercise the DUNE HD and VD pipelines across the supported sites."""
 
 import pytest
 import yaml
 
 from src.pipeline import PipelineDefinition
 from src.sites import map_stage, validate_allocation
+
+
+@pytest.fixture(
+    params=[
+        "pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml",
+        "pipelines/dune-hd-10kt-1x2x6/full_chain_261022.yaml",
+    ],
+    ids=["vd", "hd"],
+)
+def pipeline_path(request):
+    return request.param
 
 
 @pytest.fixture
@@ -15,9 +26,9 @@ def catalog(workspace_root):
 @pytest.mark.parametrize(
     "site,prefix", [("nersc", "nersc"), ("alcf", "anl_polaris"), ("s3df", "s3df")]
 )
-def test_vd_mapping(catalog, workspace_root, site, prefix):
+def test_dune_mapping(catalog, workspace_root, site, prefix, pipeline_path):
     definition = PipelineDefinition.load(
-        str(workspace_root / "pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml"),
+        str(workspace_root / pipeline_path),
         workspace_override="/tmp/vd",
     )
     stages = [
@@ -41,11 +52,11 @@ def test_vd_mapping(catalog, workspace_root, site, prefix):
 
 
 @pytest.mark.parametrize("site", ["nersc", "s3df", "alcf"])
-def test_vd_budgets_and_site_requests(catalog, workspace_root, site):
+def test_dune_budgets_and_site_requests(catalog, workspace_root, site, pipeline_path):
     from src.continuation.policy import next_request, profile_policy
 
     definition = PipelineDefinition.load(
-        str(workspace_root / "pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml"),
+        str(workspace_root / pipeline_path),
         workspace_override="/tmp/vd",
     )
     training = [s for s in definition.stages if s.get("stage") == "train"]
@@ -63,7 +74,7 @@ def test_vd_budgets_and_site_requests(catalog, workspace_root, site):
         assert stage["continuation"] == {"runtime_budget": stage["time"]}
         assert next_request(config, hours * 3600) is None
     scan = map_stage(catalog, definition.stages[0], site, {"account": "project"})
-    assert scan["time"] == "02:00:00"
+    assert scan["time"] == definition.stages[0]["time"]
     assert "continuation" not in scan
 
 
@@ -124,8 +135,8 @@ def test_noncontinuation_time_is_not_clamped(catalog):
         )
 
 
-def test_vd_nersc_dry_run_preflights_all_training_stages(
-    mock_submitter, tmp_path, monkeypatch, capsys
+def test_dune_nersc_dry_run_preflights_all_training_stages(
+    mock_submitter, tmp_path, monkeypatch, capsys, pipeline_path
 ):
     from unittest.mock import Mock
 
@@ -139,10 +150,7 @@ def test_vd_nersc_dry_run_preflights_all_training_stages(
     register = Mock(side_effect=AssertionError("Dry-run must not install automation"))
     monkeypatch.setattr(service, "register", register)
     result = mock_submitter.submit_pipeline(
-        str(
-            mock_submitter.basedir
-            / "pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml"
-        ),
+        str(mock_submitter.basedir / pipeline_path),
         workspace=str(tmp_path / "vd"),
         site="nersc",
         overrides={"account": "project"},

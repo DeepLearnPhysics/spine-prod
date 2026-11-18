@@ -1,5 +1,8 @@
 # Staged training of every learned component used by the DUNE-HD 10 kt module 1x2x6 261022
 # training candidate. Supply its destination with CLI --workspace.
+# Training budgets survive site mapping; --site bounds each allocation separately.
+# NERSC also requires --continuation-dir on Scratch. Other sites need periodic
+# controller advancement (see docs/training-continuation.md).
 # Each split owns one sharded cache repository; stages publish immutable shards.
 
 workspace: null
@@ -64,6 +67,8 @@ stages:
 
   # Train binary deghosting directly from the raw charge and chi-squared views.
   - name: train_uresnet_deghost
+    continuation:
+      runtime_budget: "5-00:00:00"
     depends_on: [build_train_filter, build_validation_filter]
     config: train/dune-hd-10kt-1x2x6/uresnet_deghost/train_261022.yaml
     stage: train
@@ -100,6 +105,8 @@ stages:
 
   # Train semantic segmentation and point proposal on the cached point domain.
   - name: train_uresnet_ppn
+    continuation:
+      runtime_budget: "3-00:00:00"
     depends_on: [cache_train_deghosting, cache_validation_deghosting]
     config: train/dune-hd-10kt-1x2x6/uresnet_ppn/train_from_deghost_cache_261022.yaml
     stage: train
@@ -147,6 +154,8 @@ stages:
 
   # Train Graph-SPICE entirely from cached deghosted points and adapted truth.
   - name: train_graph_spice
+    continuation:
+      runtime_budget: "2-00:00:00"
     depends_on: [cache_train_segmentation, cache_validation_segmentation]
     config: train/dune-hd-10kt-1x2x6/graph_spice/train_from_segmentation_cache_261022.yaml
     stage: train
@@ -184,6 +193,8 @@ stages:
 
   # Train shower aggregation and shower-primary identification from cache.
   - name: train_grappa_shower
+    continuation:
+      runtime_budget: "1-00:00:00"
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/dune-hd-10kt-1x2x6/grappa_shower/train_from_fragment_cache_261022.yaml
     stage: train
@@ -199,6 +210,8 @@ stages:
 
   # Train track aggregation concurrently from the same fragment cache.
   - name: train_grappa_track
+    continuation:
+      runtime_budget: "16:00:00"
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/dune-hd-10kt-1x2x6/grappa_track/train_from_fragment_cache_261022.yaml
     stage: train
@@ -236,6 +249,8 @@ stages:
 
   # Train interaction aggregation and particle classifiers from cached graphs.
   - name: train_grappa_inter
+    continuation:
+      runtime_budget: "08:00:00"
     time: "08:00:00"
     depends_on: [cache_train_particle_graphs, cache_validation_particle_graphs]
     config: train/dune-hd-10kt-1x2x6/grappa_inter/train_from_particle_cache_261022.yaml
