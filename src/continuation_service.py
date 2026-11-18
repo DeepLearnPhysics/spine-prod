@@ -1,5 +1,6 @@
 """NERSC-managed periodic continuation; no SSH session or GPU allocation needed."""
 
+import contextlib
 import hashlib
 import os
 import re
@@ -98,25 +99,108 @@ def register(manifest, account, basedir):
     """Install/read back the timer before enabling a pipeline or submitting work."""
     manifest = Path(manifest).resolve()
     root, registry = service_paths(account)
-    block = schedule_block(account, registry, basedir)
     # All accounts share a lock because scrontab belongs to the user.
     with c.locked(root / "registration"):
-        data = c.read(registry) if registry.exists() else {"pipelines": {}}
-        entry = data["pipelines"].setdefault(str(manifest), {})
-        entry.update(enabled=False)
-        c.atomic_json(registry, data)
+        _register_locked(manifest, account, basedir, registry)
+
+    return registry
+
+
+def _register_locked(manifest, account, basedir, registry):
+    """Caller holds the user-wide registration lock."""
+    block = schedule_block(account, registry, basedir)
+    data = c.read(registry) if registry.exists() else {"pipelines": {}}
+    entry = data["pipelines"].setdefault(str(manifest), {})
+    entry.setdefault("enabled", False)
+    c.atomic_json(registry, data)
+    existing = read_schedule()
+    desired = merge_schedule(existing, block)
+    if desired != existing:
+        backup = registry.parent / ("scrontab-before-" + str(time.time_ns()) + ".txt")
+        backup.write_text(existing)
+        # Detect edits made while preparing the replacement.
+        if read_schedule() != existing:
+            raise RuntimeError("scrontab changed during registration; retry submission")
+        subprocess.run(
+            ["scrontab", "-"],
+            input=desired,
+            text=True,
+            capture_output=True,
+            check=True,
+            timeout=30,
+        )
+    if read_schedule() != desired:
+        raise RuntimeError(
+            "scrontab registration could not be verified; training not submitted"
+        )
+    entry.update(enabled=True, registered_at=time.time())
+    data.update(schedule_state="active", cleanup_error=None)
+    with c.locked(manifest):
+        state = c.read(manifest)
+        state["automation"] = {
+            "backend": "nersc-scrontab",
+            "registry": str(registry),
+            "manifest": str(manifest),
+            "registered_at": entry["registered_at"],
+        }
+        c.atomic_json(manifest, state)
+    c.atomic_json(registry, data)
+
+
+@contextlib.contextmanager
+def reactivating(state):
+    """Serialize reactivation and the user operation against idle retirement."""
+    automation = state.get("automation", {})
+    if automation.get("backend") != "nersc-scrontab":
+        yield
+        return
+    registry = Path(automation["registry"])
+    manifest = Path(automation["manifest"])
+    with c.locked(registry.parent.parent / "registration"):
+        _register_locked(manifest, registry.parent.name, state["basedir"], registry)
+        yield
+
+
+def remove_schedule(existing, account):
+    key = hashlib.sha256(account.encode()).hexdigest()[:16]
+    start = f"# BEGIN spine-prod continuation {key}"
+    end = f"# END spine-prod continuation {key}"
+    if existing.count(start) != existing.count(end) or existing.count(start) > 1:
+        raise RuntimeError("Ambiguous managed scrontab block; inspect scrontab -l")
+    if start not in existing:
+        return existing
+    left, rest = existing.split(start, 1)
+    _, right = rest.split(end, 1)
+    if right.startswith("\n"):
+        right = right[1:]
+    return left + right
+
+
+def retire_if_idle(registry):
+    """Remove only this account's timer after rechecking the current registry."""
+    registry = Path(registry)
+    with c.locked(registry.parent.parent / "registration"):
+        data = c.read(registry)
+        # Re-read while holding the same lock as registrations/reactivations.
+        # Missing/corrupt state is uncertainty, never evidence of completion.
+        for name, entry in data["pipelines"].items():
+            if entry.get("enabled") and needs_tick(Path(name)):
+                return False
         existing = read_schedule()
-        desired = merge_schedule(existing, block)
+        desired = remove_schedule(existing, registry.parent.name)
         if desired != existing:
             backup = registry.parent / (
-                "scrontab-before-" + str(time.time_ns()) + ".txt"
+                "scrontab-before-retirement-" + str(time.time_ns()) + ".txt"
             )
             backup.write_text(existing)
-            # Detect edits made while preparing the replacement.
             if read_schedule() != existing:
                 raise RuntimeError(
-                    "scrontab changed during registration; retry submission"
+                    "scrontab changed during retirement; leaving controller registered"
                 )
+            # Removing our entry may terminate this cron invocation. Persist
+            # intent first, so its status remains intelligible in that case.
+            data.update(schedule_state="retiring", cleanup_error=None)
+            c.atomic_json(registry, data)
             subprocess.run(
                 ["scrontab", "-"],
                 input=desired,
@@ -125,22 +209,13 @@ def register(manifest, account, basedir):
                 check=True,
                 timeout=30,
             )
-        if read_schedule() != desired:
-            raise RuntimeError(
-                "scrontab registration could not be verified; training not submitted"
-            )
-        entry.update(enabled=True, registered_at=time.time())
-        with c.locked(manifest):
-            state = c.read(manifest)
-            state["automation"] = {
-                "backend": "nersc-scrontab",
-                "registry": str(registry),
-                "manifest": str(manifest),
-                "registered_at": entry["registered_at"],
-            }
-            c.atomic_json(manifest, state)
+            if read_schedule() != desired:
+                raise RuntimeError("Could not verify automatic controller retirement")
+        data.update(
+            schedule_state="stopped", stopped_at=time.time(), cleanup_error=None
+        )
         c.atomic_json(registry, data)
-    return registry
+        return True
 
 
 def needs_tick(manifest):
@@ -209,13 +284,33 @@ def tick_registry(registry):
                     )
                     c.atomic_json(registry, latest)
 
+        try:
+            retire_if_idle(registry)
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            RuntimeError,
+            subprocess.SubprocessError,
+        ) as exc:
+            with c.locked(root / "registration"):
+                latest = c.read(registry)
+                latest["cleanup_error"] = str(exc)
+                c.atomic_json(registry, latest)
+            print(f"Controller retirement deferred: {exc}", file=sys.stderr)
+
 
 def health(state):
     automation = state.get("automation")
     if not automation:
         return "manual"
     try:
-        entry = c.read(automation["registry"])["pipelines"][automation["manifest"]]
+        registry = c.read(automation["registry"])
+        if registry.get("cleanup_error"):
+            return "controller retirement error: " + registry["cleanup_error"]
+        if registry.get("schedule_state") in ("stopped", "retiring"):
+            return registry["schedule_state"] + "; no pipelines need monitoring"
+        entry = registry["pipelines"][automation["manifest"]]
         if not entry.get("enabled"):
             return "disabled"
         if entry.get("last_error"):

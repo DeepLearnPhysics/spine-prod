@@ -235,6 +235,16 @@ def advance(path, context=None):
 
 
 def operate(path, action, stage=None, value=None):
+    """Rearm automatic hosting before changing a blocked pipeline's state."""
+    if action in ("extend", "retry", "accept", "adopt"):
+        from .continuation_service import reactivating
+
+        with reactivating(c.read(path)):
+            return _operate(path, action, stage, value)
+    return _operate(path, action, stage, value)
+
+
+def _operate(path, action, stage=None, value=None):
     """Serialize user operations with submission, including cancellation races."""
     path = Path(path)
     with c.locked(path):
