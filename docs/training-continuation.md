@@ -14,11 +14,9 @@ NERSC, load the Python module before submitting. The controller retains that
 Python executable for unattended invocations.
 
 The training runtime must provide **SPINE continuation capability 2**, including
-pending-validation replay. This implementation is maintained in
-[SPINE](https://github.com/DeepLearnPhysics/spine/pull/194), not in spine-prod.
-Use a SPINE release/container that includes it, or select a source checkout with
-`--spine-path` while testing an unreleased implementation. Check the executable
-inside the selected training environment:
+pending-validation replay. **SPINE 1.5.0** provides this support and is the
+default runtime selected by `DEFAULT_SPINE_VERSION`. The implementation is
+maintained in SPINE. Check the executable inside the selected training environment:
 
 ```bash
 spine --continuation-contract
