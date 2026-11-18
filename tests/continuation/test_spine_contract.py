@@ -332,3 +332,45 @@ def test_pending_validation_archives_partial_log(tmp_path):
     assert not path.exists()
     assert next(tmp_path.glob("*.interrupted-*")).read_text() == "partial"
     logger.close()
+
+
+def test_checkpoint_cadence_survives_multiple_short_allocations():
+    """Splitting a run must preserve the uninterrupted validation boundaries."""
+    from spine.model.manager import ModelManager
+
+    manager = SimpleNamespace(save_step=980, start_iteration=0)
+    uninterrupted = [i for i in range(2500) if ModelManager.should_save(manager, i)]
+    resumed = []
+    for start, stop in ((0, 526), (526, 997), (997, 1649), (1649, 2500)):
+        manager.start_iteration = start
+        resumed.extend(
+            i for i in range(start, stop) if ModelManager.should_save(manager, i)
+        )
+    assert uninterrupted == resumed == [979, 1959]
+    manager.save_step = None
+    assert not ModelManager.should_save(manager, 1959)
+
+
+def test_resumed_driver_validates_at_original_epoch_boundary(tmp_path, monkeypatch):
+    """A resumed allocation validates before pausing at its later boundary."""
+    from spine.model.manager import ModelManager
+
+    drv, saves, outcome, _ = driver(tmp_path, monkeypatch, start=978, limit=2000)
+    drv.model.save_step = 980
+    drv.model.should_save = lambda i: ModelManager.should_save(drv.model, i)
+    processed = []
+
+    def process(**kwargs):
+        processed.append(kwargs)
+        if len(processed) == 3:
+            (tmp_path / "pause").touch()
+        return {"loss": 1.0}
+
+    drv.process = process
+    drv.run()
+    drv.validation.run.assert_called_once()
+    assert [iteration for iteration, _, _ in saves] == [979, 980]
+    result = json.loads(outcome.read_text())
+    assert result["state"] == "paused"
+    assert result["iteration"] == 980
+    assert not result["pending_validation"]
