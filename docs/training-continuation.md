@@ -298,6 +298,80 @@ directory and weights directory persist across allocations, retaining the best
 checkpoint as well as the latest restart checkpoint. Downstream stages remain
 blocked until logical completion and successful terminal accounting.
 
+## Comparing six-hour and twelve-hour allocations
+
+`pipelines/continuation/nersc_6h.yaml` and `nersc_12h.yaml` give the same
+single-node workload a **12-hour cumulative runtime budget**, with allocation
+ceilings of six and twelve hours respectively. Both use a two-minute checkpoint
+margin, identical validation cadence, and the same input/configuration defaults.
+They disable early stopping and use a deliberately unreachable iteration limit
+so this experiment measures budget-limited throughput. Do not use these stopping
+settings for ordinary scientific training.
+
+Run both from the same immutable spine-prod and patched SPINE revisions, with
+identical input lists, account, QoS, GPU resources, and seeds. Submit close together
+and repeat on another day, alternating submission order; a single pair is a pilot,
+not a reliable estimate of queue behavior. Concurrent runs can also influence one
+another through resource contention and account scheduling policies.
+
+From the directory containing `spine-prod`, this previews both experiments:
+
+```bash
+source spine-prod/configure.sh
+for chunk in 6 12; do
+  python3 spine-prod/submit.py \
+    --pipeline "spine-prod/pipelines/continuation/nersc_${chunk}h.yaml" \
+    --workspace "$PWD/continuation-benchmark-${chunk}h" \
+    --continuation-dir "$SCRATCH/continuation-benchmark-${chunk}h" \
+    --spine-path "$PWD/spine-continuation-v4-checkout" \
+    --account m5252 \
+    --source-list "$PWD/train.list" \
+    --val-source-list "$PWD/test.list" \
+    --dry-run
+done
+```
+
+Replace the checkout/account as needed, then remove `--dry-run` to submit. Each
+case can consume up to 12 full-node hours (24 combined). For repeats, change both
+directory names. No downstream validation stage is submitted: `budget_exhausted`
+is the expected endpoint, not successful scientific completion. Checkpoint
+margins and unusable final fragments mean actual runtime can finish slightly
+below the budget; do not assume exactly two allocations versus one.
+
+Export each case on NERSC using:
+
+```bash
+python3 spine-prod/scripts/continue_training.py metrics \
+  "$SCRATCH/continuation-benchmark-6h/.spine-prod/continuation_pipeline.json" \
+  > allocations-6h.csv
+```
+
+Repeat for 12h. Compare total queue wait, submission-to-final-job-end elapsed time,
+confirmed allocated runtime, number of restarts, and final training progress.
+Report both time to reach common progress and progress achieved within the budget;
+allocation runtime includes startup, validation, checkpointing, and teardown, not
+just optimizer steps. The controller log supplies the eventual terminal state;
+retain scheduler submission/start/end records when collecting logs.
+
+NERSC describes requested walltime as a scheduling input and shorter jobs as
+better backfill candidates ([scheduling](https://docs.nersc.gov/jobs/scheduling/),
+[queue troubleshooting](https://docs.nersc.gov/jobs/troubleshooting/)). Shorter
+chunks may start sooner but must queue repeatedly. Therefore measure the whole
+campaign rather than declaring a winner from its first start time. NERSC's
+[best practices](https://docs.nersc.gov/jobs/best-practices/#time-limits) recommend
+short or variable-length jobs and checkpoint/restart chains, without prescribing
+one optimal duration. A later variable-duration case could set `min_time` to one
+hour with the six-hour ceiling; these bounds are experimental choices, not a
+NERSC recommendation. Keep that separate from the fixed-duration comparison.
+
+The 20-minute test can estimate restart overhead, but extrapolating its few queue
+samples assumes stable queue conditions and independent waits, neither of which
+is established. Its original early-stopping settings and v3's mixed software
+revisions also prevent a controlled comparison. A matched short-chunk experiment
+can use either benchmark file with `--time 00:20:00`, fresh directories, and the
+same 12-hour budget; this is an additional experiment, not part of the two-case
+launch above.
+
 ## Operations and recovery
 
 ```bash
