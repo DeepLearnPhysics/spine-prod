@@ -9,10 +9,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
-from .client import PBSClient, SlurmClient
-from .component import SubmissionComponent
-from .joint_sharding import plan_shards, survey_sources
-from .run_manager import RunManager
+from ..client import PBSClient, SlurmClient
+from ..runs import RunManager
+from ..sites import validate_allocation
+from .base import SubmissionComponent
+from .render import render_script
+from .sharding import plan_shards, survey_sources
+from .validation import validate_request
 
 
 class BatchRunner(SubmissionComponent):
@@ -183,6 +186,8 @@ class BatchRunner(SubmissionComponent):
         tensorboard: bool = False,
         allow_missing_inputs: bool = False,
         retry: bool = False,
+        continuation: Optional[Dict] = None,
+        continuation_dir: Optional[str] = None,
         **profile_overrides,
     ) -> List[str]:
         """Submit batch job for SPINE processing.
@@ -326,6 +331,10 @@ class BatchRunner(SubmissionComponent):
         retry : bool, optional
             Reuse an existing pipeline stage directory while preserving prior
             submissions. Training resumes its latest checkpoint when present.
+        continuation : dict, optional
+            Allocation policy and total runtime budget for resumable training.
+        continuation_dir : str, optional
+            Durable controller directory, separate from training outputs.
         **profile_overrides
             Override profile settings
 
@@ -341,127 +350,40 @@ class BatchRunner(SubmissionComponent):
         if no_writer:
             self.context.spine_cli.warn_no_writer_deprecated()
 
-        if joint_file_mode not in ("broadcast", "paired", "balanced"):
-            raise ValueError(
-                "joint_file_mode must be either 'broadcast', 'paired' or 'balanced'"
-            )
-
-        if not isinstance(joint_validate_trees, bool):
-            raise TypeError("joint_validate_trees must be a boolean")
-        if joint_validate_trees and joint_file_mode != "balanced":
-            raise ValueError("joint_validate_trees requires balanced joint sharding")
-
-        if in_place and (output is not None or output_suffix is not None):
-            raise ValueError(
-                "--in-place cannot be combined with --output or --output-suffix"
-            )
-        if bool(cache_repository) != bool(cache_stage):
-            raise ValueError(
-                "cache_repository and cache_stage must be provided together"
-            )
-        if cache_repository and stage != "inference":
-            raise ValueError("Cache publication is valid only for inference jobs")
-        if output_source_list and (
-            in_place
-            or not files
-            or named_sources
-            or not output
-            or not output_suffix
-            or Path(output).suffix.lower() in {".h5", ".hdf5"}
-        ):
-            raise ValueError(
-                "output_source_list requires an explicit output directory and suffix"
-            )
-
-        if stage not in ("inference", "train", "validation"):
-            raise ValueError("stage must be one of: inference, train, validation")
-        if stage != "inference" and not run_dir:
-            raise ValueError(f"--run-dir is required for the {stage} stage")
-        if stage != "train" and (resume or resume_from):
-            raise ValueError("--resume and --resume-from are valid only for training")
-        if weight_path and (resume or resume_from):
-            raise ValueError("--weight-path cannot be combined with training resume")
-        if bool(warm_start_path) != bool(warm_start_modules):
-            raise ValueError(
-                "warm_start_path and warm_start_modules must be provided together"
-            )
-        if warm_start_path and stage != "train":
-            raise ValueError("Pipeline warm start is valid only for training jobs")
-        if warm_start_path and weight_path:
-            raise ValueError("Pipeline warm start cannot be combined with weight_path")
-        if stage != "validation" and (validation_name or rerun_validation):
-            raise ValueError(
-                "--validation-name and --rerun-validation are valid only for validation"
-            )
-        if validation_files and stage != "train":
-            raise ValueError(
-                "--val-source and --val-source-list are valid only for training"
-            )
-        if validation_named_sources and stage != "train":
-            raise ValueError("Named validation sources are valid only for training")
-        if val_entry_fraction_range is not None and stage != "train":
-            raise ValueError("--val-entry-fraction-range is valid only for training")
-        if val_entry_filter is not None and stage != "train":
-            raise ValueError("--val-entry-filter is valid only for training")
-        if val_num_entries is not None and stage != "train":
-            raise ValueError("--val-num-entries is valid only for training")
-        if val_num_files is not None and stage != "train":
-            raise ValueError("--val-num-files is valid only for training")
-        # Validate limits independently of whether source resolution is needed.
-        self.file_handler.limit_files([], num_files)
-        self.file_handler.limit_files([], val_num_files)
-        if num_files is not None and not (files or named_sources):
-            raise ValueError(
-                "--num-files requires --source/--source-list or named sources"
-            )
-        if val_num_files is not None and not (
-            validation_files or validation_named_sources
-        ):
-            raise ValueError(
-                "--val-num-files requires --val-source/--val-source-list or "
-                "named validation sources"
-            )
-        if num_entries is not None and entry_fraction_range is not None:
-            raise ValueError(
-                "--num-entries cannot be combined with --entry-fraction-range"
-            )
-        if val_num_entries is not None and val_entry_fraction_range is not None:
-            raise ValueError(
-                "--val-num-entries cannot be combined with "
-                "--val-entry-fraction-range"
-            )
-        if export_weights:
-            if stage != "inference":
-                raise ValueError("--export-weights requires stage=inference")
-            if (
-                files
-                or named_sources
-                or validation_files
-                or validation_named_sources
-                or entry_fraction_range is not None
-                or val_entry_fraction_range is not None
-                or num_entries is not None
-                or val_num_entries is not None
-                or num_files is not None
-                or val_num_files is not None
-            ):
-                raise ValueError(
-                    "--export-weights cannot be combined with dataset selections"
-                )
-            if output is not None or output_suffix is not None:
-                raise ValueError(
-                    "--export-weights cannot be combined with writer output options"
-                )
-        if files and named_sources:
-            raise ValueError("Flat and named training sources cannot be combined")
-        if validation_files and validation_named_sources:
-            raise ValueError("Flat and named validation sources cannot be combined")
-        if stage != "inference" and (ntasks is not None or files_per_task is not None):
-            raise ValueError(
-                "--ntasks and --files-per-task are valid only for inference"
-            )
-        if in_place and stage != "inference":
-            raise ValueError("--in-place is valid only for inference")
+        validate_request(
+            self.file_handler,
+            files=files,
+            validation_files=validation_files,
+            named_sources=named_sources,
+            validation_named_sources=validation_named_sources,
+            warm_start_path=warm_start_path,
+            warm_start_modules=warm_start_modules,
+            weight_path=weight_path,
+            export_weights=export_weights,
+            output=output,
+            output_suffix=output_suffix,
+            output_source_list=output_source_list,
+            in_place=in_place,
+            cache_repository=cache_repository,
+            cache_stage=cache_stage,
+            ntasks=ntasks,
+            files_per_task=files_per_task,
+            joint_file_mode=joint_file_mode,
+            joint_validate_trees=joint_validate_trees,
+            num_files=num_files,
+            val_num_files=val_num_files,
+            num_entries=num_entries,
+            val_num_entries=val_num_entries,
+            entry_fraction_range=entry_fraction_range,
+            val_entry_fraction_range=val_entry_fraction_range,
+            val_entry_filter=val_entry_filter,
+            stage=stage,
+            run_dir=run_dir,
+            resume=resume,
+            resume_from=resume_from,
+            validation_name=validation_name,
+            rerun_validation=rerun_validation,
+        )
 
         file_list = []
         if files:
@@ -696,6 +618,19 @@ class BatchRunner(SubmissionComponent):
         if site != "s3df" and "gpus" in profile_overrides:
             raise ValueError(f"--gpus is not valid for {site.upper()} profiles")
         profile_config.update(profile_overrides)
+        continuation_policy = None
+        if continuation is not None:
+            from ..continuation.policy import profile_policy
+            from ..continuation.state import validate_storage
+
+            if stage != "train" or ntasks is not None or files_per_task is not None:
+                raise ValueError("Continuation supports ordinary training jobs only")
+            validate_storage(continuation_dir, site)
+            continuation_policy = profile_policy(
+                self.profiles, profile_config, continuation
+            )
+
+        validate_allocation(self.profiles, profile_config)
         world_size = self.context.spine_cli.align_world_size(profile_config, world_size)
         spine_runtime_options = self.context.spine_cli.format_runtime_options(
             world_size,
@@ -724,6 +659,7 @@ class BatchRunner(SubmissionComponent):
                 flashmatch_bind_root,
                 extra_bind_root,
                 cache_bind_root,
+                continuation_dir,
             ]
             if root
         ]
@@ -788,11 +724,82 @@ class BatchRunner(SubmissionComponent):
         # Every scheduler submission gets the same immutable attempt layout,
         # including the first inference attempt. This keeps retries uniform.
         attempt_dir = RunManager.create_attempt_dir(job_dir)
+        continuation_attempt = None
+        control_dir = attempt_dir
+        if continuation_policy is not None:
+            import hashlib
+
+            from ..continuation.policy import describe_policy, next_request
+            from ..continuation.state import reserve
+
+            if continuation_dir is not None:
+                control_dir = (
+                    Path(continuation_dir)
+                    / ".spine-prod"
+                    / "attempts"
+                    / attempt_dir.name
+                )
+                control_dir.mkdir(parents=True, exist_ok=True)
+            # Include every scientific CLI override and resolved input selection,
+            # but keep allocation policy and per-attempt paths out of identity.
+            identity_values = dict(
+                config=RunManager.config_digest(config),
+                world_size=world_size,
+                runtime=spine_runtime_options,
+                overrides=set_overrides,
+                sources=effective_named_sources,
+                files=file_list,
+                validation_sources=effective_validation_named_sources,
+                validation_files=validation_file_list,
+                entry_options=entry_fraction_options,
+                num_entry_options=num_entry_options,
+                entry_filter_options=entry_filter_options,
+                module_weights=module_weights,
+                weight_path=weight_path,
+                warm_start_path=warm_start_path,
+                warm_start_modules=warm_start_modules,
+            )
+            identity = hashlib.sha256(
+                json.dumps(identity_values, sort_keys=True).encode()
+            ).hexdigest()
+            if dry_run:
+                request = next_request(continuation_policy, 0)
+                continuation_attempt = {"token": "dry-run", "request": request}
+            else:
+                continuation_attempt = reserve(
+                    job_dir,
+                    identity,
+                    continuation_policy,
+                    scheduler,
+                    control_dir,
+                    site=site,
+                    continuation_dir=continuation_dir,
+                )
+            profile_config["time"] = continuation_attempt["request"]["time"]
+            validate_allocation(self.profiles, profile_config)
+            print(
+                "  Continuation: submission-host controller; downstream deferred until completed"
+            )
+            print("  " + describe_policy(continuation_policy))
+            # Contract variables explicitly cross both Shifter and Apptainer.
+            spine_cmd = (
+                "env "
+                + " ".join(
+                    f"{key}={shlex.quote(str(value))}"
+                    for key, value in {
+                        "SPINE_CONTINUATION_TOKEN": continuation_attempt["token"],
+                        "SPINE_PAUSE_FILE": control_dir / "pause",
+                        "SPINE_OUTCOME_FILE": control_dir / "outcome.json",
+                    }.items()
+                )
+                + " "
+                + (spine_cmd or "spine")
+            )
         graceful_stop_file = None
         if stage == "train":
             # Keep the request marker scoped to one immutable submission. A
             # retry therefore cannot inherit a completed attempt's request.
-            graceful_stop_file = attempt_dir / "graceful_stop"
+            graceful_stop_file = control_dir / "graceful_stop"
             lifecycle_args.extend(
                 [
                     "--graceful-stop-file",
@@ -1200,14 +1207,23 @@ class BatchRunner(SubmissionComponent):
                 chunk_spine_overrides = spine_cli_overrides
 
             batch_client = self.get_batch_client(profile_config)
-            template = batch_client.load_template(
-                self.get_template_name(profile_config)
-            )
-
-            script_content = template.render(
+            script_path = render_script(
+                batch_client,
+                self.get_template_name(profile_config),
+                attempt_dir,
+                chunk_idx,
+                len(file_chunks),
+                continuation_attempt=continuation_attempt,
+                continuation_policy=continuation_policy,
+                continuation_run_dir=str(job_dir),
+                continuation_dir=continuation_dir,
                 array_spec=array_spec,
                 job_name=(
-                    f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
+                    continuation_attempt["token"]
+                    if continuation_attempt
+                    else (
+                        f"{job_name}_{chunk_idx}" if len(file_chunks) > 1 else job_name
+                    )
                 ),
                 log_dir=str(attempt_dir),
                 stdout_path=(
@@ -1269,14 +1285,6 @@ class BatchRunner(SubmissionComponent):
                 **profile_config,
             )
 
-            script_name = "submit"
-            if len(file_chunks) > 1:
-                script_name += f"_{chunk_idx:03d}"
-            script_path = attempt_dir / f"{script_name}{batch_client.script_suffix}"
-            with open(script_path, "w", encoding="utf-8") as f:
-                f.write(script_content)
-            script_path.chmod(0o755)
-
             # Submit
             print(f"\nSubmitting chunk {chunk_idx + 1}/{len(file_chunks)}:")
             print(f"  Script: {script_path}")
@@ -1296,6 +1304,12 @@ class BatchRunner(SubmissionComponent):
                 print(f"  Dependency: {chunk_dependency}")
 
             job_id = batch_client.submit(script_path, dry_run)
+            if continuation_attempt and not dry_run:
+                from ..continuation.state import submitted
+
+                submitted(
+                    job_dir, continuation_attempt["token"], job_id, continuation_dir
+                )
             if job_id:
                 job_ids.append(job_id)
                 print(f"  Job ID: {job_id}")
@@ -1312,6 +1326,7 @@ class BatchRunner(SubmissionComponent):
             "job_name": job_name,
             "stage": stage,
             "run_dir": str(job_dir),
+            "continuation_dir": continuation_dir,
             "detector": detector,
             "config": config,
             "original_config": original_config if apply_mods else config,

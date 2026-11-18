@@ -10,6 +10,10 @@ A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPIN
 
 SPINE is a deep learning-based reconstruction framework for liquid argon time projection chamber (LArTPC) detectors. This production system provides tools for running SPINE at scale on large datasets using scheduler-managed job arrays.
 
+For opt-in training across scheduler allocations, see the
+[continuation guide](docs/training-continuation.md) for runtime requirements,
+storage setup, scheduling policy, and controller operations.
+
 ## Quick Start
 
 ### 1. Environment Setup
@@ -29,9 +33,10 @@ container image. The repository default release is recorded in
 that value and derives the registry tag and default S3DF Singularity image path.
 This container packages SPINE, OpT0Finder, and runtime dependencies, and jobs
 invoke the container-provided `spine` executable directly.
-The current default is SPINE v1.4.0. Maintained configurations require SPINE
-v1.4.0 or later. Launchers check the selected executable after environment
-setup, inside the container when applicable. See the [migration notes](MIGRATION_1_4.md)
+Maintained configurations require SPINE v1.4.4 or later; continuation also
+requires the runtime capability described in the continuation guide. Launchers
+check the selected executable after environment setup, inside the container
+when applicable. See the [migration notes](MIGRATION_1_4.md)
 for ordered stages, named modifiers, and compatibility changes.
 
 **Alternative Container Location:** You can override the local `.sif` path or
@@ -153,7 +158,8 @@ change output routing. If secondary entries run out, the last processed primary
 file may have a partial output and subsequent files produce no output. Use
 `--set base.split_output=false` to combine a task's events into one output instead.
 
-The default and minimum supported runtime is SPINE 1.4.4. It includes primary-only
+The default runtime is SPINE 1.5.0, which supports training continuation.
+The baseline minimum for other workflows remains SPINE 1.4.4, which includes primary-only
 joint output routing, training-compatible shower-primary reporting, overall
 semantic recall, and initial validation/checkpoint selection before training.
 Explicit runtime overrides must provide SPINE 1.4.4 or newer.
@@ -686,6 +692,39 @@ stages:
     profile: s3df_milano
     ntasks: 20
 ```
+
+Switch an existing pipeline between sites with `--site s3df`, `--site nersc`,
+or `--site alcf` (Polaris). The correspondence in `templates/profiles.yaml`
+maps CPU, single-GPU, and full-GPU-node profiles while preserving stage times,
+scan parallelism, model settings, and dependencies. Launch resource overrides
+apply last. Profiles requiring more GPU memory than the destination provides
+are rejected; allocation correspondence does not imply identical performance.
+
+```bash
+./submit.py --pipeline pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml \
+  --site nersc --account YOUR_PROJECT --workspace /path/to/vd-run \
+  --source-list /path/to/train_file_list.txt \
+  --val-source-list /path/to/test_file_list.txt --dry-run
+```
+
+Preflight checks every selected stage before submitting any jobs, including in
+`--dry-run`. The VD five-day and three-day training requests exceed NERSC's
+48-hour regular-QOS limit: explicitly choose shorter requests with `--time`
+(which overrides every selected stage), or use allocation continuation when
+that feature is integrated. Site selection never truncates training time or
+resubmits jobs. Selecting only the scan stages allows testing data access first.
+
+The central `sites` table records queue/QOS allocation limits and their sources.
+Known limits also apply to ordinary batch, filter, and report submissions.
+S3DF limits are currently unknown (`null`), not unlimited; populate them from
+local scheduler policy. These static checks do not replace live scheduler policy,
+account eligibility, or queue availability. Polaris capacity currently allows
+168 hours but limits each user to two queued/running jobs and one running job;
+site selection does not throttle submissions. Portable jobs use one node each.
+Accounts, data lists, software paths, and workspaces must be valid at the target
+site; no files are transferred. NERSC requires an explicit account; Polaris
+uses its configured project unless overridden. CPU stages on Polaris use its
+GPU-equipped nodes.
 
 `workspace` defines the pipeline's shared output root and is available as the
 reserved `${workspace}` variable. Declaring `workspace: null` keeps a checked-in

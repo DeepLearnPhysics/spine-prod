@@ -25,10 +25,12 @@ jobs:
 
   test:
     name: Test Configuration Files
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-24.04]
 
     steps:
       - uses: actions/checkout@v6
@@ -59,7 +61,7 @@ jobs:
         if: matrix.python-version == '3.11'
         run: >-
           python -m coverage report
-          --include='src/*,submit.py'
+          --include='src/*,scripts/*.py,submit.py'
           --fail-under=100
 
       - name: Upload coverage to Codecov

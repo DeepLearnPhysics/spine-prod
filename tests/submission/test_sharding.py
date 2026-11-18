@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.joint_sharding import plan_shards, survey_sources
+from src.submission.sharding import plan_shards, survey_sources
 
 
 def test_primary_file_limit_and_disjoint_secondary_ranges():
@@ -46,7 +46,7 @@ def test_survey_cache_reused_and_invalidated(tmp_path):
     source.write_bytes(b"first")
     sources = {"primary": [str(source)], "secondary": [str(source)]}
     cache = tmp_path / "counts.json"
-    with patch("src.joint_sharding.count_root_entries", return_value=5) as count:
+    with patch("src.submission.sharding.count_root_entries", return_value=5) as count:
         assert survey_sources(sources, cache) == {"primary": [5], "secondary": [5]}
         survey_sources(sources, cache)
         assert count.call_count == 1
@@ -59,7 +59,7 @@ def test_root_survey_checks_tree_counts(tmp_path):
     uproot = pytest.importorskip("uproot")
     import numpy as np
 
-    from src.joint_sharding import count_root_entries
+    from src.submission.sharding import count_root_entries
 
     path = tmp_path / "events.root"
     with uproot.recreate(path) as source:
@@ -81,7 +81,7 @@ def test_full_validation_upgrades_reference_cache(tmp_path):
     source.touch()
     cache = tmp_path / "counts.json"
     sources = {"primary": [str(source)]}
-    with patch("src.joint_sharding.count_root_entries", return_value=5) as count:
+    with patch("src.submission.sharding.count_root_entries", return_value=5) as count:
         survey_sources(sources, cache)
         survey_sources(sources, cache, validate_trees=True)
         assert count.call_count == 2
@@ -99,7 +99,7 @@ def test_reference_survey_opens_only_one_tree(monkeypatch, backend, validate):
     from types import SimpleNamespace
     from unittest.mock import MagicMock
 
-    from src.joint_sharding import count_root_entries
+    from src.submission.sharding import count_root_entries
 
     opened = []
     counts = {"a_tree": 7, "b_tree": 9}
@@ -150,7 +150,7 @@ def test_survey_requires_a_root_backend(monkeypatch):
     """Missing optional backends produce an actionable error."""
     import sys
 
-    from src.joint_sharding import count_root_entries
+    from src.submission.sharding import count_root_entries
 
     monkeypatch.setitem(sys.modules, "uproot", None)
     monkeypatch.setitem(sys.modules, "ROOT", None)
@@ -165,7 +165,7 @@ def test_pyroot_rejects_unreadable_files(monkeypatch, zombie):
     from types import SimpleNamespace
     from unittest.mock import MagicMock
 
-    from src.joint_sharding import count_root_entries
+    from src.submission.sharding import count_root_entries
 
     source = MagicMock() if zombie else None
     if zombie:
@@ -183,7 +183,7 @@ def test_pyroot_rejects_unreadable_files(monkeypatch, zombie):
 def test_root_file_without_larcv_trees(tmp_path):
     """A readable ROOT file without an event tree cannot drive sharding."""
     uproot = pytest.importorskip("uproot")
-    from src.joint_sharding import count_root_entries
+    from src.submission.sharding import count_root_entries
 
     path = tmp_path / "empty.root"
     with uproot.recreate(path):
@@ -211,7 +211,7 @@ def test_survey_discards_invalid_cached_counts(tmp_path, cached_count):
             }
         )
     )
-    with patch("src.joint_sharding.count_root_entries", return_value=5) as count:
+    with patch("src.submission.sharding.count_root_entries", return_value=5) as count:
         assert survey_sources({"primary": [str(source)]}, cache) == {"primary": [5]}
         count.assert_called_once()
 
@@ -223,7 +223,9 @@ def test_survey_invalidates_on_mtime_without_size_change(tmp_path):
     source = tmp_path / "input.root"
     source.write_bytes(b"first")
     sources = {"primary": [str(source)]}
-    with patch("src.joint_sharding.count_root_entries", side_effect=[5, 6]) as count:
+    with patch(
+        "src.submission.sharding.count_root_entries", side_effect=[5, 6]
+    ) as count:
         survey_sources(sources, tmp_path / "cache.json")
         stat = source.stat()
         os.utime(source, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
@@ -237,11 +239,11 @@ def test_failed_validation_does_not_upgrade_or_overwrite_cache(tmp_path):
     source.touch()
     sources = {"primary": [str(source)]}
     cache = tmp_path / "counts.json"
-    with patch("src.joint_sharding.count_root_entries", return_value=5):
+    with patch("src.submission.sharding.count_root_entries", return_value=5):
         survey_sources(sources, cache)
     before = cache.read_bytes()
     with patch(
-        "src.joint_sharding.count_root_entries", side_effect=ValueError("mismatch")
+        "src.submission.sharding.count_root_entries", side_effect=ValueError("mismatch")
     ):
         with pytest.raises(ValueError, match="mismatch"):
             survey_sources(sources, cache, validate_trees=True)

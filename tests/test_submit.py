@@ -424,10 +424,12 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         preload=True,
         overrides={},
         workspace="/runs/benchmark",
+        continuation_dir=None,
         from_stage=None,
         to_stage=None,
         select_stages=None,
         skip_stages=None,
+        site=None,
         stage_module_weights=None,
         warm_start=None,
         source_list=None,
@@ -781,3 +783,70 @@ def test_pipeline_source_list_overrides_require_one_unqualified_path(
     with pytest.raises(SystemExit, match="2"):
         run_main("--pipeline", "pipeline.yaml", flag, *values)
     assert "requires exactly one unqualified list path" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("version", [(3, 6, 15), (3, 8, 20)])
+def test_old_python_reports_requirement_before_submission_imports(version):
+    """Unsupported hosts must not fail with a misleading missing Submitter."""
+    import subprocess
+    from pathlib import Path
+
+    package = Path(__file__).resolve().parents[1] / "src" / "__init__.py"
+    probe = (
+        "import runpy, sys; "
+        f"sys.version_info = {version!r}; "
+        f"runpy.run_path({str(package)!r})"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True
+    )
+    assert result.returncode != 0
+    assert "spine-prod requires Python 3.9 or newer" in result.stderr
+    assert "module load python" in result.stderr
+    assert "cannot import name 'Submitter'" not in result.stderr
+
+
+def test_site_requires_pipeline(capsys):
+    with pytest.raises(SystemExit):
+        run_main("--config", "config.yaml", "--site", "nersc")
+    assert "--site is only supported with --pipeline" in capsys.readouterr().err
+
+
+def test_pipeline_forwards_site():
+    mock = Mock()
+    mock.submit_pipeline.return_value = {}
+    run_main("--pipeline", "pipeline.yaml", "--site", "nersc", submitter=mock)
+    assert mock.submit_pipeline.call_args.kwargs["site"] == "nersc"
+
+
+def test_pipeline_continuation_directory_forwarded():
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--workspace",
+        "/global/cfs/cdirs/project/run",
+        "--continuation-dir",
+        "/pscratch/sd/u/user/state",
+        submitter=submitter,
+    )
+    assert result == 0
+    assert (
+        submitter.submit_pipeline.call_args.kwargs["continuation_dir"]
+        == "/pscratch/sd/u/user/state"
+    )
+    assert (
+        submitter.submit_pipeline.call_args.kwargs["workspace"]
+        == "/global/cfs/cdirs/project/run"
+    )
+
+
+def test_continuation_directory_requires_pipeline(capsys):
+    """A controller directory is meaningful only for a pipeline."""
+    with pytest.raises(SystemExit):
+        run_main("--config", "config.yaml", "--continuation-dir", "/scratch/state")
+    assert (
+        "--continuation-dir is only supported with --pipeline"
+        in capsys.readouterr().err
+    )
