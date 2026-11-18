@@ -11,6 +11,9 @@ defaults:
 stages:
   - name: train_uresnet_ppn
     stage: train
+    warm_start:
+      uresnet: uresnet_ppn.uresnet
+      ppn: uresnet_ppn.ppn
     config: train/generic/uresnet_ppn/train_240805.yaml
     run_dir: ${workspace}/train
     source_list: ${train_source_list}
