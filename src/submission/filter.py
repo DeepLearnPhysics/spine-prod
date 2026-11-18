@@ -6,9 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from .component import SubmissionComponent
-from .run_manager import RunManager
-from .site_resources import validate_allocation
+from ..runs import RunManager
+from ..sites import validate_allocation
+from .base import SubmissionComponent
 
 
 class FilterRunner(SubmissionComponent):

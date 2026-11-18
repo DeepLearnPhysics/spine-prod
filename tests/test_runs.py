@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.run_manager import RunManager
+from src.runs import RunManager
 
 
 def write_config(path: Path, value: str = "base: {}\n") -> str:

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.config_manager import ConfigManager
+from src.config import ConfigManager
 
 
 @pytest.fixture
@@ -405,7 +405,7 @@ def test_create_composite_config_handles_cross_drive_relpath_failure(
             raise ValueError("different drive")
         return original_relpath(path, start)
 
-    monkeypatch.setattr("src.config_manager.os.path.relpath", fail_custom_relpath)
+    monkeypatch.setattr("src.config.os.path.relpath", fail_custom_relpath)
 
     result = Path(
         manager.create_composite_config(str(external), [str(custom)], tmp_path)
@@ -429,7 +429,7 @@ def test_create_composite_config_handles_initial_relpath_failure(
             raise ValueError("different drive")
         return original_relpath(path, start)
 
-    monkeypatch.setattr("src.config_manager.os.path.relpath", fail_config_tree_relpath)
+    monkeypatch.setattr("src.config.os.path.relpath", fail_config_tree_relpath)
 
     result = Path(manager.create_composite_config("base.yaml", [], tmp_path))
 
@@ -471,7 +471,7 @@ def test_create_composite_config_keeps_include_when_rewrite_relpath_fails(
             raise ValueError("different drive")
         return original_relpath(path, start)
 
-    monkeypatch.setattr("src.config_manager.os.path.relpath", fail_missing_relpath)
+    monkeypatch.setattr("src.config.os.path.relpath", fail_missing_relpath)
 
     manager.create_composite_config(str(latest), [], tmp_path)
 
@@ -611,7 +611,7 @@ def test_create_latest_config_uses_absolute_path_when_relpath_fails(
     base.parent.mkdir(parents=True)
     base.touch()
     monkeypatch.setattr(
-        "src.config_manager.os.path.relpath",
+        "src.config.os.path.relpath",
         lambda *args, **kwargs: (_ for _ in ()).throw(ValueError("different drive")),
     )
 

@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from .component import SubmissionComponent
+from .base import SubmissionComponent
 
 
 class RuntimeResolver(SubmissionComponent):
@@ -32,7 +32,7 @@ class RuntimeResolver(SubmissionComponent):
     @staticmethod
     def default_container_version() -> str:
         """Return the repository default SPINE container version."""
-        version_path = Path(__file__).resolve().parents[1] / "DEFAULT_SPINE_VERSION"
+        version_path = Path(__file__).resolve().parents[2] / "DEFAULT_SPINE_VERSION"
         with open(version_path, "r", encoding="utf-8") as f:
             return f.read().strip()
 

@@ -99,3 +99,33 @@ def test_version_check_script_entrypoint(monkeypatch):
     )
     with pytest.raises(SystemExit, match="0"):
         runpy.run_path(str(SCRIPT), run_name="__main__")
+
+
+@pytest.mark.parametrize("capability, expected", [("2\n", 0), ("1\n", 1), ("", 1)])
+def test_continuation_capability_precedes_version_probe(
+    monkeypatch, capsys, capability, expected
+):
+    """Continuation requires replay support from the selected runtime executable."""
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--require-continuation", "spine"])
+    calls = []
+
+    def probe(command, **options):
+        calls.append(command)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=(
+                capability
+                if command[-1] == "--continuation-contract"
+                else "SPINE 1.4.4\n"
+            ),
+        )
+
+    monkeypatch.setattr(check_spine_version.subprocess, "run", probe)
+    assert check_spine_version.main() == expected
+    assert calls[0] == ["spine", "--continuation-contract"]
+    if expected:
+        assert len(calls) == 1
+        assert "contract 2" in capsys.readouterr().err
+    else:
+        assert calls[1] == ["spine", "--version"]

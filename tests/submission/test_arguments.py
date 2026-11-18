@@ -4,7 +4,7 @@ import shlex
 
 import pytest
 
-from src.spine_cli import SpineCLI
+from src.submission.arguments import SpineCLI
 
 
 @pytest.mark.parametrize("validation", [False, True])

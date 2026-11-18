@@ -19,6 +19,12 @@
 #SBATCH --mem={{ mem }}
 {% endif %}
 #SBATCH --time={{ time }}
+{% if continuation_attempt %}
+{% if continuation_attempt.request.min_time %}
+#SBATCH --time-min={{ continuation_attempt.request.min_time }}
+{% endif %}
+#SBATCH --signal=B:USR2@{{ continuation_policy.checkpoint_margin }}
+{% endif %}
 {% if exclusive %}
 #SBATCH --exclusive
 {% endif %}
@@ -136,7 +142,7 @@ INNER_CMD="${INNER_CMD}source {{ (flashmatch_path ~ '/configure.sh')|tojson }}; 
 # Ignore Python packages installed in the mounted user home.
 INNER_CMD="$INNER_CMD export PYTHONNOUSERSITE=1; "
 # Validate the configuration API inside the selected runtime.
-INNER_CMD="$INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {{ spine_cmd|default('spine', true) }} || exit \$?; "
+INNER_CMD="$INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {% if continuation_attempt %}--require-continuation {% endif %}{{ spine_cmd|default('spine', true) }} || exit \$?; "
 {% if cache_repository %}
 # Register the shared publication fence after scheduler dependencies clear.
 INNER_CMD="${INNER_CMD}export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id_shell }}; {{ cache_begin_cmd }} begin {{ cache_repository_shell }} {{ cache_stage_shell }} --publication-id \"\$SPINE_CACHE_PUBLICATION_ID\"; "
@@ -161,7 +167,27 @@ SHIFTER_MODULES+=("--module=cvmfs")
 # Prefer the runtime allocation over the original request after adjustments.
 RUN_CMD="srun -n 1 -c ${SLURM_CPUS_PER_TASK:-{{ cpus_per_task }}} shifter ${SHIFTER_MODULES[*]} --image=$SPINE_CONTAINER_TAG bash -c \"$INNER_CMD\""
 
-{% if graceful_stop_file %}
+{% if continuation_attempt %}
+# Keep the batch shell responsive and forward only to the supervisor.
+python3 {{ (basedir ~ '/scripts/continuation_runtime.py')|tojson }} \
+    {% if continuation_dir %}--continuation-dir {{ continuation_dir|tojson }} {% endif %}{{ continuation_run_dir|tojson }} {{ continuation_attempt.token|tojson }} \
+    -- bash -c "$RUN_CMD" &
+CONTINUATION_PID=$!
+CONTINUATION_INTERRUPTED=0
+trap 'CONTINUATION_INTERRUPTED=1; kill -USR2 "$CONTINUATION_PID"' USR2
+trap 'CONTINUATION_INTERRUPTED=1; kill -USR1 "$CONTINUATION_PID"' USR1
+trap 'CONTINUATION_INTERRUPTED=1; kill -TERM "$CONTINUATION_PID"' TERM INT
+while true; do
+    CONTINUATION_INTERRUPTED=0
+    wait "$CONTINUATION_PID"
+    EXIT_STATUS=$?
+    if [[ $CONTINUATION_INTERRUPTED -eq 1 && $EXIT_STATUS -gt 128 ]]; then
+        continue
+    fi
+    break
+done
+trap - USR1 USR2 TERM INT
+{% elif graceful_stop_file %}
 # Translate the scheduler signal into a filesystem request. SPINE rank zero
 # polls this marker at safe minibatch boundaries; no signal crosses the
 # container boundary or reaches DDP/DataLoader children.

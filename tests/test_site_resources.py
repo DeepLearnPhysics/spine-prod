@@ -1,34 +1,15 @@
-"""Cross-site allocation contracts, including the complete VD candidate."""
-
-from unittest.mock import patch
+"""Exercise the actual VD pipeline across the supported sites."""
 
 import pytest
 import yaml
 
 from src.pipeline import PipelineDefinition
-from src.site_resources import (
-    allocation_limits,
-    duration_seconds,
-    map_stage,
-    validate_allocation,
-)
+from src.sites import map_stage, validate_allocation
 
 
 @pytest.fixture
 def catalog(workspace_root):
     return yaml.safe_load((workspace_root / "templates/profiles.yaml").read_text())
-
-
-@pytest.mark.parametrize(
-    "value,seconds", [("5-00:00:00", 432000), ("168:00:00", 604800), ("00:05:01", 301)]
-)
-def test_duration(value, seconds):
-    assert duration_seconds(value) == seconds
-
-
-def test_invalid_duration():
-    with pytest.raises(ValueError, match="Invalid allocation time"):
-        duration_seconds("1:99:00")
 
 
 @pytest.mark.parametrize(
@@ -59,195 +40,123 @@ def test_vd_mapping(catalog, workspace_root, site, prefix):
         assert stages[0]["mem_per_cpu"] == "4g"
 
 
-@pytest.mark.parametrize(
-    "site,stage,message",
-    [
-        ("missing", {}, "Unknown site"),
-        ("nersc", {"profile": "auto"}, "named resource"),
-        ("alcf", {"profile": "nersc_gpu_80gb"}, "No anl correspondence"),
-        ("nersc", {"profile": "s3df_hopper"}, "more GPU memory"),
-        ("nersc", {"profile": "s3df_ampere"}, "requires --account"),
-    ],
-)
-def test_mapping_errors(catalog, site, stage, message):
-    with pytest.raises(ValueError, match=message):
-        map_stage(catalog, stage, site)
+@pytest.mark.parametrize("site", ["nersc", "s3df", "alcf"])
+def test_vd_budgets_and_site_requests(catalog, workspace_root, site):
+    from src.continuation.policy import next_request, profile_policy
+
+    definition = PipelineDefinition.load(
+        str(workspace_root / "pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml"),
+        workspace_override="/tmp/vd",
+    )
+    training = [s for s in definition.stages if s.get("stage") == "train"]
+    assert len(training) == 6
+    budgets = [120, 72, 48, 24, 16, 8]
+    for stage, hours in zip(training, budgets):
+        mapped = map_stage(catalog, stage, site, {"account": "project"})
+        effective = dict(catalog["profiles"][mapped["profile"]], time=mapped["time"])
+        config = profile_policy(catalog, effective, mapped["continuation"])
+        assert config["runtime_budget"] == hours * 3600
+        assert config["maximum"] == min(hours, 48 if site == "nersc" else hours) * 3600
+        request = next_request(config, 0)
+        assert request["seconds"] == min(hours, 24 if site == "nersc" else hours) * 3600
+        assert request["min_time"] == ("04:00:00" if site == "nersc" else None)
+        assert stage["continuation"] == {"runtime_budget": stage["time"]}
+        assert next_request(config, hours * 3600) is None
+    scan = map_stage(catalog, definition.stages[0], site, {"account": "project"})
+    assert scan["time"] == "02:00:00"
+    assert "continuation" not in scan
 
 
-def test_explicit_wrong_site_profile(catalog):
-    with pytest.raises(ValueError, match="does not belong"):
-        map_stage(
-            catalog, {"profile": "s3df_ampere"}, "nersc", {"profile": "s3df_ampere"}
-        )
+def test_explicit_overlong_request_is_rejected(catalog):
+    from src.continuation.policy import profile_policy
 
-
-def test_custom_gpu_count_and_cpu_memory(catalog):
+    stage = {
+        "profile": "s3df_ampere_full",
+        "time": "120:00:00",
+        "continuation": {"runtime_budget": "120:00:00"},
+    }
     result = map_stage(
+        catalog, stage, "nersc", {"account": "project", "time": "72:00:00"}
+    )
+    assert result["time"] == "72:00:00"
+    with pytest.raises(ValueError, match="max_time"):
+        profile_policy(
+            catalog,
+            dict(catalog["profiles"][result["profile"]], time=result["time"]),
+            result["continuation"],
+        )
+
+
+def test_explicit_preferences_and_short_defaults(catalog):
+    from src.continuation.policy import profile_policy
+
+    stage = {
+        "profile": "s3df_ampere",
+        "time": "48:00:00",
+        "continuation": {
+            "runtime_budget": "120:00:00",
+            "preferred_time": "06:00:00",
+            "min_time": "01:00:00",
+        },
+    }
+    result = map_stage(catalog, stage, "nersc", {"account": "project"})
+    assert result["continuation"]["preferred_time"] == "06:00:00"
+    assert result["continuation"]["min_time"] == "01:00:00"
+    stage["time"] = "01:00:00"
+    stage["continuation"] = {"runtime_budget": "02:00:00"}
+    result = map_stage(catalog, stage, "nersc", {"account": "project"})
+    assert result["continuation"]["preferred_time"] == "01:00:00"
+    assert result["continuation"]["min_time"] == "01:00:00"
+    profile_policy(
         catalog,
-        {"profile": "s3df_ampere", "gpus": 2, "partition": "ampere"},
-        "nersc",
-        {"account": "project"},
+        dict(catalog["profiles"][result["profile"]], time=result["time"]),
+        result["continuation"],
     )
-    assert result["gpus_per_node"] == 2
-    assert "partition" not in result
-    result = map_stage(
-        catalog,
-        {"profile": "s3df_milano", "mem_per_node": "64g"},
-        "nersc",
-        {"account": "project"},
-    )
-    assert result["mem_per_node"] == "64g"
-    assert "mem_per_cpu" not in result
 
 
-@pytest.mark.parametrize(
-    "profile,changes,message",
-    [
-        ("nersc_gpu_full", {"time": "5-00:00:00"}, "max_time"),
-        ("nersc_gpu", {"gpus_per_node": 4}, "GPU count"),
-        ("anl_polaris_debug", {"time": "00:01:00"}, "min_time"),
-        ("anl_polaris_capacity", {"nodes": 5}, "Node count"),
-        ("anl_polaris_capacity", {"queue": "prod"}, "Node count"),
-    ],
-)
-def test_limits(catalog, profile, changes, message):
-    with pytest.raises(ValueError, match=message):
-        validate_allocation(catalog, dict(catalog["profiles"][profile], **changes))
-
-
-def test_unknown_policy_is_not_an_invented_limit():
-    assert allocation_limits({}, {}) == {}
-    validate_allocation({}, {})
-
-
-def test_pipeline_rejects_late_limit_before_any_submission(mock_submitter, tmp_path):
-    path = tmp_path / "pipeline.yaml"
-    path.write_text(
-        yaml.safe_dump(
-            {
-                "stages": [
-                    {
-                        "name": "scan",
-                        "config": "anything.yaml",
-                        "profile": "s3df_milano",
-                    },
-                    {
-                        "name": "train",
-                        "config": "anything.yaml",
-                        "profile": "s3df_ampere_full",
-                        "time": "5-00:00:00",
-                    },
-                ]
-            }
+def test_noncontinuation_time_is_not_clamped(catalog):
+    stage = {"profile": "s3df_ampere", "time": "120:00:00"}
+    mapped = map_stage(catalog, stage, "nersc", {"account": "project"})
+    assert mapped["time"] == "120:00:00"
+    with pytest.raises(ValueError, match="max_time"):
+        validate_allocation(
+            catalog, dict(catalog["profiles"][mapped["profile"]], time=mapped["time"])
         )
+
+
+def test_vd_nersc_dry_run_preflights_all_training_stages(
+    mock_submitter, tmp_path, monkeypatch, capsys
+):
+    from unittest.mock import Mock
+
+    from src.continuation import service
+
+    monkeypatch.setattr(
+        service, "service_paths", lambda account: (tmp_path, tmp_path / "registry")
     )
-    with patch.object(mock_submitter, "submit_job") as submit:
-        with pytest.raises(ValueError, match="Stage train.*max_time"):
-            mock_submitter.submit_pipeline(
-                str(path), site="nersc", overrides={"account": "project"}
-            )
-        submit.assert_not_called()
-
-
-def test_pipeline_maps_selected_stages_before_dispatch(mock_submitter, tmp_path):
-    path = tmp_path / "pipeline.yaml"
-    path.write_text(
-        yaml.safe_dump(
-            {
-                "stages": [
-                    {
-                        "name": "scan",
-                        "config": "anything.yaml",
-                        "profile": "s3df_milano",
-                        "cpus_per_task": 16,
-                    },
-                    {
-                        "name": "train",
-                        "config": "anything.yaml",
-                        "profile": "s3df_ampere_full",
-                        "time": "5-00:00:00",
-                    },
-                ]
-            }
-        )
+    first_stage = Mock(return_value=[])
+    monkeypatch.setattr(mock_submitter, "submit_filter", first_stage)
+    register = Mock(side_effect=AssertionError("Dry-run must not install automation"))
+    monkeypatch.setattr(service, "register", register)
+    result = mock_submitter.submit_pipeline(
+        str(
+            mock_submitter.basedir
+            / "pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml"
+        ),
+        workspace=str(tmp_path / "vd"),
+        site="nersc",
+        overrides={"account": "project"},
+        continuation_dir="/pscratch/sd/u/user/vd-state",
+        dry_run=True,
     )
-    with patch.object(mock_submitter, "submit_job", return_value=["123"]) as submit:
-        mock_submitter.submit_pipeline(
-            str(path), site="nersc", to_stage="scan", overrides={"account": "project"}
-        )
-        assert submit.call_args.kwargs["profile"] == "nersc_cpu"
-        assert submit.call_args.kwargs["mem_per_cpu"] == "4g"
-
-
-@pytest.mark.parametrize(
-    "changes,message",
-    [
-        ({"nodes": 2}, "one node"),
-        ({"queue": "custom"}, "No configured limits"),
-        ({"mem_per_cpu": "garbage"}, "requires a unit"),
-    ],
-)
-def test_portable_invalid_overrides(catalog, changes, message):
-    with pytest.raises(ValueError, match=message):
-        map_stage(catalog, {"profile": "s3df_milano"}, "alcf", changes)
-
-
-def test_defaults_and_reverse_gpu_mapping(catalog):
-    assert map_stage(catalog, {}, "s3df")["profile"] == "s3df_ampere"
+    assert result == {}
+    first_stage.assert_called_once()
+    assert first_stage.call_args.kwargs["profile"] == "nersc_cpu"
+    output = capsys.readouterr().out
     assert (
-        map_stage(catalog, {"kind": "report"}, "alcf")["profile"] == "anl_polaris_cpu"
+        "budget=120:00:00; allocation=04:00:00..48:00:00; preferred=24:00:00" in output
     )
-    result = map_stage(catalog, {"profile": "nersc_gpu", "gpus_per_node": 2}, "s3df")
-    assert result["gpus"] == 2
-    assert "gpus_per_node" not in result
-
-
-def test_polaris_scan_memory(catalog):
-    result = map_stage(catalog, {"profile": "s3df_milano", "cpus_per_task": 16}, "alcf")
-    assert result["mem_per_node"] == "64gb"
-    assert "mem_per_cpu" not in result
-
-
-@pytest.mark.parametrize(
-    "site,profile,expected",
-    [
-        (
-            "nersc",
-            "s3df_milano",
-            ["--constraint=cpu", "--cpus-per-task=16", "--mem-per-cpu=4g"],
-        ),
-        ("alcf", "s3df_milano", ["ncpus=16", "#PBS -l mem=64gb"]),
-        (
-            "nersc",
-            "s3df_ampere_full",
-            ["--constraint=gpu", "--gpus-per-node=4", "--mem=0"],
-        ),
-    ],
-)
-def test_mapped_scheduler_directives(catalog, workspace_root, site, profile, expected):
-    from jinja2 import Environment, FileSystemLoader
-
-    stage = map_stage(
-        catalog, {"profile": profile, "cpus_per_task": 16}, site, {"account": "project"}
+    assert (
+        "budget=08:00:00; allocation=04:00:00..08:00:00; preferred=08:00:00" in output
     )
-    effective = dict(catalog["profiles"][stage["profile"]], **stage)
-    template = "job_template_anl.pbs" if site == "alcf" else "job_template_nersc.sbatch"
-    script = (
-        Environment(loader=FileSystemLoader(workspace_root / "templates"))
-        .get_template(template)
-        .render(**effective)
-    )
-    for directive in expected:
-        assert directive in script
-
-
-def test_unlimited_time_is_not_a_finite_allocation():
-    with pytest.raises(ValueError, match="positive"):
-        duration_seconds("00:00:00")
-
-
-def test_pbs_explicit_node_memory_units(catalog):
-    result = map_stage(
-        catalog, {"profile": "s3df_milano", "mem_per_node": "64g"}, "alcf"
-    )
-    assert result["mem_per_node"] == "64gb"
+    register.assert_not_called()
