@@ -15,7 +15,7 @@ import pytest
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("spine.continuation") is None,
-    reason="Requires SPINE continuation-v1 patch; see docs/training-continuation.md",
+    reason="Requires SPINE continuation-v2 patch; see docs/training-continuation.md",
 )
 
 
@@ -38,7 +38,9 @@ def driver(tmp_path, monkeypatch, *, start=0, limit=10, scheduled=False, early=F
     saves = []
 
     def save(iteration, epoch, validation, **kwargs):
-        cp = tmp_path / f"snapshot-{iteration}.ckpt"
+        cp = tmp_path / (
+            "snapshot-initial.ckpt" if iteration == -1 else f"snapshot-{iteration}.ckpt"
+        )
         cp.write_bytes(f"step-{iteration}".encode())
         Path(str(cp) + ".sha256").write_text(
             f"{hashlib.sha256(cp.read_bytes()).hexdigest()}  {cp.name}\n"
@@ -149,3 +151,184 @@ def test_checkpoint_failure_never_publishes_outcome(tmp_path, monkeypatch):
     with pytest.raises(OSError, match="disk full"):
         drv.run()
     assert not outcome.exists()
+
+
+def real_validation(drv, marker=None):
+    """Use the real validation batch loop with cheap CPU model/loader doubles."""
+    from spine.model.validation import ValidationManager
+
+    val = object.__new__(ValidationManager)
+    val.distributed = False
+    val.main_process = False
+    val.num_iterations = 3
+    val.initialize_log = Mock(return_value=Mock())
+
+    def load():
+        if marker is not None:
+            marker.touch()
+        return {}
+
+    val.io = SimpleNamespace(
+        loader=SimpleNamespace(sampler=None),
+        reset_loader=Mock(),
+        load=load,
+    )
+    val.model = SimpleNamespace(evaluate=Mock(return_value={"loss": 0.6}))
+    drv.validation.run = Mock(wraps=val.run)
+    return val
+
+
+def test_validation_interruption_preserves_policy_and_resumes_before_terminal_limit(
+    tmp_path, monkeypatch
+):
+    first = tmp_path / "first"
+    first.mkdir()
+    drv, saves, outcome, history = driver(first, monkeypatch, limit=1, scheduled=True)
+    # Request pause during the first validation batch, not during training.
+    drv.process = Mock(return_value={"loss": 1.0})
+    val = real_validation(drv, first / "pause")
+    drv.run()
+    result = json.loads(outcome.read_text())
+    assert result["state"] == "paused"
+    assert result["pending_validation"] is True
+    assert val.model.evaluate.call_count == 1
+    val.initialize_log.return_value.close.assert_called_once()
+    pending_state = saves[0][1]
+    assert pending_state["pending_validation"]["iteration"] == 0
+    assert pending_state["metrics"] == history["metrics"]
+    drv.validation.update_early_stopping.assert_not_called()
+    drv.validation.update_best_checkpoint.assert_not_called()
+    assert all(
+        call.args[0] != "validation" for call in drv.model.step_scheduler.call_args_list
+    )
+
+    second = tmp_path / "second"
+    second.mkdir()
+    resumed, resumed_saves, resumed_outcome, _ = driver(
+        second, monkeypatch, start=1, limit=1
+    )
+    resumed.model.checkpoint_validation = pending_state
+    resumed.process = Mock(
+        side_effect=AssertionError("No additional training permitted")
+    )
+    completed_val = real_validation(resumed)
+    resumed.run()
+    assert completed_val.model.evaluate.call_count == 3
+    resumed.process.assert_not_called()
+    resumed.validation.update_early_stopping.assert_called_once()
+    resumed.validation.update_best_checkpoint.assert_called_once()
+    resumed.model.step_scheduler.assert_called_once_with("validation", {"loss": 0.6})
+    assert "pending_validation" not in resumed_saves[0][1]
+    assert json.loads(resumed_outcome.read_text())["state"] == "completed"
+
+
+def test_pending_validation_can_early_stop_before_more_training(tmp_path, monkeypatch):
+    drv, saves, outcome, history = driver(
+        tmp_path, monkeypatch, start=1, limit=10, early=True
+    )
+    drv.model.checkpoint_validation = {
+        **history,
+        "pending_validation": {
+            "iteration": 0,
+            "epoch": 1.0,
+            "scheduled": True,
+            "reason": "scheduled",
+            "completion": None,
+        },
+    }
+    drv.process = Mock(side_effect=AssertionError("Early stop must precede training"))
+    real_validation(drv)
+    drv.run()
+    drv.process.assert_not_called()
+    assert json.loads(outcome.read_text())["reason"] == "early_stopping"
+    assert "pending_validation" not in saves[0][1]
+
+
+def test_pause_after_final_validation_batch_uses_completed_checkpoint(
+    tmp_path, monkeypatch
+):
+    drv, saves, outcome, _ = driver(tmp_path, monkeypatch, scheduled=True)
+    drv.process = Mock(return_value={"loss": 1.0})
+    val = real_validation(drv)
+
+    def evaluate(*_):
+        if val.model.evaluate.call_count == 3:
+            (tmp_path / "pause").touch()
+        return {"loss": 0.6}
+
+    val.model.evaluate.side_effect = evaluate
+    drv.run()
+    assert drv.process.call_count == 1
+    assert len(saves) == 1
+    assert "pending_validation" not in saves[0][1]
+    drv.validation.update_early_stopping.assert_called_once()
+    assert json.loads(outcome.read_text())["state"] == "paused"
+
+
+def test_interrupted_validation_restores_training_rng(tmp_path, monkeypatch):
+    import random
+
+    from spine.model.validation import ValidationInterrupted
+    from spine.utils.torch import runtime
+
+    drv, saves, _, _ = driver(tmp_path, monkeypatch, scheduled=True)
+    drv.process = Mock(return_value={"loss": 1.0})
+    monkeypatch.setattr(runtime, "capture_rng_state", random.getstate)
+    monkeypatch.setattr(runtime, "restore_rng_state", random.setstate)
+    before = random.getstate()
+
+    def interrupted(*args, **kwargs):
+        random.random()
+        raise ValidationInterrupted()
+
+    drv.validation.run.side_effect = interrupted
+    drv.run()
+    assert random.getstate() == before
+    assert saves[0][2]["runtime_state"]["ranks"][0]["rng"] == before
+
+
+def test_rank_zero_pause_is_collective_before_validation_load(tmp_path, monkeypatch):
+    from spine.model.validation import ValidationInterrupted
+    from spine.utils.torch import runtime
+
+    drv, _, _, _ = driver(tmp_path, monkeypatch)
+    # Pretend this is a non-main rank receiving another rank's pause decision.
+    drv.main_process = False
+    drv.continuation = SimpleNamespace(pause_requested=False)
+    monkeypatch.setattr(runtime, "distributed_any", lambda requested, device: True)
+    val = real_validation(drv)
+    with pytest.raises(ValidationInterrupted):
+        val.run(0, pause_requested=drv.continuation_pause_requested)
+    val.model.evaluate.assert_not_called()
+    val.io.reset_loader.assert_not_called()
+
+
+def test_initial_validation_can_pause_without_training(tmp_path, monkeypatch):
+    drv, saves, outcome, _ = driver(tmp_path, monkeypatch)
+    drv.model.checkpoint_validation = None
+    drv.validation.initial = True
+    drv.process = Mock(side_effect=AssertionError("Initial validation still pending"))
+    real_validation(drv, tmp_path / "pause")
+    drv.run()
+    assert saves[0][0] == -1
+    assert saves[0][1]["pending_validation"]["reason"] == "initial"
+    assert json.loads(outcome.read_text())["iteration"] == -1
+    assert json.loads(outcome.read_text())["state"] == "paused"
+
+
+def test_pending_validation_archives_partial_log(tmp_path):
+    from spine.model.validation import ValidationManager
+
+    val = object.__new__(ValidationManager)
+    val.log_dir = str(tmp_path)
+    val.distributed = False
+    val.prefix_log = False
+    val.overwrite_log = False
+    val.csv_buffer_size = 1
+    val.log_gpu_memory = False
+    path = tmp_path / "validation_log-0000001.csv"
+    path.write_text("partial")
+    logger = val.initialize_log(0, retry=True)
+    assert not path.exists()
+    assert next(tmp_path.glob("*.interrupted-*")).read_text() == "partial"
+    logger.close()

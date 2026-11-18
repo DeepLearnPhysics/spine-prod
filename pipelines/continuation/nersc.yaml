@@ -21,7 +21,7 @@ stages:
     val_source_list: ${validation_source_list}
     continuation:
       runtime_budget: "01:00:00"
-      checkpoint_margin: "00:02:00"
+      checkpoint_margin: "00:05:00"
       startup_allowance: "00:02:00"
       site_min_time: "00:05:00"
       max_attempts: 10

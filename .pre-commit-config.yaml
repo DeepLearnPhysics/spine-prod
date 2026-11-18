@@ -8,7 +8,7 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
-        exclude: '\.md$' # Allow trailing spaces in Markdown
+        exclude: '\.(md|patch)$' # Preserve Markdown spacing and unified-diff context
       - id: end-of-file-fixer
       - id: check-yaml
         args: ["--unsafe"] # Allow custom tags

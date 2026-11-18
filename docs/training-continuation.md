@@ -31,10 +31,21 @@ the 1.4.4 driver APIs inspected for this implementation:
 
 ```bash
 cd /path/to/spine-continuation-checkout
-git apply --check /path/to/spine-prod/patches/spine-1.4.4-continuation-v1.patch
-git apply /path/to/spine-prod/patches/spine-1.4.4-continuation-v1.patch
+git apply --check /path/to/spine-prod/patches/spine-1.4.4-continuation-v2.patch
+git apply /path/to/spine-prod/patches/spine-1.4.4-continuation-v2.patch
 python bin/run.py --continuation-contract
-# Must print: 1
+# Must print: 2
+```
+
+If the checkout already has the v1 patch (as in the first two site tests),
+apply **only the upgrade patch**, not the full v2 patch:
+
+```bash
+cd /path/to/spine-continuation-checkout
+git apply --check /path/to/spine-prod/patches/spine-continuation-v1-to-v2.patch
+git apply /path/to/spine-prod/patches/spine-continuation-v1-to-v2.patch
+python bin/run.py --continuation-contract
+# Must print: 2
 ```
 
 Use that checkout with `--spine-path`, or rebuild your container with the patch.
@@ -51,10 +62,25 @@ validation history, per-rank RNG and loader state are saved by the existing
 checkpoint machinery. SPINE 1.4.4's inspected model manager has no AMP scaler;
 a future AMP implementation must serialize its scaler before declaring this
 contract supported. World-size changes and missing rank runtime state are rejected.
+If a pause arrives during scheduled validation, all ranks stop at a safe batch
+boundary and discard partial metrics. The full checkpoint records
+`validation.pending_validation` (iteration, epoch and scheduling context).
+Resume reruns that validation before any training step, even if the training
+limit was reached. Only a completed pass updates best selection, patience and
+the validation scheduler. Training RNG state is restored around validation;
+the training loader is separate and remains checkpointed. Partial validation
+CSV logs are archived with an `.interrupted-...` suffix before rerunning.
+
+A blocking load/forward cannot be interrupted safely mid-batch: the margin must
+cover the slowest such operation plus checkpointing and shutdown. The NERSC
+smoke example now uses five minutes; the second site test took approximately
+2m38s to reach its first scheduled-validation result, exceeding the previous
+two-minute margin. This is a test setting, not a universal production margin.
+
 Periodic checkpoints remain enabled. Resume uses the latest verified continuation
 snapshot; existing best-checkpoint promotion remains tied to scientific validation.
 
-Contract 1 uses `SPINE_CONTINUATION_TOKEN`, `SPINE_PAUSE_FILE`, and
+Runtime capability 2 retains outcome schema 1 and uses `SPINE_CONTINUATION_TOKEN`, `SPINE_PAUSE_FILE`, and
 `SPINE_OUTCOME_FILE`, explicitly passed through the container launcher. Rank zero
 atomically publishes JSON with `contract`, `token`, `state` (`paused`/`completed`),
 `reason`, `checkpoint`, `sha256`, and zero-based `iteration`, after driver cleanup.

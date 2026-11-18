@@ -491,7 +491,7 @@ def verify_outcome(run_dir, attempt):
         raise ValueError(
             "Continuation requires a committed checkpoint and matching SHA256"
         )
-    if type(outcome.get("iteration")) is not int or outcome["iteration"] < 0:
+    if type(outcome.get("iteration")) is not int or outcome["iteration"] < -1:
         raise ValueError("Invalid checkpoint progress")
     return outcome
 
@@ -564,9 +564,22 @@ def reconcile(run_dir, continuation_dir=None):
                 if result["success"]:
                     outcome = verify_outcome(run_dir, attempt)
                     previous = state.get("progress", -1)
+                    validation_completed = (
+                        len(state["attempts"]) > 1
+                        and state["attempts"][-2]
+                        .get("outcome", {})
+                        .get("pending_validation")
+                        is True
+                        and outcome.get("pending_validation") is False
+                        and outcome["iteration"] == previous
+                    )
                     if (
                         outcome["state"] == "paused"
                         and outcome["iteration"] <= previous
+                        and not validation_completed
+                        and not (
+                            len(state["attempts"]) == 1 and outcome["iteration"] == -1
+                        )
                     ):
                         raise ValueError("Paused allocation made no training progress")
                     attempt["outcome"] = outcome

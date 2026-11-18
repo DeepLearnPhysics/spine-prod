@@ -492,7 +492,7 @@ def test_metrics_separates_queue_runtime_and_pause_latency(tmp_path, monkeypatch
     assert row["accounting_confirmed"] == "True"
 
 
-@pytest.mark.parametrize("capability,expected", [("1", 0), ("0", 1)])
+@pytest.mark.parametrize("capability,expected", [("2", 0), ("1", 1), ("0", 1)])
 def test_runtime_probes_actual_executable_contract(tmp_path, capability, expected):
     import subprocess
     import sys
@@ -992,3 +992,27 @@ def test_split_preflight_locks_only_control_storage(tmp_path, monkeypatch):
     c.preflight_storage(run, continuation_dir=control)
     assert paths == [c.manifest_path(run, control)]
     assert not run.exists()
+
+
+def test_initial_pending_validation_checkpoint_is_usable(tmp_path, monkeypatch):
+    allocation(tmp_path, 1, iteration=-1)
+    monkeypatch.setattr(c, "accounting", lambda *_: {"success": True, "seconds": 200})
+    assert c.reconcile(tmp_path)["state"] == "paused"
+
+
+def test_finishing_pending_validation_counts_as_progress_once(tmp_path, monkeypatch):
+    first = allocation(tmp_path, 1, iteration=10)
+    path = Path(first["directory"]) / "outcome.json"
+    result = c.read(path)
+    result["pending_validation"] = True
+    c.atomic_json(path, result)
+    monkeypatch.setattr(c, "accounting", lambda *_: {"success": True, "seconds": 200})
+    assert c.reconcile(tmp_path)["state"] == "paused"
+    second = allocation(tmp_path, 2, iteration=10)
+    path = Path(second["directory"]) / "outcome.json"
+    result = c.read(path)
+    result["pending_validation"] = False
+    c.atomic_json(path, result)
+    assert c.reconcile(tmp_path)["state"] == "paused"
+    allocation(tmp_path, 3, iteration=10)
+    assert c.reconcile(tmp_path)["state"] == "failed"
