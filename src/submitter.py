@@ -4,18 +4,18 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .batch import BatchRunner
 from .client import SlurmClient
-from .config_manager import ConfigManager
+from .config import ConfigManager
 from .control import JobController
-from .file_handler import FileHandler
-from .filter import FilterRunner
-from .interactive import InteractiveRunner
+from .files import FileHandler
 from .pipeline import PipelineRunner
 from .preload import preload_downloads
-from .report import ReportRunner
-from .runtime import RuntimeResolver
-from .spine_cli import SpineCLI
+from .submission.arguments import SpineCLI
+from .submission.batch import BatchRunner
+from .submission.filter import FilterRunner
+from .submission.interactive import InteractiveRunner
+from .submission.report import ReportRunner
+from .submission.runtime import RuntimeResolver
 
 
 class Submitter:

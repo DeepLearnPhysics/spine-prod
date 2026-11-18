@@ -320,9 +320,9 @@ stage slicing and automatic cleanup are rejected. GPU elasticity is unsupported.
 Local regression suite:
 
 ```bash
-.venv/bin/python -m pytest tests/test_continuation.py tests/test_continuation_service.py -o addopts='' -q
+.venv/bin/python -m pytest tests/continuation/test_controller.py tests/continuation/test_service.py -o addopts='' -q
 PYTHONPATH=/path/to/patched-spine/src .venv/bin/python -m pytest \
-  tests/test_spine_continuation_contract.py -o addopts='' -q
+  tests/continuation/test_spine_contract.py -o addopts='' -q
 ```
 
 On each site, verify all of the following before production use:

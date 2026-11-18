@@ -58,7 +58,7 @@ def test_interactive_container_disables_user_site(
         image.touch()
     monkeypatch.setenv("SPINE_CONTAINER_PATH", str(image))
     with patch(
-        "src.runtime.shutil.which",
+        "src.submission.runtime.shutil.which",
         side_effect=lambda name: f"/usr/bin/{name}" if name == runtime else None,
     ):
         command = mock_submitter.runtime.build_interactive_container_command(

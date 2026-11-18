@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.file_handler import FileHandler
+from src.files import FileHandler
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def test_parse_direct_sources_sorts_each_glob(handler, monkeypatch):
         "first/*.root": ["first/b.root", "first/a.root"],
         "second/*.root": ["second/d.root", "second/c.root"],
     }
-    monkeypatch.setattr("src.file_handler.glob.glob", matches.__getitem__)
+    monkeypatch.setattr("src.files.glob.glob", matches.__getitem__)
 
     assert handler.parse_files(list(matches)) == [
         "first/a.root",

@@ -1,131 +1,64 @@
-# SPINE Production - Code Organization
+# Source organization
 
-## Overview
+`submit.py` parses command-line options and calls `Submitter`. Source modules are
+internal to spine-prod; imports use their current locations without compatibility
+shims for former module names.
 
-The SPINE production submission system uses a thin command-line entry point backed by focused modules for configuration management, file handling, scheduler integration, preloading, and job orchestration.
-
-## Structure
-
-```
-spine-prod/
-├── submit.py                # Main CLI entry point
-├── src/                     # Source code modules
-│   ├── __init__.py         # Package initialization
-│   ├── client/             # Batch scheduler clients
-│   │   ├── base.py         # Shared template/job metadata helpers
-│   │   ├── slurm.py        # SLURM sbatch client
-│   │   └── pbs.py          # PBS qsub client
-│   ├── batch.py            # Single-job planning and scheduler submission
-│   ├── component.py        # Shared component-to-façade contract
-│   ├── config_manager.py   # Configuration and profile management
-│   ├── file_handler.py     # File parsing and chunking
-│   ├── interactive.py      # Direct local/container execution workflow
-│   ├── pipeline.py         # Pipeline loading, validation, and execution
-│   ├── preload.py          # SPINE download preloading
-│   ├── runtime.py          # Executable, setup, container, and bind resolution
-│   ├── run_manager.py      # Persistent training and validation lifecycle
-│   ├── spine_cli.py        # Pure SPINE CLI argument formatting
-│   └── submitter.py        # Thin public façade and component wiring
-├── templates/              # Batch job templates
-├── config/                 # SPINE configurations
-└── runs/                   # Automatic inference run directories
-```
-
-## Module Responsibilities
-
-### `submit.py`
-- Command-line argument parsing
-- Main entry point
-- Minimal orchestration logic
-
-### `src/config_manager.py`
-- Load and manage profiles from YAML
-- Detector auto-detection
-- Modifier discovery and version resolution
-- Composite config generation
-- "Latest" config assembly
-
-### `src/file_handler.py`
-- Parse file inputs (globs, lists, direct paths)
-- Chunk files for array jobs
-- File validation
-
-### `src/client/`
-- Load batch job templates
-- Submit jobs via scheduler-specific clients
-- Create job directories
-- Save job metadata
-- Parse scheduler-specific job IDs
-- Cleanup job management for SLURM
-
-### `src/submitter.py`
-- Stable public `Submitter` API
-- Shared manager and scheduler-client construction
-- Focused component wiring and compatibility forwarding
-
-### `src/batch.py`
-- Single-job input and lifecycle validation
-- Scheduler profile and array-job planning
-- Template rendering, submission, and metadata recording
-
-### `src/interactive.py`
-- Interactive input preparation
-- Direct local or container-backed SPINE execution
-
-### `src/pipeline.py`
-- Whole-document loading and validation before scheduler interaction
-- Default/stage/CLI precedence resolution
-- Dependency-ordered stage and cleanup submission
-
-### `src/spine_cli.py`
-- Pure formatting and validation of SPINE command-line options
-- GPU allocation and world-size alignment
-
-### `src/runtime.py`
-- Software setup and executable discovery
-- Container selection and bind-path construction
-
-### `src/run_manager.py`
-- Create and validate persistent training runs
-- Resolve numeric resume checkpoints
-- Plan incremental and named validation suites
-- Create immutable attempt directories and stable latest/log links
-
-## Benefits
-
-1. **Readability**: Each module has a clear, focused purpose
-2. **Maintainability**: Changes are easier to locate and implement
-3. **Testability**: Individual components can be tested in isolation
-4. **Extensibility**: New features can be added without modifying unrelated code
-5. **Reusability**: Components can be imported and used programmatically
-
-## Usage
-
-```bash
-# Basic usage
-./submit.py --config infer/icarus/latest --source-list files.txt
-
-# Convert LArCV simulation into SPINE truth objects
-./submit.py --config convert/icarus --source simulation.root
-
-# Additional modes
-./submit.py --pipeline pipelines/icarus_production_example.yaml
-./submit.py --interactive --config ... --source test.root
-./submit.py --list-mods infer/icarus/full_chain_co_260501.yaml
-./submit.py --graceful-stop 12345678
+```text
+src/
+├── submitter.py       # Construct shared services and dispatch CLI operations
+├── config.py          # Profiles, modifiers, and composite SPINE configurations
+├── files.py           # Source resolution, file validation, and chunking
+├── runs.py            # Run directories, attempts, checkpoints, and validation
+├── sites.py           # Site resource limits and allocation defaults
+├── control.py         # Graceful job-stop requests
+├── preload.py         # Materialize configuration download directives
+├── client/            # Scheduler clients: shared base, Slurm, and PBS
+├── submission/
+│   ├── base.py        # Shared access to Submitter services
+│   ├── batch.py       # Plan, submit, and record batch jobs
+│   ├── validation.py  # Reject incompatible submission options
+│   ├── render.py      # Render and write executable scheduler scripts
+│   ├── interactive.py # Execute SPINE locally or in a container
+│   ├── filter.py      # Submit file-aware entry filtering
+│   ├── report.py      # Submit completed-metric report reduction
+│   ├── runtime.py     # Resolve executables, containers, and bind paths
+│   ├── arguments.py   # Format SPINE command-line arguments
+│   └── sharding.py    # Partition joint input datasets
+├── pipeline/
+│   ├── fields.py     # Allowed fields and reference syntax
+│   ├── validation.py # Validate pipeline and stage declarations
+│   ├── definition.py # Load definitions and resolve configuration precedence
+│   └── runner.py     # Submit stages in dependency order
+└── continuation/
+    ├── policy.py     # Budget, allocation bounds, and final-chunk decisions
+    ├── state.py      # Durable manifests, locking, and atomic writes
+    ├── scheduler.py  # Scheduler discovery, deadlines, and accounting
+    ├── checkpoints.py # Verify outcomes and recovery checkpoint integrity
+    ├── controller.py # Reconcile attempts and gate downstream stages
+    ├── service.py    # Register, run, and retire unattended controller timers
+    └── runtime.py    # Supervise training within the actual allocation deadline
 ```
 
-## Imports for Programmatic Use
+## Boundaries
 
-The refactored code can now be easily used programmatically:
+Submission validates options before preparing files or contacting the scheduler.
+Pipeline definitions validate the complete document before the runner submits any
+stage. Continuation separates scheduler observations, durable state, checkpoint
+verification, and lifecycle decisions so each can be exercised independently.
 
-```python
-from src import Submitter
-from src.config_manager import ConfigManager
-from src.file_handler import FileHandler
-from src.client import PBSClient, SlurmClient
+The compute-side continuation supervisor uses only the Python standard library.
+It must remain importable without the submission host's YAML or template packages.
+The entry points in `scripts/` stay thin and retain their paths because generated
+jobs and registered timers invoke them. Manifest formats and checkpoint contracts
+are independent of the internal Python module layout.
 
-# Example: Use components directly
-submitter = Submitter()
-job_ids = submitter.submit_job(config="...", files=["..."])
-```
+## Tests
+
+`tests/client/`, `tests/submission/`, `tests/pipeline/`, and `tests/continuation/`
+follow the source packages. Root tests cover configuration, files, runs, sites,
+CLI entry points, and detector configuration content. Submission integration tests
+are separated by configuration, input files, batch execution, interactive
+execution, and pipelines. Native SPINE checkpoint tests live in
+`tests/continuation/test_spine_contract.py` and require the patched SPINE checkout;
+see [training continuation](../docs/training-continuation.md).

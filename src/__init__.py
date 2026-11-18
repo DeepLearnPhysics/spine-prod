@@ -17,6 +17,7 @@ __all__ = ["Submitter"]
 
 
 def __getattr__(name):
+    """Load submission dependencies only when the public Submitter is requested."""
     if name == "Submitter":
         from .submitter import Submitter
 

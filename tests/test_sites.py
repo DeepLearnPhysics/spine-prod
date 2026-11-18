@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from src.pipeline import PipelineDefinition
-from src.site_resources import (
+from src.sites import (
     allocation_limits,
     duration_seconds,
     map_stage,

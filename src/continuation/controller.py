@@ -9,10 +9,15 @@ import json
 import os
 import shlex
 import sys
+import time
 import uuid
 from pathlib import Path
 
-from . import continuation as c
+from ..runs import RunManager
+from .checkpoints import recovery_checkpoint, verify_outcome
+from .policy import describe_policy, duration, next_request, profile_policy, seconds
+from .scheduler import accounting, command, discover_submission, failure_reason
+from .state import atomic_json, locked, manifest_path, read, validate_storage
 
 
 def start(
@@ -24,7 +29,31 @@ def start(
     warm_start=None,
     continuation_dir=None,
 ):
-    from .pipeline import PipelineRunner
+    """Create a durable controller and submit the first eligible stage.
+
+    Parameters
+    ----------
+    context : Submitter
+        Shared submission services and resource profiles.
+    stages : sequence of dict
+        Resolved stages in dependency order.
+    workspace : str or pathlib.Path
+        Pipeline output root.
+    dry_run : bool, default False
+        Describe the plan without registering a timer or submitting jobs.
+    preload : bool, default False
+        Resolve downloadable assets before submission.
+    warm_start : str, optional
+        Checkpoint used for declared module initialization.
+    continuation_dir : str or pathlib.Path, optional
+        Separate shared controller root; explicitly required on NERSC.
+
+    Returns
+    -------
+    dict
+        Stage names mapped to scheduler job identifiers from the initial pass.
+    """
+    from ..pipeline import PipelineRunner
 
     if not workspace:
         raise ValueError("Continuation pipelines require a workspace")
@@ -70,24 +99,22 @@ def start(
             profile = context.config_mgr.get_profile(
                 options.get("profile", "auto"), None
             )
-            from .pipeline import PROFILE_FIELDS
+            from ..pipeline import PROFILE_FIELDS
 
             profile.update(
                 {key: options[key] for key in PROFILE_FIELDS if key in options}
             )
-            c.validate_storage(continuation_dir, profile.get("site"))
+            validate_storage(continuation_dir, profile.get("site"))
             if profile.get("site") == "nersc":
                 automation_accounts.add(profile.get("account"))
-            config = c.profile_policy(
-                context.profiles, profile, options["continuation"]
-            )
-            print(f"{record['name']}: {c.describe_policy(config)}")
+            config = profile_policy(context.profiles, profile, options["continuation"])
+            print(f"{record['name']}: {describe_policy(config)}")
     if len(automation_accounts) > 1:
         raise ValueError(
             "Automatic continuation requires one NERSC account per pipeline"
         )
     if automation_accounts:
-        from .continuation_service import service_paths
+        from .service import service_paths
 
         account = next(iter(automation_accounts))
         service_paths(account)
@@ -112,13 +139,13 @@ def start(
             )
             method(dry_run=True, **record["options"])
         return {}
-    with c.locked(path):
+    with locked(path):
         if path.exists():
-            state = c.read(path)
+            state = read(path)
             if state["definition_sha256"] != digest:
                 raise ValueError("Controller definition changed; use a new workspace")
         else:
-            c.atomic_json(
+            atomic_json(
                 path,
                 {
                     "contract": 1,
@@ -133,7 +160,7 @@ def start(
     write_tick_script(path, context.basedir)
     print(f"Durable controller: {path}")
     if automation_accounts:
-        from .continuation_service import register
+        from .service import register
 
         registry = register(path, account, context.basedir)
         print(f"Automatic continuation registered: {registry}")
@@ -148,12 +175,30 @@ def start(
 
 
 def advance(path, context=None):
-    """Perform one bounded pass. Safe to invoke concurrently from a site timer."""
-    from .submitter import Submitter
+    """Reconcile a pipeline and submit at most one eligible stage or allocation.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Durable pipeline manifest.
+    context : Submitter, optional
+        Submission services; reconstructed from the manifest when omitted.
+
+    Returns
+    -------
+    dict
+        Stage names mapped to their current scheduler job identifiers.
+
+    Notes
+    -----
+    The pipeline lock serializes concurrent calls. A successful allocation exit
+    alone never releases consumers of an incomplete logical training stage.
+    """
+    from ..submitter import Submitter
 
     path = Path(path)
-    with c.locked(path):
-        state = c.read(path)
+    with locked(path):
+        state = read(path)
         if state["state"] != "active":
             return {}
         context = context or Submitter(basedir=Path(state["basedir"]))
@@ -163,14 +208,12 @@ def advance(path, context=None):
             options = dict(record["options"])
             is_continuation = options.get("continuation") is not None
             run_manifest = (
-                c.manifest_path(options["run_dir"], options.get("continuation_dir"))
+                manifest_path(options["run_dir"], options.get("continuation_dir"))
                 if is_continuation
                 else None
             )
             if run_manifest and run_manifest.exists():
-                logical = c.reconcile(
-                    options["run_dir"], options.get("continuation_dir")
-                )
+                logical = reconcile(options["run_dir"], options.get("continuation_dir"))
                 if not logical["attempts"]:
                     raise RuntimeError(
                         "Continuation manifest has no submission attempt; inspect its failure state"
@@ -180,25 +223,25 @@ def advance(path, context=None):
                     record["jobs"] = [attempt["job_id"]]
                 if logical["state"] == "completed" and attempt.get("accounted"):
                     record["status"] = "completed"
-                    c.atomic_json(path, state)
+                    atomic_json(path, state)
                     continue
                 if logical["state"] != "paused" or not attempt.get("accounted"):
-                    c.atomic_json(path, state)
+                    atomic_json(path, state)
                     return {record["name"]: record["jobs"]}
                 # Resume exactly the verified committed continuation artifact.
                 options.update(resume=True, resume_from=logical["checkpoint"])
             elif record["status"] == "submitted":
                 results = [
-                    c.accounting(record["scheduler"], job) for job in record["jobs"]
+                    accounting(record["scheduler"], job) for job in record["jobs"]
                 ]
                 if any(result is None for result in results):
                     return {record["name"]: record["jobs"]}
                 if not all(result["success"] for result in results):
                     record["status"] = "failed"
-                    c.atomic_json(path, state)
+                    atomic_json(path, state)
                     return {}
                 record["status"] = "completed"
-                c.atomic_json(path, state)
+                atomic_json(path, state)
                 continue
             elif record["status"] != "waiting":
                 # A controller crash between scheduler submission and recording
@@ -214,7 +257,7 @@ def advance(path, context=None):
             record.update(status="submitting", token="spc-" + uuid.uuid4().hex[:20])
             options["job_name"] = record["token"]
             state["generation"] += 1
-            c.atomic_json(path, state)
+            atomic_json(path, state)
             method = getattr(
                 context,
                 "submit_" + ("job" if record["kind"] == "spine" else record["kind"]),
@@ -226,20 +269,20 @@ def advance(path, context=None):
             record["jobs"] = jobs
             if jobs:
                 record["status"] = "submitted"
-            c.atomic_json(path, state)
+            atomic_json(path, state)
             return {record["name"]: jobs}
         state["state"] = "completed"
         state["generation"] += 1
-        c.atomic_json(path, state)
+        atomic_json(path, state)
         return {}
 
 
 def operate(path, action, stage=None, value=None):
     """Rearm automatic hosting before changing a blocked pipeline's state."""
     if action in ("extend", "retry", "accept", "adopt"):
-        from .continuation_service import reactivating
+        from .service import reactivating
 
-        with reactivating(c.read(path)):
+        with reactivating(read(path)):
             return _operate(path, action, stage, value)
     return _operate(path, action, stage, value)
 
@@ -247,8 +290,8 @@ def operate(path, action, stage=None, value=None):
 def _operate(path, action, stage=None, value=None):
     """Serialize user operations with submission, including cancellation races."""
     path = Path(path)
-    with c.locked(path):
-        state = c.read(path)
+    with locked(path):
+        state = read(path)
         records = [r for r in state["records"] if stage is None or r["name"] == stage]
         if not records:
             raise ValueError(f"Unknown stage: {stage}")
@@ -256,11 +299,11 @@ def _operate(path, action, stage=None, value=None):
             raise ValueError("This operation requires --stage")
         if action == "cancel":
             state["state"] = "cancelled"
-            c.atomic_json(path, state)  # Inhibit submissions even if qdel fails.
+            atomic_json(path, state)  # Inhibit submissions even if qdel fails.
         for record in records:
             options = record["options"]
             run_path = (
-                c.manifest_path(options["run_dir"], options.get("continuation_dir"))
+                manifest_path(options["run_dir"], options.get("continuation_dir"))
                 if options.get("continuation") is not None
                 else None
             )
@@ -268,15 +311,15 @@ def _operate(path, action, stage=None, value=None):
                 if action != "cancel":
                     raise ValueError("Stage has no continuation manifest")
                 for job in record["jobs"]:
-                    c.command(
+                    command(
                         ["scancel" if record["scheduler"] == "slurm" else "qdel", job]
                     )
                 continue
-            with c.locked(run_path):
-                logical = c.read(run_path)
+            with locked(run_path):
+                logical = read(run_path)
                 attempt = logical["attempts"][-1]
                 if action == "extend":
-                    budget = c.seconds(value)
+                    budget = seconds(value)
                     if budget <= logical["policy"]["runtime_budget"]:
                         raise ValueError(
                             "New budget must be larger than the current budget"
@@ -294,7 +337,7 @@ def _operate(path, action, stage=None, value=None):
                             "Accept requires an accounted, checkpointed, inactive stage"
                         )
                     if (
-                        c.RunManager.checkpoint_digest(Path(logical["checkpoint"]))
+                        RunManager.checkpoint_digest(Path(logical["checkpoint"]))
                         != logical["sha256"]
                     ):
                         raise ValueError("Checkpoint changed")
@@ -310,10 +353,10 @@ def _operate(path, action, stage=None, value=None):
                         raise ValueError("max_attempts reached")
                     valid = None
                     for _, candidate in reversed(
-                        c.RunManager.checkpoints(Path(options["run_dir"]))
+                        RunManager.checkpoints(Path(options["run_dir"]))
                     ):
                         try:
-                            digest = c.RunManager.checkpoint_digest(candidate)
+                            digest = RunManager.checkpoint_digest(candidate)
                             if digest:
                                 valid = (candidate, digest)
                                 break
@@ -335,12 +378,12 @@ def _operate(path, action, stage=None, value=None):
                     # Explicit adoption still verifies scheduler identity before trusting it.
                     if attempt["scheduler"] == "slurm":
                         data = json.loads(
-                            c.command(["scontrol", "show", "job", value, "--json"])
+                            command(["scontrol", "show", "job", value, "--json"])
                         )["jobs"][0]
                         name = data["name"]
                     else:
                         data = json.loads(
-                            c.command(["qstat", "-xf", "-F", "json", value])
+                            command(["qstat", "-xf", "-F", "json", value])
                         )["Jobs"][value]
                         name = data["Job_Name"]
                     if name != attempt["token"]:
@@ -353,42 +396,43 @@ def _operate(path, action, stage=None, value=None):
                 else:
                     raise ValueError(f"Unknown operation: {action}")
                 logical["generation"] += 1
-                c.atomic_json(run_path, logical)
+                atomic_json(run_path, logical)
             if (
                 action == "cancel"
                 and attempt.get("job_id")
                 and not attempt.get("accounted")
             ):
-                c.command(
+                command(
                     [
                         "scancel" if attempt["scheduler"] == "slurm" else "qdel",
                         attempt["job_id"],
                     ]
                 )
         state["generation"] += 1
-        c.atomic_json(path, state)
+        atomic_json(path, state)
 
 
 def status(path):
-    state = c.read(path)
+    """Print pipeline state, automation health and allocation accounting."""
+    state = read(path)
     print(f"Pipeline: {state['state']}")
-    from .continuation_service import health
+    from .service import health
 
     print("Automation: " + health(state))
     for record in state["records"]:
         options = record["options"]
         path = (
-            c.manifest_path(options["run_dir"], options.get("continuation_dir"))
+            manifest_path(options["run_dir"], options.get("continuation_dir"))
             if options.get("continuation") is not None
             else None
         )
         if path and path.exists():
-            logical = c.reconcile(options["run_dir"], options.get("continuation_dir"))
+            logical = reconcile(options["run_dir"], options.get("continuation_dir"))
             print(f"{record['name']}: {logical['state']} ({logical.get('reason', '')})")
             if logical.get("detail"):
                 print(f"  detail: {logical['detail']}")
             print(
-                f"  runtime: {c.duration(logical['used_seconds'])} / {c.duration(logical['policy']['runtime_budget'])}"
+                f"  runtime: {duration(logical['used_seconds'])} / {duration(logical['policy']['runtime_budget'])}"
             )
             print(
                 f"  checkpoint: {logical.get('checkpoint', 'none')}; iteration: {logical.get('progress', 'none')}"
@@ -426,14 +470,14 @@ def metrics(path, stream=None):
         ],
     )
     writer.writeheader()
-    for record in c.read(path)["records"]:
+    for record in read(path)["records"]:
         options = record["options"]
         if options.get("continuation") is None:
             continue
-        run_path = c.manifest_path(options["run_dir"], options.get("continuation_dir"))
+        run_path = manifest_path(options["run_dir"], options.get("continuation_dir"))
         if not run_path.exists():
             continue
-        logical = c.reconcile(options["run_dir"], options.get("continuation_dir"))
+        logical = reconcile(options["run_dir"], options.get("continuation_dir"))
         for attempt in logical["attempts"]:
             outcome = attempt.get("outcome", {})
             latency = ""
@@ -505,7 +549,7 @@ def write_tick_script(manifest, basedir):
         )
     )
     # Same controller lock prevents concurrent setup from truncating the launcher.
-    with c.locked(manifest):
+    with locked(manifest):
         temporary = script.with_name("advance-" + uuid.uuid4().hex + ".tmp")
         try:
             temporary.write_text("\n".join(lines) + "\n")
@@ -513,3 +557,128 @@ def write_tick_script(manifest, basedir):
             os.replace(temporary, script)
         finally:
             temporary.unlink(missing_ok=True)
+
+
+def reconcile(run_dir, continuation_dir=None):
+    """Charge completed accounting once and reconcile the training outcome.
+
+    Parameters
+    ----------
+    run_dir : str or pathlib.Path
+        Logical training directory.
+    continuation_dir : str or pathlib.Path, optional
+        Separate directory containing the run manifest.
+
+    Returns
+    -------
+    dict
+        Current run state after any accounting or recovery transition.
+
+    Notes
+    -----
+    Unknown submissions are discovered by token before further action. Recovery
+    requires a verified checkpoint and the configured retry budget; application
+    failures never cause automatic resubmission.
+    """
+    path = manifest_path(run_dir, continuation_dir)
+    with locked(path):
+        state = read(path)
+        if not state["attempts"]:
+            return state
+        attempt = state["attempts"][-1]
+        if attempt.get("accounted"):
+            return state
+        if not attempt.get("job_id"):
+            job_id = discover_submission(attempt["scheduler"], attempt["token"])
+            if job_id is None:
+                return state
+            attempt["job_id"] = job_id
+            attempt["submission_reconciled_at"] = time.time()
+            if state["state"] == "submitting":
+                state["state"] = "pending"
+            state["generation"] += 1
+            atomic_json(path, state)
+        result = accounting(attempt["scheduler"], attempt["job_id"])
+        if result is None:
+            return state
+        if type(result["seconds"]) is not int or result["seconds"] < 0:
+            raise ValueError("Invalid scheduler runtime accounting")
+        attempt.update(accounted=True, accounting=result)
+        state["used_seconds"] += result["seconds"]
+        if state["state"] != "cancelled":
+            try:
+                if result["success"]:
+                    outcome = verify_outcome(run_dir, attempt)
+                    previous = state.get("progress", -1)
+                    validation_completed = (
+                        len(state["attempts"]) > 1
+                        and state["attempts"][-2]
+                        .get("outcome", {})
+                        .get("pending_validation")
+                        is True
+                        and outcome.get("pending_validation") is False
+                        and outcome["iteration"] == previous
+                    )
+                    if (
+                        outcome["state"] == "paused"
+                        and outcome["iteration"] <= previous
+                        and not validation_completed
+                        and not (
+                            len(state["attempts"]) == 1 and outcome["iteration"] == -1
+                        )
+                    ):
+                        raise ValueError("Paused allocation made no training progress")
+                    attempt["outcome"] = outcome
+                    reason = outcome.get("reason") or (
+                        "allocation_deadline"
+                        if outcome["state"] == "paused"
+                        else "training_limit"
+                    )
+                    state.update(
+                        state=outcome["state"],
+                        reason=reason,
+                        checkpoint=outcome["checkpoint"],
+                        sha256=outcome["sha256"],
+                        progress=outcome["iteration"],
+                    )
+                    attempt["reason"] = reason
+                else:
+                    reason = failure_reason(result)
+                    attempt["reason"] = reason
+                    state.update(
+                        state="cancelled" if reason == "user_cancelled" else "failed",
+                        reason=reason,
+                    )
+                    failure_file = Path(attempt["directory"]) / "failure.json"
+                    if failure_file.exists():
+                        details = read(failure_file)
+                        if details.get("token") == attempt["token"]:
+                            attempt["failure"] = details
+                    retries = state.get("infrastructure_retries", 0)
+                    limit = state["policy"].get("max_infrastructure_retries", 0)
+                    # Application failures/OOM/cancellation are never automatic retries.
+                    if (
+                        reason in ("preemption", "node_failure", "allocation_expiry")
+                        and retries < limit
+                    ):
+                        recovered = recovery_checkpoint(run_dir, attempt)
+                        state.update(
+                            recovered,
+                            state="paused",
+                            infrastructure_retries=retries + 1,
+                        )
+                        attempt["recovery"] = recovered
+                if state["state"] == "paused":
+                    if next_request(state["policy"], state["used_seconds"]) is None:
+                        state.update(
+                            state="budget_exhausted", reason="runtime_budget_exhausted"
+                        )
+                    elif len(state["attempts"]) >= state["policy"]["max_attempts"]:
+                        state.update(state="failed", reason="max_attempts_reached")
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                state.update(
+                    state="failed", reason="invalid_restart_state", detail=str(error)
+                )
+        state["generation"] += 1
+        atomic_json(path, state)
+        return state

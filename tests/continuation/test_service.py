@@ -6,9 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from src import continuation as c
-from src import continuation_pipeline as pipeline
-from src import continuation_service as service
+from src.continuation import controller as pipeline
+from src.continuation import service
+from src.continuation import state as storage
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def service_environment(tmp_path, monkeypatch):
     registry = root / "project" / "registry.json"
     monkeypatch.setattr(service, "service_paths", lambda _: (root, registry))
     manifest = tmp_path / "run" / "continuation_pipeline.json"
-    c.atomic_json(manifest, {"state": "active", "records": []})
+    storage.atomic_json(manifest, {"state": "active", "records": []})
     return root, registry, manifest
 
 
@@ -48,9 +48,9 @@ def test_registration_preserves_other_jobs_and_is_idempotent(
     assert schedule[0].startswith(original)
     assert schedule[0].count("# BEGIN spine-prod") == 1
     assert calls.count(["scrontab", "-"]) == 1
-    assert len(c.read(registry)["pipelines"]) == 1
-    assert c.read(registry)["pipelines"][str(manifest)]["enabled"]
-    assert c.read(manifest)["automation"]["backend"] == "nersc-scrontab"
+    assert len(storage.read(registry)["pipelines"]) == 1
+    assert storage.read(registry)["pipelines"][str(manifest)]["enabled"]
+    assert storage.read(manifest)["automation"]["backend"] == "nersc-scrontab"
     assert list(registry.parent.glob("scrontab-before-*"))[0].read_text() == original
 
 
@@ -65,8 +65,8 @@ def test_registration_failure_disables_pipeline(service_environment, monkeypatch
     monkeypatch.setattr(service.subprocess, "run", fail)
     with pytest.raises(subprocess.CalledProcessError):
         service.register(manifest, "project", Path.cwd())
-    assert not c.read(registry)["pipelines"][str(manifest)]["enabled"]
-    assert "automation" not in c.read(manifest)
+    assert not storage.read(registry)["pipelines"][str(manifest)]["enabled"]
+    assert "automation" not in storage.read(manifest)
 
 
 def test_read_schedule_errors_are_not_treated_as_empty(monkeypatch):
@@ -116,13 +116,13 @@ def test_tick_runs_real_script_cleans_environment_and_skips_completed(
     monkeypatch.setenv("SLURM_MEM_PER_CPU", "2048")
     monkeypatch.setenv("SBATCH_QOS", "cron")
     monkeypatch.setenv("SRUN_CPUS_PER_TASK", "1")
-    c.atomic_json(registry, {"pipelines": {str(manifest): {"enabled": True}}})
+    storage.atomic_json(registry, {"pipelines": {str(manifest): {"enabled": True}}})
     service.tick_registry(registry)
     assert result.read_text() == "ran\n"
-    entry = c.read(registry)["pipelines"][str(manifest)]
+    entry = storage.read(registry)["pipelines"][str(manifest)]
     assert entry["last_checked"]
     assert entry["last_error"] is None
-    c.atomic_json(manifest, {"state": "completed", "records": []})
+    storage.atomic_json(manifest, {"state": "completed", "records": []})
     service.tick_registry(registry)
     assert result.read_text() == "ran\n"
 
@@ -130,8 +130,8 @@ def test_tick_runs_real_script_cleans_environment_and_skips_completed(
 def test_tick_error_does_not_disable_other_pipelines(service_environment):
     _, registry, manifest = service_environment
     other = manifest.parent / "other" / "controller.json"
-    c.atomic_json(other, {"state": "completed", "records": []})
-    c.atomic_json(
+    storage.atomic_json(other, {"state": "completed", "records": []})
+    storage.atomic_json(
         registry,
         {
             "pipelines": {
@@ -141,7 +141,7 @@ def test_tick_error_does_not_disable_other_pipelines(service_environment):
         },
     )
     service.tick_registry(registry)
-    entries = c.read(registry)["pipelines"]
+    entries = storage.read(registry)["pipelines"]
     assert entries[str(manifest)]["last_error"]
     assert entries[str(other)]["last_checked"]
     assert entries[str(other)]["last_error"] is None
@@ -151,8 +151,8 @@ def test_tick_error_does_not_disable_other_pipelines(service_environment):
 def test_blocked_training_is_not_advanced(service_environment, logical_state):
     _, _, manifest = service_environment
     run = manifest.parent / "train"
-    c.atomic_json(c.manifest_path(run), {"state": logical_state})
-    c.atomic_json(
+    storage.atomic_json(storage.manifest_path(run), {"state": logical_state})
+    storage.atomic_json(
         manifest,
         {
             "state": "active",
@@ -174,7 +174,7 @@ def test_start_never_submits_training_if_registration_fails(tmp_path, monkeypatc
 
     context = Submitter()
     context.submit_job = Mock()
-    monkeypatch.setattr(c, "validate_storage", lambda *_: None)
+    monkeypatch.setattr(pipeline, "validate_storage", lambda *_: None)
     monkeypatch.setattr(
         service, "service_paths", lambda _: (tmp_path, tmp_path / "registry")
     )
@@ -205,11 +205,11 @@ def test_health_reports_missing_and_stale_registry(service_environment, monkeypa
     _, registry, manifest = service_environment
     fake_scrontab(monkeypatch)
     service.register(manifest, "project", Path.cwd())
-    state = c.read(manifest)
+    state = storage.read(manifest)
     assert "awaiting" in service.health(state)
-    data = c.read(registry)
+    data = storage.read(registry)
     data["pipelines"][str(manifest)]["last_checked"] = 1
-    c.atomic_json(registry, data)
+    storage.atomic_json(registry, data)
     assert "stale" in service.health(state)
     registry.unlink()
     assert service.health(state) == "registry unavailable"
@@ -218,12 +218,12 @@ def test_health_reports_missing_and_stale_registry(service_environment, monkeypa
 def test_service_drives_two_pauses_and_releases_consumer_once(
     service_environment, monkeypatch
 ):
-    from tests.test_continuation import allocation
+    from .helpers import allocation
 
     _, registry, manifest = service_environment
     run = manifest.parent / "train"
     control = manifest.parent / "scratch"
-    c.atomic_json(
+    storage.atomic_json(
         manifest,
         {
             "state": "active",
@@ -252,7 +252,7 @@ def test_service_drives_two_pauses_and_releases_consumer_once(
             ],
         },
     )
-    c.atomic_json(registry, {"pipelines": {str(manifest): {"enabled": True}}})
+    storage.atomic_json(registry, {"pipelines": {str(manifest): {"enabled": True}}})
     submissions = []
 
     def submit(**options):
@@ -273,7 +273,7 @@ def test_service_drives_two_pauses_and_releases_consumer_once(
     )
     # Simulate completed allocations; use the real reconcile/advance algorithms.
     monkeypatch.setattr(
-        c,
+        pipeline,
         "accounting",
         lambda *_: {"success": True, "seconds": 200, "status": "COMPLETED"},
     )
@@ -297,21 +297,21 @@ def test_service_drives_two_pauses_and_releases_consumer_once(
     assert submissions[1]["resume_from"].endswith("snapshot-10.ckpt")
     assert submissions[2]["resume_from"].endswith("snapshot-20.ckpt")
     assert submissions[3]["config"] == "consumer"
-    assert c.read(manifest)["state"] == "completed"
-    assert c.read(c.manifest_path(run, control))["used_seconds"] == 600
+    assert storage.read(manifest)["state"] == "completed"
+    assert storage.read(storage.manifest_path(run, control))["used_seconds"] == 600
 
     assert schedule[0] == ""
-    assert c.read(registry)["schedule_state"] == "stopped"
+    assert storage.read(registry)["schedule_state"] == "stopped"
 
 
 def test_two_pipelines_share_one_schedule(service_environment, monkeypatch):
     _, registry, manifest = service_environment
     schedule, calls = fake_scrontab(monkeypatch)
     other = manifest.parent / "another.json"
-    c.atomic_json(other, {"state": "active", "records": []})
+    storage.atomic_json(other, {"state": "active", "records": []})
     service.register(manifest, "project", Path.cwd())
     service.register(other, "project", Path.cwd())
-    assert len(c.read(registry)["pipelines"]) == 2
+    assert len(storage.read(registry)["pipelines"]) == 2
     assert schedule[0].count("# BEGIN spine-prod") == 1
     assert calls.count(["scrontab", "-"]) == 1
 
@@ -359,19 +359,19 @@ def test_retirement_preserves_unrelated_entries_and_relaunch_rearms(
     service.register(manifest, "project", Path.cwd())
     # The all-completed transition has yet to run, so still needs a tick.
     assert not service.retire_if_idle(registry)
-    state = c.read(manifest)
+    state = storage.read(manifest)
     state["state"] = "completed"
-    c.atomic_json(manifest, state)
+    storage.atomic_json(manifest, state)
     assert service.retire_if_idle(registry)
     assert schedule[0] == unrelated
-    assert "stopped" in service.health(c.read(manifest))
+    assert "stopped" in service.health(storage.read(manifest))
     # Repeated cleanup is a no-op; a new launch installs one block again.
     installed = calls.count(["scrontab", "-"])
     assert service.retire_if_idle(registry)
     assert calls.count(["scrontab", "-"]) == installed
     service.register(manifest, "project", Path.cwd())
     assert schedule[0].count("# BEGIN spine-prod") == 1
-    assert c.read(registry)["schedule_state"] == "active"
+    assert storage.read(registry)["schedule_state"] == "active"
 
 
 def test_retirement_keeps_timer_for_other_active_pipeline(
@@ -381,9 +381,9 @@ def test_retirement_keeps_timer_for_other_active_pipeline(
     schedule, _ = fake_scrontab(monkeypatch)
     service.register(manifest, "project", Path.cwd())
     other = manifest.parent / "other.json"
-    c.atomic_json(other, {"state": "active", "records": []})
+    storage.atomic_json(other, {"state": "active", "records": []})
     service.register(other, "project", Path.cwd())
-    c.atomic_json(manifest, {"state": "completed", "records": []})
+    storage.atomic_json(manifest, {"state": "completed", "records": []})
     assert not service.retire_if_idle(registry)
     assert "# BEGIN spine-prod" in schedule[0]
     other.unlink()
@@ -403,20 +403,20 @@ def test_retirement_keeps_timer_for_other_active_pipeline(
 def test_operator_actions_rearm_stopped_service(
     service_environment, monkeypatch, action, logical_state, value
 ):
-    from tests.test_continuation import allocation
+    from .helpers import allocation
 
     _, registry, manifest = service_environment
     schedule, _ = fake_scrontab(monkeypatch)
     run = manifest.parent / "train"
     attempt = allocation(run, 1)
-    logical = c.read(c.manifest_path(run))
-    outcome = c.read(Path(attempt["directory"]) / "outcome.json")
+    logical = storage.read(storage.manifest_path(run))
+    outcome = storage.read(Path(attempt["directory"]) / "outcome.json")
     logical.update(
         state=logical_state, checkpoint=outcome["checkpoint"], sha256=outcome["sha256"]
     )
     logical["attempts"][0]["accounted"] = True
-    c.atomic_json(c.manifest_path(run), logical)
-    c.atomic_json(
+    storage.atomic_json(storage.manifest_path(run), logical)
+    storage.atomic_json(
         manifest,
         {
             "state": "active",
@@ -441,8 +441,8 @@ def test_operator_actions_rearm_stopped_service(
     assert schedule[0] == ""
     pipeline.operate(manifest, action, stage="train", value=value)
     assert schedule[0].count("# BEGIN spine-prod") == 1
-    assert c.read(registry)["schedule_state"] == "active"
-    assert c.read(c.manifest_path(run))["state"] == (
+    assert storage.read(registry)["schedule_state"] == "active"
+    assert storage.read(storage.manifest_path(run))["state"] == (
         "completed" if action == "accept" else "paused"
     )
 
@@ -455,7 +455,7 @@ def test_retirement_waits_for_reactivation_state_change(
 
     _, registry, manifest = service_environment
     schedule, _ = fake_scrontab(monkeypatch)
-    c.atomic_json(
+    storage.atomic_json(
         manifest, {"state": "completed", "records": [], "basedir": str(Path.cwd())}
     )
     service.register(manifest, "project", Path.cwd())
@@ -467,11 +467,11 @@ def test_retirement_waits_for_reactivation_state_change(
         return service.retire_if_idle(registry)
 
     with ThreadPoolExecutor() as pool:
-        with service.reactivating(c.read(manifest)):
+        with service.reactivating(storage.read(manifest)):
             future = pool.submit(cleanup)
             assert attempted.wait(2)
-            state = c.read(manifest)
+            state = storage.read(manifest)
             state["state"] = "active"
-            c.atomic_json(manifest, state)
+            storage.atomic_json(manifest, state)
         assert future.result(timeout=2) is False
     assert "# BEGIN spine-prod" in schedule[0]

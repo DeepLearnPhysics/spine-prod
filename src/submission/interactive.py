@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from .component import SubmissionComponent
+from .base import SubmissionComponent
 
 
 class InteractiveRunner(SubmissionComponent):

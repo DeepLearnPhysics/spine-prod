@@ -248,7 +248,7 @@ def test_metric_evaluation_does_not_require_optical_or_trigger_products(version)
 
 
 def test_latest_inference_keeps_published_checkpoint(tmp_path):
-    from src.config_manager import ConfigManager
+    from src.config import ConfigManager
 
     generated = ConfigManager(ROOT).create_latest_config("2x2", tmp_path)
     latest = spine_config.load_config_file(generated, download=False)

@@ -1,6 +1,5 @@
 """Allocation lifecycle, accounting and consumer gating regression tests."""
 
-import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,72 +7,27 @@ from types import SimpleNamespace
 import pytest
 from jinja2 import Template
 
-from src import continuation as c
-from src import continuation_pipeline as pipeline
+from src.continuation import controller as pipeline
+from src.continuation import policy as policies
+from src.continuation import scheduler as scheduling
+from src.continuation import state as storage
 
-
-def config(**extra):
-    return c.policy(
-        {
-            "runtime_budget": "00:12:00",
-            "checkpoint_margin": "00:00:10",
-            "startup_allowance": "00:00:05",
-            **extra,
-        },
-        "00:04:00",
-        "slurm",
-    )
-
-
-def checkpoint(run, iteration):
-    path = run / "weights" / f"snapshot-{iteration}.ckpt"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(f"restart-state-{iteration}".encode())
-    sha = hashlib.sha256(path.read_bytes()).hexdigest()
-    Path(str(path) + ".sha256").write_text(f"{sha}  {path.name}\n")
-    return path, sha
-
-
-def allocation(run, number, outcome="paused", iteration=None, continuation_dir=None):
-    attempt_dir = (continuation_dir or run) / "attempts" / str(number)
-    attempt_dir.mkdir(parents=True)
-    attempt = c.reserve(
-        run,
-        "scientific-identity",
-        config(),
-        "slurm",
-        attempt_dir,
-        continuation_dir=continuation_dir,
-    )
-    c.submitted(run, attempt["token"], str(number), continuation_dir)
-    cp, sha = checkpoint(run, iteration if iteration is not None else number * 10)
-    c.atomic_json(
-        attempt_dir / "outcome.json",
-        dict(
-            contract=1,
-            token=attempt["token"],
-            state=outcome,
-            checkpoint=str(cp),
-            sha256=sha,
-            iteration=iteration if iteration is not None else number * 10,
-        ),
-    )
-    return attempt
+from .helpers import allocation, checkpoint, config
 
 
 @pytest.mark.parametrize("bad", ["0:00:00", "1:60:00", "10", -2, True])
 def test_duration_rejects_invalid(bad):
     with pytest.raises(ValueError):
-        c.seconds(bad)
+        policies.seconds(bad)
 
 
 def test_policy_final_chunk_and_rounding():
     cfg = config(min_time="00:02:00")
-    assert c.next_request(cfg, 599)["seconds"] == 120
-    assert c.next_request(cfg, 599)["rounding_seconds"] == 1
-    assert c.next_request(cfg, 659)["seconds"] == 60
-    assert c.next_request(cfg, 661) is None
-    assert c.seconds("2-03:00:00") == 51 * 3600
+    assert policies.next_request(cfg, 599)["seconds"] == 120
+    assert policies.next_request(cfg, 599)["rounding_seconds"] == 1
+    assert policies.next_request(cfg, 659)["seconds"] == 60
+    assert policies.next_request(cfg, 661) is None
+    assert policies.seconds("2-03:00:00") == 51 * 3600
 
 
 @pytest.mark.parametrize(
@@ -98,9 +52,9 @@ def test_pbs_variable_is_explicitly_gated():
         "checkpoint_margin": "00:01:00",
     }
     with pytest.raises(ValueError, match="site validation"):
-        c.policy(values, "00:20:00", "pbs")
+        policies.policy(values, "00:20:00", "pbs")
     assert (
-        c.policy({**values, "allow_pbs_shrink_to_fit": True}, "00:20:00", "pbs")[
+        policies.policy({**values, "allow_pbs_shrink_to_fit": True}, "00:20:00", "pbs")[
             "minimum"
         ]
         == 600
@@ -110,22 +64,24 @@ def test_pbs_variable_is_explicitly_gated():
 def test_pause_resume_accounting_and_duplicate_intent(tmp_path, monkeypatch):
     allocation(tmp_path, 1)
     with pytest.raises(ValueError, match="reconcile"):
-        c.reserve(
+        storage.reserve(
             tmp_path, "scientific-identity", config(), "slurm", tmp_path / "duplicate"
         )
     monkeypatch.setattr(
-        c,
+        pipeline,
         "accounting",
         lambda *_: {"success": True, "seconds": 200, "status": "COMPLETED"},
     )
-    state = c.reconcile(tmp_path)
+    state = pipeline.reconcile(tmp_path)
     assert state["state"] == "paused"
     assert state["used_seconds"] == 200
-    assert c.reconcile(tmp_path)["used_seconds"] == 200
+    assert pipeline.reconcile(tmp_path)["used_seconds"] == 200
     allocation(tmp_path, 2, "completed")
-    assert c.reconcile(tmp_path)["state"] == "completed"
+    assert pipeline.reconcile(tmp_path)["state"] == "completed"
     with pytest.raises(ValueError):
-        c.reserve(tmp_path, "changed-config", config(), "slurm", tmp_path / "changed")
+        storage.reserve(
+            tmp_path, "changed-config", config(), "slurm", tmp_path / "changed"
+        )
 
 
 @pytest.mark.parametrize(
@@ -134,21 +90,21 @@ def test_pause_resume_accounting_and_duplicate_intent(tmp_path, monkeypatch):
 def test_fail_closed_and_charge_failed_allocation(tmp_path, monkeypatch, failure):
     attempt = allocation(tmp_path, 1)
     outcome = Path(attempt["directory"]) / "outcome.json"
-    data = c.read(outcome)
+    data = storage.read(outcome)
     if failure == "checksum":
         Path(data["checkpoint"]).write_bytes(b"partial")
     elif failure == "missing":
         outcome.unlink()
     elif failure == "stale":
         data["token"] = "previous-attempt"
-        c.atomic_json(outcome, data)
+        storage.atomic_json(outcome, data)
     elif failure == "no_progress":
-        path = c.manifest_path(tmp_path)
-        state = c.read(path)
+        path = storage.manifest_path(tmp_path)
+        state = storage.read(path)
         state["progress"] = data["iteration"]
-        c.atomic_json(path, state)
+        storage.atomic_json(path, state)
     monkeypatch.setattr(
-        c,
+        pipeline,
         "accounting",
         lambda *_: {
             "success": failure != "hard_kill",
@@ -156,25 +112,27 @@ def test_fail_closed_and_charge_failed_allocation(tmp_path, monkeypatch, failure
             "status": "TIMEOUT",
         },
     )
-    state = c.reconcile(tmp_path)
+    state = pipeline.reconcile(tmp_path)
     assert state["state"] == "failed"
     assert state["used_seconds"] == 240
 
 
 def test_cancel_during_checkpointing_inhibits_completion(tmp_path, monkeypatch):
     allocation(tmp_path, 1, "completed")
-    path = c.manifest_path(tmp_path)
-    state = c.read(path)
+    path = storage.manifest_path(tmp_path)
+    state = storage.read(path)
     state["state"] = "cancelled"
-    c.atomic_json(path, state)
-    monkeypatch.setattr(c, "accounting", lambda *_: {"success": True, "seconds": 200})
-    assert c.reconcile(tmp_path)["state"] == "cancelled"
+    storage.atomic_json(path, state)
+    monkeypatch.setattr(
+        pipeline, "accounting", lambda *_: {"success": True, "seconds": 200}
+    )
+    assert pipeline.reconcile(tmp_path)["state"] == "cancelled"
 
 
 def test_actual_pbs_deadline_not_requested_maximum(monkeypatch):
     start = 1700000000
     monkeypatch.setattr(
-        c,
+        scheduling,
         "command",
         lambda _: json.dumps(
             {
@@ -190,12 +148,12 @@ def test_actual_pbs_deadline_not_requested_maximum(monkeypatch):
             }
         ),
     )
-    assert c.allocation("pbs", "1.server") == (start, start + 360)
+    assert scheduling.allocation("pbs", "1.server") == (start, start + 360)
 
 
 def test_actual_slurm_deadline_typed_timestamps(monkeypatch):
     monkeypatch.setattr(
-        c,
+        scheduling,
         "command",
         lambda _: json.dumps(
             {
@@ -208,7 +166,7 @@ def test_actual_slurm_deadline_typed_timestamps(monkeypatch):
             }
         ),
     )
-    assert c.allocation("slurm", "1") == (1700000000, 1700000360)
+    assert scheduling.allocation("slurm", "1") == (1700000000, 1700000360)
 
 
 @pytest.mark.parametrize("split", [False, True])
@@ -218,7 +176,7 @@ def test_two_pauses_then_completion_submits_consumer_exactly_once(
     run = tmp_path / "train"
     continuation_dir = tmp_path / "scratch" if split else None
     path = tmp_path / "controller.json"
-    c.atomic_json(
+    storage.atomic_json(
         path,
         {
             "state": "active",
@@ -266,11 +224,13 @@ def test_two_pauses_then_completion_submits_consumer_exactly_once(
         submit_job=submit,
     )
     # Queued/running allocations have no accounting, even if an outcome exists.
-    monkeypatch.setattr(c, "accounting", lambda *_: None)
+    monkeypatch.setattr(pipeline, "accounting", lambda *_: None)
     pipeline.advance(path, context)
     pipeline.advance(path, context)
     assert len(calls) == 1
-    monkeypatch.setattr(c, "accounting", lambda *_: {"success": True, "seconds": 200})
+    monkeypatch.setattr(
+        pipeline, "accounting", lambda *_: {"success": True, "seconds": 200}
+    )
     pipeline.advance(path, context)
     pipeline.advance(path, context)
     assert len(calls) == 3
@@ -280,7 +240,7 @@ def test_two_pauses_then_completion_submits_consumer_exactly_once(
     pipeline.advance(path, context)
     pipeline.advance(path, context)
     assert len(calls) == 4
-    assert c.read(path)["state"] == "completed"
+    assert storage.read(path)["state"] == "completed"
 
 
 @pytest.mark.parametrize("site", ["nersc.sbatch", "s3df.sbatch", "anl.pbs"])
@@ -321,7 +281,7 @@ def test_concurrent_reservations_submit_only_one_intent(tmp_path):
 
     def reserve(number):
         try:
-            return c.reserve(
+            return storage.reserve(
                 tmp_path, "identity", config(), "slurm", tmp_path / str(number)
             )
         except ValueError:
@@ -330,29 +290,31 @@ def test_concurrent_reservations_submit_only_one_intent(tmp_path):
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(reserve, [1, 2]))
     assert len([result for result in results if result]) == 1
-    assert len(c.read(c.manifest_path(tmp_path))["attempts"]) == 1
+    assert len(storage.read(storage.manifest_path(tmp_path))["attempts"]) == 1
 
 
 def test_atomic_publish_interruption_leaves_previous_manifest(tmp_path, monkeypatch):
     path = tmp_path / "manifest.json"
-    c.atomic_json(path, {"generation": 1})
+    storage.atomic_json(path, {"generation": 1})
 
     def fail(*_):
         raise OSError("interrupted before rename")
 
-    monkeypatch.setattr(c.os, "replace", fail)
+    monkeypatch.setattr(storage.os, "replace", fail)
     with pytest.raises(OSError):
-        c.atomic_json(path, {"generation": 2})
-    assert c.read(path) == {"generation": 1}
+        storage.atomic_json(path, {"generation": 2})
+    assert storage.read(path) == {"generation": 1}
 
 
 def test_budget_extension_and_explicit_accept(tmp_path, monkeypatch):
     run = tmp_path / "train"
     allocation(run, 1)
-    monkeypatch.setattr(c, "accounting", lambda *_: {"success": True, "seconds": 720})
-    assert c.reconcile(run)["state"] == "budget_exhausted"
+    monkeypatch.setattr(
+        pipeline, "accounting", lambda *_: {"success": True, "seconds": 720}
+    )
+    assert pipeline.reconcile(run)["state"] == "budget_exhausted"
     path = tmp_path / "pipeline.json"
-    c.atomic_json(
+    storage.atomic_json(
         path,
         {
             "state": "active",
@@ -367,10 +329,10 @@ def test_budget_extension_and_explicit_accept(tmp_path, monkeypatch):
         },
     )
     pipeline.operate(path, "extend", "train", "00:20:00")
-    assert c.read(c.manifest_path(run))["state"] == "paused"
-    assert c.read(c.manifest_path(run))["budget_override"] == 1200
+    assert storage.read(storage.manifest_path(run))["state"] == "paused"
+    assert storage.read(storage.manifest_path(run))["budget_override"] == 1200
     pipeline.operate(path, "accept", "train")
-    assert c.read(c.manifest_path(run))["state"] == "completed"
+    assert storage.read(storage.manifest_path(run))["state"] == "completed"
 
 
 def test_shell_trap_supervisor_and_launcher_handle_repeated_pause(tmp_path):
@@ -384,8 +346,8 @@ def test_shell_trap_supervisor_and_launcher_handle_repeated_pause(tmp_path):
 
     attempt_dir = tmp_path / "attempt"
     attempt_dir.mkdir()
-    attempt = c.reserve(tmp_path, "identity", config(), "slurm", attempt_dir)
-    c.submitted(tmp_path, attempt["token"], "123")
+    attempt = storage.reserve(tmp_path, "identity", config(), "slurm", attempt_dir)
+    storage.submitted(tmp_path, attempt["token"], "123")
     bindir = tmp_path / "bin"
     bindir.mkdir()
     scheduler = bindir / "scontrol"
@@ -434,7 +396,7 @@ def test_shell_trap_supervisor_and_launcher_handle_repeated_pause(tmp_path):
     )
     try:
         deadline = time.monotonic() + 10
-        while c.read(c.manifest_path(tmp_path))["state"] != "running":
+        while storage.read(storage.manifest_path(tmp_path))["state"] != "running":
             assert process.poll() is None
             assert time.monotonic() < deadline
             time.sleep(0.02)
@@ -447,7 +409,7 @@ def test_shell_trap_supervisor_and_launcher_handle_repeated_pause(tmp_path):
         assert process.returncode == 0, stderr.decode()
         assert (attempt_dir / "pause").is_file()
         assert not (attempt_dir / "graceful_stop").exists()
-        state = c.read(c.manifest_path(tmp_path))
+        state = storage.read(storage.manifest_path(tmp_path))
         assert state["state"] == "pausing"
         assert state["attempts"][0]["launcher_exit"] == 0
     finally:
@@ -462,19 +424,19 @@ def test_metrics_separates_queue_runtime_and_pause_latency(tmp_path, monkeypatch
 
     run = tmp_path / "train"
     attempt = allocation(run, 1)
-    path = c.manifest_path(run)
-    logical = c.read(path)
+    path = storage.manifest_path(run)
+    logical = storage.read(path)
     record = logical["attempts"][0]
     record.update(
         start=record["intent_time"] + 40, pause_requested_at=100, assigned_seconds=240
     )
-    c.atomic_json(path, logical)
+    storage.atomic_json(path, logical)
     outcome_path = Path(attempt["directory"]) / "outcome.json"
-    outcome = c.read(outcome_path)
+    outcome = storage.read(outcome_path)
     outcome["committed_at"] = 109
-    c.atomic_json(outcome_path, outcome)
+    storage.atomic_json(outcome_path, outcome)
     controller = tmp_path / "controller.json"
-    c.atomic_json(
+    storage.atomic_json(
         controller,
         {
             "records": [
@@ -482,7 +444,9 @@ def test_metrics_separates_queue_runtime_and_pause_latency(tmp_path, monkeypatch
             ]
         },
     )
-    monkeypatch.setattr(c, "accounting", lambda *_: {"success": True, "seconds": 205})
+    monkeypatch.setattr(
+        pipeline, "accounting", lambda *_: {"success": True, "seconds": 205}
+    )
     stream = io.StringIO()
     pipeline.metrics(controller, stream)
     row = list(csv.DictReader(io.StringIO(stream.getvalue())))[0]
@@ -528,31 +492,31 @@ def test_runtime_probes_actual_executable_contract(tmp_path, capability, expecte
 )
 def test_nersc_dvs_workspace_rejected_before_submission(path):
     with pytest.raises(ValueError, match=r"\$SCRATCH"):
-        c.validate_storage(path, "nersc")
+        storage.validate_storage(path, "nersc")
 
 
 def test_nersc_symlink_into_cfs_rejected(tmp_path):
     link = tmp_path / "workspace"
     link.symlink_to("/global/cfs/cdirs/m5252/run")
     with pytest.raises(ValueError, match="DVS"):
-        c.validate_storage(link, "nersc")
+        storage.validate_storage(link, "nersc")
 
 
 def test_dvs_errno_has_actionable_message_and_never_enters_lock(tmp_path, monkeypatch):
     def unsupported(*_):
         raise OSError(524, "Unknown error 524")
 
-    monkeypatch.setattr(c.fcntl, "flock", unsupported)
+    monkeypatch.setattr(storage.fcntl, "flock", unsupported)
     with pytest.raises(RuntimeError, match="Do not disable locking"):
-        with c.locked(tmp_path / "manifest.json"):
+        with storage.locked(tmp_path / "manifest.json"):
             pytest.fail("An unsupported lock must not be bypassed")
 
 
 def test_storage_preflight_leaves_scientific_state_unchanged(tmp_path):
-    path = c.manifest_path(tmp_path)
-    c.atomic_json(path, {"sentinel": 1})
-    c.preflight_storage(tmp_path, "anl")
-    assert c.read(path) == {"sentinel": 1}
+    path = storage.manifest_path(tmp_path)
+    storage.atomic_json(path, {"sentinel": 1})
+    storage.preflight_storage(tmp_path, "anl")
+    assert storage.read(path) == {"sentinel": 1}
     assert not list(path.parent.glob("preflight-*.json"))
 
 
@@ -563,7 +527,7 @@ def test_preferred_chunk_and_site_minimum():
     profile = dict(
         catalog["profiles"]["nersc_gpu_full"], time="48:00:00", qos="preempt"
     )
-    cfg = c.profile_policy(
+    cfg = policies.profile_policy(
         catalog,
         profile,
         {
@@ -574,12 +538,12 @@ def test_preferred_chunk_and_site_minimum():
         },
     )
     assert cfg["site_min_time"] == 7200
-    assert c.next_request(cfg, 0)["seconds"] == 86400
-    assert c.next_request(cfg, 119 * 3600) is None
-    assert c.next_request(cfg, 118 * 3600)["seconds"] == 7200
+    assert policies.next_request(cfg, 0)["seconds"] == 86400
+    assert policies.next_request(cfg, 119 * 3600) is None
+    assert policies.next_request(cfg, 118 * 3600)["seconds"] == 7200
     assert cfg["runtime_budget"] == 120 * 3600
     with pytest.raises(ValueError, match="max_time"):
-        c.profile_policy(
+        policies.profile_policy(
             catalog, dict(profile, time="120:00:00"), {"runtime_budget": "240:00:00"}
         )
 
@@ -616,16 +580,16 @@ def test_bounded_infrastructure_recovery_never_retries_application_errors(
     Path(
         attempt["directory"], "outcome.json"
     ).unlink()  # hard kill, periodic artifact survives
-    path = c.manifest_path(tmp_path)
-    state = c.read(path)
+    path = storage.manifest_path(tmp_path)
+    state = storage.read(path)
     state["policy"]["max_infrastructure_retries"] = 1
-    c.atomic_json(path, state)
+    storage.atomic_json(path, state)
     monkeypatch.setattr(
-        c,
+        pipeline,
         "accounting",
         lambda *_: {"status": scheduler_state, "success": False, "seconds": 240},
     )
-    result = c.reconcile(tmp_path)
+    result = pipeline.reconcile(tmp_path)
     assert result["used_seconds"] == 240
     assert result["reason"] == expected
     assert result["state"] == (
@@ -633,20 +597,20 @@ def test_bounded_infrastructure_recovery_never_retries_application_errors(
         if recoverable
         else "cancelled" if scheduler_state == "CANCELLED" else "failed"
     )
-    assert c.reconcile(tmp_path)["used_seconds"] == 240
+    assert pipeline.reconcile(tmp_path)["used_seconds"] == 240
     if recoverable:
         directory = tmp_path / "attempts/2"
         directory.mkdir()
-        second = c.reserve(
+        second = storage.reserve(
             tmp_path,
             "scientific-identity",
             config(max_infrastructure_retries=1),
             "slurm",
             directory,
         )
-        c.submitted(tmp_path, second["token"], "2")
+        storage.submitted(tmp_path, second["token"], "2")
         checkpoint(tmp_path, 20)
-        result = c.reconcile(tmp_path)
+        result = pipeline.reconcile(tmp_path)
         assert result["state"] == "failed"
         assert result["infrastructure_retries"] == 1
         assert result["used_seconds"] == 480
@@ -654,17 +618,17 @@ def test_bounded_infrastructure_recovery_never_retries_application_errors(
 
 def test_preemption_without_new_checkpoint_stops(tmp_path, monkeypatch):
     allocation(tmp_path, 1)
-    path = c.manifest_path(tmp_path)
-    state = c.read(path)
+    path = storage.manifest_path(tmp_path)
+    state = storage.read(path)
     state["policy"]["max_infrastructure_retries"] = 2
     state["attempts"][0]["start_progress"] = 10
-    c.atomic_json(path, state)
+    storage.atomic_json(path, state)
     monkeypatch.setattr(
-        c,
+        pipeline,
         "accounting",
         lambda *_: {"status": "PREEMPTED", "success": False, "seconds": 120},
     )
-    state = c.reconcile(tmp_path)
+    state = pipeline.reconcile(tmp_path)
     assert state["state"] == "failed"
     assert "No new verified" in state["detail"]
     assert state["attempts"][0]["reason"] == "preemption"
@@ -748,11 +712,11 @@ def test_all_training_stages_report_policy_in_dry_run(tmp_path, capsys, monkeypa
 
 def test_unknown_submission_reconciles_token_and_charges_once(tmp_path, monkeypatch):
     attempt = allocation(tmp_path, 1)
-    path = c.manifest_path(tmp_path)
-    state = c.read(path)
+    path = storage.manifest_path(tmp_path)
+    state = storage.read(path)
     state["attempts"][0]["job_id"] = None
     state["state"] = "submitting"
-    c.atomic_json(path, state)
+    storage.atomic_json(path, state)
     commands = []
 
     def query(argv):
@@ -761,30 +725,32 @@ def test_unknown_submission_reconciles_token_and_charges_once(tmp_path, monkeypa
             return "42|" + attempt["token"] + "|\n"
         return "42|COMPLETED|200|0:0|\n"
 
-    monkeypatch.setattr(c, "command", query)
-    result = c.reconcile(tmp_path)
+    monkeypatch.setattr(scheduling, "command", query)
+    result = pipeline.reconcile(tmp_path)
     assert result["attempts"][0]["job_id"] == "42"
     assert result["state"] == "paused"
     assert result["used_seconds"] == 200
-    c.reconcile(tmp_path)
+    pipeline.reconcile(tmp_path)
     assert len(commands) == 2
 
 
 def test_unknown_submission_with_no_match_never_resubmits(tmp_path, monkeypatch):
-    attempt = c.reserve(tmp_path, "identity", config(), "slurm", tmp_path / "attempt")
-    monkeypatch.setattr(c, "command", lambda _: "")
-    state = c.reconcile(tmp_path)
+    attempt = storage.reserve(
+        tmp_path, "identity", config(), "slurm", tmp_path / "attempt"
+    )
+    monkeypatch.setattr(scheduling, "command", lambda _: "")
+    state = pipeline.reconcile(tmp_path)
     assert state["state"] == "submitting"
     assert state["attempts"][0]["token"] == attempt["token"]
     with pytest.raises(ValueError, match="reconcile"):
-        c.reserve(tmp_path, "identity", config(), "slurm", tmp_path / "other")
+        storage.reserve(tmp_path, "identity", config(), "slurm", tmp_path / "other")
 
 
 def test_recovery_rejects_ambiguous_scheduler_matches(monkeypatch):
     token = "spc-" + "a" * 20
-    monkeypatch.setattr(c, "command", lambda _: f"1|{token}|\n2|{token}|\n")
+    monkeypatch.setattr(scheduling, "command", lambda _: f"1|{token}|\n2|{token}|\n")
     with pytest.raises(RuntimeError, match="Multiple jobs"):
-        c.discover_submission("slurm", token)
+        scheduling.discover_submission("slurm", token)
 
 
 def test_flock_failure_emits_traceback_and_diagnostic_without_launch(tmp_path):
@@ -794,13 +760,13 @@ def test_flock_failure_emits_traceback_and_diagnostic_without_launch(tmp_path):
 
     attempt_dir = tmp_path / "attempt"
     attempt_dir.mkdir()
-    attempt = c.reserve(tmp_path, "identity", config(), "slurm", attempt_dir)
-    c.submitted(tmp_path, attempt["token"], "123")
+    attempt = storage.reserve(tmp_path, "identity", config(), "slurm", attempt_dir)
+    storage.submitted(tmp_path, attempt["token"], "123")
     script = str(Path("scripts/continuation_runtime.py").resolve())
     code = (
-        "import runpy, sys, src.continuation as c\n"
+        "import runpy, sys, src.continuation.state as storage\n"
         "def fail(*args): raise OSError(524, 'Unknown error 524')\n"
-        "c.fcntl.flock = fail\n"
+        "storage.fcntl.flock = fail\n"
         f"sys.argv = [{script!r}, {str(tmp_path)!r}, {attempt['token']!r}, '--', 'does-not-exist']\n"
         f"runpy.run_path({script!r}, run_name='__main__')\n"
     )
@@ -813,8 +779,8 @@ def test_flock_failure_emits_traceback_and_diagnostic_without_launch(tmp_path):
     assert result.returncode == 1
     assert "Traceback" in result.stderr
     assert "Do not disable locking" in result.stderr
-    assert c.read(attempt_dir / "failure.json")["token"] == attempt["token"]
-    assert c.read(c.manifest_path(tmp_path))["state"] == "pending"
+    assert storage.read(attempt_dir / "failure.json")["token"] == attempt["token"]
+    assert storage.read(storage.manifest_path(tmp_path))["state"] == "pending"
 
 
 def test_pipeline_stops_cfs_request_before_any_scheduler_call(tmp_path, mock_submitter):
@@ -851,12 +817,10 @@ def test_pipeline_stops_cfs_request_before_any_scheduler_call(tmp_path, mock_sub
 def test_watchdog_uses_actual_deadline_and_remaining_budget(
     tmp_path, monkeypatch, assigned, used, split
 ):
-    import importlib.util
-
     continuation_dir = tmp_path / "scratch" if split else None
     attempt_dir = (continuation_dir or tmp_path) / "attempt"
     attempt_dir.mkdir(parents=True)
-    attempt = c.reserve(
+    attempt = storage.reserve(
         tmp_path,
         "identity",
         config(),
@@ -864,16 +828,13 @@ def test_watchdog_uses_actual_deadline_and_remaining_budget(
         attempt_dir,
         continuation_dir=continuation_dir,
     )
-    c.submitted(tmp_path, attempt["token"], "123", continuation_dir)
-    manifest = c.manifest_path(tmp_path, continuation_dir)
-    state = c.read(manifest)
+    storage.submitted(tmp_path, attempt["token"], "123", continuation_dir)
+    manifest = storage.manifest_path(tmp_path, continuation_dir)
+    state = storage.read(manifest)
     state["used_seconds"] = used
-    c.atomic_json(manifest, state)
-    spec = importlib.util.spec_from_file_location(
-        "continuation_runtime_test", "scripts/continuation_runtime.py"
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    storage.atomic_json(manifest, state)
+    from src.continuation import runtime as module
+
     now = [1000.0]
     monkeypatch.setattr(module.time, "time", lambda: now[0])
     monkeypatch.setattr(module.time, "sleep", lambda _: now.__setitem__(0, now[0] + 1))
@@ -895,7 +856,7 @@ def test_watchdog_uses_actual_deadline_and_remaining_budget(
         module.run(str(tmp_path), attempt["token"], ["fake-launcher"], continuation_dir)
         == 0
     )
-    state = c.read(manifest)
+    state = storage.read(manifest)
     assert state["attempts"][0]["pause_requested_at"] == 1030
     assert state["attempts"][0]["assigned_seconds"] == assigned
     assert state["state"] == "pausing"
@@ -905,7 +866,7 @@ def test_vd_training_budgets_survive_nersc_site_mapping(tmp_path):
     import yaml
 
     from src.pipeline import PipelineDefinition
-    from src.site_resources import map_stage
+    from src.sites import map_stage
 
     catalog = yaml.safe_load(Path("templates/profiles.yaml").read_text())
     definition = PipelineDefinition.load(
@@ -918,16 +879,16 @@ def test_vd_training_budgets_survive_nersc_site_mapping(tmp_path):
             catalog, stage, "nersc", {"account": "project", "time": "48:00:00"}
         )
         effective = dict(catalog["profiles"][mapped["profile"]], time=mapped["time"])
-        config = c.profile_policy(
+        config = policies.profile_policy(
             catalog,
             effective,
             {"runtime_budget": "120:00:00", "preferred_time": "24:00:00"},
         )
         assert config["runtime_budget"] == 432000
         assert config["maximum"] == 172800
-        assert c.next_request(config, 0)["seconds"] == 86400
-        assert c.next_request(config, 4 * 86400)["seconds"] == 86400
-        assert c.next_request(config, 5 * 86400) is None
+        assert policies.next_request(config, 0)["seconds"] == 86400
+        assert policies.next_request(config, 4 * 86400)["seconds"] == 86400
+        assert policies.next_request(config, 5 * 86400) is None
 
 
 @pytest.mark.parametrize(
@@ -936,14 +897,14 @@ def test_vd_training_budgets_survive_nersc_site_mapping(tmp_path):
 )
 def test_nersc_requires_explicit_scratch_state(path):
     with pytest.raises(ValueError, match="continuation-dir"):
-        c.validate_storage(path, "nersc")
+        storage.validate_storage(path, "nersc")
 
 
 def test_nersc_scratch_state_and_symlink_accepted(tmp_path):
-    c.validate_storage("/pscratch/sd/u/user/continuation", "nersc")
+    storage.validate_storage("/pscratch/sd/u/user/continuation", "nersc")
     link = tmp_path / "state"
     link.symlink_to("/pscratch/sd/u/user/continuation")
-    c.validate_storage(link, "nersc")
+    storage.validate_storage(link, "nersc")
 
 
 def test_split_batch_keeps_training_artifacts_and_moves_control_files(
@@ -963,8 +924,8 @@ def test_split_batch_keeps_training_artifacts_and_moves_control_files(
         continuation={"runtime_budget": "06:00:00"},
         continuation_dir=str(control),
     )
-    assert not c.manifest_path(run).exists()
-    state = c.read(c.manifest_path(run, control))
+    assert not storage.manifest_path(run).exists()
+    state = storage.read(storage.manifest_path(run, control))
     attempt = state["attempts"][0]
     assert attempt["job_id"] == "42"
     assert Path(attempt["directory"]).is_relative_to(control)
@@ -982,37 +943,41 @@ def test_split_batch_keeps_training_artifacts_and_moves_control_files(
 def test_split_preflight_locks_only_control_storage(tmp_path, monkeypatch):
     run, control = tmp_path / "cfs", tmp_path / "scratch"
     paths = []
-    original = c.locked
+    original = storage.locked
 
     def locked(path):
         paths.append(path)
         return original(path)
 
-    monkeypatch.setattr(c, "locked", locked)
-    c.preflight_storage(run, continuation_dir=control)
-    assert paths == [c.manifest_path(run, control)]
+    monkeypatch.setattr(storage, "locked", locked)
+    storage.preflight_storage(run, continuation_dir=control)
+    assert paths == [storage.manifest_path(run, control)]
     assert not run.exists()
 
 
 def test_initial_pending_validation_checkpoint_is_usable(tmp_path, monkeypatch):
     allocation(tmp_path, 1, iteration=-1)
-    monkeypatch.setattr(c, "accounting", lambda *_: {"success": True, "seconds": 200})
-    assert c.reconcile(tmp_path)["state"] == "paused"
+    monkeypatch.setattr(
+        pipeline, "accounting", lambda *_: {"success": True, "seconds": 200}
+    )
+    assert pipeline.reconcile(tmp_path)["state"] == "paused"
 
 
 def test_finishing_pending_validation_counts_as_progress_once(tmp_path, monkeypatch):
     first = allocation(tmp_path, 1, iteration=10)
     path = Path(first["directory"]) / "outcome.json"
-    result = c.read(path)
+    result = storage.read(path)
     result["pending_validation"] = True
-    c.atomic_json(path, result)
-    monkeypatch.setattr(c, "accounting", lambda *_: {"success": True, "seconds": 200})
-    assert c.reconcile(tmp_path)["state"] == "paused"
+    storage.atomic_json(path, result)
+    monkeypatch.setattr(
+        pipeline, "accounting", lambda *_: {"success": True, "seconds": 200}
+    )
+    assert pipeline.reconcile(tmp_path)["state"] == "paused"
     second = allocation(tmp_path, 2, iteration=10)
     path = Path(second["directory"]) / "outcome.json"
-    result = c.read(path)
+    result = storage.read(path)
     result["pending_validation"] = False
-    c.atomic_json(path, result)
-    assert c.reconcile(tmp_path)["state"] == "paused"
+    storage.atomic_json(path, result)
+    assert pipeline.reconcile(tmp_path)["state"] == "paused"
     allocation(tmp_path, 3, iteration=10)
-    assert c.reconcile(tmp_path)["state"] == "failed"
+    assert pipeline.reconcile(tmp_path)["state"] == "failed"
