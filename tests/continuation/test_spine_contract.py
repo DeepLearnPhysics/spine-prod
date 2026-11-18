@@ -14,7 +14,8 @@ from unittest.mock import Mock
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    importlib.util.find_spec("spine.continuation") is None,
+    importlib.util.find_spec("spine") is None
+    or importlib.util.find_spec("spine.continuation") is None,
     reason="Requires SPINE continuation-v2 patch; see docs/training-continuation.md",
 )
 
