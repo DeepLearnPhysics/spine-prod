@@ -374,3 +374,16 @@ def test_resumed_driver_validates_at_original_epoch_boundary(tmp_path, monkeypat
     assert result["state"] == "paused"
     assert result["iteration"] == 980
     assert not result["pending_validation"]
+
+
+@pytest.mark.parametrize("resume", [False, True])
+def test_initial_validation_does_not_restart_on_resume(tmp_path, monkeypatch, resume):
+    """An explicit baseline applies to fresh runs, never to resumed history."""
+    drv, saves, outcome, _ = driver(tmp_path, monkeypatch)
+    drv.validation.initial = True
+    drv.model.checkpoint_validation = None
+    drv.model.resume_training = resume
+    drv.run()
+    assert drv.validation.run.call_count == (0 if resume else 1)
+    assert [iteration for iteration, _, _ in saves] == ([0] if resume else [-1, 0])
+    assert json.loads(outcome.read_text())["state"] == "paused"

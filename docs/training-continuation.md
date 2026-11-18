@@ -31,14 +31,14 @@ the 1.4.4 driver APIs inspected for this implementation:
 
 ```bash
 cd /path/to/spine-continuation-checkout
-git apply --check /path/to/spine-prod/patches/spine-1.4.4-continuation-v3.patch
-git apply /path/to/spine-prod/patches/spine-1.4.4-continuation-v3.patch
+git apply --check /path/to/spine-prod/patches/spine-1.4.4-continuation-v4.patch
+git apply /path/to/spine-prod/patches/spine-1.4.4-continuation-v4.patch
 python bin/run.py --continuation-contract
 # Must print: 2
 ```
 
 If the checkout already has the v1 patch (as in the first two site tests),
-apply the v1-to-v2 upgrade below, then the v2-to-v3 upgrade:
+apply the v1-to-v2 upgrade below, then the v2-to-v3 and v3-to-v4 upgrades:
 
 ```bash
 cd /path/to/spine-continuation-checkout
@@ -48,13 +48,34 @@ python bin/run.py --continuation-contract
 # Must print: 2
 ```
 
-For a checkout already patched to v2 (including the third site test), apply only:
+For a checkout already patched to v2 (including the third site test), apply the v2-to-v3 upgrade, followed by v3-to-v4:
 
 ```bash
 cd /path/to/spine-continuation-checkout
 git apply --check /path/to/spine-prod/patches/spine-continuation-v2-to-v3.patch
 git apply /path/to/spine-prod/patches/spine-continuation-v2-to-v3.patch
 ```
+
+For a checkout already patched to v3, apply only the latest upgrade:
+
+```bash
+cd /path/to/spine-continuation-checkout
+git apply --check /path/to/spine-prod/patches/spine-continuation-v3-to-v4.patch
+git apply /path/to/spine-prod/patches/spine-continuation-v3-to-v4.patch
+```
+
+Revision v4 changes the default for the existing `validation.initial` option:
+
+```yaml
+validation:
+  # Omit initial to validate loaded weights, but skip random initialization.
+  initial: false  # Explicitly skip baseline validation, including warm starts.
+```
+
+Set `initial: true` to request a baseline even for random initialization. The
+automatic default includes module-only weight imports. Continuation resumes do
+not repeat baseline validation; unfinished validation is always replayed before
+training, regardless of `initial`. Scheduled validation remains unchanged.
 
 Patch revision v3 fixes checkpoint/validation scheduling across resumes; the
 runtime capability contract remains **2**, since its interface is unchanged.
