@@ -1,0 +1,6 @@
+__meta__:
+  kind: bundle
+  version: "261117"
+  date: "2026-11-17"
+  description: DUNE-VD 261117 build_${split.name}_filter derived from DUNE-HD 261022
+include: filter/dune-vd-10kt-1x8x6/space_points_261022.yaml

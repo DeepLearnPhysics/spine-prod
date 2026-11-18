@@ -1,0 +1,31 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+# Common base configuration for DUNE-VD 10 kt module 1x8x6
+
+__meta__:
+  kind: fragment
+
+# Base configuration
+base:
+  world_size: 1
+  iterations: -1
+  seed: 0
+  dtype: float32
+  unwrap: true
+  log_dir: logs
+  prefix_log: true
+  overwrite_log: true
+  log_step: 1
+  split_output: true
+
+# Geometry configuration
+geo:
+  detector: dune-vd-10kt-1x8x6
+  tag: dunevd10kt_3view_30deg_v3_refactored_1x8x6ref
+
+# Build output representations
+build:
+  mode: both
+  units: cm
+  fragments: false
+  particles: true
+  interactions: true

@@ -1,0 +1,19 @@
+__meta__:
+  kind: bundle
+  version: "261117"
+  date: "2026-11-17"
+  description:
+    DUNE-VD 261117 cache_${split.name}_deghosting derived from DUNE-HD
+    261022
+include: cache/dune-vd-10kt-1x8x6/uresnet_deghost/deghosting_261022.yaml
+override:
+  geo:
+    detector: dune-vd-10kt-1x8x6
+    tag: dunevd10kt_3view_30deg_v3_refactored_1x8x6ref
+  model.modules.chain.stages~:
+    update:
+      name: calibration
+      changes:
+        config:
+          mode: apply
+          calibration: !include model/dune-vd-10kt-1x8x6/calibration/calibration_261117.yaml

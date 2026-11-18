@@ -1,0 +1,10 @@
+__meta__:
+  kind: bundle
+  version: "261117"
+  date: "2026-11-17"
+  description: DUNE-VD 261117 train_grappa_inter derived from DUNE-HD 261022
+include: train/dune-vd-10kt-1x8x6/grappa_inter/train_from_particle_cache_261022.yaml
+override:
+  geo:
+    detector: dune-vd-10kt-1x8x6
+    tag: dunevd10kt_3view_30deg_v3_refactored_1x8x6ref

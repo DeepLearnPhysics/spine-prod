@@ -1,10 +1,12 @@
 """Portable resource profiles and scheduler allocation limits.
 
-Limits describe one allocation, not a training runtime budget. Continuation can
-consume ``allocation_limits`` without changing these submission semantics.
+Limits describe one allocation, not a training runtime budget. Site-mapped
+training preserves source walltimes as cumulative continuation budgets.
 """
 
 import re
+
+from .continuation.policy import duration
 
 
 def duration_seconds(value):
@@ -56,7 +58,7 @@ def map_stage(catalog, stage, site, overrides=None):
     """Translate a concrete profile through its allocation role.
 
     Scheduler-specific YAML fields belong to the original site. CPU and memory
-    requirements, time, and application settings survive translation; explicit
+    requirements, training budgets, and application settings survive translation; explicit
     launch overrides apply last in the destination site's vocabulary.
     """
     overrides = overrides or {}
@@ -76,6 +78,10 @@ def map_stage(catalog, stage, site, overrides=None):
     source = profiles[source_name]
     result = dict(stage)
     result.setdefault("profile", source_name)
+    if stage.get("kind", "spine") == "spine" and stage.get("stage") == "train":
+        continuation = dict(stage.get("continuation", {}))
+        continuation.setdefault("runtime_budget", stage.get("time", source["time"]))
+        result["continuation"] = continuation
     if source["site"] != site:
         role = source.get("allocation_role")
         if role not in sites[site]["roles"]:
@@ -139,4 +145,32 @@ def map_stage(catalog, stage, site, overrides=None):
         result["mem_per_node"] = re.sub(
             r"([kmgt])$", r"\1b", str(result["mem_per_node"]), flags=re.IGNORECASE
         )
-    return result
+    return _continuation_allocation(catalog, result, target, overrides)
+
+
+def _continuation_allocation(catalog, stage, profile, overrides):
+    """Bound opted-in allocations without changing their total training budget.
+
+    Explicit launch times and stage chunk preferences remain authoritative and
+    are validated later. Only inherited ceilings and site defaults are adapted.
+    """
+    if "continuation" not in stage:
+        return stage
+    effective = dict(profile, **stage)
+    ceiling = duration_seconds(effective["time"])
+    hard_limit = allocation_limits(catalog, effective).get("max_time")
+    if hard_limit and "time" not in overrides:
+        ceiling = min(ceiling, duration_seconds(hard_limit))
+    stage["time"] = duration(ceiling)
+    defaults = dict(catalog["sites"][profile["site"]].get("continuation_defaults", {}))
+    defaults.update(profile.get("continuation_defaults", {}))
+    explicit = stage["continuation"]
+    preferred = explicit.get(
+        "preferred_time", defaults.get("preferred_time", stage["time"])
+    )
+    preferred_seconds = min(ceiling, duration_seconds(preferred))
+    for key, bound in (("preferred_time", ceiling), ("min_time", preferred_seconds)):
+        if key in defaults and key not in explicit:
+            defaults[key] = duration(min(duration_seconds(defaults[key]), bound))
+    stage["continuation"] = dict(defaults, **explicit)
+    return stage

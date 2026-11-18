@@ -1,0 +1,7 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-VD candidate uresnet_deghost loss
+balance_loss: false

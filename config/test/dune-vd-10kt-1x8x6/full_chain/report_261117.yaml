@@ -1,0 +1,6 @@
+__meta__:
+  kind: bundle
+  version: "261117"
+  date: "2026-11-17"
+  description: DUNE-VD 261117 report_full_chain derived from DUNE-HD 261022
+include: test/dune-vd-10kt-1x8x6/full_chain/report_261022.yaml

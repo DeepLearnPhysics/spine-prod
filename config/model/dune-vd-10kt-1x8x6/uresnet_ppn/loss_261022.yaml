@@ -1,0 +1,9 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+__meta__:
+  kind: fragment
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-VD 10 kt module 1x8x6 candidate UResNet-PPN objective
+
+uresnet_loss: !include model/dune-vd-10kt-1x8x6/uresnet_ppn/uresnet_loss_261022.yaml
+ppn_loss: !include model/dune-vd-10kt-1x8x6/uresnet_ppn/ppn_loss_261022.yaml

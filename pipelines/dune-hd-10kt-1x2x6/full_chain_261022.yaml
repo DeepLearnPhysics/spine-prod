@@ -1,5 +1,8 @@
 # Staged training of every learned component used by the DUNE-HD 10 kt module 1x2x6 261022
 # training candidate. Supply its destination with CLI --workspace.
+# With --site, training time becomes the total budget across bounded allocations.
+# NERSC also requires --continuation-dir on Scratch. Other sites need periodic
+# controller advancement (see docs/training-continuation.md).
 # Each split owns one sharded cache repository; stages publish immutable shards.
 
 workspace: null
@@ -197,7 +200,7 @@ stages:
     run_dir: ${workspace}/train/grappa_shower
     tensorboard: true
 
-  # Train track aggregation concurrently from the same fragment cache.
+  # Train track aggregation from the same fragment cache.
   - name: train_grappa_track
     depends_on: [cache_train_fragment_graphs, cache_validation_fragment_graphs]
     config: train/dune-hd-10kt-1x2x6/grappa_track/train_from_fragment_cache_261022.yaml
