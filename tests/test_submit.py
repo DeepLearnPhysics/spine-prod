@@ -840,3 +840,13 @@ def test_pipeline_continuation_directory_forwarded():
         submitter.submit_pipeline.call_args.kwargs["workspace"]
         == "/global/cfs/cdirs/project/run"
     )
+
+
+def test_continuation_directory_requires_pipeline(capsys):
+    """A controller directory is meaningful only for a pipeline."""
+    with pytest.raises(SystemExit):
+        run_main("--config", "config.yaml", "--continuation-dir", "/scratch/state")
+    assert (
+        "--continuation-dir is only supported with --pipeline"
+        in capsys.readouterr().err
+    )

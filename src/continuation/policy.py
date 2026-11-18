@@ -93,8 +93,6 @@ def policy(values, maximum, scheduler, defaults=None):
     minimum = result["minimum"] or result["preferred"]
     if minimum > result["preferred"]:
         raise ValueError("min_time must not exceed preferred_time")
-    if minimum > result["maximum"]:
-        raise ValueError("min_time must not exceed time")
     if result["checkpoint_margin"] + result["startup_allowance"] >= minimum:
         raise ValueError("Allocation must exceed checkpoint_margin + startup_allowance")
     if result["site_min_time"] > minimum:

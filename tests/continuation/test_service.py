@@ -475,3 +475,134 @@ def test_retirement_waits_for_reactivation_state_change(
             storage.atomic_json(manifest, state)
         assert future.result(timeout=2) is False
     assert "# BEGIN spine-prod" in schedule[0]
+
+
+@pytest.mark.parametrize(
+    "account,scratch",
+    [("bad/account", "/pscratch/user"), ("project", "/pscratch/with space")],
+)
+def test_service_paths_reject_invalid_names(monkeypatch, account, scratch):
+    """Unsafe account and path characters cannot enter a cron entry."""
+    monkeypatch.setenv("SCRATCH", scratch)
+    with pytest.raises(ValueError):
+        service.service_paths(account)
+
+
+def test_schedule_rejects_shell_expansion_and_ambiguous_markers(tmp_path):
+    """Only complete unique managed blocks may be replaced or removed."""
+    with pytest.raises(ValueError):
+        service.schedule_block("project", tmp_path / "registry", tmp_path / "$bad")
+    block = service.schedule_block("project", tmp_path / "registry", tmp_path)
+    with pytest.raises(RuntimeError):
+        service.merge_schedule(block + block, block)
+    with pytest.raises(RuntimeError):
+        service.remove_schedule(block + block, "project")
+    assert service.merge_schedule(block.rstrip("\n"), block) == block
+    assert service.remove_schedule(block.rstrip("\n"), "project") == ""
+    assert service.remove_schedule("unrelated", "project") == "unrelated"
+
+
+def test_registration_detects_external_edit(service_environment, monkeypatch):
+    """Do not overwrite a scrontab edited while registration was preparing."""
+    _, registry, manifest = service_environment
+    from unittest.mock import Mock
+
+    monkeypatch.setattr(
+        service, "read_schedule", Mock(side_effect=["", "external edit"])
+    )
+    with pytest.raises(RuntimeError, match="changed during registration"):
+        service.register(manifest, "project", Path.cwd())
+    assert not storage.read(registry)["pipelines"][str(manifest)]["enabled"]
+
+
+@pytest.mark.parametrize("verify_failure", [False, True])
+def test_retirement_races_leave_diagnostic(
+    service_environment, monkeypatch, verify_failure
+):
+    """Failed timer retirement must be visible rather than silently forgotten."""
+    from unittest.mock import Mock
+
+    _, registry, manifest = service_environment
+    storage.atomic_json(manifest, {"state": "completed", "records": []})
+    storage.atomic_json(registry, {"pipelines": {str(manifest): {"enabled": True}}})
+    block = service.schedule_block("project", registry, Path.cwd())
+    replies = (
+        [block, block, "different"] if verify_failure else [block, "external edit"]
+    )
+    monkeypatch.setattr(service, "read_schedule", Mock(side_effect=replies))
+    monkeypatch.setattr(service.subprocess, "run", Mock())
+    service.tick_registry(registry)
+    assert storage.read(registry)["cleanup_error"]
+
+
+@pytest.mark.parametrize("mode", ["deadline", "disabled", "removed"])
+def test_tick_registry_handles_bounded_and_changed_registrations(
+    service_environment, monkeypatch, mode
+):
+    """Respect scan time limits, disabled entries and concurrent deregistration."""
+    from unittest.mock import Mock
+
+    _, registry, manifest = service_environment
+    storage.atomic_json(
+        registry, {"pipelines": {str(manifest): {"enabled": mode != "disabled"}}}
+    )
+    monkeypatch.setattr(service, "retire_if_idle", Mock())
+    monkeypatch.setattr(
+        service.time,
+        "monotonic",
+        Mock(side_effect=[0, 2000 if mode == "deadline" else 1]),
+    )
+
+    def needs_tick(_):
+        """Simulate removal while a tick is checking a pipeline."""
+        storage.atomic_json(registry, {"pipelines": {}})
+        return False
+
+    monkeypatch.setattr(service, "needs_tick", needs_tick)
+    service.tick_registry(registry)
+    assert "last_checked" not in storage.read(registry)["pipelines"].get(
+        str(manifest), {}
+    )
+
+
+def test_needs_tick_handles_completed_and_failed_records(tmp_path):
+    """Completed predecessors are skipped; failed ordinary stages stop monitoring."""
+    manifest = tmp_path / "pipeline.json"
+    storage.atomic_json(
+        manifest,
+        {"state": "active", "records": [{"status": "completed"}, {"status": "failed"}]},
+    )
+    assert not service.needs_tick(manifest)
+    storage.atomic_json(
+        manifest, {"state": "active", "records": [{"status": "completed"}]}
+    )
+    assert service.needs_tick(manifest)
+
+
+def test_health_reports_all_registration_failures(tmp_path, monkeypatch):
+    """Expose absent, disabled, errored and stale automation states."""
+    registry = tmp_path / "registry.json"
+    state = {"automation": {"registry": str(registry), "manifest": "pipeline"}}
+    assert service.health({}) == "manual"
+    assert service.health(state) == "registry unavailable"
+    for data, expected in [
+        ({"cleanup_error": "failure"}, "controller retirement error: failure"),
+        ({"pipelines": {"pipeline": {"enabled": False}}}, "disabled"),
+        (
+            {"pipelines": {"pipeline": {"enabled": True, "last_error": "failed"}}},
+            "controller error: failed",
+        ),
+    ]:
+        storage.atomic_json(registry, data)
+        assert service.health(state) == expected
+
+
+def test_registration_requires_readback(service_environment, monkeypatch):
+    """A successful scrontab exit alone does not prove timer installation."""
+    _, _, manifest = service_environment
+    monkeypatch.setattr(service, "read_schedule", lambda: "")
+    monkeypatch.setattr(
+        service.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0)
+    )
+    with pytest.raises(RuntimeError, match="could not be verified"):
+        service.register(manifest, "project", Path.cwd())

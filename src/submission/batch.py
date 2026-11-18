@@ -625,8 +625,6 @@ class BatchRunner(SubmissionComponent):
 
             if stage != "train" or ntasks is not None or files_per_task is not None:
                 raise ValueError("Continuation supports ordinary training jobs only")
-            if not run_dir:
-                raise ValueError("Continuation requires run_dir")
             validate_storage(continuation_dir, site)
             continuation_policy = profile_policy(
                 self.profiles, profile_config, continuation
@@ -766,10 +764,6 @@ class BatchRunner(SubmissionComponent):
             ).hexdigest()
             if dry_run:
                 request = next_request(continuation_policy, 0)
-                if request is None:
-                    raise ValueError(
-                        "Continuation budget cannot fit a useful allocation"
-                    )
                 continuation_attempt = {"token": "dry-run", "request": request}
             else:
                 continuation_attempt = reserve(
