@@ -182,14 +182,16 @@ def test_pipeline_maps_selected_stages_before_dispatch(mock_submitter, tmp_path)
 @pytest.mark.parametrize(
     "changes,message",
     [
-        ({"nodes": 2}, "one node"),
+        ({"nodes": 0}, "Node count"),
         ({"queue": "custom"}, "No configured limits"),
         ({"mem_per_cpu": "garbage"}, "requires a unit"),
     ],
 )
 def test_portable_invalid_overrides(catalog, changes, message):
     with pytest.raises(ValueError, match=message):
-        map_stage(catalog, {"profile": "s3df_milano"}, "alcf", changes)
+        map_stage(
+            catalog, {"profile": "s3df_milano", "stage": "train"}, "alcf", changes
+        )
 
 
 def test_defaults_and_reverse_gpu_mapping(catalog):

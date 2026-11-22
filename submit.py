@@ -518,7 +518,11 @@ Examples:
         "--exclude",
         help="Exclude a comma-separated node list (Slurm only)",
     )
-    parser.add_argument("--nodes", type=int, help="Override number of nodes")
+    parser.add_argument(
+        "--nodes",
+        type=int,
+        help="Nodes per training allocation; with --site, applies only to training stages",
+    )
     parser.add_argument("--time", "-t", help="Override time limit")
     parser.add_argument(
         "--bind-paths",

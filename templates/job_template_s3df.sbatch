@@ -5,8 +5,15 @@
 #SBATCH --account={{ account }}
 #SBATCH --partition={{ partition }}
 
+{% if nodes|default(1)|int > 1 %}
+#SBATCH --nodes={{ nodes }}
+#SBATCH --ntasks={{ nodes }}
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node={{ gpus }}
+{% else %}
 #SBATCH --ntasks=1
 #SBATCH --gpus={{ gpus }}
+{% endif %}
 #SBATCH --cpus-per-task={{ cpus_per_task }}
 {% if mem_per_node is defined %}
 #SBATCH --mem={{ mem_per_node }}
@@ -115,6 +122,20 @@ echo "Using input files defined in the config"
 echo
 {% endif %}
 
+{% if nodes|default(1)|int > 1 %}
+# One scheduler task per node; torchrun starts the local GPU workers.
+{% if site == 'anl' %}
+export MASTER_ADDR=$(head -n 1 "$PBS_NODEFILE")
+{% else %}
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+{% endif %}
+if [ -z "$MASTER_ADDR" ]; then
+    echo "ERROR: Cannot determine the distributed rendezvous node" >&2
+    exit 1
+fi
+{% endif %}
+
+
 # Cap the number Numba threads to 64 (what OpenBLAS was compiled with)
 export NUMBA_NUM_THREADS=64
 echo "NUMBA_NUM_THREADS set to $NUMBA_NUM_THREADS"
@@ -150,10 +171,14 @@ SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD export SPINE_CACHE_PUBLICATION_ID=
 {% if custom_command %}
 SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ custom_command }}"
 {% else %}
-SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {{ spine_cmd|default('spine', true) }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+SINGULARITY_INNER_CMD="$SINGULARITY_INNER_CMD exec {% if nodes|default(1)|int > 1 %}python3 \"{{ basedir }}/scripts/distributed_launch.py\" --nodes {{ nodes }} --gpus-per-node {{ gpus }} --scheduler slurm -- {% endif %}{{ spine_cmd|default('spine', true) }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 {% endif %}
 SINGULARITY_CMD="singularity exec --bind $BIND_PATHS --nv $SPINE_CONTAINER_PATH bash -c '$SINGULARITY_INNER_CMD'"
+{% if nodes|default(1)|int > 1 %}
+RUN_CMD="srun --nodes={{ nodes }} --ntasks={{ nodes }} --ntasks-per-node=1 --kill-on-bad-exit=1 -c ${SLURM_CPUS_PER_TASK:-{{ cpus_per_task }}} $SINGULARITY_CMD"
+{% else %}
 RUN_CMD="$SINGULARITY_CMD"
+{% endif %}
 
 {% if continuation_attempt %}
 # Keep the batch shell responsive and forward only to the supervisor.

@@ -733,7 +733,9 @@ S3DF limits are currently unknown (`null`), not unlimited; populate them from
 local scheduler policy. These static checks do not replace live scheduler policy,
 account eligibility, or queue availability. Polaris capacity currently allows
 168 hours but limits each user to two queued/running jobs and one running job;
-site selection does not throttle submissions. Portable jobs use one node each.
+site selection does not throttle submissions. Portable training supports multiple
+nodes with `--nodes`; other stages retain their own allocations. See
+[multi-node training](docs/multi-node-training.md).
 Accounts, data lists, software paths, and workspaces must be valid at the target
 site; no files are transferred. NERSC requires an explicit account; Polaris
 uses its configured project unless overridden. CPU stages on Polaris use its

@@ -211,19 +211,20 @@ class SpineCLI:
         profile_config: Dict, requested_world_size: Optional[int]
     ) -> Optional[int]:
         """Align SPINE process count with the scheduler GPU allocation."""
+        nodes = int(profile_config.get("nodes", 1))
+        if nodes < 1:
+            raise ValueError("Node count must be positive")
         site = profile_config.get("site", "s3df")
         if site == "s3df" and "gpus" in profile_config:
             allocated_gpus = int(profile_config["gpus"])
         elif site != "s3df" and "gpus_per_node" in profile_config:
-            nodes = int(profile_config.get("nodes", 1))
-            if nodes != 1:
-                raise ValueError(
-                    "Multi-node GPU submissions are not supported; use a single node"
-                )
             allocated_gpus = int(profile_config["gpus_per_node"])
         else:
             return requested_world_size
 
+        if nodes > 1 and allocated_gpus < 1:
+            raise ValueError("Multi-node training requires GPUs on every node")
+        allocated_gpus *= nodes
         if requested_world_size is not None and requested_world_size != allocated_gpus:
             raise ValueError(
                 f"--world-size {requested_world_size} conflicts with the "

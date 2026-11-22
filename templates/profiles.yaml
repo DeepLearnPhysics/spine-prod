@@ -113,6 +113,7 @@ profiles:
   # -> 4 GB per CPU
   # Use this for standard jobs - better availability and queue times
   nersc_gpu:
+    multi_node_profile: nersc_gpu_full
     allocation_role: single_gpu
     site: nersc
     qos: shared
@@ -129,6 +130,7 @@ profiles:
   # 256 nodes with 4x A100 80GB GPUs (less available, longer queues)
   # Use only when you specifically need >40GB GPU memory
   nersc_gpu_80gb:
+    multi_node_profile: nersc_gpu_full_80gb
     allocation_role: single_gpu_80gb
     site: nersc
     qos: shared

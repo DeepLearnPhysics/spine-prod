@@ -618,6 +618,15 @@ class BatchRunner(SubmissionComponent):
         if site != "s3df" and "gpus" in profile_overrides:
             raise ValueError(f"--gpus is not valid for {site.upper()} profiles")
         profile_config.update(profile_overrides)
+        if int(profile_config.get("nodes", 1)) > 1 and (
+            stage != "train"
+            or export_weights
+            or ntasks is not None
+            or files_per_task is not None
+        ):
+            raise ValueError(
+                "Multi-node allocations support ordinary training jobs only"
+            )
         continuation_policy = None
         if continuation is not None:
             from ..continuation.policy import profile_policy

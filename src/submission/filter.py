@@ -69,6 +69,8 @@ class FilterRunner(SubmissionComponent):
         if scheduler == "pbs" and profile_overrides.get("exclude"):
             raise ValueError("--exclude is only supported by Slurm profiles")
         profile_config.update(profile_overrides)
+        if int(profile_config.get("nodes", 1)) != 1:
+            raise ValueError("Filtering and reporting require a single-node allocation")
         validate_allocation(self.profiles, profile_config)
         if not profile_config.get("account") and detector in self.profiles["detectors"]:
             profile_config["account"] = self.profiles["detectors"][detector].get(

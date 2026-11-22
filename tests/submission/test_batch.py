@@ -137,10 +137,12 @@ class TestSubmitterHelpers:
             mock_submitter.spine_cli.align_world_size(
                 {"site": "s3df", "gpus": 2}, requested_world_size=4
             )
-        with pytest.raises(ValueError, match="Multi-node"):
+        assert (
             mock_submitter.spine_cli.align_world_size(
                 {"site": "anl", "gpus_per_node": 4, "nodes": 2}, None
             )
+            == 8
+        )
 
     def test_classify_config_request_covers_shorthand_and_absolute_paths(
         self, mock_submitter, workspace_root

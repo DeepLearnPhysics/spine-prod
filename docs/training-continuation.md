@@ -200,8 +200,9 @@ and cancel that scheduler job separately.
 
 Continuation pipelines currently serialize all stages. Explicit profiles are
 required; stage slicing, automatic cleanup, and changes in GPU world size are
-unsupported. Missing scheduler history blocks advancement. Polaris shrink-to-fit
-and multi-node restart behavior require site validation.
+unsupported. Missing scheduler history blocks advancement. Polaris shrink-to-fit requires site validation. Multi-node training uses a fixed
+node/GPU count across attempts; validate pause/resume on each site before production use.
+See [multi-node training](multi-node-training.md).
 
 Regression tests live in `tests/continuation/`; native training and validation
 replay tests live in SPINE. Before a new deployment, exercise pause/resume and

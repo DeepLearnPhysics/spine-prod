@@ -61,7 +61,10 @@ def map_stage(catalog, stage, site, overrides=None):
     requirements, training budgets, and application settings survive translation; explicit
     launch overrides apply last in the destination site's vocabulary.
     """
-    overrides = overrides or {}
+    overrides = dict(overrides or {})
+    training = stage.get("kind", "spine") == "spine" and stage.get("stage") == "train"
+    if not training:
+        overrides.pop("nodes", None)
     sites = catalog["sites"]
     site = {"alcf": "anl", "polaris": "anl"}.get(site, site)
     if site not in sites:
@@ -78,7 +81,7 @@ def map_stage(catalog, stage, site, overrides=None):
     source = profiles[source_name]
     result = dict(stage)
     result.setdefault("profile", source_name)
-    if stage.get("kind", "spine") == "spine" and stage.get("stage") == "train":
+    if training:
         continuation = dict(stage.get("continuation", {}))
         continuation.setdefault("runtime_budget", stage.get("time", source["time"]))
         result["continuation"] = continuation
@@ -117,6 +120,15 @@ def map_stage(catalog, stage, site, overrides=None):
             result["gpus" if site == "s3df" else "gpus_per_node"] = gpu_count
     result.update(overrides)
     target = profiles[result["profile"]]
+    if (
+        int(result.get("nodes", target.get("nodes", 1))) > 1
+        and "profile" not in overrides
+        and target.get("multi_node_profile")
+    ):
+        result["profile"] = target["multi_node_profile"]
+        target = profiles[result["profile"]]
+        if "qos" not in overrides:
+            result.pop("qos", None)
     if target["site"] != site:
         raise ValueError(
             f"--profile {result['profile']} does not belong to site {site}"
@@ -126,8 +138,11 @@ def map_stage(catalog, stage, site, overrides=None):
             f"--site {site} requires --account (or an account in its profile)"
         )
     effective = dict(target, **{k: v for k, v in result.items() if k != "profile"})
-    if int(effective.get("nodes", 1)) != 1:
-        raise ValueError("Portable pipelines currently support one node per job")
+    nodes = int(effective.get("nodes", 1))
+    if nodes < 1:
+        raise ValueError("Node count must be positive")
+    if nodes > 1 and not training:
+        raise ValueError("Multi-node allocations are supported only for training")
     selector = sites[site]["queue_field"]
     if effective.get(selector) not in sites[site]["limits"]:
         raise ValueError(

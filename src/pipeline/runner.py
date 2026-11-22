@@ -97,7 +97,7 @@ class PipelineRunner(SubmissionComponent):
             {
                 key: value
                 for key, value in (overrides or {}).items()
-                if site is None or key not in ("time", "profile")
+                if site is None or key not in ("time", "profile", "nodes")
             },
             workspace_override=workspace,
             stage_module_weights=parsed_stage_weights,
