@@ -2,7 +2,6 @@
 
 import subprocess
 from pathlib import Path
-from typing import List, Optional
 
 from .base import BatchClient
 
@@ -12,11 +11,11 @@ class SlurmClient(BatchClient):
 
     script_suffix = ".sbatch"
 
-    def submit(self, script_path: Path, dry_run: bool = False) -> Optional[str]:
+    def submit(self, script_path: Path, dry_run: bool = False) -> str | None:
         """Submit a job to SLURM and return the job ID."""
         return self.submit_sbatch(script_path, dry_run)
 
-    def submit_sbatch(self, script_path: Path, dry_run: bool = False) -> Optional[str]:
+    def submit_sbatch(self, script_path: Path, dry_run: bool = False) -> str | None:
         """Submit job to SLURM and return job ID."""
         if dry_run:
             print(f"[DRY RUN] Would submit: {script_path}")
@@ -26,9 +25,8 @@ class SlurmClient(BatchClient):
 
         result = subprocess.run(
             ["sbatch", str(script_path)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
+            capture_output=True,
+            text=True,
             check=False,
         )
 
@@ -49,9 +47,8 @@ class SlurmClient(BatchClient):
 
         result = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
+            capture_output=True,
+            text=True,
             check=False,
         )
         if result.returncode != 0:
@@ -60,11 +57,11 @@ class SlurmClient(BatchClient):
 
     def submit_cleanup_job(
         self,
-        paths_to_clean: List[str],
+        paths_to_clean: list[str],
         job_name: str,
         dependency: str,
         dry_run: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Submit a cleanup job to remove intermediate files."""
         if dry_run:
             print(f"[DRY RUN] Would schedule cleanup of: {', '.join(paths_to_clean)}")

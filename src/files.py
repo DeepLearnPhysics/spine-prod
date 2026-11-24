@@ -2,8 +2,9 @@
 
 import glob
 import os
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any
 
 
 class FileHandler:
@@ -11,10 +12,10 @@ class FileHandler:
 
     def parse_files(
         self,
-        file_input: List[str],
+        file_input: list[str],
         source_type: str = "source",
         allow_missing: bool = False,
-    ) -> List[str]:
+    ) -> list[str]:
         """Parse file input (paths, globs, or txt file).
 
         Parameters
@@ -86,7 +87,7 @@ class FileHandler:
         sources: Mapping[str, Mapping[str, Any]],
         allow_missing: bool = False,
         aligned: bool = True,
-    ) -> Dict[str, List[str]]:
+    ) -> dict[str, list[str]]:
         """Resolve every target in a composite dataset source mapping.
 
         Aligned targets must resolve to the same number of files. The
@@ -137,7 +138,7 @@ class FileHandler:
         return resolved
 
     @staticmethod
-    def limit_files(files: List[str], num_files: Optional[int]) -> List[str]:
+    def limit_files(files: list[str], num_files: int | None) -> list[str]:
         """Restrict an already-resolved source list to its first files."""
         if num_files is None:
             return files
@@ -151,10 +152,10 @@ class FileHandler:
 
     @staticmethod
     def limit_named_sources(
-        sources: Mapping[str, List[str]],
-        num_files: Optional[int],
+        sources: Mapping[str, list[str]],
+        num_files: int | None,
         primary_only: bool = False,
-    ) -> Dict[str, List[str]]:
+    ) -> dict[str, list[str]]:
         """Restrict aligned named sources while preserving a shared cache."""
         if num_files is None:
             return {target: list(paths) for target, paths in sources.items()}
@@ -175,9 +176,9 @@ class FileHandler:
 
     @staticmethod
     def pair_joint_sources(
-        sources: Mapping[str, List[str]],
-        num_files: Optional[int] = None,
-    ) -> Dict[str, List[str]]:
+        sources: Mapping[str, list[str]],
+        num_files: int | None = None,
+    ) -> dict[str, list[str]]:
         """Pair ordered primary/secondary files up to the shorter source.
 
         Parameters
@@ -215,8 +216,8 @@ class FileHandler:
 
     @staticmethod
     def stage_cache_output_paths(
-        source_files: List[str], output_dir: str, suffix: str
-    ) -> List[str]:
+        source_files: list[str], output_dir: str, suffix: str
+    ) -> list[str]:
         """Predict source-routed stage-cache paths for an output manifest."""
         directory = Path(output_dir)
         paths = [
@@ -235,7 +236,7 @@ class FileHandler:
         return paths
 
     @staticmethod
-    def _duplicates(values: List[str]) -> List[str]:
+    def _duplicates(values: list[str]) -> list[str]:
         """Return repeated values once, preserving first duplicate order."""
         seen = set()
         repeated = set()
@@ -248,8 +249,8 @@ class FileHandler:
         return duplicates
 
     def chunk_files(
-        self, files: List[str], max_array_size: int, files_per_task: int
-    ) -> List[List[str]]:
+        self, files: list[str], max_array_size: int, files_per_task: int
+    ) -> list[list[str]]:
         """Split files into chunks for array jobs.
 
         Parameters

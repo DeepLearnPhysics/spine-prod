@@ -5,7 +5,7 @@ if [[ $# -lt 5 ]]; then
     cat >&2 <<'USAGE'
 Usage: bash scripts/smoke_multinode.sh SITE ACCOUNT TRAIN_ROOT VALIDATION_ROOT RUN_DIR [--dry-run]
 SITE: s3df, nersc, or polaris (alcf also accepted).
-SPINE_PROD_PYTHON: submission interpreter (default: python3); requires Python 3.9+.
+SPINE_PROD_PYTHON: submission interpreter (default: python3); requires Python 3.10+.
 Use generic MPV/MPR v04 LArCV files on storage visible to both compute nodes.
 RUN_DIR must be a fresh shared directory. This submits a job; it does not wait.
 USAGE

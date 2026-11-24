@@ -21,7 +21,7 @@ def test_lazy_import_rejects_unknown_attribute():
 def test_old_python_has_actionable_error(monkeypatch):
     """Login-node Python failures explain which environment to load."""
     monkeypatch.setattr(sys, "version_info", (3, 8, 0))
-    with pytest.raises(ImportError, match="module load python"):
+    with pytest.raises(ImportError, match="Activate a Python 3.10"):
         exec(compile(Path(src.__file__).read_text(), src.__file__, "exec"), {})
 
 

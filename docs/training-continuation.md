@@ -10,7 +10,7 @@ existing scheduler dependencies.
 
 ## Runtime requirements
 
-The submission host requires Python 3.9 or newer and `requirements.txt`. On
+The submission host requires Python 3.10 or newer and `requirements.txt`. On
 NERSC, load the Python module before submitting. The controller retains that
 Python executable for unattended invocations.
 

@@ -5,7 +5,6 @@ import re
 import warnings
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import yaml
 
@@ -27,7 +26,7 @@ class ConfigManager:
         self.profiles = self._load_profiles()
 
     @property
-    def detector_aliases(self) -> Dict[str, str]:
+    def detector_aliases(self) -> dict[str, str]:
         """Map deprecated detector identifiers to their canonical names."""
         aliases = {}
         for detector, config in self.profiles.get("detectors", {}).items():
@@ -66,7 +65,7 @@ class ConfigManager:
 
         return str(Path(*parts))
 
-    def _load_profiles(self) -> Dict:
+    def _load_profiles(self) -> dict:
         """Load resource profiles from YAML.
 
         Returns
@@ -122,8 +121,8 @@ class ConfigManager:
     def modifier_search_path(
         self,
         config: str,
-        family: Optional[str] = None,
-        detector: Optional[str] = None,
+        family: str | None = None,
+        detector: str | None = None,
     ) -> str:
         """Return the family-local directory used to discover modifiers.
 
@@ -201,7 +200,7 @@ class ConfigManager:
         attempted = "\n".join(f"  Tried: {path}" for path in tried)
         raise FileNotFoundError(f"Config not found: {config}\n{attempted}")
 
-    def get_profile(self, profile_name: str, detector: Optional[str] = None) -> Dict:
+    def get_profile(self, profile_name: str, detector: str | None = None) -> dict:
         """Get resource profile with detector defaults.
 
         Parameters
@@ -247,7 +246,7 @@ class ConfigManager:
 
         return profile_config
 
-    def discover_modifiers(self, config: str) -> Dict[str, List[Path]]:
+    def discover_modifiers(self, config: str) -> dict[str, list[Path]]:
         """Discover available modifier configs in the same directory as the base config.
 
         Parameters
@@ -304,7 +303,7 @@ class ConfigManager:
 
         return modifiers
 
-    def extract_version(self, config_path: Path) -> Optional[str]:
+    def extract_version(self, config_path: Path) -> str | None:
         """Extract version number from config filename (YYMMDD format).
 
         Parameters
@@ -322,7 +321,7 @@ class ConfigManager:
         return match.group(1) if match else None
 
     @staticmethod
-    def _bundle_metadata(description: str, version: Optional[str] = None) -> str:
+    def _bundle_metadata(description: str, version: str | None = None) -> str:
         """Format explicit bundle metadata for a generated configuration."""
         metadata = {"kind": "bundle"}
         if version:
@@ -334,9 +333,9 @@ class ConfigManager:
     def resolve_modifier_version(
         self,
         mod_name: str,
-        available_versions: List[Path],
-        base_version: Optional[str],
-        explicit_version: Optional[str],
+        available_versions: list[Path],
+        base_version: str | None,
+        explicit_version: str | None,
     ) -> Path:
         """Resolve which version of a modifier to use.
 
@@ -410,10 +409,10 @@ class ConfigManager:
     def create_composite_config(
         self,
         base_config: str,
-        modifiers: List[str],
+        modifiers: list[str],
         job_dir: Path,
-        detector: Optional[str] = None,
-        family: Optional[str] = None,
+        detector: str | None = None,
+        family: str | None = None,
     ) -> str:
         """Create a composite config that includes base + modifiers.
 
@@ -761,7 +760,7 @@ class ConfigManager:
         print(f"Created latest config: {snapshot}")
         return str(snapshot)
 
-    def list_modifiers(self, config_path: str) -> Dict:
+    def list_modifiers(self, config_path: str) -> dict:
         """List available modifiers for a given configuration file.
 
         Parameters

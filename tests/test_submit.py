@@ -11,9 +11,10 @@ import submit
 def run_main(*args, submitter=None):
     """Run the CLI with a mocked Submitter instance."""
     submitter = submitter or Mock()
-    with patch.object(sys, "argv", ["submit.py", *args]), patch.object(
-        submit, "Submitter", return_value=submitter
-    ) as submitter_class:
+    with (
+        patch.object(sys, "argv", ["submit.py", *args]),
+        patch.object(submit, "Submitter", return_value=submitter) as submitter_class,
+    ):
         result = submit.main()
     return result, submitter, submitter_class
 
@@ -785,7 +786,7 @@ def test_pipeline_source_list_overrides_require_one_unqualified_path(
     assert "requires exactly one unqualified list path" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("version", [(3, 6, 15), (3, 8, 20)])
+@pytest.mark.parametrize("version", [(3, 6, 15), (3, 8, 20), (3, 9, 25)])
 def test_old_python_reports_requirement_before_submission_imports(version):
     """Unsupported hosts must not fail with a misleading missing Submitter."""
     import subprocess
@@ -801,7 +802,7 @@ def test_old_python_reports_requirement_before_submission_imports(version):
         [sys.executable, "-c", probe], capture_output=True, text=True
     )
     assert result.returncode != 0
-    assert "spine-prod requires Python 3.9 or newer" in result.stderr
+    assert "spine-prod requires Python 3.10 or newer" in result.stderr
     assert "submission host" in result.stderr
     assert "SPINE_PROD_PYTHON" in result.stderr
     assert "cannot import name 'Submitter'" not in result.stderr

@@ -371,11 +371,14 @@ def test_training_submission_renders_global_world(mock_submitter, tmp_path, prof
     source = tmp_path / "train.root"
     source.touch()
     run_dir = tmp_path / "run"
-    with patch.object(
-        mock_submitter.batch,
-        "get_batch_client",
-        return_value=mock_submitter.batch_client,
-    ), patch.object(mock_submitter.batch_client, "submit", return_value=None):
+    with (
+        patch.object(
+            mock_submitter.batch,
+            "get_batch_client",
+            return_value=mock_submitter.batch_client,
+        ),
+        patch.object(mock_submitter.batch_client, "submit", return_value=None),
+    ):
         mock_submitter.submit_job(
             config="train/generic/uresnet/train_240718.yaml",
             files=[str(source)],

@@ -1,8 +1,9 @@
 """Submit resolved pipeline stages and manage dependency gates."""
 
 import os
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 from ..runs import RunManager
 from ..sites import allocation_limits, map_stage, validate_allocation
@@ -19,19 +20,19 @@ class PipelineRunner(SubmissionComponent):
         pipeline_path: str,
         dry_run: bool = False,
         preload: bool = False,
-        overrides: Optional[Mapping[str, Any]] = None,
-        workspace: Optional[str] = None,
-        continuation_dir: Optional[str] = None,
-        from_stage: Optional[str] = None,
-        to_stage: Optional[str] = None,
-        select_stages: Optional[Sequence[str]] = None,
-        stage_module_weights: Optional[Sequence[Sequence[str]]] = None,
-        warm_start: Optional[str] = None,
-        source_list: Optional[str] = None,
-        val_source_list: Optional[str] = None,
-        skip_stages: Optional[Sequence[str]] = None,
-        site: Optional[str] = None,
-    ) -> Dict[str, List[str]]:
+        overrides: Mapping[str, Any] | None = None,
+        workspace: str | None = None,
+        continuation_dir: str | None = None,
+        from_stage: str | None = None,
+        to_stage: str | None = None,
+        select_stages: Sequence[str] | None = None,
+        stage_module_weights: Sequence[Sequence[str]] | None = None,
+        warm_start: str | None = None,
+        source_list: str | None = None,
+        val_source_list: str | None = None,
+        skip_stages: Sequence[str] | None = None,
+        site: str | None = None,
+    ) -> dict[str, list[str]]:
         """Submit an ordered multi-stage production pipeline.
 
         The complete document is validated before the first scheduler call.
@@ -186,8 +187,8 @@ class PipelineRunner(SubmissionComponent):
                 continuation_dir,
             )
 
-        job_map: Dict[str, List[str]] = {}
-        cleanup_map: Dict[str, List[str]] = {}
+        job_map: dict[str, list[str]] = {}
+        cleanup_map: dict[str, list[str]] = {}
         for stage in stages:
             name = stage["name"]
             print(f"Stage: {name}")
@@ -267,11 +268,11 @@ class PipelineRunner(SubmissionComponent):
     @staticmethod
     def _select_stages(
         stages: Sequence[Mapping[str, Any]],
-        from_stage: Optional[str],
-        to_stage: Optional[str],
-        select_stages: Optional[Sequence[str]] = None,
-        skip_stages: Optional[Sequence[str]] = None,
-    ) -> Tuple[Sequence[Mapping[str, Any]], List[str], List[str]]:
+        from_stage: str | None,
+        to_stage: str | None,
+        select_stages: Sequence[str] | None = None,
+        skip_stages: Sequence[str] | None = None,
+    ) -> tuple[Sequence[Mapping[str, Any]], list[str], list[str]]:
         """Select an ordered range or dependency-aware sparse stage set."""
         names = [stage["name"] for stage in stages]
         if skip_stages is not None:
@@ -330,9 +331,9 @@ class PipelineRunner(SubmissionComponent):
             selected_names = set(select_stages)
             stage_map = {stage["name"]: stage for stage in stages}
 
-            def selected_dependencies(name: str) -> List[str]:
+            def selected_dependencies(name: str) -> list[str]:
                 """Find the nearest selected ancestors of one selected stage."""
-                result: List[str] = []
+                result: list[str] = []
 
                 def visit(dependency: str) -> None:
                     """Collect selected predecessors in dependency order."""
@@ -378,10 +379,10 @@ class PipelineRunner(SubmissionComponent):
     def _submission_options(
         cls,
         stage: Mapping[str, Any],
-        dependency: Optional[str],
+        dependency: str | None,
         retry: bool = False,
-        warm_start_path: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        warm_start_path: str | None = None,
+    ) -> dict[str, Any]:
         """Translate one stage to ``BatchRunner.submit_job`` options."""
         if stage.get("kind", "spine") == "report":
             options = {key: stage[key] for key in PROFILE_FIELDS if key in stage}
@@ -515,7 +516,7 @@ class PipelineRunner(SubmissionComponent):
     @staticmethod
     def _source(
         stage: Mapping[str, Any], *keys: str
-    ) -> Tuple[Optional[str], Optional[List[str]]]:
+    ) -> tuple[str | None, list[str] | None]:
         """Extract and normalize one scalar/list source declaration."""
         configured = [key for key in keys if key in stage]
         key = configured[0] if configured else None
@@ -523,7 +524,7 @@ class PipelineRunner(SubmissionComponent):
         return key, PipelineRunner._as_list(value)
 
     @staticmethod
-    def _as_list(value: Any) -> Optional[List[Any]]:
+    def _as_list(value: Any) -> list[Any] | None:
         """Normalize an optional scalar to the downstream list form."""
         if value is None:
             return None
@@ -531,8 +532,8 @@ class PipelineRunner(SubmissionComponent):
 
     @staticmethod
     def _dependency(
-        depends_on: Sequence[str], job_map: Mapping[str, List[str]]
-    ) -> Optional[str]:
+        depends_on: Sequence[str], job_map: Mapping[str, list[str]]
+    ) -> str | None:
         """Resolve stage names to a scheduler ``afterok`` expression."""
         job_ids = [
             job_id
@@ -544,8 +545,8 @@ class PipelineRunner(SubmissionComponent):
     def _schedule_cleanup(
         self,
         stages: Sequence[Mapping[str, Any]],
-        job_map: Mapping[str, List[str]],
-        cleanup_map: Mapping[str, List[str]],
+        job_map: Mapping[str, list[str]],
+        cleanup_map: Mapping[str, list[str]],
         dry_run: bool,
     ) -> None:
         """Remove artifacts after each producer's direct consumers finish."""

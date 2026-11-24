@@ -1,8 +1,9 @@
 """Resolve pipeline defaults, variables, templates and stage declarations."""
 
 import os
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 import yaml
 
@@ -27,13 +28,13 @@ class PipelineDefinition(StageValidator):
     """
 
     __slots__ = ("stages", "workspace")
-    stages: Tuple[Mapping[str, Any], ...]
-    workspace: Optional[str]
+    stages: tuple[Mapping[str, Any], ...]
+    workspace: str | None
 
     def __init__(
         self,
         stages: Sequence[Mapping[str, Any]],
-        workspace: Optional[str] = None,
+        workspace: str | None = None,
     ):
         """Store the resolved workspace and immutable submission order."""
         self.stages = tuple(stages)
@@ -43,11 +44,11 @@ class PipelineDefinition(StageValidator):
     def load(
         cls,
         pipeline_path: str,
-        overrides: Optional[Mapping[str, Any]] = None,
-        workspace_override: Optional[str] = None,
-        stage_module_weights: Optional[Mapping[str, Mapping[str, str]]] = None,
-        source_list: Optional[str] = None,
-        val_source_list: Optional[str] = None,
+        overrides: Mapping[str, Any] | None = None,
+        workspace_override: str | None = None,
+        stage_module_weights: Mapping[str, Mapping[str, str]] | None = None,
+        source_list: str | None = None,
+        val_source_list: str | None = None,
     ) -> "PipelineDefinition":
         """Load and validate a pipeline without contacting a scheduler.
 
@@ -138,8 +139,8 @@ class PipelineDefinition(StageValidator):
 
     @staticmethod
     def parse_stage_module_weights(
-        values: Optional[Sequence[Sequence[str]]],
-    ) -> Dict[str, Dict[str, str]]:
+        values: Sequence[Sequence[str]] | None,
+    ) -> dict[str, dict[str, str]]:
         """Parse repeated ``STAGE MODULE=PATH`` command-line assignments.
 
         Parameters
@@ -153,7 +154,7 @@ class PipelineDefinition(StageValidator):
         dict
             Stage names mapped to destination modules and checkpoint paths.
         """
-        result: Dict[str, Dict[str, str]] = {}
+        result: dict[str, dict[str, str]] = {}
         for value in values or ():
             if isinstance(value, (str, bytes)) or len(value) != 2:
                 raise ValueError("--stage-module-weight requires STAGE and MODULE=PATH")
@@ -185,7 +186,7 @@ class PipelineDefinition(StageValidator):
     @classmethod
     def _apply_stage_module_weights(
         cls,
-        stages: Sequence[Dict[str, Any]],
+        stages: Sequence[dict[str, Any]],
         overrides: Mapping[str, Mapping[str, str]],
     ) -> None:
         """Merge validated launch-time weights into named SPINE stages."""
@@ -218,8 +219,8 @@ class PipelineDefinition(StageValidator):
 
     @staticmethod
     def _resolve_workspace(
-        document: Mapping[str, Any], workspace_override: Optional[str]
-    ) -> Optional[str]:
+        document: Mapping[str, Any], workspace_override: str | None
+    ) -> str | None:
         """Resolve the launch workspace before expanding pipeline variables.
 
         An explicit ``workspace: null`` marks the pipeline as portable and
@@ -241,7 +242,7 @@ class PipelineDefinition(StageValidator):
         return workspace
 
     @classmethod
-    def _resolve_variables(cls, workspace: Any, raw_variables: Any) -> Dict[str, str]:
+    def _resolve_variables(cls, workspace: Any, raw_variables: Any) -> dict[str, str]:
         """Validate and resolve pipeline-local string substitutions.
 
         ``workspace`` is exposed as the reserved ``${workspace}`` variable.
@@ -273,9 +274,9 @@ class PipelineDefinition(StageValidator):
             if not isinstance(value, str):
                 raise TypeError(f"Pipeline variable '{name}' must be a string")
 
-        resolved: Dict[str, str] = {}
+        resolved: dict[str, str] = {}
 
-        def resolve(name: str, stack: Tuple[str, ...]) -> str:
+        def resolve(name: str, stack: tuple[str, ...]) -> str:
             """Resolve one variable while retaining its dependency stack."""
             if name in resolved:
                 return resolved[name]
@@ -299,7 +300,7 @@ class PipelineDefinition(StageValidator):
     @classmethod
     def _resolve_collections(
         cls, raw_collections: Any, variables: Mapping[str, str]
-    ) -> Dict[str, Tuple[Mapping[str, Any], ...]]:
+    ) -> dict[str, tuple[Mapping[str, Any], ...]]:
         """Validate reusable collections used by stage ``for_each`` blocks.
 
         Collections are deliberately small data tables: each is a non-empty
@@ -307,7 +308,7 @@ class PipelineDefinition(StageValidator):
         in string values before entries become iteration-local variables.
         """
         collections = cls._require_mapping(raw_collections, "Pipeline collections")
-        resolved: Dict[str, Tuple[Mapping[str, Any], ...]] = {}
+        resolved: dict[str, tuple[Mapping[str, Any], ...]] = {}
         for name, raw_items in collections.items():
             if not isinstance(name, str) or not VARIABLE_NAME_PATTERN.match(name):
                 raise ValueError(
@@ -341,7 +342,7 @@ class PipelineDefinition(StageValidator):
         raw_stages: Any,
         variables: Mapping[str, str],
         collections: Mapping[str, Sequence[Mapping[str, Any]]],
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Expand ``for_each`` templates into ordinary concrete stages."""
         if not isinstance(raw_stages, list) or not raw_stages:
             raise ValueError("Pipeline must define a non-empty stages list")
@@ -444,7 +445,7 @@ class PipelineDefinition(StageValidator):
         return value
 
     @staticmethod
-    def _normalize_aliases(values: Mapping[str, Any], context: str) -> Dict[str, Any]:
+    def _normalize_aliases(values: Mapping[str, Any], context: str) -> dict[str, Any]:
         """Convert legacy aliases before values enter precedence resolution."""
         normalized = dict(values)
         if "larcv_basedir" in normalized:
@@ -456,13 +457,13 @@ class PipelineDefinition(StageValidator):
         return normalized
 
     @staticmethod
-    def _merge_layers(*layers: Mapping[str, Any]) -> Dict[str, Any]:
+    def _merge_layers(*layers: Mapping[str, Any]) -> dict[str, Any]:
         """Merge precedence layers, replacing mutually exclusive settings.
 
         A higher-layer ``gpus`` setting, for example, removes a lower-layer
         ``gpus_per_node`` setting instead of passing both to the batch runner.
         """
-        merged: Dict[str, Any] = {}
+        merged: dict[str, Any] = {}
         for layer in layers:
             for group in EXCLUSIVE_GROUPS:
                 if group.intersection(layer):
@@ -479,7 +480,7 @@ class PipelineDefinition(StageValidator):
         defaults: Mapping[str, Any],
         overrides: Mapping[str, Any],
         prior_names: set,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Resolve and validate one stage against all preceding stages."""
         if not isinstance(raw_stage, Mapping):
             raise TypeError(f"Pipeline stage {index} must be a mapping")

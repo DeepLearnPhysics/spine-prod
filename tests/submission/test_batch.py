@@ -665,8 +665,9 @@ class TestSubmitterHelpers:
         def find_apptainer(command):
             return "/usr/bin/apptainer" if command == "apptainer" else None
 
-        with patch.dict(os.environ, {}, clear=True), patch(
-            "src.submission.runtime.shutil.which", side_effect=find_apptainer
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("src.submission.runtime.shutil.which", side_effect=find_apptainer),
         ):
             assert (
                 mock_submitter.runtime.sif_runtime_executable() == "/usr/bin/apptainer"
@@ -1552,9 +1553,10 @@ class TestBatchSpineOverride:
             "run_dir": str(tmp_path / "run"),
         }
         kwargs.update(options)
-        with patch("src.submission.batch.survey_sources") as survey, patch.object(
-            mock_submitter.batch_client, "submit"
-        ) as submit:
+        with (
+            patch("src.submission.batch.survey_sources") as survey,
+            patch.object(mock_submitter.batch_client, "submit") as submit,
+        ):
             with pytest.raises(error, match=message):
                 mock_submitter.submit_job(
                     config="infer/nd-lar/full_chain_260409.yaml", **kwargs
@@ -1711,13 +1713,16 @@ SPINE_CONTAINER_PATH=/unused.sif
         monkeypatch.setitem(
             mock_submitter.profiles["defaults"], "max_array_size", max_array_size
         )
-        with patch.object(
-            mock_submitter.batch,
-            "get_batch_client",
-            return_value=mock_submitter.batch_client,
-        ), patch.object(
-            mock_submitter.batch_client, "submit", return_value="joint"
-        ) as submit:
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(
+                mock_submitter.batch_client, "submit", return_value="joint"
+            ) as submit,
+        ):
             mock_submitter.submit_job(
                 config="infer/nd-lar/full_chain_260409.yaml",
                 apply_mods=["joint:240819"],

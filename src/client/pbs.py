@@ -3,7 +3,6 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 from .base import BatchClient
 
@@ -13,11 +12,11 @@ class PBSClient(BatchClient):
 
     script_suffix = ".pbs"
 
-    def submit(self, script_path: Path, dry_run: bool = False) -> Optional[str]:
+    def submit(self, script_path: Path, dry_run: bool = False) -> str | None:
         """Submit a job to PBS and return the job ID."""
         return self.submit_qsub(script_path, dry_run)
 
-    def submit_qsub(self, script_path: Path, dry_run: bool = False) -> Optional[str]:
+    def submit_qsub(self, script_path: Path, dry_run: bool = False) -> str | None:
         """Submit job to PBS and return job ID."""
         if dry_run:
             print(f"[DRY RUN] Would submit: {script_path}")
@@ -44,9 +43,8 @@ class PBSClient(BatchClient):
         command.append(str(script_path))
         result = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
+            capture_output=True,
+            text=True,
             check=False,
         )
 
@@ -71,9 +69,8 @@ class PBSClient(BatchClient):
 
         result = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
+            capture_output=True,
+            text=True,
             check=False,
         )
         if result.returncode != 0:

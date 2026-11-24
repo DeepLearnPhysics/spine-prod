@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/DeepLearnPhysics/spine-prod/branch/main/graph/badge.svg)](https://codecov.io/gh/DeepLearnPhysics/spine-prod)
-[![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/downloads/)
 
 A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPINE) (Scalable Particle Imaging with Neural Embeddings) reconstruction on HPC clusters with SLURM- and PBS-based batch systems.
 
@@ -26,6 +26,25 @@ cd spine-prod
 # Configure environment
 source configure.sh
 ```
+
+**Python support:** spine-prod supports Python **3.10–3.13**, including helpers
+executed inside the SPINE container (currently Python 3.10). Select a supported
+interpreter on the submission host before installing `requirements.txt` and
+running `submit.py`; `configure.sh` does not activate a Python environment.
+
+Available site options reported in November 2026:
+
+| Site | Supported interpreter options |
+| --- | --- |
+| S3DF | Python 3.12 (also has 3.9, below our minimum) |
+| NERSC | Python 3.11 |
+| Polaris / Aurora | Python 3.11 or 3.13 |
+
+The default login-node Python may still be 3.6. Verify the selected interpreter
+with `python3 --version` after activating your environment. Continuation
+controllers also need access to that environment. For the multi-node smoke
+helper, you can explicitly select it with
+`SPINE_PROD_PYTHON=/path/to/environment/bin/python`.
 
 **SPINE Version Control:** Production jobs now run entirely from a tagged SPINE
 container image. The repository default release is recorded in

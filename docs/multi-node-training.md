@@ -98,7 +98,7 @@ site-local copies of those generic files and a fresh shared run directory.
 The inputs must contain `sparse3d_pcluster` and `sparse3d_pcluster_semantics`.
 Each file needs at least 16 entries; training is limited to the first 64 and
 validation to the first 16. The helper sources its own checkout's `configure.sh`.
-The submission host needs Python 3.9+ with spine-prod's requirements, even
+The submission host needs Python 3.10+ with spine-prod's requirements, even
 though training runs inside a container. Sourcing `configure.sh` does not
 activate Python. Activate your submission environment before invoking the helper,
 or select its interpreter explicitly:

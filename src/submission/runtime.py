@@ -4,7 +4,6 @@ import os
 import shlex
 import shutil
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from .base import SubmissionComponent
 
@@ -14,8 +13,8 @@ class RuntimeResolver(SubmissionComponent):
 
     @staticmethod
     def resolve_setup_path(
-        path: Optional[str], option_name: str
-    ) -> Tuple[Optional[str], Optional[str]]:
+        path: str | None, option_name: str
+    ) -> tuple[str | None, str | None]:
         """Resolve a software setup path to a source command and bind root."""
         if not path:
             return None, None
@@ -56,10 +55,10 @@ class RuntimeResolver(SubmissionComponent):
 
     @staticmethod
     def resolve_spine_command(
-        spine_path: Optional[str] = None,
+        spine_path: str | None = None,
         *,
         allow_host_path: bool = False,
-    ) -> Tuple[Optional[str], Optional[str]]:
+    ) -> tuple[str | None, str | None]:
         """Resolve explicit overrides; discover host installs only for local use."""
         configured = spine_path or os.environ.get("SPINE_LOCAL_PATH")
         if configured:
@@ -99,8 +98,8 @@ class RuntimeResolver(SubmissionComponent):
 
     @staticmethod
     def resolve_spine_report_command(
-        spine_path: Optional[str] = None,
-    ) -> Tuple[Optional[str], Optional[str]]:
+        spine_path: str | None = None,
+    ) -> tuple[str | None, str | None]:
         """Resolve ``spine-report`` against an install or source checkout.
 
         A source checkout does not need to install its console entry point.
@@ -135,8 +134,8 @@ class RuntimeResolver(SubmissionComponent):
 
     @staticmethod
     def resolve_spine_filter_command(
-        spine_path: Optional[str] = None,
-    ) -> Tuple[Optional[str], Optional[str]]:
+        spine_path: str | None = None,
+    ) -> tuple[str | None, str | None]:
         """Resolve ``spine-filter`` against an install or source checkout."""
         configured = spine_path or os.environ.get("SPINE_LOCAL_PATH")
         if configured:
@@ -164,8 +163,8 @@ class RuntimeResolver(SubmissionComponent):
 
     @staticmethod
     def resolve_spine_cache_command(
-        spine_path: Optional[str] = None,
-    ) -> Tuple[Optional[str], Optional[str]]:
+        spine_path: str | None = None,
+    ) -> tuple[str | None, str | None]:
         """Resolve ``spine-cache`` against an install or source checkout."""
         configured = spine_path or os.environ.get("SPINE_LOCAL_PATH")
         if configured:
@@ -194,8 +193,8 @@ class RuntimeResolver(SubmissionComponent):
 
     @staticmethod
     def merge_bind_paths(
-        bind_paths: Optional[str], extra_paths: Optional[List[str]] = None
-    ) -> Optional[str]:
+        bind_paths: str | None, extra_paths: list[str] | None = None
+    ) -> str | None:
         """Merge user bind roots with required extra paths."""
         resolved_paths = []
         seen_paths = set()
@@ -214,7 +213,7 @@ class RuntimeResolver(SubmissionComponent):
         return ",".join(resolved_paths) if resolved_paths else None
 
     @staticmethod
-    def default_bind_paths_for_site(site: Optional[str]) -> Optional[str]:
+    def default_bind_paths_for_site(site: str | None) -> str | None:
         """Return the implicit bind roots required by a site template."""
         if site == "s3df":
             return "/sdf/"
@@ -231,7 +230,7 @@ class RuntimeResolver(SubmissionComponent):
         return tag[len("docker:") :] if tag.startswith("docker:") else tag
 
     @staticmethod
-    def sif_runtime_executable() -> Optional[str]:
+    def sif_runtime_executable() -> str | None:
         """Return the Singularity/Apptainer executable for local SIF execution."""
         configured = os.environ.get("SPINE_CONTAINER_RUNTIME_BIN")
         if configured:
@@ -255,7 +254,7 @@ class RuntimeResolver(SubmissionComponent):
         return " ".join(shlex.quote(arg) for arg in shlex.split(configured))
 
     @staticmethod
-    def interactive_bind_paths(bind_paths: Optional[str] = None) -> str:
+    def interactive_bind_paths(bind_paths: str | None = None) -> str:
         """Return the bind roots for interactive Singularity/Apptainer execution."""
         resolved_paths = {str(Path.cwd())}
         if bind_paths:
@@ -265,7 +264,7 @@ class RuntimeResolver(SubmissionComponent):
         return ",".join(sorted(resolved_paths))
 
     def build_interactive_container_command(
-        self, inner_cmd: str, cvmfs: bool, bind_paths: Optional[str] = None
+        self, inner_cmd: str, cvmfs: bool, bind_paths: str | None = None
     ) -> str:
         """Build an interactive container command for local smoke tests."""
         # Container workloads must not import packages from the mounted user home.

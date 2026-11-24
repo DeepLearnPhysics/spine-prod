@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .client import SlurmClient
 from .config import ConfigManager
@@ -21,7 +21,7 @@ from .submission.runtime import RuntimeResolver
 class Submitter:
     """Compose focused services behind the stable submission API."""
 
-    def __init__(self, basedir: Optional[Path] = None, central_dir: bool = False):
+    def __init__(self, basedir: Path | None = None, central_dir: bool = False):
         """Initialize shared state and wire submission components."""
         self.basedir = basedir or Path(__file__).parent.parent
         self.config_mgr = ConfigManager(self.basedir)
@@ -44,15 +44,15 @@ class Submitter:
         self.pipeline = PipelineRunner(self)
 
     @property
-    def profiles(self) -> Dict:
+    def profiles(self) -> dict:
         """Return scheduler and detector profiles."""
         return self.config_mgr.profiles
 
-    def list_modifiers(self, config_path: str) -> Dict:
+    def list_modifiers(self, config_path: str) -> dict:
         """List modifier versions available to a configuration."""
         return self.config_mgr.list_modifiers(config_path)
 
-    def submit_job(self, *args: Any, **kwargs: Any) -> List[str]:
+    def submit_job(self, *args: Any, **kwargs: Any) -> list[str]:
         """Submit one job through the batch component."""
         return self.batch.submit_job(*args, **kwargs)
 
@@ -60,15 +60,15 @@ class Submitter:
         """Execute one job through the interactive component."""
         return self.interactive.run_interactive(*args, **kwargs)
 
-    def submit_report(self, *args: Any, **kwargs: Any) -> List[str]:
+    def submit_report(self, *args: Any, **kwargs: Any) -> list[str]:
         """Submit one completed-metric report reduction."""
         return self.report.submit_report(*args, **kwargs)
 
-    def submit_filter(self, *args: Any, **kwargs: Any) -> List[str]:
+    def submit_filter(self, *args: Any, **kwargs: Any) -> list[str]:
         """Submit one file-aware entry-filter operation."""
         return self.filter.submit_filter(*args, **kwargs)
 
-    def submit_pipeline(self, *args: Any, **kwargs: Any) -> Dict[str, List[str]]:
+    def submit_pipeline(self, *args: Any, **kwargs: Any) -> dict[str, list[str]]:
         """Submit an ordered workflow through the pipeline component."""
         return self.pipeline.submit_pipeline(*args, **kwargs)
 

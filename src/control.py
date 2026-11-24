@@ -1,7 +1,6 @@
 """Scheduler-aware control of running SPINE production jobs."""
 
 import shutil
-from typing import Optional
 
 from .client import PBSClient, SlurmClient
 from .submission.base import SubmissionComponent
@@ -15,7 +14,7 @@ class JobController(SubmissionComponent):
     def graceful_stop(
         self,
         job_id: str,
-        scheduler: Optional[str] = None,
+        scheduler: str | None = None,
         dry_run: bool = False,
     ) -> str:
         """Ask a training job to checkpoint and complete successfully.
@@ -47,7 +46,7 @@ class JobController(SubmissionComponent):
         return scheduler
 
     @classmethod
-    def resolve_scheduler(cls, scheduler: Optional[str] = None) -> str:
+    def resolve_scheduler(cls, scheduler: str | None = None) -> str:
         """Resolve an explicit scheduler or detect one available on ``PATH``."""
         if scheduler is not None:
             if scheduler not in cls.SCHEDULER_COMMANDS:

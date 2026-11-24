@@ -2,15 +2,16 @@
 
 import math
 import shlex
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any
 
 
 class SpineCLI:
     """Pure helpers for producing deterministic SPINE CLI fragments."""
 
     @staticmethod
-    def format_set_overrides(set_overrides: Optional[List[str]]) -> str:
+    def format_set_overrides(set_overrides: list[str] | None) -> str:
         """Format SPINE ``--set`` overrides for shell execution."""
         if not set_overrides:
             return ""
@@ -39,7 +40,7 @@ class SpineCLI:
 
     @staticmethod
     def format_named_sources(
-        sources: Optional[Mapping[str, Mapping[str, Any]]],
+        sources: Mapping[str, Mapping[str, Any]] | None,
         validation: bool = False,
     ) -> str:
         """Format target-qualified composite dataset source overrides."""
@@ -88,7 +89,7 @@ class SpineCLI:
 
     @staticmethod
     def format_module_weights(
-        module_weights: Optional[Mapping[str, str]],
+        module_weights: Mapping[str, str] | None,
     ) -> str:
         """Format module-specific checkpoint overrides."""
         if not module_weights:
@@ -101,14 +102,14 @@ class SpineCLI:
         return f"--module-weight {' '.join(values)}"
 
     @staticmethod
-    def format_weight_path(weight_path: Optional[str]) -> str:
+    def format_weight_path(weight_path: str | None) -> str:
         """Format an optional complete-model checkpoint override."""
         if not weight_path:
             return ""
         return f"--weight-path {shlex.quote(weight_path)}"
 
     @staticmethod
-    def format_export_weights(export_weights: Optional[str]) -> str:
+    def format_export_weights(export_weights: str | None) -> str:
         """Format an optional terminal model-export destination."""
         if not export_weights:
             return ""
@@ -116,12 +117,12 @@ class SpineCLI:
 
     @staticmethod
     def format_runtime_options(
-        world_size: Optional[int] = None,
-        batch_size: Optional[int] = None,
-        minibatch_size: Optional[int] = None,
-        num_workers: Optional[int] = None,
-        epochs: Optional[float] = None,
-        iterations: Optional[int] = None,
+        world_size: int | None = None,
+        batch_size: int | None = None,
+        minibatch_size: int | None = None,
+        num_workers: int | None = None,
+        epochs: float | None = None,
+        iterations: int | None = None,
     ) -> str:
         """Format first-class SPINE runtime CLI overrides."""
         options = [
@@ -139,8 +140,8 @@ class SpineCLI:
     @classmethod
     def format_entry_fraction_ranges(
         cls,
-        entry_fraction_range: Optional[Tuple[float, float]] = None,
-        val_entry_fraction_range: Optional[Tuple[float, float]] = None,
+        entry_fraction_range: tuple[float, float] | None = None,
+        val_entry_fraction_range: tuple[float, float] | None = None,
     ) -> str:
         """Format deterministic main and validation entry partitions."""
         options = []
@@ -156,8 +157,8 @@ class SpineCLI:
 
     @staticmethod
     def format_num_entries(
-        num_entries: Optional[int] = None,
-        val_num_entries: Optional[int] = None,
+        num_entries: int | None = None,
+        val_num_entries: int | None = None,
     ) -> str:
         """Format exact main and validation dataset-size limits."""
         options = []
@@ -174,8 +175,8 @@ class SpineCLI:
 
     @staticmethod
     def format_entry_filters(
-        entry_filter: Optional[str] = None,
-        val_entry_filter: Optional[str] = None,
+        entry_filter: str | None = None,
+        val_entry_filter: str | None = None,
     ) -> str:
         """Format file-aware input and validation eligibility manifests."""
         options = []
@@ -191,8 +192,8 @@ class SpineCLI:
 
     @staticmethod
     def validate_fraction_range(
-        flag: str, value: Tuple[float, float]
-    ) -> Tuple[float, float]:
+        flag: str, value: tuple[float, float]
+    ) -> tuple[float, float]:
         """Require one finite, nonempty fractional interval."""
         if isinstance(value, (str, bytes)) or len(value) != 2:
             raise ValueError(f"{flag} requires exactly two values")
@@ -208,8 +209,8 @@ class SpineCLI:
 
     @staticmethod
     def align_world_size(
-        profile_config: Dict, requested_world_size: Optional[int]
-    ) -> Optional[int]:
+        profile_config: dict, requested_world_size: int | None
+    ) -> int | None:
         """Align SPINE process count with the scheduler GPU allocation."""
         nodes = int(profile_config.get("nodes", 1))
         if nodes < 1:
@@ -234,13 +235,13 @@ class SpineCLI:
 
     @staticmethod
     def default_writer_output_settings(
-        job_dir: Path, config: str, suffix: Optional[str] = None
-    ) -> Tuple[str, str]:
+        job_dir: Path, config: str, suffix: str | None = None
+    ) -> tuple[str, str]:
         """Return default HDF5 writer directory and suffix settings."""
         return str(job_dir / "output"), suffix or Path(config).stem
 
     @staticmethod
-    def format_output_args(output: Optional[str], directory: str, suffix: str) -> str:
+    def format_output_args(output: str | None, directory: str, suffix: str) -> str:
         """Format SPINE output arguments for explicit or derived writer naming."""
         if output:
             output_path = Path(output)
