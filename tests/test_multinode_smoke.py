@@ -9,14 +9,25 @@ from pathlib import Path
 import pytest
 
 
+@pytest.mark.parametrize("explicit_python", [False, True])
 @pytest.mark.parametrize("site", ["s3df", "nersc", "polaris"])
-def test_smoke_submission(workspace_root, tmp_path, site):
+def test_smoke_submission(workspace_root, tmp_path, site, explicit_python):
     binaries = Path(sys.executable).parent
     source = tmp_path / "generic.root"
     source.touch()
     run = tmp_path / "run"
     env = dict(os.environ, PATH=f"{binaries}:{os.environ['PATH']}")
     env.pop("FORCE_SPINE_PROD_BASEDIR", None)
+    env.pop("SPINE_PROD_PYTHON", None)
+    if explicit_python:
+        # The override must work even when the default python3 is unusable.
+        shim_dir = tmp_path / "bin"
+        shim_dir.mkdir()
+        shim = shim_dir / "python3"
+        shim.write_text("#!/bin/sh\nexit 99\n")
+        shim.chmod(0o755)
+        env["PATH"] = f"{shim_dir}:{env['PATH']}"
+        env["SPINE_PROD_PYTHON"] = sys.executable
     result = subprocess.run(
         [
             "bash",

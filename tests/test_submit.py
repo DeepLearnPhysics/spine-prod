@@ -802,7 +802,8 @@ def test_old_python_reports_requirement_before_submission_imports(version):
     )
     assert result.returncode != 0
     assert "spine-prod requires Python 3.9 or newer" in result.stderr
-    assert "module load python" in result.stderr
+    assert "submission host" in result.stderr
+    assert "SPINE_PROD_PYTHON" in result.stderr
     assert "cannot import name 'Submitter'" not in result.stderr
 
 

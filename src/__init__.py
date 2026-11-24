@@ -9,8 +9,11 @@ import sys
 if sys.version_info < (3, 9):
     raise ImportError(
         "spine-prod requires Python 3.9 or newer; found {}.{}.{}. "
-        "On NERSC, run `module load python`, verify `python3 --version`, "
-        "and retry using that environment.".format(*sys.version_info[:3])
+        "Activate a Python 3.9+ environment on the submission host, install "
+        "requirements.txt there, and retry with that environment's interpreter. "
+        "For scripts/smoke_multinode.sh, select it with SPINE_PROD_PYTHON.".format(
+            *sys.version_info[:3]
+        )
     )
 
 __all__ = ["Submitter"]
