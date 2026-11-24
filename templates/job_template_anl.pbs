@@ -19,6 +19,8 @@
 #PBS -l walltime={{ time }}
 {% endif %}
 #PBS -l filesystems={{ filesystems|default("home:grand:eagle") }}
+# Request the site resource required by the Apptainer --fakeroot launch below.
+#PBS -l singularity_fakeroot=true
 #PBS -k doe
 #PBS -N {{ job_name }}
 {% if array_spec %}

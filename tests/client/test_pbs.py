@@ -74,3 +74,31 @@ def test_graceful_stop_dry_run_and_failure(client, capsys):
     with patch("src.client.pbs.subprocess.run", return_value=result):
         with pytest.raises(RuntimeError, match="unknown job"):
             client.graceful_stop("12345.server")
+
+
+@pytest.mark.parametrize("configured", [False, True])
+def test_qsub_forwards_only_selected_runtime_exports(
+    client, tmp_path, monkeypatch, configured
+):
+    names = [
+        "SPINE_CONTAINER_PATH",
+        "SPINE_CONTAINER_VERSION",
+        "SPINE_CONTAINER_TAG",
+        "NCCL_DEBUG",
+        "MASTER_PORT",
+    ]
+    for name in names:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("UNRELATED_PRIVATE_VALUE", "do-not-forward")
+    if configured:
+        monkeypatch.setenv("SPINE_CONTAINER_PATH", "/shared/image.sif")
+        monkeypatch.setenv("NCCL_DEBUG", "INFO")
+    with patch(
+        "src.client.pbs.subprocess.run",
+        return_value=CompletedProcess([], 0, "123.server\n", ""),
+    ) as run:
+        client.submit(tmp_path / "job.pbs")
+    expected = ["qsub"]
+    if configured:
+        expected += ["-v", "SPINE_CONTAINER_PATH,NCCL_DEBUG"]
+    assert run.call_args.args[0] == expected + [str(tmp_path / "job.pbs")]

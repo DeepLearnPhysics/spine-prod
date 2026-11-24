@@ -1,5 +1,6 @@
 """PBS batch client."""
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -24,8 +25,25 @@ class PBSClient(BatchClient):
                 print(f.read())
             return None
 
+        # PBS does not inherit arbitrary submission-host exports by default.
+        # Forward runtime selection and distributed diagnostics without -V.
+        names = [
+            name
+            for name in (
+                "SPINE_CONTAINER_PATH",
+                "SPINE_CONTAINER_VERSION",
+                "SPINE_CONTAINER_TAG",
+                "NCCL_DEBUG",
+                "MASTER_PORT",
+            )
+            if name in os.environ
+        ]
+        command = ["qsub"]
+        if names:
+            command.extend(["-v", ",".join(names)])
+        command.append(str(script_path))
         result = subprocess.run(
-            ["qsub", str(script_path)],
+            command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
