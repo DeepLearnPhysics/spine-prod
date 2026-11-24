@@ -19,6 +19,12 @@ def test_smoke_submission(workspace_root, tmp_path, site, explicit_python):
     env = dict(os.environ, PATH=f"{binaries}:{os.environ['PATH']}")
     env.pop("FORCE_SPINE_PROD_BASEDIR", None)
     env.pop("SPINE_PROD_PYTHON", None)
+    env.pop("SPINE_LOCAL_PATH", None)
+    if explicit_python:
+        checkout = tmp_path / "custom spine"
+        (checkout / "bin").mkdir(parents=True)
+        (checkout / "bin/run.py").write_text("# source checkout entry point\n")
+        env["SPINE_LOCAL_PATH"] = str(checkout)
     if explicit_python:
         # The override must work even when the default python3 is unusable.
         shim_dir = tmp_path / "bin"
@@ -52,6 +58,8 @@ def test_smoke_submission(workspace_root, tmp_path, site, explicit_python):
     assert metadata["profile_config"]["nodes"] == 2
     script = next((run / "latest").glob("submit.*")).read_text()
     assert "distributed_launch.py" in script
+    if explicit_python:
+        assert str(checkout / "bin/run.py") in script
     assert "--set train.save_epoch=null" in script
     assert "--set train.save_step=10" in script
     if site == "nersc":

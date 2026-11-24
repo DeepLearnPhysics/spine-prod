@@ -112,6 +112,15 @@ export SPINE_PROD_PYTHON=/path/to/python-environment/bin/python
 Without this override the helper uses `python3` from `PATH`. The override
 selects only the submission interpreter; training uses the container's Python.
 
+To test a custom SPINE branch without rebuilding the image, export
+`SPINE_LOCAL_PATH=/shared/path/to/spine` before running the helper. The checkout
+must contain `bin/run.py` (or `bin/spine`) and be readable on both compute
+nodes. The helper runs this code inside the configured container, which supplies
+the native dependencies. Use a fresh run directory for each comparison.
+
+The helper defaults `NCCL_DEBUG` to `INFO` for transport diagnostics. Set
+`NCCL_DEBUG=WARN` to compare SPINE progress output without NCCL debug traffic.
+
 Before a Polaris submission, export `SPINE_CONTAINER_PATH` pointing to the
 SPINE 1.5 SIF image on shared Polaris storage. PBS forwards this setting and the
 NCCL diagnostic setting; the job requests `singularity_fakeroot=true` for Apptainer.

@@ -6,6 +6,8 @@ if [[ $# -lt 5 ]]; then
 Usage: bash scripts/smoke_multinode.sh SITE ACCOUNT TRAIN_ROOT VALIDATION_ROOT RUN_DIR [--dry-run]
 SITE: s3df, nersc, or polaris (alcf also accepted).
 SPINE_PROD_PYTHON: submission interpreter (default: python3); requires Python 3.10+.
+SPINE_LOCAL_PATH: optional shared SPINE source checkout, run inside the container.
+NCCL_DEBUG: defaults to INFO for diagnostics; set WARN for quieter output.
 Use generic MPV/MPR v04 LArCV files on storage visible to both compute nodes.
 RUN_DIR must be a fresh shared directory. This submits a job; it does not wait.
 USAGE
@@ -43,7 +45,7 @@ case "$site" in
     *) echo "Unknown site: $site" >&2; exit 2 ;;
 esac
 # Retain NCCL initialization details in the attempt logs for rank/network diagnosis.
-export NCCL_DEBUG=INFO
+export NCCL_DEBUG="${NCCL_DEBUG:-INFO}"
 "${SPINE_PROD_PYTHON:-python3}" "$repo_dir/submit.py" \
     --config train/generic/uresnet/train_240718.yaml \
     --stage train --run-dir "$run_dir" \
