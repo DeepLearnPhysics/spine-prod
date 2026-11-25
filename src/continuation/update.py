@@ -12,7 +12,13 @@ from .state import atomic_json, locked, read
 
 
 def update_campaign(
-    path, workspace, minimum=None, cache_dir=None, apply=False, context=None
+    path,
+    workspace,
+    minimum=None,
+    cache_dir=None,
+    apply=False,
+    context=None,
+    checkpoint_margin=None,
 ):
     """Change future submission options under the controller lock.
 
@@ -26,10 +32,12 @@ def update_campaign(
 
     path = Path(path).expanduser().resolve()
     workspace = Path(workspace).expanduser().resolve()
-    if minimum is None and cache_dir is None:
-        raise ValueError("Provide --min-time and/or --cache-dir")
+    if minimum is None and cache_dir is None and checkpoint_margin is None:
+        raise ValueError("Provide --min-time, --checkpoint-margin, and/or --cache-dir")
     if minimum is not None:
         seconds(minimum)
+    if checkpoint_margin is not None:
+        seconds(checkpoint_margin)
     with locked(path):
         original = read(path)
         if original["state"] != "active":
@@ -82,6 +90,12 @@ def update_campaign(
                 and options.get("continuation") is not None
             ):
                 options["continuation"]["min_time"] = minimum
+            if (
+                checkpoint_margin is not None
+                and record["status"] != "completed"
+                and options.get("continuation") is not None
+            ):
+                options["continuation"]["checkpoint_margin"] = checkpoint_margin
             profile = context.config_mgr.get_profile(options.get("profile", "auto"))
             profile.update(
                 {key: options[key] for key in PROFILE_FIELDS if key in options}
@@ -113,6 +127,7 @@ def update_campaign(
                 backup=str(backup),
                 stages=changed,
                 min_time=minimum,
+                checkpoint_margin=checkpoint_margin,
                 cache_dir=(
                     str(Path(cache_dir).expanduser().resolve()) if cache_dir else None
                 ),
