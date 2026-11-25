@@ -32,6 +32,9 @@ class PipelineRunner(SubmissionComponent):
         val_source_list: str | None = None,
         skip_stages: Sequence[str] | None = None,
         site: str | None = None,
+        cache_dir: str | None = None,
+        cache_archive_dir: str | None = None,
+        audit_dir: str | None = None,
     ) -> dict[str, list[str]]:
         """Submit an ordered multi-stage production pipeline.
 
@@ -56,6 +59,12 @@ class PipelineRunner(SubmissionComponent):
         continuation_dir : str, optional
             Separate shared continuation state root; NERSC requires Scratch.
             Training logs, checkpoints and outputs stay in the workspace.
+        cache_dir : str, optional
+            Relocate declared working caches and their downstream references.
+        cache_archive_dir : str, optional
+            Durable cache snapshots copied by CPU jobs after each producer.
+        audit_dir : str, optional
+            Historical continuation records; defaults to workspace/monitoring.
         from_stage : str, optional
             Restart at this stage in pipeline order. Earlier stages are
             treated as completed, and selected stage directories are retried
@@ -105,7 +114,9 @@ class PipelineRunner(SubmissionComponent):
             source_list=source_list,
             val_source_list=val_source_list,
         )
-        all_stages = definition.stages
+        from .storage import archive_plans, validate_cache_storage, working_stages
+
+        all_stages = working_stages(definition.stages, definition.workspace, cache_dir)
         if warm_start is not None:
             if not isinstance(warm_start, str) or not warm_start:
                 raise ValueError("Pipeline warm-start path must be a non-empty string")
@@ -130,6 +141,7 @@ class PipelineRunner(SubmissionComponent):
             profile = self.config_mgr.get_profile(stage.get("profile", "auto"))
             profile.update({key: stage[key] for key in PROFILE_FIELDS if key in stage})
             try:
+                validate_cache_storage(stage, profile.get("site"))
                 if stage.get("continuation") is not None:
                     from ..continuation.policy import profile_policy
                     from ..continuation.state import validate_storage
@@ -167,6 +179,9 @@ class PipelineRunner(SubmissionComponent):
             )
         print()
 
+        archives = archive_plans(
+            stages, definition.workspace, cache_archive_dir, self.context
+        )
         if definition.workspace is not None:
             self._prepare_log_index(definition.workspace, stages)
 
@@ -185,6 +200,8 @@ class PipelineRunner(SubmissionComponent):
                 preload,
                 warm_start,
                 continuation_dir,
+                cache_archives=archives,
+                audit_dir=audit_dir,
             )
 
         job_map: dict[str, list[str]] = {}
@@ -230,6 +247,13 @@ class PipelineRunner(SubmissionComponent):
                     dry_run=dry_run,
                     preload=preload,
                     **options,
+                )
+            if name in archives:
+                archive_dependency = self._dependency([name], job_map)
+                job_map[name] = self.context.submit_archive(
+                    **archives[name],
+                    dependency=archive_dependency,
+                    dry_run=dry_run,
                 )
             if definition.workspace is not None and stage.get("run_dir"):
                 self._link_stage_attempt(

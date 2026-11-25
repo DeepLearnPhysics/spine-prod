@@ -10,6 +10,7 @@ from .control import JobController
 from .files import FileHandler
 from .pipeline import PipelineRunner
 from .preload import preload_downloads
+from .submission.archive import ArchiveRunner
 from .submission.arguments import SpineCLI
 from .submission.batch import BatchRunner
 from .submission.filter import FilterRunner
@@ -41,6 +42,7 @@ class Submitter:
         self.interactive = InteractiveRunner(self)
         self.filter = FilterRunner(self)
         self.report = ReportRunner(self)
+        self.archive = ArchiveRunner(self)
         self.pipeline = PipelineRunner(self)
 
     @property
@@ -67,6 +69,10 @@ class Submitter:
     def submit_filter(self, *args: Any, **kwargs: Any) -> list[str]:
         """Submit one file-aware entry-filter operation."""
         return self.filter.submit_filter(*args, **kwargs)
+
+    def submit_archive(self, **kwargs: Any) -> list[str]:
+        """Submit a verified cache snapshot after producer accounting."""
+        return self.archive.submit_archive(**kwargs)
 
     def submit_pipeline(self, *args: Any, **kwargs: Any) -> dict[str, list[str]]:
         """Submit an ordered workflow through the pipeline component."""

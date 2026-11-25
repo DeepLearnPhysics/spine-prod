@@ -107,6 +107,7 @@ source configure.sh
 python3 submit.py --pipeline /path/to/pipeline.yaml \
   --workspace /global/cfs/cdirs/YOUR_PROJECT/training-run \
   --continuation-dir "$SCRATCH/training-run-state" \
+  --cache-dir "$SCRATCH/training-run-cache" \
   --account YOUR_ACCOUNT --dry-run
 ```
 
@@ -120,6 +121,53 @@ storage needs committed publication and integrity checks. The supervisor tests
 state storage before launching training. Keep manifests for the lifetime of the
 campaign, including while jobs are queued. Deleting them loses accounting and
 submission history.
+
+### Working caches and optional durable copies
+
+`--cache-dir ROOT` relocates pipeline-declared `cache_repository` and `cache_dir`
+paths, including downstream references and configuration overrides. Cache paths
+must originally be under the workspace. For example, `WORKSPACE/cache/train.spine-cache`
+becomes `ROOT/train.spine-cache`; `WORKSPACE/filter/counts` becomes `ROOT/filter/counts`.
+NERSC requires these working caches on Scratch because publication uses file locks
+that CFS/DVS does not support. S3DF can keep everything under `/sdf`; Polaris keeps
+its existing shared-storage layout. `--continuation-dir` alone does not move caches.
+
+Optionally add `--cache-archive-dir /durable/path/cache-archive`. After each cache
+producer succeeds, a CPU batch job copies its committed cache repository and
+verifies checksums before publishing an immutable snapshot. Consumers wait for
+this archive job to succeed. Unchanged shards are shared across snapshots. The
+working cache stays in place; the archive needs no filesystem locks and can live
+on NERSC CFS. Filter count caches are relocated but are not archived by this option.
+Archive jobs use the site's CPU profile and the producer's account.
+
+After Scratch data is lost, explicitly restore a selected snapshot into a **new**
+working directory:
+
+```bash
+python3 scripts/cache_archive.py restore \
+  /durable/path/cache-archive/train.spine-cache/snapshots/SNAPSHOT_HASH.json \
+  "$SCRATCH/restored-cache/train.spine-cache"
+```
+
+Restoration verifies every shard and clears old publication fences. It restores
+cache data only: it does not resume a controller, skip pipeline stages, or check
+whether the data matches a new training configuration. Select the appropriate
+snapshot and stage when reusing it.
+
+### Historical monitoring records
+
+New continuation pipelines write a verified audit under `WORKSPACE/monitoring`
+at terminal outcomes and before removing their managed timer. `--audit-dir PATH`
+selects another destination; choose durable storage if the workspace is on Scratch.
+Each pipeline gets immutable JSON snapshots and a `latest.json` index. These contain
+the pipeline and logical-stage manifests, available attempt outcomes and failure
+reports, controller output, and stage summaries with job IDs and runtime totals.
+They exclude cache payloads and checkpoints, which retain their own storage policy.
+
+These are historical records, with no restore or job-reactivation operation.
+If archival fails, the timer remains registered and retries on a later tick;
+completed training is not resubmitted. Existing campaigns created without an audit
+destination retain their previous behavior.
 
 ## Automatic advancement
 

@@ -28,6 +28,8 @@ def start(
     preload=False,
     warm_start=None,
     continuation_dir=None,
+    cache_archives=None,
+    audit_dir=None,
 ):
     """Create a durable controller and submit the first eligible stage.
 
@@ -91,6 +93,19 @@ def start(
                 "jobs": [],
             }
         )
+        if stage["name"] in (cache_archives or {}):
+            records.append(
+                {
+                    "name": stage["name"] + "__archive",
+                    "kind": "archive",
+                    "options": cache_archives[stage["name"]],
+                    "status": "waiting",
+                    "jobs": [],
+                }
+            )
+    audit_dir = str(
+        Path(audit_dir or Path(workspace) / "monitoring").expanduser().resolve()
+    )
     automation_accounts = set()
     # Validate every operational policy before the first scheduler interaction.
     for record in records:
@@ -142,6 +157,10 @@ def start(
     with locked(path):
         if path.exists():
             state = read(path)
+            if state.get("audit_dir", audit_dir) != audit_dir:
+                raise ValueError(
+                    "Controller audit directory changed; use the original --audit-dir"
+                )
             if state["definition_sha256"] != digest:
                 raise ValueError("Controller definition changed; use a new workspace")
         else:
@@ -152,6 +171,7 @@ def start(
                     "state": "active",
                     "definition_sha256": digest,
                     "basedir": str(context.basedir),
+                    "audit_dir": audit_dir,
                     "records": records,
                     "preload": preload,
                     "generation": 0,
@@ -195,11 +215,13 @@ def advance(path, context=None):
     alone never releases consumers of an incomplete logical training stage.
     """
     from ..submitter import Submitter
+    from .audit import archive_audit
 
     path = Path(path)
     with locked(path):
         state = read(path)
         if state["state"] != "active":
+            archive_audit(path)
             return {}
         context = context or Submitter(basedir=Path(state["basedir"]))
         for record in state["records"]:
@@ -227,6 +249,8 @@ def advance(path, context=None):
                     continue
                 if logical["state"] != "paused" or not attempt.get("accounted"):
                     atomic_json(path, state)
+                    if logical["state"] in ("failed", "cancelled", "budget_exhausted"):
+                        archive_audit(path)
                     return {record["name"]: record["jobs"]}
                 # Resume exactly the verified committed continuation artifact.
                 options.update(resume=True, resume_from=logical["checkpoint"])
@@ -239,6 +263,7 @@ def advance(path, context=None):
                 if not all(result["success"] for result in results):
                     record["status"] = "failed"
                     atomic_json(path, state)
+                    archive_audit(path)
                     return {}
                 record["status"] = "completed"
                 atomic_json(path, state)
@@ -274,6 +299,7 @@ def advance(path, context=None):
         state["state"] = "completed"
         state["generation"] += 1
         atomic_json(path, state)
+        archive_audit(path)
         return {}
 
 

@@ -156,6 +156,7 @@ def test_dune_nersc_dry_run_preflights_all_training_stages(
         workspace=str(tmp_path / "vd"),
         site="nersc",
         overrides={"account": "project"},
+        cache_dir="/pscratch/sd/u/user/cache",
         continuation_dir="/pscratch/sd/u/user/vd-state",
         dry_run=True,
     )
@@ -217,6 +218,7 @@ def test_site_cli_time_preserves_pipeline_budget(mock_submitter, tmp_path, monke
             "time": "06:00:00",
             "profile": "nersc_gpu_full",
         },
+        cache_dir="/pscratch/sd/u/user/cache",
         continuation_dir="/pscratch/sd/u/user/hd-state",
         dry_run=True,
     )

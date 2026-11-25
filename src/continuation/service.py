@@ -264,6 +264,11 @@ def retire_if_idle(registry):
         for name, entry in data["pipelines"].items():
             if entry.get("enabled") and needs_tick(Path(name)):
                 return False
+        from .audit import archive_audit
+
+        for name, entry in data["pipelines"].items():
+            if entry.get("enabled"):
+                archive_audit(Path(name))
         existing = read_schedule(site)
         desired = remove_schedule(existing, registry.parent.name)
         if desired != existing:

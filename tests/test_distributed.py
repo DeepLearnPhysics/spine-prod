@@ -324,6 +324,7 @@ def test_pipeline_nodes_override_is_training_only(
         site="nersc",
         overrides={"account": "project", "nodes": 2},
         continuation_dir="/pscratch/sd/u/user/hd-state",
+        cache_dir="/pscratch/sd/u/user/hd-cache",
         dry_run=True,
     )
     stages = start.call_args.args[1]

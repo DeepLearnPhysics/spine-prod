@@ -426,6 +426,9 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         overrides={},
         workspace="/runs/benchmark",
         continuation_dir=None,
+        cache_dir=None,
+        cache_archive_dir=None,
+        audit_dir=None,
         from_stage=None,
         to_stage=None,
         select_stages=None,
@@ -852,3 +855,32 @@ def test_continuation_directory_requires_pipeline(capsys):
         "--continuation-dir is only supported with --pipeline"
         in capsys.readouterr().err
     )
+
+
+@pytest.mark.parametrize("flag", ["--cache-dir", "--cache-archive-dir", "--audit-dir"])
+def test_storage_options_require_pipeline(flag):
+    with pytest.raises(SystemExit):
+        run_main("--config", "config.yaml", flag, "/storage")
+
+
+def test_pipeline_storage_options_forwarded():
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--cache-dir",
+        "/scratch/cache",
+        "--cache-archive-dir",
+        "/durable/cache",
+        "--audit-dir",
+        "/durable/audit",
+        submitter=submitter,
+    )
+    assert result == 0
+    assert submitter.submit_pipeline.call_args.kwargs["cache_dir"] == "/scratch/cache"
+    assert (
+        submitter.submit_pipeline.call_args.kwargs["cache_archive_dir"]
+        == "/durable/cache"
+    )
+    assert submitter.submit_pipeline.call_args.kwargs["audit_dir"] == "/durable/audit"
