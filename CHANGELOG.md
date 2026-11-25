@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Native multi-node training on S3DF, NERSC, and Polaris, with fixed-topology
+  checkpoint continuation and automatic S3DF cron hosting.
+- Python 3.10–3.13 submission support, with a standard-library Python 3.9+
+  worker supervisor. Default SPINE runtime updated to 1.5.2.
 - Added a DUNE-VD 1x8x6 training candidate derived from DUNE-HD 261022,
   with VD geometry, shared cache/export calibration, grouped evaluation,
   and VD MPV/MPR v0 input lists.

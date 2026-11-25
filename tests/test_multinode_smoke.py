@@ -37,7 +37,7 @@ def test_smoke_submission(workspace_root, tmp_path, site, explicit_python):
     result = subprocess.run(
         [
             "bash",
-            str(workspace_root / "scripts/smoke_multinode.sh"),
+            str(workspace_root / "tests/smoke_multinode.sh"),
             site,
             "project",
             str(source),

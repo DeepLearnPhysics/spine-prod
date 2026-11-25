@@ -13,7 +13,7 @@ def require_python(minimum=(3, 10)):
         raise ImportError(
             "spine-prod requires Python {}.{} or newer; found {}.{}.{}. "
             "Activate a supported environment on the submission host and install "
-            "requirements.txt there. For scripts/smoke_multinode.sh, select it "
+            "requirements.txt there. For test helpers, select it "
             "with SPINE_PROD_PYTHON.".format(*minimum, *sys.version_info[:3])
         )
 
