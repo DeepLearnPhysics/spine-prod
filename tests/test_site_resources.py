@@ -70,7 +70,10 @@ def test_dune_budgets_and_site_requests(catalog, workspace_root, site, pipeline_
         assert config["maximum"] == min(hours, 48 if site == "nersc" else hours) * 3600
         request = next_request(config, 0)
         assert request["seconds"] == min(hours, 24 if site == "nersc" else hours) * 3600
-        assert request["min_time"] == ("04:00:00" if site == "nersc" else None)
+        assert request["min_time"] == ("01:00:00" if site == "nersc" else None)
+        if site == "nersc":
+            assert config["checkpoint_margin"] == 120
+            assert config["startup_allowance"] == 300
         assert "continuation" not in stage
         assert next_request(config, hours * 3600) is None
     scan = map_stage(catalog, definition.stages[0], site, {"account": "project"})
@@ -163,10 +166,10 @@ def test_dune_nersc_dry_run_preflights_all_training_stages(
     assert first_stage.call_args.kwargs["profile"] == "nersc_cpu"
     output = capsys.readouterr().out
     assert (
-        "budget=120:00:00; allocation=04:00:00..48:00:00; preferred=24:00:00" in output
+        "budget=120:00:00; allocation=01:00:00..48:00:00; preferred=24:00:00" in output
     )
     assert (
-        "budget=08:00:00; allocation=04:00:00..08:00:00; preferred=08:00:00" in output
+        "budget=08:00:00; allocation=01:00:00..08:00:00; preferred=08:00:00" in output
     )
     register.assert_not_called()
 

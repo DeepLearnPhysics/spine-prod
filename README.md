@@ -722,7 +722,7 @@ Non-continuation stages retain their requested time and fail if it exceeds limit
 The HD 261022 and VD 261117 candidates use this default for all six training stages.
 Without `--site`, ordinary submission semantics remain unchanged unless continuation
 is explicitly configured. On NERSC, `--continuation-dir` in the command above must point to Scratch. Its 120-hour and
-72-hour budgets become at most 48-hour allocations, requesting 4–24-hour grants
+72-hour budgets become at most 48-hour allocations, requesting 1–24-hour grants
 by default. Shorter training stages retain their smaller ceilings. This is an
 initial scheduling policy, not a measured optimum. Budget exhaustion blocks
 consumers unless explicitly accepted. S3DF/Polaris require periodic controller
