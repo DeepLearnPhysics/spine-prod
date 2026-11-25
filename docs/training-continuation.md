@@ -51,7 +51,7 @@ stage, for example:
   continuation:
     runtime_budget: "120:00:00"
     preferred_time: "24:00:00"
-    checkpoint_margin: "00:15:00"
+    checkpoint_margin: "00:02:00"
     startup_allowance: "00:05:00"
     max_infrastructure_retries: 2
     max_attempts: 100
@@ -77,7 +77,7 @@ budget. Without `--site`, continuation still requires an explicit mapping. Site-
 profile defaults and explicit stage settings take precedence. Inherited chunk
 preferences shrink to fit shorter stage ceilings. Explicit CLI `--time` and
 stage chunk preferences are validated as supplied, so invalid requests fail.
-NERSC defaults to a 4–24-hour request range, with a 15-minute checkpoint margin
+NERSC defaults to a 1–24-hour request range, with a two-minute checkpoint margin
 and five-minute startup allowance. This is a starting policy, not a measured
 optimum. Non-continuation stages are never automatically shortened.
 PBS shrink-to-fit additionally requires `allow_pbs_shrink_to_fit: true` and local
