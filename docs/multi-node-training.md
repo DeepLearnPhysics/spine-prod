@@ -93,7 +93,7 @@ bash scripts/smoke_multinode.sh s3df neutrino:ml-dev \
   /sdf/data/neutrino/YOUR_SHARED_RUN_DIRECTORY/multinode-smoke
 ```
 
-For NERSC use `nersc m5252`; for Polaris use `polaris YOUR_PROJECT`, followed by
+For NERSC use `nersc m5252`; for Polaris use `polaris neutrinoGPU::SpineDev`, followed by
 site-local copies of those generic files and a fresh shared run directory.
 The inputs must contain `sparse3d_pcluster` and `sparse3d_pcluster_semantics`.
 Each file needs at least 16 entries; training is limited to the first 64 and

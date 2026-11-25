@@ -159,7 +159,9 @@ APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD exec {{ custom_command }}"
 {% else %}
 APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD exec {% if nodes|default(1)|int > 1 %}python3 \"{{ basedir }}/scripts/distributed_launch.py\" --nodes {{ nodes }} --gpus-per-node {{ gpus_per_node }} --scheduler pbs -- {% endif %}{{ spine_cmd|default('spine', true) }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 {% endif %}
-RUN_CMD="{% if nodes|default(1)|int > 1 %}mpiexec -n {{ nodes }} --ppn 1 --depth={{ cpus_per_task }} --cpu-bind depth {% endif %}apptainer exec $APPTAINER_BIND_OPTS --fakeroot --nv $SPINE_CONTAINER_PATH bash -c '$APPTAINER_INNER_CMD'"
+# PALS may relocate its immediate executable under /run/palsd. Launch env
+# so Apptainer retains its installation path and can find apptainer.conf.
+RUN_CMD="{% if nodes|default(1)|int > 1 %}mpiexec -n {{ nodes }} --ppn 1 --depth={{ cpus_per_task }} --cpu-bind depth /usr/bin/env {% endif %}apptainer exec $APPTAINER_BIND_OPTS --fakeroot --nv $SPINE_CONTAINER_PATH bash -c '$APPTAINER_INNER_CMD'"
 
 {% if continuation_attempt %}
 # Keep the batch shell responsive and forward only to the supervisor.
