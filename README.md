@@ -704,6 +704,7 @@ are rejected; allocation correspondence does not imply identical performance.
 ./submit.py --pipeline pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml \
   --site nersc --account YOUR_PROJECT --workspace /path/to/vd-run \
   --continuation-dir "$SCRATCH/vd-state" \
+  --cache-dir "$SCRATCH/vd-cache" \
   --source-list /path/to/train_file_list.txt \
   --val-source-list /path/to/test_file_list.txt --dry-run
 ```
