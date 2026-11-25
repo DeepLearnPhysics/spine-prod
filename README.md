@@ -743,8 +743,8 @@ is explicitly configured. On NERSC, `--continuation-dir` in the command above mu
 72-hour budgets become at most 48-hour allocations, requesting 4–24-hour grants
 by default. Shorter training stages retain their smaller ceilings. This is an
 initial scheduling policy, not a measured optimum. Budget exhaustion blocks
-consumers unless explicitly accepted. S3DF/Polaris require periodic controller
-advancement; see [training continuation](docs/training-continuation.md).
+consumers unless explicitly accepted. S3DF automatically registers its controller
+on `sdfcron001`; Polaris still requires externally hosted periodic advancement. See [training continuation](docs/training-continuation.md).
 
 The central `sites` table records queue/QOS allocation limits and their sources.
 Known limits also apply to ordinary batch, filter, and report submissions.
