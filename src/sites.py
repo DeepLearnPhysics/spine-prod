@@ -119,6 +119,13 @@ def map_stage(catalog, stage, site, overrides=None):
         if gpu_count is not None:
             result["gpus" if site == "s3df" else "gpus_per_node"] = gpu_count
     result.update(overrides)
+    if (
+        result.get("cache_repository")
+        and result.get("files_per_task") is None
+        and "ntasks" not in overrides
+        and "cache_ntasks" in sites[site]
+    ):
+        result["ntasks"] = sites[site]["cache_ntasks"]
     target = profiles[result["profile"]]
     if (
         int(result.get("nodes", target.get("nodes", 1))) > 1

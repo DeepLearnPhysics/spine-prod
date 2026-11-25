@@ -314,3 +314,48 @@ def test_invalid_margin_does_not_change_controller(campaign, mock_submitter, mar
             context=mock_submitter,
         )
     assert read(path) == original
+
+
+def test_cache_task_update_only_changes_waiting_cache_options(campaign, monkeypatch):
+    path, workspace, original = campaign
+    script = Path(__file__).resolve().parents[2] / "scripts/update_continuation.py"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(script),
+            str(path),
+            "--workspace",
+            str(workspace),
+            "--cache-ntasks",
+            "100",
+            "--apply",
+        ],
+    )
+    runpy.run_path(str(script), run_name="__main__")
+    expected = copy.deepcopy(original["records"])
+    expected[2]["options"]["ntasks"] = 100
+    assert read(path)["records"] == expected
+    assert read(path)["configuration_updates"][-1]["cache_ntasks"] == 100
+
+
+@pytest.mark.parametrize("mode", ["zero", "bool", "started", "explicit", "absent"])
+def test_cache_task_update_rejects_unsafe_cases(campaign, mock_submitter, mode):
+    path, workspace, original = campaign
+    count = 100
+    if mode == "zero":
+        count = 0
+    elif mode == "bool":
+        count = True
+    elif mode == "started":
+        original["records"][2]["status"] = "submitted"
+    elif mode == "explicit":
+        original["records"][2]["options"]["files_per_task"] = 1
+    else:
+        del original["records"][2]["options"]["cache_repository"]
+    atomic_json(path, original)
+    with pytest.raises(ValueError):
+        update.update_campaign(
+            path, workspace, cache_ntasks=count, apply=True, context=mock_submitter
+        )
+    assert read(path) == original
