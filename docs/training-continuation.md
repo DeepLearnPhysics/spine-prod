@@ -197,6 +197,33 @@ this requirement. The generated tick script is also available for recovery:
 bash /path/to/continuation-dir/.spine-prod/advance.sh
 ```
 
+## Update an existing campaign
+
+Changing a pipeline YAML or site default does not rewrite a controller's saved
+submission options. For an active campaign, use:
+
+```bash
+python3 scripts/update_continuation.py STATE/.spine-prod/continuation_pipeline.json \
+  --workspace /durable/original/workspace \
+  --min-time 01:00:00 --cache-dir "$SCRATCH/campaign-cache"
+```
+
+This previews the affected stages. Add `--apply` to save the update under the
+controller lock, after writing and verifying a backup beside its manifest.
+Completed stages, checkpoint identities, consumed budgets, existing allocation
+records, and scheduler jobs remain unchanged. Future submissions use the new
+minimum. Current pending Slurm jobs can separately be updated with
+`scontrol update JobId=JOB_ID TimeMin=01:00:00`; no cancellation is needed.
+
+Cache relocation is limited to campaigns where **all cache producers are still
+waiting**, and their old repositories are absent or empty. It rewrites future
+cache outputs and consumer references, while preserving completed filter stages.
+This is not a general cache-data migration. Existing controllers do not acquire
+optional archive jobs or historical-audit destinations through this command.
+Continue using the existing controller and state directory; do not create a fresh
+campaign to change these operational settings. The initial launch digest is kept
+as provenance, and updates are recorded in `configuration_updates`.
+
 ## Completion and recovery
 
 An allocation pause saves complete restart state without forcing validation.
