@@ -1,5 +1,7 @@
 """Render scheduler scripts into immutable submission-attempt directories."""
 
+import shlex
+import sys
 from pathlib import Path
 
 
@@ -28,6 +30,7 @@ def render_script(
     pathlib.Path
         Written script, ready to pass to the scheduler client.
     """
+    context["submission_python_shell"] = shlex.quote(sys.executable)
     template = client.load_template(template_name)
     content = template.render(**context)
     name = "submit" if num_chunks == 1 else f"submit_{chunk_index:03d}"

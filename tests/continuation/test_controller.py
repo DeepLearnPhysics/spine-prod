@@ -252,6 +252,7 @@ def test_directives_and_shell_syntax(site, tmp_path):
         time="01:00:00",
         continuation_attempt={"token": "spc-test", "request": {"min_time": "00:10:00"}},
         continuation_policy={"checkpoint_margin": 60},
+        submission_python_shell="'/shared/python env/bin/python3.12'",
         continuation_run_dir=str(tmp_path),
         continuation_dir="/scratch/control",
         basedir=str(Path.cwd()),
@@ -269,6 +270,7 @@ def test_directives_and_shell_syntax(site, tmp_path):
         assert "--time-min=00:10:00" in rendered
         assert "--signal=B:USR2@60" in rendered
     assert "--require-continuation" in rendered
+    assert "'/shared/python env/bin/python3.12' \"" in rendered
     assert "continuation_runtime.py" in rendered
     assert '--continuation-dir "/scratch/control"' in rendered
     script = tmp_path / "job.sh"
@@ -359,8 +361,9 @@ def test_shell_trap_supervisor_and_launcher_handle_repeated_pause(tmp_path):
         + "'\n"
     )
     scheduler.chmod(0o755)
-    # Use the same interpreter/dependencies as pytest on the compute-host side.
-    (bindir / "python3").symlink_to(sys.executable)
+    # The supervisor must ignore an incompatible compute-host default Python.
+    (bindir / "python3").write_text("#!/bin/sh\nexit 99\n")
+    (bindir / "python3").chmod(0o755)
     child = tmp_path / "child.py"
     child.write_text(
         "import pathlib, time\np=pathlib.Path("
@@ -370,6 +373,7 @@ def test_shell_trap_supervisor_and_launcher_handle_repeated_pause(tmp_path):
     )
     rendered = Template(Path("templates/job_template_nersc.sbatch").read_text()).render(
         continuation_attempt=attempt,
+        submission_python_shell=shlex.quote(sys.executable),
         continuation_policy=config(),
         continuation_run_dir=str(tmp_path),
         basedir=str(Path.cwd()),
