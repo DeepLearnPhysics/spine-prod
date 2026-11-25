@@ -6,15 +6,17 @@ submission-only YAML/template dependencies are loaded when Submitter is used.
 
 import sys
 
-if sys.version_info < (3, 10):
-    raise ImportError(
-        "spine-prod requires Python 3.10 or newer; found {}.{}.{}. "
-        "Activate a Python 3.10+ environment on the submission host, install "
-        "requirements.txt there, and retry with that environment's interpreter. "
-        "For scripts/smoke_multinode.sh, select it with SPINE_PROD_PYTHON.".format(
-            *sys.version_info[:3]
+
+def require_python(minimum=(3, 10)):
+    """Check host Python; only the standard-library worker accepts Python 3.9."""
+    if sys.version_info < minimum:
+        raise ImportError(
+            "spine-prod requires Python {}.{} or newer; found {}.{}.{}. "
+            "Activate a supported environment on the submission host and install "
+            "requirements.txt there. For scripts/smoke_multinode.sh, select it "
+            "with SPINE_PROD_PYTHON.".format(*minimum, *sys.version_info[:3])
         )
-    )
+
 
 __all__ = ["Submitter"]
 
@@ -22,6 +24,7 @@ __all__ = ["Submitter"]
 def __getattr__(name):
     """Load submission dependencies only when the public Submitter is requested."""
     if name == "Submitter":
+        require_python()
         from .submitter import Submitter
 
         return Submitter

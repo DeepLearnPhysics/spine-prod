@@ -1,7 +1,6 @@
 """Continuation routing and public submission validation."""
 
 import sys
-from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -21,8 +20,8 @@ def test_lazy_import_rejects_unknown_attribute():
 def test_old_python_has_actionable_error(monkeypatch):
     """Login-node Python failures explain which environment to load."""
     monkeypatch.setattr(sys, "version_info", (3, 8, 0))
-    with pytest.raises(ImportError, match="Activate a Python 3.10"):
-        exec(compile(Path(src.__file__).read_text(), src.__file__, "exec"), {})
+    with pytest.raises(ImportError, match="requires Python 3.10"):
+        src.require_python()
 
 
 @pytest.mark.parametrize(

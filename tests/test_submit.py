@@ -796,7 +796,7 @@ def test_old_python_reports_requirement_before_submission_imports(version):
     probe = (
         "import runpy, sys; "
         f"sys.version_info = {version!r}; "
-        f"runpy.run_path({str(package)!r})"
+        f"runpy.run_path({str(package)!r})['require_python']()"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe], capture_output=True, text=True

@@ -70,3 +70,19 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  worker-python39:
+    name: Compute supervisor (Python 3.9, standard library)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.9"
+      - run: python -m pip install 'pytest<9'
+      - name: Exercise worker without submission dependencies
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/continuation_runtime.py --help
+          python -m pytest -o addopts='' --confcutdir=tests/continuation tests/continuation/test_runtime.py tests/continuation/test_worker_python.py

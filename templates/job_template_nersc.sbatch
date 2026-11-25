@@ -187,7 +187,7 @@ RUN_CMD="srun {% if nodes|default(1)|int > 1 %}--nodes={{ nodes }} --ntasks={{ n
 
 {% if continuation_attempt %}
 # Keep the batch shell responsive and forward only to the supervisor.
-{{ submission_python_shell }} {{ (basedir ~ '/scripts/continuation_runtime.py')|tojson }} \
+python3 {{ (basedir ~ '/scripts/continuation_runtime.py')|tojson }} \
     {% if continuation_dir %}--continuation-dir {{ continuation_dir|tojson }} {% endif %}{{ continuation_run_dir|tojson }} {{ continuation_attempt.token|tojson }} \
     -- bash -c "$RUN_CMD" &
 CONTINUATION_PID=$!

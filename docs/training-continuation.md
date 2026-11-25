@@ -14,6 +14,10 @@ The submission host requires Python 3.10 or newer and `requirements.txt`. On
 NERSC, load the Python module before submitting. The controller retains that
 Python executable for unattended invocations.
 
+The compute-side supervisor uses the worker host’s `python3` and requires only
+Python 3.9+ and the standard library. It does not reuse the login node’s Python
+path. Submission and the periodic controller still require Python 3.10+.
+
 The training runtime must provide **SPINE continuation capability 2**, including
 pending-validation replay. **SPINE 1.5.0** provides this support and is the
 default runtime selected by `DEFAULT_SPINE_VERSION`. The implementation is
