@@ -65,6 +65,8 @@ def test_smoke_submission(workspace_root, tmp_path, site, explicit_python):
     if site == "nersc":
         assert "#SBATCH --qos=debug" in script
     elif site == "polaris":
+        assert "/lus" in metadata["profile_config"]["bind_paths"].split(",")
+        assert "--bind /lus" in script
         assert "--cpu-bind depth /usr/bin/env apptainer exec" in script
         assert "#PBS -q debug" in script
         assert "#PBS -l singularity_fakeroot=true" in script

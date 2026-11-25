@@ -253,7 +253,7 @@ profiles:
     cpus_per_task: 16
     filesystems: home:grand:eagle
     time: "2:00:00"
-    bind_paths: null
+    bind_paths: /lus
     description: "Capacity queue GPU processing on ANL Polaris"
 
   # ANL Polaris capacity queue using all four GPUs on one node
@@ -274,7 +274,7 @@ profiles:
     cpus_per_task: 64
     filesystems: home:grand:eagle
     time: "2:00:00"
-    bind_paths: null
+    bind_paths: /lus
     description: "Full-node GPU processing in the ANL Polaris capacity queue"
 
   # ANL Polaris debug queue
@@ -295,7 +295,7 @@ profiles:
     cpus_per_task: 16
     filesystems: home:grand:eagle
     time: "1:00:00"
-    bind_paths: null
+    bind_paths: /lus
     description: "Debug GPU processing on ANL Polaris"
 
   # ANL Polaris debug queue using all four GPUs on one node
@@ -316,7 +316,7 @@ profiles:
     cpus_per_task: 64
     filesystems: home:grand:eagle
     time: "1:00:00"
-    bind_paths: null
+    bind_paths: /lus
     description: "Full-node GPU processing in the ANL Polaris debug queue"
 
   anl_polaris_cpu:
@@ -332,6 +332,7 @@ profiles:
     gpus_per_node: 0
     cpus_per_task: 1
     filesystems: home:grand:eagle
+    bind_paths: /lus
     time: "2:00:00"
 
 # Detector-specific defaults
