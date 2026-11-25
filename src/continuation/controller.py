@@ -105,21 +105,21 @@ def start(
                 {key: options[key] for key in PROFILE_FIELDS if key in options}
             )
             validate_storage(continuation_dir, profile.get("site"))
-            if profile.get("site") == "nersc":
-                automation_accounts.add(profile.get("account"))
+            if profile.get("site") in ("nersc", "s3df"):
+                automation_accounts.add((profile["site"], profile.get("account")))
             config = profile_policy(context.profiles, profile, options["continuation"])
             print(f"{record['name']}: {describe_policy(config)}")
     if len(automation_accounts) > 1:
         raise ValueError(
-            "Automatic continuation requires one NERSC account per pipeline"
+            "Automatic continuation requires one site/account per pipeline"
         )
     if automation_accounts:
         from .service import service_paths
 
-        account = next(iter(automation_accounts))
-        service_paths(account)
+        site, account = next(iter(automation_accounts))
+        service_paths(account, site)
         print(
-            "Automation plan: NERSC scrontab, every minute; will register and verify before training submission"
+            f"Automation plan: {site} managed cron, every minute; will register and verify before training submission"
         )
     digest = hashlib.sha256(json.dumps(records, sort_keys=True).encode()).hexdigest()
     if dry_run:
@@ -157,12 +157,12 @@ def start(
                     "generation": 0,
                 },
             )
-    write_tick_script(path, context.basedir)
+    write_tick_script(path, context.basedir, site if automation_accounts else None)
     print(f"Durable controller: {path}")
     if automation_accounts:
         from .service import register
 
-        registry = register(path, account, context.basedir)
+        registry = register(path, account, context.basedir, site)
         print(f"Automatic continuation registered: {registry}")
     else:
         print(
@@ -510,7 +510,7 @@ def metrics(path, stream=None):
             )
 
 
-def write_tick_script(manifest, basedir):
+def write_tick_script(manifest, basedir, site=None):
     """Pin the submission interpreter and container selection for periodic ticks.
 
     NERSC registration installs a managed timer; no login terminal or
@@ -537,6 +537,10 @@ def write_tick_script(manifest, basedir):
         if os.environ.get(key):
             lines.append(f"export {key}={shlex.quote(os.environ[key])}")
     lines.append("source " + shlex.quote(str(basedir / "configure.sh")))
+    if site == "s3df":
+        from .s3df import SLURM_BIN
+
+        lines.append(f'export PATH={shlex.quote(SLURM_BIN)}:"$PATH"')
     lines.append(
         "exec "
         + shlex.join(

@@ -367,11 +367,11 @@ def test_start_rejects_multiple_accounts(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(ctl, "validate_storage", lambda *_: None)
     monkeypatch.setattr(ctl, "profile_policy", lambda *_: config())
-    with pytest.raises(ValueError, match="one NERSC account"):
+    with pytest.raises(ValueError, match="one site/account"):
         ctl.start(context, [dict(name=p, profile=p) for p in ("a", "b")], tmp_path)
 
 
-@pytest.mark.parametrize("site", ["nersc", "s3df"])
+@pytest.mark.parametrize("site", ["nersc", "s3df", "anl"])
 def test_start_registers_before_advancing(tmp_path, monkeypatch, site):
     """Registration must succeed before the first NERSC allocation is submitted."""
     from src.pipeline import PipelineRunner
@@ -397,7 +397,7 @@ def test_start_registers_before_advancing(tmp_path, monkeypatch, site):
     monkeypatch.setattr(service, "register", register)
     monkeypatch.setattr(ctl, "advance", Mock(return_value={}))
     ctl.start(context, [dict(name="train", profile="test")], tmp_path)
-    assert register.call_count == (site == "nersc")
+    assert register.call_count == (site != "anl")
     ctl.advance.assert_called_once()
 
 

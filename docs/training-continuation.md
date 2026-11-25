@@ -19,8 +19,8 @@ Python 3.9+ and the standard library. It does not reuse the login node’s Pytho
 path. Submission and the periodic controller still require Python 3.10+.
 
 The training runtime must provide **SPINE continuation capability 2**, including
-pending-validation replay. **SPINE 1.5.0** provides this support and is the
-default runtime selected by `DEFAULT_SPINE_VERSION`. The implementation is
+pending-validation replay. SPINE 1.5.0 introduced this support; **SPINE 1.5.2**
+is the default runtime selected by `DEFAULT_SPINE_VERSION`. The implementation is
 maintained in SPINE. Check the executable inside the selected training environment:
 
 ```bash
@@ -145,9 +145,37 @@ python3 scripts/continue_training.py status \
   "$SCRATCH/training-run-state/.spine-prod/continuation_pipeline.json"
 ```
 
-**Polaris and S3DF require an externally hosted periodic invocation**; automatic
-hosting is currently implemented only for NERSC. Their launch output explains
-this requirement. The generated tick script is also available for recovery:
+**S3DF submission automatically registers a regular cron entry on `sdfcron001`.**
+Submit from the usual interactive node; noninteractive SSH is used only for
+preflight and schedule management. Cron runs the controller locally every minute,
+without an SSH session or GPU allocation. Registration uses `BatchMode=yes` and
+strict host-key checking: establish trusted access to `sdfcron001` beforehand.
+Authentication or preflight failures stop submission before training starts.
+Dry-run describes registration but does not connect or modify crontab.
+
+Preflight verifies the submission interpreter and dependencies on the cron host,
+Slurm/cron utilities, and shared state storage. The cron entry explicitly sets
+Slurm's PATH and uses a nonblocking `flock` so scheduled invocations cannot pile up.
+Each pipeline retains its submission interpreter and selected container/source.
+The selected Python executable (for example `/usr/bin/python3.12`) must exist
+on both interactive and cron hosts; compute workers independently use Python 3.9+.
+
+Account registries and controller logs live under
+`~/.spine-prod/automation/s3df/ACCOUNT/`. Existing cron entries are preserved and
+backed up before changes; installation is verified. Finished or blocked campaigns
+retire their managed timer when no registered pipeline needs monitoring. Missing
+state delays retirement, and explicit recovery operations re-register the timer.
+Inspect the schedule from your interactive node with:
+
+```bash
+ssh -o BatchMode=yes sdfcron001 crontab -l
+```
+
+No manual polling loop is needed on S3DF. Use a fresh workspace for the automated
+smoke test and check both pipeline completion and retirement of its cron entry.
+
+**Polaris still requires an externally hosted periodic invocation.**
+The generated tick script remains available for recovery on every site:
 
 ```bash
 bash /path/to/continuation-dir/.spine-prod/advance.sh

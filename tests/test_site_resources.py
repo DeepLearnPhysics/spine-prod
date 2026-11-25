@@ -143,7 +143,9 @@ def test_dune_nersc_dry_run_preflights_all_training_stages(
     from src.continuation import service
 
     monkeypatch.setattr(
-        service, "service_paths", lambda account: (tmp_path, tmp_path / "registry")
+        service,
+        "service_paths",
+        lambda account, site: (tmp_path, tmp_path / "registry"),
     )
     first_stage = Mock(return_value=[])
     monkeypatch.setattr(mock_submitter, "submit_filter", first_stage)
