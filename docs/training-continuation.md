@@ -212,7 +212,10 @@ This previews the affected stages. Add `--apply` to save the update under the
 controller lock, after writing and verifying a backup beside its manifest.
 Completed stages, checkpoint identities, consumed budgets, existing allocation
 records, and scheduler jobs remain unchanged. Future submissions use the new
-minimum. Current pending Slurm jobs can separately be updated with
+minimum. `--checkpoint-margin 00:02:00` similarly changes the margin for future
+allocations; it does not change a running supervisor's deadline or saved policy.
+For a margin-only update, omit `--cache-dir` to preserve already relocated caches.
+Current pending Slurm jobs can separately be updated with
 `scontrol update JobId=JOB_ID TimeMin=01:00:00`; no cancellation is needed.
 
 Cache relocation is limited to campaigns where **all cache producers are still

@@ -257,6 +257,7 @@ def test_next_resume_keeps_checkpoint_and_uses_updated_minimum(
         path,
         workspace,
         minimum="01:00:00",
+        checkpoint_margin="00:02:00",
         cache_dir="/pscratch/user/cache",
         apply=True,
         context=mock_submitter,
@@ -267,6 +268,49 @@ def test_next_resume_keeps_checkpoint_and_uses_updated_minimum(
     monkeypatch.setattr(mock_submitter, "submit_job", submit)
     controller.advance(path, mock_submitter)
     assert submit.call_args.kwargs["continuation"]["min_time"] == "01:00:00"
+    assert submit.call_args.kwargs["continuation"]["checkpoint_margin"] == "00:02:00"
     assert submit.call_args.kwargs["resume_from"] == "/durable/restart.ckpt"
     assert submit.call_args.kwargs["resume"] is True
     assert read(logical_path)["used_seconds"] == 275239
+
+
+def test_margin_only_cli_preserves_running_state_and_caches(campaign, monkeypatch):
+    path, workspace, original = campaign
+    # Completed trainers must keep their historical policy.
+    original["records"][3]["status"] = "completed"
+    atomic_json(path, original)
+    script = Path(__file__).resolve().parents[2] / "scripts/update_continuation.py"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(script),
+            str(path),
+            "--workspace",
+            str(workspace),
+            "--checkpoint-margin",
+            "00:02:00",
+            "--apply",
+        ],
+    )
+    runpy.run_path(str(script), run_name="__main__")
+    updated = read(path)
+    expected = copy.deepcopy(original["records"])
+    expected[1]["options"]["continuation"]["checkpoint_margin"] = "00:02:00"
+    assert updated["records"] == expected
+    assert updated["configuration_updates"][-1]["checkpoint_margin"] == "00:02:00"
+    assert updated["configuration_updates"][-1]["cache_dir"] is None
+
+
+@pytest.mark.parametrize("margin", ["garbage", "04:00:00"])
+def test_invalid_margin_does_not_change_controller(campaign, mock_submitter, margin):
+    path, workspace, original = campaign
+    with pytest.raises(ValueError):
+        update.update_campaign(
+            path,
+            workspace,
+            checkpoint_margin=margin,
+            apply=True,
+            context=mock_submitter,
+        )
+    assert read(path) == original

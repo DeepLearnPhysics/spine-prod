@@ -15,12 +15,18 @@ def main():
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--min-time")
     parser.add_argument("--cache-dir")
+    parser.add_argument("--checkpoint-margin")
     parser.add_argument(
         "--apply", action="store_true", help="Save changes (default: dry run)"
     )
     args = parser.parse_args()
     update_campaign(
-        args.manifest, args.workspace, args.min_time, args.cache_dir, args.apply
+        args.manifest,
+        args.workspace,
+        args.min_time,
+        args.cache_dir,
+        args.apply,
+        checkpoint_margin=args.checkpoint_margin,
     )
 
 
