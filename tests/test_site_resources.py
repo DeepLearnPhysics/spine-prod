@@ -227,3 +227,40 @@ def test_site_cli_time_preserves_pipeline_budget(mock_submitter, tmp_path, monke
     train = next(s for s in stages if s["name"] == "train_uresnet_deghost")
     assert train["time"] == "06:00:00"
     assert train["continuation"]["runtime_budget"] == "5-00:00:00"
+
+
+@pytest.mark.parametrize("site", ["nersc", "s3df", "alcf"])
+def test_cache_task_target_is_site_specific(
+    catalog, workspace_root, pipeline_path, site
+):
+    definition = PipelineDefinition.load(
+        str(workspace_root / pipeline_path), workspace_override="/tmp/run"
+    )
+    for stage in definition.stages:
+        if stage.get("cache_repository"):
+            mapped = map_stage(catalog, stage, site, {"account": "project"})
+            assert mapped["ntasks"] == (100 if site == "nersc" else stage["ntasks"])
+            assert mapped["time"] == stage["time"]
+            explicit = map_stage(
+                catalog, stage, site, {"account": "project", "ntasks": 12}
+            )
+            assert explicit["ntasks"] == 12
+            grouped = map_stage(
+                catalog, dict(stage, files_per_task=2), site, {"account": "project"}
+            )
+            assert grouped["ntasks"] == stage["ntasks"]
+
+
+@pytest.mark.parametrize(
+    "num_files,expected_tasks", [(30, 30), (100, 100), (150, 75), (1000, 100)]
+)
+def test_cache_target_never_creates_empty_tasks(
+    mock_submitter, num_files, expected_tasks
+):
+    files = [f"input-{index}.root" for index in range(num_files)]
+    per_task = mock_submitter.batch.resolve_files_per_task(num_files, ntasks=100)
+    arrays = mock_submitter.file_handler.chunk_files(files, 1000, per_task)
+    tasks = [task for array in arrays for task in array]
+    assert len(tasks) == expected_tasks
+    assert all(tasks)
+    assert [path for task in tasks for path in task] == files

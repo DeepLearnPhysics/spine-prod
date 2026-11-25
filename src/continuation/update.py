@@ -19,6 +19,7 @@ def update_campaign(
     apply=False,
     context=None,
     checkpoint_margin=None,
+    cache_ntasks=None,
 ):
     """Change future submission options under the controller lock.
 
@@ -32,12 +33,21 @@ def update_campaign(
 
     path = Path(path).expanduser().resolve()
     workspace = Path(workspace).expanduser().resolve()
-    if minimum is None and cache_dir is None and checkpoint_margin is None:
-        raise ValueError("Provide --min-time, --checkpoint-margin, and/or --cache-dir")
+    if (
+        minimum is None
+        and cache_dir is None
+        and checkpoint_margin is None
+        and cache_ntasks is None
+    ):
+        raise ValueError(
+            "Provide --min-time, --checkpoint-margin, --cache-dir, and/or --cache-ntasks"
+        )
     if minimum is not None:
         seconds(minimum)
     if checkpoint_margin is not None:
         seconds(checkpoint_margin)
+    if cache_ntasks is not None and (type(cache_ntasks) is not int or cache_ntasks < 1):
+        raise ValueError("--cache-ntasks must be a positive integer")
     with locked(path):
         original = read(path)
         if original["state"] != "active":
@@ -81,6 +91,20 @@ def update_campaign(
                             "Destination cache repository is not empty: " + str(target)
                         )
                 record["options"] = options
+        if cache_ntasks is not None:
+            producers = [r for r in records if r["options"].get("cache_repository")]
+            if not producers:
+                raise ValueError("No declared cache producers in this campaign")
+            for record in producers:
+                if record["status"] != "waiting":
+                    raise ValueError(
+                        "Cache task updates require all producers to be waiting"
+                    )
+                if record["options"].get("files_per_task") is not None:
+                    raise ValueError(
+                        "Remove the explicit files_per_task policy before changing cache task count"
+                    )
+                record["options"]["ntasks"] = cache_ntasks
         changed = []
         for before, record in zip(original["records"], records):
             options = record["options"]
@@ -128,6 +152,7 @@ def update_campaign(
                 stages=changed,
                 min_time=minimum,
                 checkpoint_margin=checkpoint_margin,
+                cache_ntasks=cache_ntasks,
                 cache_dir=(
                     str(Path(cache_dir).expanduser().resolve()) if cache_dir else None
                 ),

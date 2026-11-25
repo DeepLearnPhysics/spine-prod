@@ -218,6 +218,15 @@ For a margin-only update, omit `--cache-dir` to preserve already relocated cache
 Current pending Slurm jobs can separately be updated with
 `scontrol update JobId=JOB_ID TimeMin=01:00:00`; no cancellation is needed.
 
+Use `--cache-ntasks 100` to change the file-grouping target of existing waiting
+cache stages. This requires all cache producers to be waiting and no explicit
+`files_per_task` policy. It preserves walltimes, cache paths, and training options.
+New pipelines mapped with `--site nersc` default to this target; other sites keep
+the pipeline's cache task counts. The target is configured by the site's
+`cache_ntasks` setting; explicit `files_per_task` policies retain their existing semantics.
+With no `files_per_task`, files are grouped in batches of `ceil(num_files / ntasks)`
+(minimum one), so fewer than 100 files produce one nonempty task per file.
+
 Cache relocation is limited to campaigns where **all cache producers are still
 waiting**, and their old repositories are absent or empty. It rewrites future
 cache outputs and consumer references, while preserving completed filter stages.
