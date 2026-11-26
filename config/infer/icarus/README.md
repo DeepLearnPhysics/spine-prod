@@ -2,24 +2,34 @@
 
 The configurations below have been trained on ICARUS MPV/MPR datasets. This summary is divided by training/validation dataset.
 
-## Data calibration and private trigger input
+## Data calibration and private inputs
 
 The `data` and `transp` modifiers use the public `v10_06_03` calibration
 databases under `$ICARUS_DATA_DIR` (configured to CVMFS by `configure.sh`).
 Submit container jobs with `--cvmfs` to expose these files. These modifiers
 preserve their existing gain and recombination settings.
 
-The trigger CSV is private and is not distributed with this repository or
-on CVMFS. Before submitting with `--apply-mods data`, explicitly provide it:
+The trigger CSV and unblinded-event list are private and are not distributed
+with this repository or on CVMFS. `configure.sh` supplies these S3DF defaults:
+
+```bash
+ICARUS_TRIGGER_FILE=/sdf/data/neutrino/icarus/trigger/trigger_04032026.csv
+ICARUS_UNBLINDING_FILE=/sdf/data/neutrino/icarus/db/blinding/unblinded_event_list_run2_all.txt
+```
+
+Override either path before sourcing `configure.sh` or submitting a job:
 
 ```bash
 export ICARUS_TRIGGER_FILE=/path/to/your/trigger.csv
+export ICARUS_UNBLINDING_FILE=/path/to/your/unblinded_event_list.txt
 ```
 
-The file must be readable on the compute node and mounted inside the container.
-There is no default trigger file or automatic download. With Singularity or
+The `data` modifier uses the trigger file; `unblind` uses the event list.
+Select files appropriate to the sample and run period. Explicit overrides
+are preserved when `configure.sh` is sourced again. Each file must be readable
+on the compute node and mounted inside the container. With Singularity or
 Apptainer, add its directory to `--bind-paths` if it is outside the standard
-site mounts.
+site mounts. No private files are downloaded automatically.
 
 ## Directory Structure
 

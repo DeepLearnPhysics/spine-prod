@@ -67,6 +67,10 @@ if [[ -z $ICARUS_DATA_DIR ]]; then
     export ICARUS_DATA_DIR=/cvmfs/icarus.opensciencegrid.org/products/icarus/icarus_data
 fi
 
+# Private ICARUS inputs: use the shared S3DF copies unless explicitly overridden.
+export ICARUS_TRIGGER_FILE="${ICARUS_TRIGGER_FILE:-/sdf/data/neutrino/icarus/trigger/trigger_04032026.csv}"
+export ICARUS_UNBLINDING_FILE="${ICARUS_UNBLINDING_FILE:-/sdf/data/neutrino/icarus/db/blinding/unblinded_event_list_run2_all.txt}"
+
 # If SBND_DATA_DIR is not set, default to the standard location on CVMFS.
 if [[ -z $SBND_DATA_DIR ]]; then
     export SBND_DATA_DIR=/cvmfs/sbnd.opensciencegrid.org/products/sbnd/sbnd_data/
