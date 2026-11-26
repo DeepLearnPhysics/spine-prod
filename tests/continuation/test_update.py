@@ -359,3 +359,48 @@ def test_cache_task_update_rejects_unsafe_cases(campaign, mock_submitter, mode):
             path, workspace, cache_ntasks=count, apply=True, context=mock_submitter
         )
     assert read(path) == original
+
+
+def test_cache_walltime_cli_preserves_training_and_grouping(campaign, monkeypatch):
+    path, workspace, original = campaign
+    original["records"][2]["options"].update(ntasks=100, time="08:00:00")
+    atomic_json(path, original)
+    script = Path(__file__).resolve().parents[2] / "scripts/update_continuation.py"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(script),
+            str(path),
+            "--workspace",
+            str(workspace),
+            "--cache-time",
+            "02:00:00",
+            "--apply",
+        ],
+    )
+    runpy.run_path(str(script), run_name="__main__")
+    expected = copy.deepcopy(original["records"])
+    expected[2]["options"]["time"] = "02:00:00"
+    assert read(path)["records"] == expected
+    assert read(path)["configuration_updates"][-1]["cache_time"] == "02:00:00"
+
+
+@pytest.mark.parametrize("mode", ["invalid", "overlimit", "started", "missing"])
+def test_cache_time_rejects_invalid_updates(campaign, mock_submitter, mode):
+    path, workspace, original = campaign
+    time = "02:00:00"
+    if mode == "invalid":
+        time = "zero"
+    elif mode == "overlimit":
+        time = "49:00:00"
+    elif mode == "started":
+        original["records"][2]["status"] = "submitted"
+    else:
+        del original["records"][2]["options"]["cache_repository"]
+    atomic_json(path, original)
+    with pytest.raises(ValueError):
+        update.update_campaign(
+            path, workspace, cache_time=time, apply=True, context=mock_submitter
+        )
+    assert read(path) == original

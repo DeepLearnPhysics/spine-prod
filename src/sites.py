@@ -123,6 +123,13 @@ def map_stage(catalog, stage, site, overrides=None):
         and "cache_ntasks" in sites[site]
     ):
         result["ntasks"] = sites[site]["cache_ntasks"]
+    if (
+        result.get("cache_repository")
+        and result.get("files_per_task") is None
+        and "time" not in overrides
+        and "cache_time" in sites[site]
+    ):
+        result["time"] = sites[site]["cache_time"]
     target = profiles[result["profile"]]
     if target["site"] != site:
         raise ValueError(
