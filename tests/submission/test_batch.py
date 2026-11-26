@@ -1999,7 +1999,7 @@ SPINE_CONTAINER_PATH=/unused.sif
         assert "export SPINE_CACHE_PUBLICATION_ID=attempt-id" in script
         assert (
             f"spine-cache begin {repository} segmentation "
-            '--publication-id \\"\\$SPINE_CACHE_PUBLICATION_ID\\"'
+            "--publication-id attempt-id || exit 1;"
         ) in script
         assert "--set io.writer.parallel=true" in script
         assert "--set io.writer.expected_sources=2" in script
