@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..pipeline.fields import PROFILE_FIELDS
 from ..pipeline.storage import validate_cache_storage, working_stages
+from ..sites import validate_allocation
 from .policy import profile_policy, seconds
 from .state import atomic_json, locked, read
 
@@ -20,6 +21,7 @@ def update_campaign(
     context=None,
     checkpoint_margin=None,
     cache_ntasks=None,
+    cache_time=None,
 ):
     """Change future submission options under the controller lock.
 
@@ -38,14 +40,17 @@ def update_campaign(
         and cache_dir is None
         and checkpoint_margin is None
         and cache_ntasks is None
+        and cache_time is None
     ):
         raise ValueError(
-            "Provide --min-time, --checkpoint-margin, --cache-dir, and/or --cache-ntasks"
+            "Provide --min-time, --checkpoint-margin, --cache-dir, --cache-ntasks, and/or --cache-time"
         )
     if minimum is not None:
         seconds(minimum)
     if checkpoint_margin is not None:
         seconds(checkpoint_margin)
+    if cache_time is not None:
+        seconds(cache_time)
     if cache_ntasks is not None and (type(cache_ntasks) is not int or cache_ntasks < 1):
         raise ValueError("--cache-ntasks must be a positive integer")
     with locked(path):
@@ -91,20 +96,26 @@ def update_campaign(
                             "Destination cache repository is not empty: " + str(target)
                         )
                 record["options"] = options
-        if cache_ntasks is not None:
+        if cache_ntasks is not None or cache_time is not None:
             producers = [r for r in records if r["options"].get("cache_repository")]
             if not producers:
                 raise ValueError("No declared cache producers in this campaign")
             for record in producers:
                 if record["status"] != "waiting":
                     raise ValueError(
-                        "Cache task updates require all producers to be waiting"
+                        "Cache allocation updates require all producers to be waiting"
                     )
-                if record["options"].get("files_per_task") is not None:
+                if (
+                    cache_ntasks is not None
+                    and record["options"].get("files_per_task") is not None
+                ):
                     raise ValueError(
                         "Remove the explicit files_per_task policy before changing cache task count"
                     )
-                record["options"]["ntasks"] = cache_ntasks
+                if cache_ntasks is not None:
+                    record["options"]["ntasks"] = cache_ntasks
+                if cache_time is not None:
+                    record["options"]["time"] = cache_time
         changed = []
         for before, record in zip(original["records"], records):
             options = record["options"]
@@ -126,6 +137,8 @@ def update_campaign(
             )
             if options.get("continuation") is not None:
                 profile_policy(context.profiles, profile, options["continuation"])
+            if cache_time is not None and options.get("cache_repository"):
+                validate_allocation(context.profiles, profile)
             # Completed filter caches remain in their original location.
             if cache_dir is not None and record["status"] == "waiting":
                 validate_cache_storage(options, profile.get("site"))
@@ -153,6 +166,7 @@ def update_campaign(
                 min_time=minimum,
                 checkpoint_margin=checkpoint_margin,
                 cache_ntasks=cache_ntasks,
+                cache_time=cache_time,
                 cache_dir=(
                     str(Path(cache_dir).expanduser().resolve()) if cache_dir else None
                 ),

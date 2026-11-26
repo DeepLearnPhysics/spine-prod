@@ -17,6 +17,7 @@ def main():
     parser.add_argument("--cache-dir")
     parser.add_argument("--checkpoint-margin")
     parser.add_argument("--cache-ntasks", type=int)
+    parser.add_argument("--cache-time")
     parser.add_argument(
         "--apply", action="store_true", help="Save changes (default: dry run)"
     )
@@ -29,6 +30,7 @@ def main():
         args.apply,
         checkpoint_margin=args.checkpoint_margin,
         cache_ntasks=args.cache_ntasks,
+        cache_time=args.cache_time,
     )
 
 

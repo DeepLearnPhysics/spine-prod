@@ -242,7 +242,7 @@ def test_cache_task_target_is_site_specific(
         if stage.get("cache_repository"):
             mapped = map_stage(catalog, stage, site, {"account": "project"})
             assert mapped["ntasks"] == (100 if site == "nersc" else stage["ntasks"])
-            assert mapped["time"] == stage["time"]
+            assert mapped["time"] == ("02:00:00" if site == "nersc" else stage["time"])
             explicit = map_stage(
                 catalog, stage, site, {"account": "project", "ntasks": 12}
             )
@@ -251,6 +251,11 @@ def test_cache_task_target_is_site_specific(
                 catalog, dict(stage, files_per_task=2), site, {"account": "project"}
             )
             assert grouped["ntasks"] == stage["ntasks"]
+            assert grouped["time"] == stage["time"]
+            timed = map_stage(
+                catalog, stage, site, {"account": "project", "time": "03:00:00"}
+            )
+            assert timed["time"] == "03:00:00"
 
 
 @pytest.mark.parametrize(

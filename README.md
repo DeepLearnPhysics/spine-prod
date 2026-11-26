@@ -736,7 +736,9 @@ are bounded by the destination queue's hard limit; the total budget is preserved
 CLI `--time` overrides only the allocation ceiling, not the inherited budget.
 Site-level `continuation_defaults` supply chunk preferences, bounded by each stage's allocation ceiling. Explicit CLI `--time`
 and stage continuation preferences are validated rather than silently shortened.
-Non-continuation stages retain their requested time and fail if it exceeds limits.
+NERSC cache stages default to up to 100 tasks with two-hour requests, unless
+explicit file grouping or a launch walltime override is supplied. Other
+non-continuation stages retain their requested time and fail if it exceeds limits.
 
 The HD 261022 and VD 261117 candidates use this default for all six training stages.
 Without `--site`, ordinary submission semantics remain unchanged unless continuation

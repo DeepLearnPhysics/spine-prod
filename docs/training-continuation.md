@@ -79,7 +79,8 @@ preferences shrink to fit shorter stage ceilings. Explicit CLI `--time` and
 stage chunk preferences are validated as supplied, so invalid requests fail.
 NERSC defaults to a 1–24-hour request range, with a two-minute checkpoint margin
 and five-minute startup allowance. This is a starting policy, not a measured
-optimum. Non-continuation stages are never automatically shortened.
+optimum. Cache stages have a separate site allocation policy described below;
+other non-continuation stages retain their requested time.
 PBS shrink-to-fit additionally requires `allow_pbs_shrink_to_fit: true` and local
 queue validation; fixed-duration PBS allocations do not require this flag.
 
@@ -253,9 +254,16 @@ Current pending Slurm jobs can separately be updated with
 Use `--cache-ntasks 100` to change the file-grouping target of existing waiting
 cache stages. This requires all cache producers to be waiting and no explicit
 `files_per_task` policy. It preserves walltimes, cache paths, and training options.
+Use `--cache-time 02:00:00` to change the fixed walltime for waiting cache jobs;
+this also requires all producers to be waiting and validates site allocation limits.
+It can be combined with `--cache-ntasks`, or used alone without changing grouping.
 New pipelines mapped with `--site nersc` default to this target; other sites keep
 the pipeline's cache task counts. The target is configured by the site's
-`cache_ntasks` setting; explicit `files_per_task` policies retain their existing semantics.
+`cache_ntasks` setting. NERSC also defaults cache jobs to a fixed two-hour request
+(`cache_time`), a provisional budget pending measured runtimes. Explicit launch
+walltime overrides take precedence. Explicit `files_per_task` policies retain their
+existing grouping and walltime semantics. These defaults apply to cache producers,
+not training, filtering, evaluation, or reporting.
 With no `files_per_task`, files are grouped in batches of `ceil(num_files / ntasks)`
 (minimum one), so fewer than 100 files produce one nonempty task per file.
 

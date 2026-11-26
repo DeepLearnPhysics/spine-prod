@@ -425,6 +425,7 @@ sites:
   nersc:
     queue_field: qos
     cache_ntasks: 100
+    cache_time: "02:00:00"
     # Starting scheduling policy, not an empirically established optimum.
     # Slurm may grant 1..24h; shorter stage ceilings bound these defaults.
     continuation_defaults:
