@@ -17,6 +17,7 @@ def main():
             "status",
             "extend",
             "accept",
+            "accept-best",
             "cancel",
             "adopt",
             "retry",

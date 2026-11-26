@@ -264,6 +264,7 @@ python3 scripts/continue_training.py metrics MANIFEST > allocations.csv
 python3 scripts/continue_training.py extend MANIFEST --stage train --value 168:00:00
 python3 scripts/continue_training.py retry MANIFEST --stage train
 python3 scripts/continue_training.py accept MANIFEST --stage train
+python3 scripts/continue_training.py accept-best MANIFEST --stage train
 python3 scripts/continue_training.py adopt MANIFEST --stage train --value JOB_ID
 python3 scripts/continue_training.py cancel MANIFEST
 python3 scripts/continue_training.py preflight STATE_DIRECTORY --site nersc
@@ -273,6 +274,11 @@ python3 scripts/continue_training.py preflight STATE_DIRECTORY --site nersc
 - `retry` requires a confirmed failed allocation and a checksum-valid checkpoint.
 - `accept` explicitly releases consumers using an inactive, verified result; it
   does not invent a best checkpoint if validation has never produced one.
+- `accept-best` explicitly ends an accounted failed, paused, or budget-exhausted
+  stage using a checksum-verified `weights/snapshot-best.ckpt`. It preserves the
+  attempt history and records the accepted artifact separately. Consumers must
+  already reference that best checkpoint (as the staged detector pipelines do).
+  No training allocation or sampler-state restore is needed.
 - `adopt` resolves a lost submission response after verifying the job-name token.
 - `cancel` durably inhibits future submissions before cancelling known jobs.
 - `metrics` exports allocation timing, progress, and checkpoint latency.
