@@ -145,7 +145,7 @@ INNER_CMD="$INNER_CMD export PYTHONNOUSERSITE=1; "
 INNER_CMD="$INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {% if continuation_attempt %}--require-continuation {% endif %}{{ spine_cmd|default('spine', true) }} || exit \$?; "
 {% if cache_repository %}
 # Register the shared publication fence after scheduler dependencies clear.
-INNER_CMD="${INNER_CMD}export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id_shell }}; {{ cache_begin_cmd }} begin {{ cache_repository_shell }} {{ cache_stage_shell }} --publication-id \"\$SPINE_CACHE_PUBLICATION_ID\"; "
+INNER_CMD="${INNER_CMD}export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id_shell }}; {{ cache_begin_cmd }} begin {{ cache_repository_shell }} {{ cache_stage_shell }} --publication-id {{ cache_publication_id_shell }} || exit 1; "
 {% endif %}
 {% if custom_command %}
 INNER_CMD="${INNER_CMD}exec {{ custom_command }}"
