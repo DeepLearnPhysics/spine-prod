@@ -1117,3 +1117,64 @@ def test_retry_cache_requires_inactive_failed_jobs(tmp_path, monkeypatch, mode):
     assert updated["retry_history"][0]["previous_time"] == "08:00:00"
     assert result["records"][1] == downstream
     assert result["generation"] == 5
+
+
+def test_cache_retry_submits_new_attempt_in_existing_directory(
+    tmp_path, mock_submitter, monkeypatch
+):
+    run = tmp_path / "cache-run"
+    source = tmp_path / "source.root"
+    source.touch()
+    options = dict(
+        config="cache/generic/uresnet_ppn/segmentation_240805.yaml",
+        profile="s3df_ampere",
+        files=[str(source)],
+        output=str(tmp_path / "data.spine-cache"),
+        run_dir=str(run),
+        cache_repository=str(tmp_path / "data.spine-cache"),
+        cache_stage="segmentation",
+        files_per_task=1,
+        time="02:00:00",
+    )
+    monkeypatch.setattr(
+        mock_submitter.batch, "get_batch_client", lambda *_: mock_submitter.batch_client
+    )
+    jobs = iter(["old-job", "new-job"])
+    monkeypatch.setattr(mock_submitter.batch_client, "submit", lambda *_: next(jobs))
+    assert mock_submitter.submit_job(**options) == ["old-job"]
+    old_attempt = (run / "latest").resolve()
+    old_metadata = (old_attempt / "job_metadata.json").read_bytes()
+    path = tmp_path / "pipeline.json"
+    storage.atomic_json(
+        path,
+        dict(
+            state="active",
+            generation=0,
+            records=[
+                dict(
+                    name="cache",
+                    kind="spine",
+                    status="failed",
+                    scheduler="slurm",
+                    jobs=["old-job"],
+                    options=options,
+                )
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "accounting",
+        lambda *_: dict(success=False, seconds=500, status="FAILED"),
+    )
+    pipeline.operate(path, "retry-cache", "cache", "00:30:00")
+    assert pipeline.advance(path, mock_submitter) == {"cache": ["new-job"]}
+    new_attempt = (run / "latest").resolve()
+    assert new_attempt != old_attempt
+    assert (old_attempt / "job_metadata.json").read_bytes() == old_metadata
+    old = json.loads(old_metadata)
+    new = json.loads((new_attempt / "job_metadata.json").read_text())
+    assert new["cache_publication_id"] != old["cache_publication_id"]
+    record = storage.read(path)["records"][0]
+    assert record["status"] == "submitted"
+    assert record["retry_history"][0]["jobs"] == ["old-job"]
