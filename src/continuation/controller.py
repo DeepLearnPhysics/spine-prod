@@ -305,7 +305,7 @@ def advance(path, context=None):
 
 def operate(path, action, stage=None, value=None):
     """Rearm automatic hosting before changing a blocked pipeline's state."""
-    if action in ("extend", "retry", "accept", "accept-best", "adopt"):
+    if action in ("extend", "retry", "retry-cache", "accept", "accept-best", "adopt"):
         from .service import reactivating
 
         with reactivating(read(path)):
@@ -328,6 +328,51 @@ def _operate(path, action, stage=None, value=None):
             atomic_json(path, state)  # Inhibit submissions even if qdel fails.
         for record in records:
             options = record["options"]
+            if action == "retry-cache":
+                if (
+                    state["state"] != "active"
+                    or not options.get("cache_repository")
+                    or options.get("continuation") is not None
+                    or record["status"] not in ("submitted", "failed")
+                    or not record.get("jobs")
+                ):
+                    raise ValueError(
+                        "Retry-cache requires a failed cache stage in an active pipeline"
+                    )
+                if any(
+                    r["status"] != "waiting"
+                    for r in state["records"][state["records"].index(record) + 1 :]
+                ):
+                    raise ValueError(
+                        "Retry-cache requires downstream stages to be waiting"
+                    )
+                results = [
+                    accounting(record["scheduler"], job) for job in record["jobs"]
+                ]
+                if any(result is None for result in results) or all(
+                    result["success"] for result in results
+                ):
+                    raise ValueError(
+                        "Retry-cache requires confirmed terminal failure accounting"
+                    )
+                requested_time = (
+                    duration(seconds(value))
+                    if value is not None
+                    else options.get("time")
+                )
+                record.setdefault("retry_history", []).append(
+                    {
+                        "jobs": list(record["jobs"]),
+                        "accounting": results,
+                        "previous_status": record["status"],
+                        "previous_time": options.get("time"),
+                        "requested_at": time.time(),
+                    }
+                )
+                if requested_time is not None:
+                    options["time"] = requested_time
+                record.update(status="waiting", jobs=[])
+                continue
             run_path = (
                 manifest_path(options["run_dir"], options.get("continuation_dir"))
                 if options.get("continuation") is not None

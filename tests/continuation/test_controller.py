@@ -1047,3 +1047,73 @@ def test_accept_best_after_failure_preserves_history(
     assert result["attempts"] == logical["attempts"]
     assert result["used_seconds"] == logical["used_seconds"]
     assert result.get("checkpoint") == logical.get("checkpoint")
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "failed",
+        "submitted",
+        "live",
+        "success",
+        "cancelled",
+        "downstream",
+        "training",
+        "bad_time",
+        "no_jobs",
+    ],
+)
+def test_retry_cache_requires_inactive_failed_jobs(tmp_path, monkeypatch, mode):
+    record = {
+        "name": "cache",
+        "kind": "spine",
+        "status": "failed",
+        "scheduler": "slurm",
+        "jobs": ["11", "12"],
+        "options": {
+            "run_dir": str(tmp_path / "cache"),
+            "cache_repository": str(tmp_path / "data"),
+            "time": "08:00:00",
+        },
+    }
+    downstream = {"name": "next", "status": "waiting"}
+    state = {"state": "active", "generation": 4, "records": [record, downstream]}
+    if mode == "submitted":
+        record["status"] = "submitted"
+    elif mode == "cancelled":
+        state["state"] = "cancelled"
+    elif mode == "downstream":
+        downstream["status"] = "submitted"
+    elif mode == "training":
+        record["options"]["continuation"] = {}
+    elif mode == "no_jobs":
+        record["jobs"] = []
+    path = tmp_path / "pipeline.json"
+    storage.atomic_json(path, state)
+
+    def accounting(_, job):
+        if mode == "live" and job == "12":
+            return None
+        return {"success": mode == "success", "status": "FAILED", "seconds": 600}
+
+    monkeypatch.setattr(pipeline, "accounting", accounting)
+    if mode not in ("failed", "submitted"):
+        with pytest.raises(ValueError):
+            pipeline.operate(
+                path,
+                "retry-cache",
+                "cache",
+                "bad" if mode == "bad_time" else "00:30:00",
+            )
+        assert storage.read(path) == state
+        return
+    pipeline.operate(path, "retry-cache", "cache", "00:30:00")
+    result = storage.read(path)
+    updated = result["records"][0]
+    assert updated["status"] == "waiting"
+    assert updated["jobs"] == []
+    assert updated["options"]["time"] == "00:30:00"
+    assert updated["retry_history"][0]["jobs"] == ["11", "12"]
+    assert updated["retry_history"][0]["previous_time"] == "08:00:00"
+    assert result["records"][1] == downstream
+    assert result["generation"] == 5

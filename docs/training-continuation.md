@@ -263,6 +263,7 @@ python3 scripts/continue_training.py advance MANIFEST
 python3 scripts/continue_training.py metrics MANIFEST > allocations.csv
 python3 scripts/continue_training.py extend MANIFEST --stage train --value 168:00:00
 python3 scripts/continue_training.py retry MANIFEST --stage train
+python3 scripts/continue_training.py retry-cache MANIFEST --stage cache_train_deghosting --value 00:30:00
 python3 scripts/continue_training.py accept MANIFEST --stage train
 python3 scripts/continue_training.py accept-best MANIFEST --stage train
 python3 scripts/continue_training.py adopt MANIFEST --stage train --value JOB_ID
@@ -272,6 +273,11 @@ python3 scripts/continue_training.py preflight STATE_DIRECTORY --site nersc
 
 - `extend` sets a larger **total** budget without changing scientific configuration.
 - `retry` requires a confirmed failed allocation and a checksum-valid checkpoint.
+- `retry-cache` rearms a failed cache stage only after all its scheduler jobs
+  have terminal accounting and every downstream stage is still waiting. It
+  preserves failed job IDs/accounting in `retry_history`; the next tick creates
+  a new attempt and publication ID. Optional `--value` changes this stage's
+  walltime only. It reruns inference; it does not adopt unpublished shards.
 - `accept` explicitly releases consumers using an inactive, verified result; it
   does not invent a best checkpoint if validation has never produced one.
 - `accept-best` explicitly ends an accounted failed, paused, or budget-exhausted
