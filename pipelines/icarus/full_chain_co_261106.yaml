@@ -28,6 +28,8 @@ collections:
 
 defaults:
   profile: s3df_ampere
+  # Calibration databases are provided by ICARUS_DATA_DIR on CVMFS.
+  cvmfs: true
   time: "08:00:00"
 
 stages:
