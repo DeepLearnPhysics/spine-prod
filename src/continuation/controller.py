@@ -305,7 +305,7 @@ def advance(path, context=None):
 
 def operate(path, action, stage=None, value=None):
     """Rearm automatic hosting before changing a blocked pipeline's state."""
-    if action in ("extend", "retry", "accept", "adopt"):
+    if action in ("extend", "retry", "accept", "accept-best", "adopt"):
         from .service import reactivating
 
         with reactivating(read(path)):
@@ -368,6 +368,39 @@ def _operate(path, action, stage=None, value=None):
                     ):
                         raise ValueError("Checkpoint changed")
                     logical.update(state="completed", reason="user_accepted")
+                elif action == "accept-best":
+                    if logical["state"] not in (
+                        "failed",
+                        "paused",
+                        "budget_exhausted",
+                    ) or not attempt.get("accounted"):
+                        raise ValueError(
+                            "Accept-best requires an accounted, inactive stage"
+                        )
+                    weights = (Path(options["run_dir"]) / "weights").resolve()
+                    best = weights / "snapshot-best.ckpt"
+                    if best.resolve().parent != weights:
+                        raise ValueError(
+                            "Best checkpoint is outside the weights directory"
+                        )
+                    digest = RunManager.checkpoint_digest(best)
+                    if not digest:
+                        raise ValueError(
+                            "Accept-best requires a checksum-verified best checkpoint"
+                        )
+                    # Keep the failed attempt and last resume cursor as history.
+                    # Consumers use their configured best weights, never this
+                    # checkpoint's potentially damaged training sampler state.
+                    logical.update(
+                        state="completed",
+                        reason="user_accepted_best",
+                        accepted_result={
+                            "checkpoint": str(best),
+                            "sha256": digest,
+                            "previous_state": logical["state"],
+                            "accepted_at": time.time(),
+                        },
+                    )
                 elif action == "cancel":
                     logical.update(state="cancelled", reason="user_cancelled")
                 elif action == "retry":

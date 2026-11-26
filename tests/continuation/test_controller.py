@@ -979,3 +979,71 @@ def test_finishing_pending_validation_counts_as_progress_once(tmp_path, monkeypa
     assert pipeline.reconcile(tmp_path)["state"] == "paused"
     allocation(tmp_path, 3, iteration=10)
     assert pipeline.reconcile(tmp_path)["state"] == "failed"
+
+
+@pytest.mark.parametrize(
+    "state,accounted,best_status,accepted",
+    [
+        ("failed", True, "valid", True),
+        ("paused", True, "valid", True),
+        ("budget_exhausted", True, "valid", True),
+        ("running", False, "valid", False),
+        ("pending", False, "valid", False),
+        ("failed", False, "valid", False),
+        ("cancelled", True, "valid", False),
+        ("failed", True, "missing", False),
+        ("failed", True, "unsigned", False),
+        ("failed", True, "changed", False),
+        ("failed", True, "outside", False),
+    ],
+)
+def test_accept_best_after_failure_preserves_history(
+    tmp_path, state, accounted, best_status, accepted
+):
+    run = tmp_path / "train"
+    allocation(run, 1)
+    manifest = storage.manifest_path(run)
+    logical = storage.read(manifest)
+    logical["state"] = state
+    logical["attempts"][-1]["accounted"] = accounted
+    storage.atomic_json(manifest, logical)
+    best, _ = checkpoint(run, "best")
+    if best_status == "missing":
+        best.unlink()
+    elif best_status == "unsigned":
+        Path(str(best) + ".sha256").unlink()
+    elif best_status == "changed":
+        best.write_bytes(b"corrupted")
+    elif best_status == "outside":
+        outside = tmp_path / "outside.ckpt"
+        best.rename(outside)
+        best.symlink_to(outside)
+    path = tmp_path / "pipeline.json"
+    storage.atomic_json(
+        path,
+        {
+            "state": "active",
+            "generation": 0,
+            "records": [
+                {
+                    "name": "train",
+                    "options": {"run_dir": str(run), "continuation": {}},
+                    "jobs": ["1"],
+                }
+            ],
+        },
+    )
+    if not accepted:
+        with pytest.raises((ValueError, FileNotFoundError)):
+            pipeline.operate(path, "accept-best", "train")
+        assert storage.read(manifest) == logical
+        return
+    pipeline.operate(path, "accept-best", "train")
+    result = storage.read(manifest)
+    assert result["state"] == "completed"
+    assert result["reason"] == "user_accepted_best"
+    assert result["accepted_result"]["checkpoint"] == str(best)
+    assert result["accepted_result"]["previous_state"] == state
+    assert result["attempts"] == logical["attempts"]
+    assert result["used_seconds"] == logical["used_seconds"]
+    assert result.get("checkpoint") == logical.get("checkpoint")
