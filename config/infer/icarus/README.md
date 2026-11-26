@@ -2,6 +2,25 @@
 
 The configurations below have been trained on ICARUS MPV/MPR datasets. This summary is divided by training/validation dataset.
 
+## Data calibration and private trigger input
+
+The `data` and `transp` modifiers use the public `v10_06_03` calibration
+databases under `$ICARUS_DATA_DIR` (configured to CVMFS by `configure.sh`).
+Submit container jobs with `--cvmfs` to expose these files. These modifiers
+preserve their existing gain and recombination settings.
+
+The trigger CSV is private and is not distributed with this repository or
+on CVMFS. Before submitting with `--apply-mods data`, explicitly provide it:
+
+```bash
+export ICARUS_TRIGGER_FILE=/path/to/your/trigger.csv
+```
+
+The file must be readable on the compute node and mounted inside the container.
+There is no default trigger file or automatic download. With Singularity or
+Apptainer, add its directory to `--bind-paths` if it is outside the standard
+site mounts.
+
 ## Directory Structure
 
 The ICARUS configurations now follow a modular structure where each full chain configuration is built from reusable components:

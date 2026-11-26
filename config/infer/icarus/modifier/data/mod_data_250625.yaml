@@ -26,7 +26,7 @@ override:
         before: calo_ke
         value:
           name: trigger
-          file_path: /sdf/data/neutrino/icarus/trigger/trigger_04032026.csv
+          file_path: $ICARUS_TRIGGER_FILE
           flash_keys:
             - flashes
           correct_flash_times: true
@@ -75,7 +75,7 @@ override:
       efield: 0.4938 # kV/cm
       mip_dedx: 2.105168 # MeV/cm
     lifetime:
-      lifetime_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_elifetime_data.db
-      driftv_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_edriftvelocity_data.db
+      lifetime_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_elifetime_data.db
+      driftv_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_edriftvelocity_data.db
     transparency:
-      transparency_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_yz_correction_data.db
+      transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db

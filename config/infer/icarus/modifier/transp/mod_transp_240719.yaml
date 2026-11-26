@@ -18,4 +18,4 @@ override:
         changes:
           transparency:
             run_id: 9435
-            transparency_db: /sdf/data/neutrino/icarus/db/v09_84_01/tpc_yz_correction_data.db
+            transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
