@@ -371,6 +371,7 @@ def _operate(path, action, stage=None, value=None):
                 )
                 if requested_time is not None:
                     options["time"] = requested_time
+                options["retry"] = True
                 record.update(status="waiting", jobs=[])
                 continue
             run_path = (
