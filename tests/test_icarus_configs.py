@@ -17,6 +17,7 @@ BASELINE = json.loads(
     (ROOT / "tests/fixtures/icarus_inference_baseline.json").read_text()
 )
 REVISIONS = [name.removeprefix("full_chain_") for name in BASELINE]
+V05_REVISIONS = ("co_260306", "co_260410", "co_260501", "co_261106")
 COMPONENTS = (
     "uresnet_deghost",
     "uresnet_ppn",
@@ -32,6 +33,7 @@ def environment(monkeypatch):
     monkeypatch.setenv("SPINE_CONFIG_PATH", str(CONFIG))
     monkeypatch.setenv("SPINE_PROD_BASEDIR", str(ROOT))
     monkeypatch.setenv("ICARUS_DATA_DIR", "/test/icarus-data")
+    monkeypatch.setenv("ICARUS_TRAINING_CALIB_DIR", "/test/icarus-training/v05")
 
 
 def load(path):
@@ -71,7 +73,13 @@ def test_historical_model_and_cache_parity(revision):
     )
     assert exported["model"]["weight_path"] is None
     assert evaluation["model"]["weight_path"] is None
-    assert exported["model"]["modules"] == evaluation["model"]["modules"] == modules
+    assert exported["model"]["modules"] == modules
+    expected_evaluation = copy.deepcopy(modules)
+    if revision in V05_REVISIONS:
+        expected_evaluation["calibration"] = load(
+            "train/icarus/calibration/mpvmpr_v05.yaml"
+        )
+    assert evaluation["model"]["modules"] == expected_evaluation
     assert exported["geo"] == evaluation["geo"] == released["geo"]
     for name, keys in {
         "cache_train_deghosting": ["uresnet_deghost"],
@@ -99,7 +107,9 @@ def test_historical_model_and_cache_parity(revision):
     chain = deghost["model"]["modules"]["chain"]["stages"]
     assert chain[0]["config"] == modules["chain"]["stages"][0]["config"]
     assert chain[1]["config"]["calibration"] == (
-        modules.get("calibration") or {"stages": []}
+        load("train/icarus/calibration/mpvmpr_v05.yaml")
+        if revision in V05_REVISIONS
+        else modules.get("calibration") or {"stages": []}
     )
     expected_data = copy.deepcopy(released["io"]["loader"]["dataset"]["schema"]["data"])
     expected_data["sparse_event_list"] = [
@@ -460,3 +470,27 @@ def test_full_detector_filter_remains_available():
     cfg = load("filter/icarus/space_points_co_261106.yaml")
     assert "sparse3d_reco_cryoW" in cfg["measurements"]
     assert "sparse3d_reco_cryoW" in cfg["filters"]
+
+
+@pytest.mark.parametrize("revision", V05_REVISIONS)
+def test_v05_calibration_is_shared_by_training_splits_and_evaluation(revision):
+    stages = {s["name"]: s for s in pipeline(revision).stages}
+    expected = load("train/icarus/calibration/mpvmpr_v05.yaml")
+    for name in ("cache_train_deghosting", "cache_validation_deghosting"):
+        stage = stages[name]
+        assert stage["cvmfs"]
+        chain = load(stage["config"])["model"]["modules"]["chain"]["stages"]
+        assert chain[1]["config"]["calibration"] == expected
+    evaluation = load(stages["evaluate_full_chain"]["config"])
+    assert evaluation["model"]["modules"]["calibration"] == expected
+    assert expected["gain"] == {
+        "gain_db": "/test/icarus-training/v05/tpc_gain2_data.db"
+    }
+    assert expected["lifetime"] == {
+        "lifetime_db": "/test/icarus-training/v05/tpc_elifetime_data.db",
+        "driftv": 0.157565,
+    }
+    assert expected["transparency"]["run_id"] == 9435
+    assert expected["transparency"]["transparency_db"].startswith("/test/icarus-data/")
+    assert "run_id" not in expected["gain"]
+    assert "run_id" not in expected["lifetime"]

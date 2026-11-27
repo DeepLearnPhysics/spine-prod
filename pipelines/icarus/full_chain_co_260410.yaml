@@ -27,6 +27,7 @@ collections:
       filtered_source_list: ${workspace}/filter/validation/accepted_files.txt
 
 defaults:
+  cvmfs: true
   profile: s3df_ampere
   time: "08:00:00"
 

@@ -23,5 +23,5 @@ override:
     - name: calibration
       config:
         mode: apply
-        calibration: !include "model/icarus/calibration/calibration_co_260410.yaml"
+        calibration: !include "train/icarus/calibration/mpvmpr_v05.yaml"
   io.loader.num_workers: 8

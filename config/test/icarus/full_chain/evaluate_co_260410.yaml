@@ -11,6 +11,7 @@ include:
   - test/common/full_chain/analyzers_v1.yaml
   - train/icarus/modifier/single/io_single_sources.yaml
 override:
+  model.modules.calibration: !include "train/icarus/calibration/mpvmpr_v05.yaml"
   io.loader.dataset.schema.charge_label:
     provider: sparse3d
     sparse_event: sparse3d_reco_cryoE_rescaled

@@ -1,0 +1,20 @@
+__meta__:
+  kind: fragment
+  description: ICARUS MPV/MPR v05 training calibration
+# v05 mixes central-value and detector-variation simulation. Read its gain,
+# lifetime using each event's run, not the overlay data DBs. Drift velocity is fixed.
+# Point ICARUS_TRAINING_CALIB_DIR to a versioned directory containing these
+# filenames (symlinks to the production DBs are fine). No site-specific fallback.
+gain:
+  gain_db: $ICARUS_TRAINING_CALIB_DIR/tpc_gain2_data.db
+recombination:
+  model: mbox
+  efield: 0.4938
+  mip_dedx: 2.105168
+lifetime:
+  lifetime_db: $ICARUS_TRAINING_CALIB_DIR/tpc_elifetime_data.db
+  driftv: 0.157565 # cm/us
+transparency:
+  # Same public map source as data; historical training reference run.
+  transparency_db: $ICARUS_DATA_DIR/v10_06_03/icarus_data/database/tpc_yz_correction_data.db
+  run_id: 9435

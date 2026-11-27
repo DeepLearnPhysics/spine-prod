@@ -681,8 +681,8 @@ inference bundles and the original two-cryostat filter configs remain available.
 one additional candidate, `full_chain_co_261106.yaml`. The candidate incorporates
 current overlap-aware interaction targets, explicit orientation supervision,
 training-aligned reports, best-checkpoint export, and grouped evaluation. It
-retains the documented May 2026 calibration constants and databases rather than
-borrowing another detector's gain correction.
+uses the MPV/MPR v05 training calibration described below. Released inference
+configurations retain their overlay/data calibration.
 
 ```bash
 ./submit.py \
@@ -703,8 +703,28 @@ The checked-in source lists follow the deployed-model dataset documentation:
 
 Each directory uses `train_file_list.txt` and `test_file_list.txt`. Source-list
 CLI overrides propagate to filtering, mixed raw/cache readers, evaluation and
-report provenance. Define `ICARUS_DATA_DIR` for the calibration databases used
-by `co_260410`, `co_260501`, and the candidate.
+report provenance.
+
+For all four v05 pipelines, export `ICARUS_TRAINING_CALIB_DIR` before submission.
+Use a versioned directory containing `tpc_gain2_data.db` and
+`tpc_elifetime_data.db`. These databases are
+queried with each event's run number; drift velocity is fixed at 0.157565 cm/us.
+No S3DF path or data-DB fallback is provided.
+The deghost caches for both splits and held-out full-chain evaluation share
+`train/icarus/calibration/mpvmpr_v05.yaml`. Downstream training consumes those
+calibrated caches; raw deghost training does not apply charge calibration.
+
+Transparency uses the public CVMFS database under `ICARUS_DATA_DIR` with fixed
+run 9435. The v05 pipelines enable the CVMFS bind. Keep the training directory on
+storage accessible inside the job container; use `--bind-paths` if an extra bind
+is needed. Do not overwrite a database set or reuse caches produced with a
+different calibration recipe. Example:
+
+```bash
+export ICARUS_TRAINING_CALIB_DIR=/path/to/versioned/mpvmpr_v05/calibration
+```
+
+Released inference calibration and pre-v05 training recipes remain unchanged.
 
 Training and cache stages operate on complete logical events containing both
 cryostats. They deliberately use unsplit collation: splitting coordinate tensors
