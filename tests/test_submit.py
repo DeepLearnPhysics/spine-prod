@@ -11,9 +11,10 @@ import submit
 def run_main(*args, submitter=None):
     """Run the CLI with a mocked Submitter instance."""
     submitter = submitter or Mock()
-    with patch.object(sys, "argv", ["submit.py", *args]), patch.object(
-        submit, "Submitter", return_value=submitter
-    ) as submitter_class:
+    with (
+        patch.object(sys, "argv", ["submit.py", *args]),
+        patch.object(submit, "Submitter", return_value=submitter) as submitter_class,
+    ):
         result = submit.main()
     return result, submitter, submitter_class
 
@@ -425,6 +426,9 @@ def test_pipeline_mode_prints_stage_jobs(capsys):
         overrides={},
         workspace="/runs/benchmark",
         continuation_dir=None,
+        cache_dir=None,
+        cache_archive_dir=None,
+        audit_dir=None,
         from_stage=None,
         to_stage=None,
         select_stages=None,
@@ -785,7 +789,7 @@ def test_pipeline_source_list_overrides_require_one_unqualified_path(
     assert "requires exactly one unqualified list path" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("version", [(3, 6, 15), (3, 8, 20)])
+@pytest.mark.parametrize("version", [(3, 6, 15), (3, 8, 20), (3, 9, 25)])
 def test_old_python_reports_requirement_before_submission_imports(version):
     """Unsupported hosts must not fail with a misleading missing Submitter."""
     import subprocess
@@ -795,14 +799,15 @@ def test_old_python_reports_requirement_before_submission_imports(version):
     probe = (
         "import runpy, sys; "
         f"sys.version_info = {version!r}; "
-        f"runpy.run_path({str(package)!r})"
+        f"runpy.run_path({str(package)!r})['require_python']()"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe], capture_output=True, text=True
     )
     assert result.returncode != 0
-    assert "spine-prod requires Python 3.9 or newer" in result.stderr
-    assert "module load python" in result.stderr
+    assert "spine-prod requires Python 3.10 or newer" in result.stderr
+    assert "submission host" in result.stderr
+    assert "SPINE_PROD_PYTHON" in result.stderr
     assert "cannot import name 'Submitter'" not in result.stderr
 
 
@@ -850,3 +855,32 @@ def test_continuation_directory_requires_pipeline(capsys):
         "--continuation-dir is only supported with --pipeline"
         in capsys.readouterr().err
     )
+
+
+@pytest.mark.parametrize("flag", ["--cache-dir", "--cache-archive-dir", "--audit-dir"])
+def test_storage_options_require_pipeline(flag):
+    with pytest.raises(SystemExit):
+        run_main("--config", "config.yaml", flag, "/storage")
+
+
+def test_pipeline_storage_options_forwarded():
+    submitter = Mock()
+    submitter.submit_pipeline.return_value = {}
+    result, _, _ = run_main(
+        "--pipeline",
+        "pipeline.yaml",
+        "--cache-dir",
+        "/scratch/cache",
+        "--cache-archive-dir",
+        "/durable/cache",
+        "--audit-dir",
+        "/durable/audit",
+        submitter=submitter,
+    )
+    assert result == 0
+    assert submitter.submit_pipeline.call_args.kwargs["cache_dir"] == "/scratch/cache"
+    assert (
+        submitter.submit_pipeline.call_args.kwargs["cache_archive_dir"]
+        == "/durable/cache"
+    )
+    assert submitter.submit_pipeline.call_args.kwargs["audit_dir"] == "/durable/audit"

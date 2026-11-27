@@ -6,7 +6,6 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 
 class RunManager:
@@ -21,7 +20,7 @@ class RunManager:
         return hashlib.sha256(Path(config).read_bytes()).hexdigest()
 
     @staticmethod
-    def checkpoint_digest(checkpoint: Path) -> Optional[str]:
+    def checkpoint_digest(checkpoint: Path) -> str | None:
         """Verify a checkpoint sidecar when present and return its digest.
 
         SPINE versions before v0.17.0 did not create checksum sidecars, so a
@@ -55,13 +54,13 @@ class RunManager:
         return digest
 
     @staticmethod
-    def _read_json(path: Path) -> Dict:
+    def _read_json(path: Path) -> dict:
         """Read a JSON object from disk."""
         with open(path, "r", encoding="utf-8") as stream:
             return json.load(stream)
 
     @staticmethod
-    def _write_json(path: Path, payload: Dict) -> None:
+    def _write_json(path: Path, payload: dict) -> None:
         """Write a JSON object to disk."""
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as stream:
@@ -73,9 +72,9 @@ class RunManager:
         run_dir: Path,
         config: str,
         resume: bool = False,
-        resume_from: Optional[str] = None,
+        resume_from: str | None = None,
         retry: bool = False,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """Create, resume, or safely retry a persistent training run.
 
         A retry resumes the latest checkpoint when one exists. If a scheduler
@@ -171,7 +170,7 @@ class RunManager:
         return None
 
     @classmethod
-    def record_training_jobs(cls, run_dir: Path, job_ids: List[str]) -> None:
+    def record_training_jobs(cls, run_dir: Path, job_ids: list[str]) -> None:
         """Record successfully submitted scheduler jobs on a training run."""
         if not job_ids:
             return
@@ -182,7 +181,7 @@ class RunManager:
         cls._write_json(metadata_path, metadata)
 
     @classmethod
-    def checkpoints(cls, run_dir: Path) -> List[Tuple[int, Path]]:
+    def checkpoints(cls, run_dir: Path) -> list[tuple[int, Path]]:
         """Return run checkpoints ordered by their numeric iteration suffix."""
         checkpoints = []
         for path in (run_dir / "weights").glob("snapshot-*.ckpt"):
@@ -192,7 +191,7 @@ class RunManager:
         return sorted(checkpoints)
 
     @classmethod
-    def latest_checkpoint(cls, run_dir: Path) -> Optional[Path]:
+    def latest_checkpoint(cls, run_dir: Path) -> Path | None:
         """Return the checkpoint with the greatest numeric iteration."""
         checkpoints = cls.checkpoints(run_dir)
         return checkpoints[-1][1] if checkpoints else None
@@ -212,7 +211,7 @@ class RunManager:
         return checkpoint
 
     @staticmethod
-    def validation_log_dir(run_dir: Path, validation_name: Optional[str]) -> Path:
+    def validation_log_dir(run_dir: Path, validation_name: str | None) -> Path:
         """Return the CSV log directory for a validation suite."""
         if validation_name:
             if not re.fullmatch(r"[A-Za-z0-9_.-]+", validation_name):
@@ -246,9 +245,9 @@ class RunManager:
         cls,
         run_dir: Path,
         config: str,
-        validation_name: Optional[str] = None,
+        validation_name: str | None = None,
         rerun: bool = False,
-    ) -> Tuple[Path, List[Path]]:
+    ) -> tuple[Path, list[Path]]:
         """Validate a training run and return the log directory and checkpoints."""
         metadata_path = run_dir / cls.METADATA_NAME
         if not metadata_path.is_file():

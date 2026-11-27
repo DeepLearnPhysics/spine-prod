@@ -331,6 +331,16 @@ Examples:
         help="Continuation state root (defaults to workspace; NERSC requires an explicit Scratch path). Training logs and checkpoints stay in the workspace.",
     )
     parser.add_argument(
+        "--cache-dir", help="Working cache root (NERSC requires Scratch)."
+    )
+    parser.add_argument(
+        "--cache-archive-dir", help="Optional durable, verified cache archive root."
+    )
+    parser.add_argument(
+        "--audit-dir",
+        help="Historical monitoring archive root (default: WORKSPACE/monitoring).",
+    )
+    parser.add_argument(
         "--workspace",
         help=(
             "Pipeline-wide output root exposed as ${workspace}. Required when "
@@ -518,7 +528,11 @@ Examples:
         "--exclude",
         help="Exclude a comma-separated node list (Slurm only)",
     )
-    parser.add_argument("--nodes", type=int, help="Override number of nodes")
+    parser.add_argument(
+        "--nodes",
+        type=int,
+        help="Nodes per training allocation; with --site, applies only to training stages",
+    )
     parser.add_argument("--time", "-t", help="Override time limit")
     parser.add_argument(
         "--bind-paths",
@@ -570,6 +584,16 @@ Examples:
     if args.site is not None and not args.pipeline:
         parser.error("--site is only supported with --pipeline")
 
+    if (
+        any(
+            value is not None
+            for value in (args.cache_dir, args.cache_archive_dir, args.audit_dir)
+        )
+        and not args.pipeline
+    ):
+        parser.error(
+            "--cache-dir, --cache-archive-dir and --audit-dir require --pipeline"
+        )
     if args.continuation_dir is not None and not args.pipeline:
         parser.error("--continuation-dir is only supported with --pipeline")
     if args.workspace is not None and not args.pipeline:
@@ -800,6 +824,9 @@ Examples:
                 overrides=pipeline_overrides,
                 workspace=args.workspace,
                 continuation_dir=args.continuation_dir,
+                cache_dir=args.cache_dir,
+                cache_archive_dir=args.cache_archive_dir,
+                audit_dir=args.audit_dir,
                 from_stage=args.from_stage,
                 to_stage=args.to_stage,
                 select_stages=args.select_stage,

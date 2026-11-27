@@ -2,9 +2,10 @@
 
 import shlex
 import sys
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 from ..runs import RunManager
 from ..sites import validate_allocation
@@ -19,22 +20,22 @@ class FilterRunner(SubmissionComponent):
         config: str,
         operation: str,
         run_dir: str,
-        sources: Optional[Sequence[str]] = None,
-        source_list: Optional[str] = None,
-        cache_dir: Optional[str] = None,
-        output: Optional[str] = None,
-        output_source_list: Optional[str] = None,
-        workers: Optional[int] = None,
+        sources: Sequence[str] | None = None,
+        source_list: str | None = None,
+        cache_dir: str | None = None,
+        output: str | None = None,
+        output_source_list: str | None = None,
+        workers: int | None = None,
         force: bool = False,
         profile: str = "s3df_milano",
         job_name: str = "spine_filter",
-        dependency: Optional[str] = None,
-        spine_path: Optional[str] = None,
+        dependency: str | None = None,
+        spine_path: str | None = None,
         cvmfs: bool = False,
         dry_run: bool = False,
         retry: bool = False,
         **profile_overrides: Any,
-    ) -> List[str]:
+    ) -> list[str]:
         """Submit a persistent scan or manifest-build job.
 
         Scan jobs reuse compatible per-source records automatically. Build jobs
@@ -69,6 +70,8 @@ class FilterRunner(SubmissionComponent):
         if scheduler == "pbs" and profile_overrides.get("exclude"):
             raise ValueError("--exclude is only supported by Slurm profiles")
         profile_config.update(profile_overrides)
+        if int(profile_config.get("nodes", 1)) != 1:
+            raise ValueError("Filtering and reporting require a single-node allocation")
         validate_allocation(self.profiles, profile_config)
         if not profile_config.get("account") and detector in self.profiles["detectors"]:
             profile_config["account"] = self.profiles["detectors"][detector].get(
@@ -167,7 +170,7 @@ class FilterRunner(SubmissionComponent):
 
         from version import __version__
 
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "spine_prod_version": __version__,
             "job_name": job_name,
             "kind": "filter",
@@ -192,9 +195,7 @@ class FilterRunner(SubmissionComponent):
         return job_ids
 
     @staticmethod
-    def _format_sources(
-        sources: Optional[Sequence[str]], source_list: Optional[str]
-    ) -> str:
+    def _format_sources(sources: Sequence[str] | None, source_list: str | None) -> str:
         """Format the mutually exclusive filter input selectors."""
         if source_list is not None:
             return f"--source-list {shlex.quote(source_list)}"
@@ -204,12 +205,12 @@ class FilterRunner(SubmissionComponent):
     def _validate_operation(
         operation: str,
         *,
-        sources: Optional[Sequence[str]],
-        source_list: Optional[str],
-        cache_dir: Optional[str],
-        output: Optional[str],
-        output_source_list: Optional[str],
-        workers: Optional[int],
+        sources: Sequence[str] | None,
+        source_list: str | None,
+        cache_dir: str | None,
+        output: str | None,
+        output_source_list: str | None,
+        workers: int | None,
         force: bool,
     ) -> None:
         """Validate the operation-specific standalone CLI contract."""

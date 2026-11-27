@@ -1,0 +1,16 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+__meta__:
+  kind: bundle
+  version: "261022"
+  date: "2026-10-22"
+  description: DUNE-VD 10 kt module 1x8x6 full-chain metric report with deghosting performance
+
+include: test/common/full_chain/report_v1.yaml
+
+metrics:
+  deghosting:
+    provider: segment_confusion
+    source: "**/*segment_eval_summary.csv"
+    class_mapping:
+      Non-ghost: [shower, track, michel, delta, low_energy]
+      Ghost: [ghost]

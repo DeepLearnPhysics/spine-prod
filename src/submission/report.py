@@ -2,9 +2,10 @@
 
 import shlex
 import sys
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any
 
 import yaml
 
@@ -22,18 +23,18 @@ class ReportRunner(SubmissionComponent):
         input_dir: str,
         output_dir: str,
         run_dir: str,
-        checkpoint: Optional[str] = None,
-        dataset: Optional[str] = None,
-        dataset_selection: Optional[Mapping[str, Any]] = None,
+        checkpoint: str | None = None,
+        dataset: str | None = None,
+        dataset_selection: Mapping[str, Any] | None = None,
         profile: str = "s3df_milano",
         job_name: str = "spine_report",
-        dependency: Optional[str] = None,
-        spine_path: Optional[str] = None,
+        dependency: str | None = None,
+        spine_path: str | None = None,
         cvmfs: bool = False,
         dry_run: bool = False,
         retry: bool = False,
         **profile_overrides: Any,
-    ) -> List[str]:
+    ) -> list[str]:
         """Submit one reduction over completed analyzer CSV shards.
 
         The source report configuration is copied into the immutable attempt
@@ -66,6 +67,8 @@ class ReportRunner(SubmissionComponent):
         if scheduler == "pbs" and profile_overrides.get("exclude"):
             raise ValueError("--exclude is only supported by Slurm profiles")
         profile_config.update(profile_overrides)
+        if int(profile_config.get("nodes", 1)) != 1:
+            raise ValueError("Filtering and reporting require a single-node allocation")
         validate_allocation(self.profiles, profile_config)
         if not profile_config.get("account") and detector in self.profiles["detectors"]:
             profile_config["account"] = self.profiles["detectors"][detector].get(
@@ -149,7 +152,7 @@ class ReportRunner(SubmissionComponent):
 
         from version import __version__
 
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "spine_prod_version": __version__,
             "job_name": job_name,
             "kind": "report",
@@ -177,9 +180,9 @@ class ReportRunner(SubmissionComponent):
     def _materialize_config(
         source: Path,
         attempt_dir: Path,
-        checkpoint: Optional[str],
-        dataset: Optional[str],
-        dataset_selection: Optional[Mapping[str, Any]] = None,
+        checkpoint: str | None,
+        dataset: str | None,
+        dataset_selection: Mapping[str, Any] | None = None,
     ) -> Path:
         """Copy a report recipe while injecting run-specific provenance."""
         document = yaml.safe_load(source.read_text(encoding="utf-8")) or {}

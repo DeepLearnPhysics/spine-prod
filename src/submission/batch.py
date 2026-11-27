@@ -5,9 +5,10 @@ import math
 import shlex
 import sys
 import uuid
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any
 
 from ..client import PBSClient, SlurmClient
 from ..runs import RunManager
@@ -21,7 +22,7 @@ from .validation import validate_request
 class BatchRunner(SubmissionComponent):
     """Plan and submit one inference, training, or validation job."""
 
-    def classify_config_request(self, config: str) -> Tuple[bool, str]:
+    def classify_config_request(self, config: str) -> tuple[bool, str]:
         """Classify whether a config request should resolve to detector latest.
 
         Parameters
@@ -71,7 +72,7 @@ class BatchRunner(SubmissionComponent):
             file=sys.stderr,
         )
 
-    def get_batch_client(self, profile_config: Dict):
+    def get_batch_client(self, profile_config: dict):
         """Get the batch client for a profile."""
         scheduler = profile_config.get("scheduler")
         site = profile_config.get("site", "s3df")
@@ -88,7 +89,7 @@ class BatchRunner(SubmissionComponent):
             f"Unknown scheduler in profile: {scheduler}, must specify 'slurm' or 'pbs'"
         )
 
-    def get_template_name(self, profile_config: Dict) -> str:
+    def get_template_name(self, profile_config: dict) -> str:
         """Get the job template for a profile."""
         if profile_config.get("template"):
             return profile_config["template"]
@@ -108,8 +109,8 @@ class BatchRunner(SubmissionComponent):
     @staticmethod
     def resolve_files_per_task(
         num_files: int,
-        ntasks: Optional[int] = None,
-        files_per_task: Optional[int] = None,
+        ntasks: int | None = None,
+        files_per_task: int | None = None,
     ) -> int:
         """Resolve the effective files-per-task policy for a submission."""
         if ntasks is not None and ntasks < 1:
@@ -128,68 +129,68 @@ class BatchRunner(SubmissionComponent):
     def submit_job(
         self,
         config: str,
-        files: Optional[List[str]] = None,
+        files: list[str] | None = None,
         source_type: str = "source",
-        validation_files: Optional[List[str]] = None,
+        validation_files: list[str] | None = None,
         validation_source_type: str = "source",
-        named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
-        validation_named_sources: Optional[Mapping[str, Mapping[str, Any]]] = None,
-        module_weights: Optional[Mapping[str, str]] = None,
-        warm_start_path: Optional[str] = None,
-        warm_start_modules: Optional[Mapping[str, str]] = None,
-        weight_path: Optional[str] = None,
-        export_weights: Optional[str] = None,
+        named_sources: Mapping[str, Mapping[str, Any]] | None = None,
+        validation_named_sources: Mapping[str, Mapping[str, Any]] | None = None,
+        module_weights: Mapping[str, str] | None = None,
+        warm_start_path: str | None = None,
+        warm_start_modules: Mapping[str, str] | None = None,
+        weight_path: str | None = None,
+        export_weights: str | None = None,
         profile: str = "auto",
-        job_name: Optional[str] = None,
-        output: Optional[str] = None,
-        output_suffix: Optional[str] = None,
-        output_source_list: Optional[str] = None,
+        job_name: str | None = None,
+        output: str | None = None,
+        output_suffix: str | None = None,
+        output_source_list: str | None = None,
         in_place: bool = False,
-        cache_repository: Optional[str] = None,
-        cache_stage: Optional[str] = None,
+        cache_repository: str | None = None,
+        cache_stage: str | None = None,
         no_writer: bool = False,
-        ntasks: Optional[int] = None,
-        files_per_task: Optional[int] = None,
+        ntasks: int | None = None,
+        files_per_task: int | None = None,
         joint_file_mode: str = "broadcast",
         joint_validate_trees: bool = False,
-        dependency: Optional[str] = None,
-        larcv_path: Optional[str] = None,
-        flashmatch_path: Optional[str] = None,
+        dependency: str | None = None,
+        larcv_path: str | None = None,
+        flashmatch_path: str | None = None,
         flashmatch: bool = False,
         cvmfs: bool = False,
         expandable_segments: bool = False,
-        apply_mods: Optional[List[str]] = None,
+        apply_mods: list[str] | None = None,
         dry_run: bool = False,
         preload: bool = False,
-        set_overrides: Optional[List[str]] = None,
-        world_size: Optional[int] = None,
-        batch_size: Optional[int] = None,
-        minibatch_size: Optional[int] = None,
-        num_workers: Optional[int] = None,
-        epochs: Optional[float] = None,
-        iterations: Optional[int] = None,
-        num_files: Optional[int] = None,
-        val_num_files: Optional[int] = None,
-        num_entries: Optional[int] = None,
-        val_num_entries: Optional[int] = None,
-        entry_fraction_range: Optional[Tuple[float, float]] = None,
-        val_entry_fraction_range: Optional[Tuple[float, float]] = None,
-        entry_filter: Optional[str] = None,
-        val_entry_filter: Optional[str] = None,
-        spine_path: Optional[str] = None,
+        set_overrides: list[str] | None = None,
+        world_size: int | None = None,
+        batch_size: int | None = None,
+        minibatch_size: int | None = None,
+        num_workers: int | None = None,
+        epochs: float | None = None,
+        iterations: int | None = None,
+        num_files: int | None = None,
+        val_num_files: int | None = None,
+        num_entries: int | None = None,
+        val_num_entries: int | None = None,
+        entry_fraction_range: tuple[float, float] | None = None,
+        val_entry_fraction_range: tuple[float, float] | None = None,
+        entry_filter: str | None = None,
+        val_entry_filter: str | None = None,
+        spine_path: str | None = None,
         stage: str = "inference",
-        run_dir: Optional[str] = None,
+        run_dir: str | None = None,
         resume: bool = False,
-        resume_from: Optional[str] = None,
-        validation_name: Optional[str] = None,
+        resume_from: str | None = None,
+        validation_name: str | None = None,
         rerun_validation: bool = False,
         tensorboard: bool = False,
         allow_missing_inputs: bool = False,
         retry: bool = False,
-        continuation: Optional[Dict] = None,
-        continuation_dir: Optional[str] = None,
+        continuation: dict | None = None,
+        continuation_dir: str | None = None,
         **profile_overrides,
-    ) -> List[str]:
+    ) -> list[str]:
         """Submit batch job for SPINE processing.
 
         Parameters
@@ -608,6 +609,9 @@ class BatchRunner(SubmissionComponent):
         # Detect detector and get profile
         profile_config = self.config_mgr.get_profile(profile, detector)
         site = profile_config.get("site", "s3df")
+        from ..pipeline.storage import validate_cache_storage
+
+        validate_cache_storage({"cache_repository": cache_repository}, site)
         scheduler = profile_config.get("scheduler")
         if scheduler is None:
             scheduler = "pbs" if site in ("anl", "polaris") else "slurm"
@@ -618,6 +622,15 @@ class BatchRunner(SubmissionComponent):
         if site != "s3df" and "gpus" in profile_overrides:
             raise ValueError(f"--gpus is not valid for {site.upper()} profiles")
         profile_config.update(profile_overrides)
+        if int(profile_config.get("nodes", 1)) > 1 and (
+            stage != "train"
+            or export_weights
+            or ntasks is not None
+            or files_per_task is not None
+        ):
+            raise ValueError(
+                "Multi-node allocations support ordinary training jobs only"
+            )
         continuation_policy = None
         if continuation is not None:
             from ..continuation.policy import profile_policy

@@ -137,10 +137,12 @@ class TestSubmitterHelpers:
             mock_submitter.spine_cli.align_world_size(
                 {"site": "s3df", "gpus": 2}, requested_world_size=4
             )
-        with pytest.raises(ValueError, match="Multi-node"):
+        assert (
             mock_submitter.spine_cli.align_world_size(
                 {"site": "anl", "gpus_per_node": 4, "nodes": 2}, None
             )
+            == 8
+        )
 
     def test_classify_config_request_covers_shorthand_and_absolute_paths(
         self, mock_submitter, workspace_root
@@ -663,8 +665,9 @@ class TestSubmitterHelpers:
         def find_apptainer(command):
             return "/usr/bin/apptainer" if command == "apptainer" else None
 
-        with patch.dict(os.environ, {}, clear=True), patch(
-            "src.submission.runtime.shutil.which", side_effect=find_apptainer
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("src.submission.runtime.shutil.which", side_effect=find_apptainer),
         ):
             assert (
                 mock_submitter.runtime.sif_runtime_executable() == "/usr/bin/apptainer"
@@ -1550,9 +1553,10 @@ class TestBatchSpineOverride:
             "run_dir": str(tmp_path / "run"),
         }
         kwargs.update(options)
-        with patch("src.submission.batch.survey_sources") as survey, patch.object(
-            mock_submitter.batch_client, "submit"
-        ) as submit:
+        with (
+            patch("src.submission.batch.survey_sources") as survey,
+            patch.object(mock_submitter.batch_client, "submit") as submit,
+        ):
             with pytest.raises(error, match=message):
                 mock_submitter.submit_job(
                     config="infer/nd-lar/full_chain_260409.yaml", **kwargs
@@ -1709,13 +1713,16 @@ SPINE_CONTAINER_PATH=/unused.sif
         monkeypatch.setitem(
             mock_submitter.profiles["defaults"], "max_array_size", max_array_size
         )
-        with patch.object(
-            mock_submitter.batch,
-            "get_batch_client",
-            return_value=mock_submitter.batch_client,
-        ), patch.object(
-            mock_submitter.batch_client, "submit", return_value="joint"
-        ) as submit:
+        with (
+            patch.object(
+                mock_submitter.batch,
+                "get_batch_client",
+                return_value=mock_submitter.batch_client,
+            ),
+            patch.object(
+                mock_submitter.batch_client, "submit", return_value="joint"
+            ) as submit,
+        ):
             mock_submitter.submit_job(
                 config="infer/nd-lar/full_chain_260409.yaml",
                 apply_mods=["joint:240819"],
@@ -1992,7 +1999,7 @@ SPINE_CONTAINER_PATH=/unused.sif
         assert "export SPINE_CACHE_PUBLICATION_ID=attempt-id" in script
         assert (
             f"spine-cache begin {repository} segmentation "
-            '--publication-id \\"\\$SPINE_CACHE_PUBLICATION_ID\\"'
+            "--publication-id attempt-id || exit 1;"
         ) in script
         assert "--set io.writer.parallel=true" in script
         assert "--set io.writer.expected_sources=2" in script

@@ -1,0 +1,10 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+__meta__:
+  kind: fragment
+  description: Shared DUNE-VD 10 kt module 1x8x6 full-chain dependencies
+
+include: model/common/full_chain/base_v1.yaml
+
+geo:
+  detector: dune-vd-10kt-1x8x6
+  tag: dunevd10kt_3view_30deg_v3_refactored_1x8x6ref

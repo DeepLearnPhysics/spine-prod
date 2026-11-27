@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src import require_python  # noqa: E402
+
+require_python()
 from src.continuation.controller import advance, metrics, operate, status  # noqa: E402
 
 
@@ -17,9 +20,11 @@ def main():
             "status",
             "extend",
             "accept",
+            "accept-best",
             "cancel",
             "adopt",
             "retry",
+            "retry-cache",
             "metrics",
             "preflight",
         ],
@@ -30,7 +35,8 @@ def main():
         "--site", choices=["nersc", "s3df", "anl"], help="Site for preflight"
     )
     parser.add_argument(
-        "--value", help="New total budget (extend), or scheduler job ID (adopt)"
+        "--value",
+        help="New total budget (extend), cache walltime (retry-cache), or job ID (adopt)",
     )
     args = parser.parse_args()
     if args.action == "preflight":

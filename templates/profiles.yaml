@@ -113,6 +113,7 @@ profiles:
   # -> 4 GB per CPU
   # Use this for standard jobs - better availability and queue times
   nersc_gpu:
+    multi_node_profile: nersc_gpu_full
     allocation_role: single_gpu
     site: nersc
     qos: shared
@@ -129,6 +130,7 @@ profiles:
   # 256 nodes with 4x A100 80GB GPUs (less available, longer queues)
   # Use only when you specifically need >40GB GPU memory
   nersc_gpu_80gb:
+    multi_node_profile: nersc_gpu_full_80gb
     allocation_role: single_gpu_80gb
     site: nersc
     qos: shared
@@ -241,7 +243,7 @@ profiles:
     site: anl
     scheduler: pbs
     template: job_template_anl.pbs
-    account: "14453"
+    account: "neutrinoGPU::SpineDev"
     queue: capacity
     system: polaris
     nodes: 1
@@ -251,7 +253,7 @@ profiles:
     cpus_per_task: 16
     filesystems: home:grand:eagle
     time: "2:00:00"
-    bind_paths: null
+    bind_paths: /lus
     description: "Capacity queue GPU processing on ANL Polaris"
 
   # ANL Polaris capacity queue using all four GPUs on one node
@@ -262,7 +264,7 @@ profiles:
     site: anl
     scheduler: pbs
     template: job_template_anl.pbs
-    account: "14453"
+    account: "neutrinoGPU::SpineDev"
     queue: capacity
     system: polaris
     nodes: 1
@@ -272,7 +274,7 @@ profiles:
     cpus_per_task: 64
     filesystems: home:grand:eagle
     time: "2:00:00"
-    bind_paths: null
+    bind_paths: /lus
     description: "Full-node GPU processing in the ANL Polaris capacity queue"
 
   # ANL Polaris debug queue
@@ -283,7 +285,7 @@ profiles:
     site: anl
     scheduler: pbs
     template: job_template_anl.pbs
-    account: "14453"
+    account: "neutrinoGPU::SpineDev"
     queue: debug
     system: polaris
     nodes: 1
@@ -293,7 +295,7 @@ profiles:
     cpus_per_task: 16
     filesystems: home:grand:eagle
     time: "1:00:00"
-    bind_paths: null
+    bind_paths: /lus
     description: "Debug GPU processing on ANL Polaris"
 
   # ANL Polaris debug queue using all four GPUs on one node
@@ -304,7 +306,7 @@ profiles:
     site: anl
     scheduler: pbs
     template: job_template_anl.pbs
-    account: "14453"
+    account: "neutrinoGPU::SpineDev"
     queue: debug
     system: polaris
     nodes: 1
@@ -314,7 +316,7 @@ profiles:
     cpus_per_task: 64
     filesystems: home:grand:eagle
     time: "1:00:00"
-    bind_paths: null
+    bind_paths: /lus
     description: "Full-node GPU processing in the ANL Polaris debug queue"
 
   anl_polaris_cpu:
@@ -322,7 +324,7 @@ profiles:
     site: anl
     scheduler: pbs
     template: job_template_anl.pbs
-    account: "14453"
+    account: "neutrinoGPU::SpineDev"
     queue: capacity
     system: polaris
     nodes: 1
@@ -330,6 +332,7 @@ profiles:
     gpus_per_node: 0
     cpus_per_task: 1
     filesystems: home:grand:eagle
+    bind_paths: /lus
     time: "2:00:00"
 
 # Detector-specific defaults
@@ -421,6 +424,15 @@ sites:
         max_time: null
   nersc:
     queue_field: qos
+    cache_ntasks: 100
+    cache_time: "02:00:00"
+    # Starting scheduling policy, not an empirically established optimum.
+    # Slurm may grant 1..24h; shorter stage ceilings bound these defaults.
+    continuation_defaults:
+      preferred_time: "24:00:00"
+      min_time: "01:00:00"
+      checkpoint_margin: "00:02:00"
+      startup_allowance: "00:05:00"
     roles:
       cpu: nersc_cpu
       single_gpu: nersc_gpu

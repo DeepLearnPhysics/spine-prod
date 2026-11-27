@@ -1,6 +1,7 @@
 """Validate stage options and lifecycle constraints before submission."""
 
-from typing import Any, List, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from ..submission.arguments import SpineCLI
 from .fields import VARIABLE_NAME_PATTERN
@@ -522,6 +523,6 @@ class StageValidator:
             )
 
     @staticmethod
-    def _present(stage: Mapping[str, Any], *keys: str) -> List[str]:
+    def _present(stage: Mapping[str, Any], *keys: str) -> list[str]:
         """Return configured keys while retaining their declared order."""
         return [key for key in keys if key in stage]

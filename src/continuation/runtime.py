@@ -9,8 +9,11 @@ import time
 import traceback
 from pathlib import Path
 
+from .. import require_python
 from .scheduler import allocation
 from .state import atomic_json, locked, manifest_path, preflight_storage, read
+
+require_python((3, 9))
 
 
 def run(run_dir, token, argv, continuation_dir=None):

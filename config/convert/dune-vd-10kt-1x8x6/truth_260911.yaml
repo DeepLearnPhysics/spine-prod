@@ -7,10 +7,28 @@ __meta__:
   date: "2026-09-11"
   description: "DUNE-VD 10 kt module 1x8x6 LArCV-to-SPINE truth conversion configuration"
 
-# DUNE-HD and DUNE-VD use the same LArCV truth products and output contract.
-# Pin that established conversion recipe, then replace only the geometry.
-include: convert/dune-hd-10kt-1x2x6/truth_260202.yaml
+include:
+  - infer/dune-vd-10kt-1x8x6/base/base_260202.yaml
+  - infer/dune-vd-10kt-1x8x6/io/io_260202.yaml
 
+# Overrides
 override:
-  geo.detector: dune-vd-10kt-1x8x6
-  geo.tag: dunevd10kt_3view_30deg_v3_refactored_1x8x6ref
+  # Only build truth objects
+  build.mode: truth
+  build.fragments: true
+
+  # Force CPU execution for truth-only parsing
+  base.world_size: 0
+
+  # Temporary workaround until SPINE produces sources labels without reco
+  # No reconstructed information or wire-TPC-only source products to write
+  io.writer.keys+: [truth_fragments]
+  io.writer.keys-:
+    [
+      points,
+      depositions,
+      reco_particles,
+      reco_interactions,
+      sources,
+      sources_label,
+    ]

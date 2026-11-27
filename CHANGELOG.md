@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Native multi-node training on S3DF, NERSC, and Polaris, with fixed-topology
+  checkpoint continuation and automatic S3DF cron hosting.
+- Python 3.10–3.13 submission support, with a standard-library Python 3.9+
+  worker supervisor. Default SPINE runtime updated to 1.5.2.
+- Added a DUNE-VD 1x8x6 training candidate derived from DUNE-HD 261022,
+  with VD geometry, shared cache/export calibration, grouped evaluation,
+  and VD MPV/MPR v0 input lists.
 - Pipeline launches now accept `--source-list` and `--val-source-list` to
   override declared train/validation source-list variables across all stages.
 - Added SBND canonical models and staged training/cache/evaluation/reporting
@@ -42,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   avoiding the truncated `{name:` sampler name at runtime.
 
 ### Changed
+- Audited DUNE candidate calibration against upstream defaults: use the VD
+  collection gain and explicit DUNE modified-box coefficients for VD and HD.
 - SBND pipelines now target S3DF and use historical SBND training batches as
   starting estimates: 4/25/50/32/32/128 events per GPU for the six trainers.
   Polaris dataset-list paths remain documented placeholders pending S3DF copies.

@@ -15,7 +15,7 @@ from src.continuation import state as storage
 def service_environment(tmp_path, monkeypatch):
     root = tmp_path / "automation"
     registry = root / "project" / "registry.json"
-    monkeypatch.setattr(service, "service_paths", lambda _: (root, registry))
+    monkeypatch.setattr(service, "service_paths", lambda *args: (root, registry))
     manifest = tmp_path / "run" / "continuation_pipeline.json"
     storage.atomic_json(manifest, {"state": "active", "records": []})
     return root, registry, manifest
@@ -92,7 +92,7 @@ def test_read_schedule_errors_are_not_treated_as_empty(monkeypatch):
 def test_schedule_edit_race_never_overwrites(service_environment, monkeypatch):
     _, _, manifest = service_environment
     reads = iter(["original\n", "changed\n"])
-    monkeypatch.setattr(service, "read_schedule", lambda: next(reads))
+    monkeypatch.setattr(service, "read_schedule", lambda *args: next(reads))
     monkeypatch.setattr(
         service.subprocess, "run", lambda *a, **k: pytest.fail("must not install")
     )
@@ -103,7 +103,7 @@ def test_schedule_edit_race_never_overwrites(service_environment, monkeypatch):
 def test_tick_runs_real_script_cleans_environment_and_skips_completed(
     service_environment, monkeypatch
 ):
-    monkeypatch.setattr(service, "read_schedule", lambda: "")
+    monkeypatch.setattr(service, "read_schedule", lambda *args: "")
     _, registry, manifest = service_environment
     result = manifest.parent / "result"
     (manifest.parent / "advance.sh").write_text(
@@ -167,7 +167,10 @@ def test_blocked_training_is_not_advanced(service_environment, logical_state):
     assert not service.needs_tick(manifest)
 
 
-def test_start_never_submits_training_if_registration_fails(tmp_path, monkeypatch):
+@pytest.mark.parametrize("profile", ["nersc_gpu_full", "s3df_ampere_full"])
+def test_start_never_submits_training_if_registration_fails(
+    tmp_path, monkeypatch, profile
+):
     from unittest.mock import Mock
 
     from src.submitter import Submitter
@@ -176,7 +179,7 @@ def test_start_never_submits_training_if_registration_fails(tmp_path, monkeypatc
     context.submit_job = Mock()
     monkeypatch.setattr(pipeline, "validate_storage", lambda *_: None)
     monkeypatch.setattr(
-        service, "service_paths", lambda _: (tmp_path, tmp_path / "registry")
+        service, "service_paths", lambda *args: (tmp_path, tmp_path / "registry")
     )
 
     def fail(*_):
@@ -187,7 +190,7 @@ def test_start_never_submits_training_if_registration_fails(tmp_path, monkeypatc
         {
             "name": "train",
             "stage": "train",
-            "profile": "nersc_gpu_full",
+            "profile": profile,
             "account": "project",
             "config": "train.yaml",
             "run_dir": str(tmp_path / "train"),
@@ -600,7 +603,7 @@ def test_health_reports_all_registration_failures(tmp_path, monkeypatch):
 def test_registration_requires_readback(service_environment, monkeypatch):
     """A successful scrontab exit alone does not prove timer installation."""
     _, _, manifest = service_environment
-    monkeypatch.setattr(service, "read_schedule", lambda: "")
+    monkeypatch.setattr(service, "read_schedule", lambda *args: "")
     monkeypatch.setattr(
         service.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0)
     )

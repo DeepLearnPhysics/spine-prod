@@ -39,10 +39,15 @@ def test_scheduler_resolution_validates_explicit_name(mock_submitter):
 
 def test_scheduler_resolution_detects_one_available_command(mock_submitter):
     """Automatic selection should work when exactly one scheduler is present."""
-    with patch(
-        "src.control.shutil.which",
-        side_effect=lambda command: "/bin/scancel" if command == "scancel" else None,
-    ), patch.object(SlurmClient, "graceful_stop") as stop:
+    with (
+        patch(
+            "src.control.shutil.which",
+            side_effect=lambda command: (
+                "/bin/scancel" if command == "scancel" else None
+            ),
+        ),
+        patch.object(SlurmClient, "graceful_stop") as stop,
+    ):
         assert mock_submitter.graceful_stop("123") == "slurm"
 
     stop.assert_called_once_with("123", False)

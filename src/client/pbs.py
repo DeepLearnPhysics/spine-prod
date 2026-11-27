@@ -1,8 +1,8 @@
 """PBS batch client."""
 
+import os
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 from .base import BatchClient
 
@@ -12,11 +12,11 @@ class PBSClient(BatchClient):
 
     script_suffix = ".pbs"
 
-    def submit(self, script_path: Path, dry_run: bool = False) -> Optional[str]:
+    def submit(self, script_path: Path, dry_run: bool = False) -> str | None:
         """Submit a job to PBS and return the job ID."""
         return self.submit_qsub(script_path, dry_run)
 
-    def submit_qsub(self, script_path: Path, dry_run: bool = False) -> Optional[str]:
+    def submit_qsub(self, script_path: Path, dry_run: bool = False) -> str | None:
         """Submit job to PBS and return job ID."""
         if dry_run:
             print(f"[DRY RUN] Would submit: {script_path}")
@@ -24,11 +24,27 @@ class PBSClient(BatchClient):
                 print(f.read())
             return None
 
+        # PBS does not inherit arbitrary submission-host exports by default.
+        # Forward runtime selection and distributed diagnostics without -V.
+        names = [
+            name
+            for name in (
+                "SPINE_CONTAINER_PATH",
+                "SPINE_CONTAINER_VERSION",
+                "SPINE_CONTAINER_TAG",
+                "NCCL_DEBUG",
+                "MASTER_PORT",
+            )
+            if name in os.environ
+        ]
+        command = ["qsub"]
+        if names:
+            command.extend(["-v", ",".join(names)])
+        command.append(str(script_path))
         result = subprocess.run(
-            ["qsub", str(script_path)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
+            command,
+            capture_output=True,
+            text=True,
             check=False,
         )
 
@@ -53,9 +69,8 @@ class PBSClient(BatchClient):
 
         result = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
+            capture_output=True,
+            text=True,
             check=False,
         )
         if result.returncode != 0:

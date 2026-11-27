@@ -3,7 +3,6 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
 
 from jinja2 import Template
 
@@ -41,13 +40,13 @@ class BatchClient:
         job_dir.mkdir(parents=True, exist_ok=True)
         return job_dir
 
-    def save_job_metadata(self, job_dir: Path, metadata: Dict):
+    def save_job_metadata(self, job_dir: Path, metadata: dict):
         """Save job metadata for tracking."""
         metadata_path = job_dir / "job_metadata.json"
         with open(metadata_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2)
 
-    def submit(self, script_path: Path, dry_run: bool = False) -> Optional[str]:
+    def submit(self, script_path: Path, dry_run: bool = False) -> str | None:
         """Submit a batch script and return its job ID."""
         raise NotImplementedError
 
@@ -55,7 +54,7 @@ class BatchClient:
         """Request graceful completion of a running SPINE training job."""
         raise NotImplementedError
 
-    def format_dependency(self, dependency: Optional[str]) -> Optional[str]:
+    def format_dependency(self, dependency: str | None) -> str | None:
         """Format a dependency string for scheduler directives."""
         return dependency
 

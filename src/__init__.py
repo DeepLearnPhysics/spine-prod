@@ -6,12 +6,17 @@ submission-only YAML/template dependencies are loaded when Submitter is used.
 
 import sys
 
-if sys.version_info < (3, 9):
-    raise ImportError(
-        "spine-prod requires Python 3.9 or newer; found {}.{}.{}. "
-        "On NERSC, run `module load python`, verify `python3 --version`, "
-        "and retry using that environment.".format(*sys.version_info[:3])
-    )
+
+def require_python(minimum=(3, 10)):
+    """Check host Python; only the standard-library worker accepts Python 3.9."""
+    if sys.version_info < minimum:
+        raise ImportError(
+            "spine-prod requires Python {}.{} or newer; found {}.{}.{}. "
+            "Activate a supported environment on the submission host and install "
+            "requirements.txt there. For test helpers, select it "
+            "with SPINE_PROD_PYTHON.".format(*minimum, *sys.version_info[:3])
+        )
+
 
 __all__ = ["Submitter"]
 
@@ -19,6 +24,7 @@ __all__ = ["Submitter"]
 def __getattr__(name):
     """Load submission dependencies only when the public Submitter is requested."""
     if name == "Submitter":
+        require_python()
         from .submitter import Submitter
 
         return Submitter

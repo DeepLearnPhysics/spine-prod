@@ -1,4 +1,4 @@
-"""NERSC-managed periodic continuation; no SSH session or GPU allocation needed."""
+"""Site-managed periodic continuation with shared registration and reconciliation."""
 
 import contextlib
 import hashlib
@@ -22,8 +22,13 @@ def clean_environment():
     }
 
 
-def service_paths(account):
-    """Resolve the shared registration lock and account registry on NERSC Scratch."""
+def service_paths(account, site="nersc"):
+    """Resolve shared registration and account state for the hosting site."""
+    if site == "s3df":
+        if not re.fullmatch(r"[A-Za-z0-9_:-]+", account or ""):
+            raise ValueError("Automatic S3DF continuation requires a valid account")
+        root = Path.home() / ".spine-prod" / "automation" / "s3df"
+        return root, root / account / "registry.json"
     if not re.fullmatch(r"[A-Za-z0-9_-]+", account or ""):
         raise ValueError("Automatic NERSC continuation requires a valid account")
     scratch = os.environ.get("SCRATCH")
@@ -34,10 +39,23 @@ def service_paths(account):
     return root, root / account / "registry.json"
 
 
-def read_schedule():
-    """Read scrontab, treating only its first-use diagnostic as an empty schedule."""
+def schedule_command(site, option):
+    """Resolve the site's schedule command, remotely when S3DF requires it."""
+    if site == "s3df":
+        from .s3df import command
+
+        return command(["/usr/bin/crontab", option])
+    return ["scrontab", option]
+
+
+def read_schedule(site="nersc"):
+    """Read the schedule; only the first-use diagnostic means an empty schedule."""
     result = subprocess.run(
-        ["scrontab", "-l"], capture_output=True, text=True, timeout=30, check=False
+        schedule_command(site, "-l"),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
     )
     if result.returncode:
         # Slurm versions emit the first-use diagnostic on either stream.
@@ -47,7 +65,7 @@ def read_schedule():
             value.strip() for value in (result.stdout, result.stderr) if value.strip()
         )
         if re.fullmatch(
-            r"(?:scrontab:\s*)?no s?crontab for \S+", message, re.IGNORECASE
+            r"(?:(?:s?crontab):\s*)?no s?crontab for \S+", message, re.IGNORECASE
         ):
             return ""
         raise RuntimeError(
@@ -99,7 +117,7 @@ def merge_schedule(existing, block):
     return existing + ("" if not existing or existing.endswith("\n") else "\n") + block
 
 
-def register(manifest, account, basedir):
+def register(manifest, account, basedir, site="nersc"):
     """Register and verify automatic hosting before enabling a pipeline.
 
     Parameters
@@ -107,9 +125,11 @@ def register(manifest, account, basedir):
     manifest : str or pathlib.Path
         Existing pipeline manifest to register.
     account : str
-        NERSC allocation account used by the recurring controller.
+        Allocation account used to group registered pipelines.
     basedir : str or pathlib.Path
         Repository containing the controller entry point.
+    site : {"nersc", "s3df"}
+        Site providing automatic timer hosting.
 
     Returns
     -------
@@ -118,42 +138,52 @@ def register(manifest, account, basedir):
 
     Notes
     -----
-    All accounts share the registration lock because scrontab is user-wide.
+    All accounts share the registration lock because the schedule is user-wide.
     The lock is always acquired before any pipeline manifest lock.
     """
     manifest = Path(manifest).resolve()
-    root, registry = service_paths(account)
-    # All accounts share a lock because scrontab belongs to the user.
+    root, registry = service_paths(account, site)
+    if site == "s3df":
+        from .s3df import preflight
+
+        preflight(manifest, basedir)
+    # All accounts share a lock because the schedule belongs to the user.
     with locked(root / "registration"):
-        _register_locked(manifest, account, basedir, registry)
+        _register_locked(manifest, account, basedir, registry, site)
 
     return registry
 
 
-def _register_locked(manifest, account, basedir, registry):
+def _register_locked(manifest, account, basedir, registry, site):
     """Caller holds the user-wide registration lock."""
-    block = schedule_block(account, registry, basedir)
+    if site == "s3df":
+        from .s3df import schedule_block as cron_block
+
+        block = cron_block(account, registry, basedir)
+    else:
+        block = schedule_block(account, registry, basedir)
     data = read(registry) if registry.exists() else {"pipelines": {}}
+    data["site"] = site
     entry = data["pipelines"].setdefault(str(manifest), {})
     entry.setdefault("enabled", False)
     atomic_json(registry, data)
-    existing = read_schedule()
+    existing = read_schedule(site)
     desired = merge_schedule(existing, block)
     if desired != existing:
         backup = registry.parent / ("scrontab-before-" + str(time.time_ns()) + ".txt")
         backup.write_text(existing)
         # Detect edits made while preparing the replacement.
-        if read_schedule() != existing:
+        if read_schedule(site) != existing:
             raise RuntimeError("scrontab changed during registration; retry submission")
         subprocess.run(
-            ["scrontab", "-"],
+            schedule_command(site, "-"),
             input=desired,
             text=True,
             capture_output=True,
             check=True,
             timeout=30,
         )
-    if read_schedule() != desired:
+    if read_schedule(site) != desired:
         raise RuntimeError(
             "scrontab registration could not be verified; training not submitted"
         )
@@ -162,7 +192,7 @@ def _register_locked(manifest, account, basedir, registry):
     with locked(manifest):
         state = read(manifest)
         state["automation"] = {
-            "backend": "nersc-scrontab",
+            "backend": "s3df-crontab" if site == "s3df" else "nersc-scrontab",
             "registry": str(registry),
             "manifest": str(manifest),
             "registered_at": entry["registered_at"],
@@ -175,13 +205,19 @@ def _register_locked(manifest, account, basedir, registry):
 def reactivating(state):
     """Serialize reactivation and the user operation against idle retirement."""
     automation = state.get("automation", {})
-    if automation.get("backend") != "nersc-scrontab":
+    if automation.get("backend") not in ("nersc-scrontab", "s3df-crontab"):
         yield
         return
     registry = Path(automation["registry"])
     manifest = Path(automation["manifest"])
     with locked(registry.parent.parent / "registration"):
-        _register_locked(manifest, registry.parent.name, state["basedir"], registry)
+        _register_locked(
+            manifest,
+            registry.parent.name,
+            state["basedir"],
+            registry,
+            "s3df" if automation["backend"] == "s3df-crontab" else "nersc",
+        )
         yield
 
 
@@ -222,19 +258,25 @@ def retire_if_idle(registry):
     registry = Path(registry)
     with locked(registry.parent.parent / "registration"):
         data = read(registry)
+        site = data.get("site", "nersc")
         # Re-read while holding the same lock as registrations/reactivations.
         # Missing/corrupt state is uncertainty, never evidence of completion.
         for name, entry in data["pipelines"].items():
             if entry.get("enabled") and needs_tick(Path(name)):
                 return False
-        existing = read_schedule()
+        from .audit import archive_audit
+
+        for name, entry in data["pipelines"].items():
+            if entry.get("enabled"):
+                archive_audit(Path(name))
+        existing = read_schedule(site)
         desired = remove_schedule(existing, registry.parent.name)
         if desired != existing:
             backup = registry.parent / (
                 "scrontab-before-retirement-" + str(time.time_ns()) + ".txt"
             )
             backup.write_text(existing)
-            if read_schedule() != existing:
+            if read_schedule(site) != existing:
                 raise RuntimeError(
                     "scrontab changed during retirement; leaving controller registered"
                 )
@@ -243,14 +285,14 @@ def retire_if_idle(registry):
             data.update(schedule_state="retiring", cleanup_error=None)
             atomic_json(registry, data)
             subprocess.run(
-                ["scrontab", "-"],
+                schedule_command(site, "-"),
                 input=desired,
                 text=True,
                 capture_output=True,
                 check=True,
                 timeout=30,
             )
-            if read_schedule() != desired:
+            if read_schedule(site) != desired:
                 raise RuntimeError("Could not verify automatic controller retirement")
         data.update(
             schedule_state="stopped", stopped_at=time.time(), cleanup_error=None

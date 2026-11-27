@@ -28,6 +28,8 @@ def start(
     preload=False,
     warm_start=None,
     continuation_dir=None,
+    cache_archives=None,
+    audit_dir=None,
 ):
     """Create a durable controller and submit the first eligible stage.
 
@@ -91,6 +93,19 @@ def start(
                 "jobs": [],
             }
         )
+        if stage["name"] in (cache_archives or {}):
+            records.append(
+                {
+                    "name": stage["name"] + "__archive",
+                    "kind": "archive",
+                    "options": cache_archives[stage["name"]],
+                    "status": "waiting",
+                    "jobs": [],
+                }
+            )
+    audit_dir = str(
+        Path(audit_dir or Path(workspace) / "monitoring").expanduser().resolve()
+    )
     automation_accounts = set()
     # Validate every operational policy before the first scheduler interaction.
     for record in records:
@@ -105,21 +120,21 @@ def start(
                 {key: options[key] for key in PROFILE_FIELDS if key in options}
             )
             validate_storage(continuation_dir, profile.get("site"))
-            if profile.get("site") == "nersc":
-                automation_accounts.add(profile.get("account"))
+            if profile.get("site") in ("nersc", "s3df"):
+                automation_accounts.add((profile["site"], profile.get("account")))
             config = profile_policy(context.profiles, profile, options["continuation"])
             print(f"{record['name']}: {describe_policy(config)}")
     if len(automation_accounts) > 1:
         raise ValueError(
-            "Automatic continuation requires one NERSC account per pipeline"
+            "Automatic continuation requires one site/account per pipeline"
         )
     if automation_accounts:
         from .service import service_paths
 
-        account = next(iter(automation_accounts))
-        service_paths(account)
+        site, account = next(iter(automation_accounts))
+        service_paths(account, site)
         print(
-            "Automation plan: NERSC scrontab, every minute; will register and verify before training submission"
+            f"Automation plan: {site} managed cron, every minute; will register and verify before training submission"
         )
     digest = hashlib.sha256(json.dumps(records, sort_keys=True).encode()).hexdigest()
     if dry_run:
@@ -142,6 +157,10 @@ def start(
     with locked(path):
         if path.exists():
             state = read(path)
+            if state.get("audit_dir", audit_dir) != audit_dir:
+                raise ValueError(
+                    "Controller audit directory changed; use the original --audit-dir"
+                )
             if state["definition_sha256"] != digest:
                 raise ValueError("Controller definition changed; use a new workspace")
         else:
@@ -152,17 +171,18 @@ def start(
                     "state": "active",
                     "definition_sha256": digest,
                     "basedir": str(context.basedir),
+                    "audit_dir": audit_dir,
                     "records": records,
                     "preload": preload,
                     "generation": 0,
                 },
             )
-    write_tick_script(path, context.basedir)
+    write_tick_script(path, context.basedir, site if automation_accounts else None)
     print(f"Durable controller: {path}")
     if automation_accounts:
         from .service import register
 
-        registry = register(path, account, context.basedir)
+        registry = register(path, account, context.basedir, site)
         print(f"Automatic continuation registered: {registry}")
     else:
         print(
@@ -195,11 +215,13 @@ def advance(path, context=None):
     alone never releases consumers of an incomplete logical training stage.
     """
     from ..submitter import Submitter
+    from .audit import archive_audit
 
     path = Path(path)
     with locked(path):
         state = read(path)
         if state["state"] != "active":
+            archive_audit(path)
             return {}
         context = context or Submitter(basedir=Path(state["basedir"]))
         for record in state["records"]:
@@ -227,6 +249,8 @@ def advance(path, context=None):
                     continue
                 if logical["state"] != "paused" or not attempt.get("accounted"):
                     atomic_json(path, state)
+                    if logical["state"] in ("failed", "cancelled", "budget_exhausted"):
+                        archive_audit(path)
                     return {record["name"]: record["jobs"]}
                 # Resume exactly the verified committed continuation artifact.
                 options.update(resume=True, resume_from=logical["checkpoint"])
@@ -239,6 +263,7 @@ def advance(path, context=None):
                 if not all(result["success"] for result in results):
                     record["status"] = "failed"
                     atomic_json(path, state)
+                    archive_audit(path)
                     return {}
                 record["status"] = "completed"
                 atomic_json(path, state)
@@ -274,12 +299,13 @@ def advance(path, context=None):
         state["state"] = "completed"
         state["generation"] += 1
         atomic_json(path, state)
+        archive_audit(path)
         return {}
 
 
 def operate(path, action, stage=None, value=None):
     """Rearm automatic hosting before changing a blocked pipeline's state."""
-    if action in ("extend", "retry", "accept", "adopt"):
+    if action in ("extend", "retry", "retry-cache", "accept", "accept-best", "adopt"):
         from .service import reactivating
 
         with reactivating(read(path)):
@@ -302,6 +328,52 @@ def _operate(path, action, stage=None, value=None):
             atomic_json(path, state)  # Inhibit submissions even if qdel fails.
         for record in records:
             options = record["options"]
+            if action == "retry-cache":
+                if (
+                    state["state"] != "active"
+                    or not options.get("cache_repository")
+                    or options.get("continuation") is not None
+                    or record["status"] not in ("submitted", "failed")
+                    or not record.get("jobs")
+                ):
+                    raise ValueError(
+                        "Retry-cache requires a failed cache stage in an active pipeline"
+                    )
+                if any(
+                    r["status"] != "waiting"
+                    for r in state["records"][state["records"].index(record) + 1 :]
+                ):
+                    raise ValueError(
+                        "Retry-cache requires downstream stages to be waiting"
+                    )
+                results = [
+                    accounting(record["scheduler"], job) for job in record["jobs"]
+                ]
+                if any(result is None for result in results) or all(
+                    result["success"] for result in results
+                ):
+                    raise ValueError(
+                        "Retry-cache requires confirmed terminal failure accounting"
+                    )
+                requested_time = (
+                    duration(seconds(value))
+                    if value is not None
+                    else options.get("time")
+                )
+                record.setdefault("retry_history", []).append(
+                    {
+                        "jobs": list(record["jobs"]),
+                        "accounting": results,
+                        "previous_status": record["status"],
+                        "previous_time": options.get("time"),
+                        "requested_at": time.time(),
+                    }
+                )
+                if requested_time is not None:
+                    options["time"] = requested_time
+                options["retry"] = True
+                record.update(status="waiting", jobs=[])
+                continue
             run_path = (
                 manifest_path(options["run_dir"], options.get("continuation_dir"))
                 if options.get("continuation") is not None
@@ -342,6 +414,39 @@ def _operate(path, action, stage=None, value=None):
                     ):
                         raise ValueError("Checkpoint changed")
                     logical.update(state="completed", reason="user_accepted")
+                elif action == "accept-best":
+                    if logical["state"] not in (
+                        "failed",
+                        "paused",
+                        "budget_exhausted",
+                    ) or not attempt.get("accounted"):
+                        raise ValueError(
+                            "Accept-best requires an accounted, inactive stage"
+                        )
+                    weights = (Path(options["run_dir"]) / "weights").resolve()
+                    best = weights / "snapshot-best.ckpt"
+                    if best.resolve().parent != weights:
+                        raise ValueError(
+                            "Best checkpoint is outside the weights directory"
+                        )
+                    digest = RunManager.checkpoint_digest(best)
+                    if not digest:
+                        raise ValueError(
+                            "Accept-best requires a checksum-verified best checkpoint"
+                        )
+                    # Keep the failed attempt and last resume cursor as history.
+                    # Consumers use their configured best weights, never this
+                    # checkpoint's potentially damaged training sampler state.
+                    logical.update(
+                        state="completed",
+                        reason="user_accepted_best",
+                        accepted_result={
+                            "checkpoint": str(best),
+                            "sha256": digest,
+                            "previous_state": logical["state"],
+                            "accepted_at": time.time(),
+                        },
+                    )
                 elif action == "cancel":
                     logical.update(state="cancelled", reason="user_cancelled")
                 elif action == "retry":
@@ -510,7 +615,7 @@ def metrics(path, stream=None):
             )
 
 
-def write_tick_script(manifest, basedir):
+def write_tick_script(manifest, basedir, site=None):
     """Pin the submission interpreter and container selection for periodic ticks.
 
     NERSC registration installs a managed timer; no login terminal or
@@ -537,6 +642,10 @@ def write_tick_script(manifest, basedir):
         if os.environ.get(key):
             lines.append(f"export {key}={shlex.quote(os.environ[key])}")
     lines.append("source " + shlex.quote(str(basedir / "configure.sh")))
+    if site == "s3df":
+        from .s3df import SLURM_BIN
+
+        lines.append(f'export PATH={shlex.quote(SLURM_BIN)}:"$PATH"')
     lines.append(
         "exec "
         + shlex.join(

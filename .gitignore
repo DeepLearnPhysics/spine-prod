@@ -58,3 +58,6 @@ output_*/
 
 # YAML linting cache
 .yamllint-cache/
+
+# Downloaded multi-node development runs (keep outside version control).
+/multinode-smoke-*/

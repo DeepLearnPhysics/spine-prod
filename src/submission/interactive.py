@@ -3,7 +3,6 @@
 import shlex
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from .base import SubmissionComponent
 
@@ -14,36 +13,36 @@ class InteractiveRunner(SubmissionComponent):
     def run_interactive(
         self,
         config: str,
-        files: Optional[List[str]] = None,
+        files: list[str] | None = None,
         source_type: str = "source",
-        output: Optional[str] = None,
-        output_suffix: Optional[str] = None,
+        output: str | None = None,
+        output_suffix: str | None = None,
         in_place: bool = False,
         no_writer: bool = False,
-        files_per_task: Optional[int] = None,
+        files_per_task: int | None = None,
         task_id: int = 1,
-        larcv_path: Optional[str] = None,
-        flashmatch_path: Optional[str] = None,
+        larcv_path: str | None = None,
+        flashmatch_path: str | None = None,
         flashmatch: bool = False,
         cvmfs: bool = False,
         expandable_segments: bool = False,
-        apply_mods: Optional[List[str]] = None,
+        apply_mods: list[str] | None = None,
         preload: bool = False,
-        set_overrides: Optional[List[str]] = None,
-        world_size: Optional[int] = None,
-        batch_size: Optional[int] = None,
-        minibatch_size: Optional[int] = None,
-        num_workers: Optional[int] = None,
-        epochs: Optional[float] = None,
-        iterations: Optional[int] = None,
-        num_files: Optional[int] = None,
-        num_entries: Optional[int] = None,
-        entry_fraction_range: Optional[Tuple[float, float]] = None,
-        entry_filter: Optional[str] = None,
+        set_overrides: list[str] | None = None,
+        world_size: int | None = None,
+        batch_size: int | None = None,
+        minibatch_size: int | None = None,
+        num_workers: int | None = None,
+        epochs: float | None = None,
+        iterations: int | None = None,
+        num_files: int | None = None,
+        num_entries: int | None = None,
+        entry_fraction_range: tuple[float, float] | None = None,
+        entry_filter: str | None = None,
         interactive_runtime: str = "auto",
-        bind_paths: Optional[str] = None,
-        spine_path: Optional[str] = None,
-        weight_path: Optional[str] = None,
+        bind_paths: str | None = None,
+        spine_path: str | None = None,
+        weight_path: str | None = None,
     ) -> int:
         """Run SPINE processing interactively (no SLURM submission).
 

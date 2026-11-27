@@ -19,6 +19,8 @@
 #PBS -l walltime={{ time }}
 {% endif %}
 #PBS -l filesystems={{ filesystems|default("home:grand:eagle") }}
+# Request the site resource required by the Apptainer --fakeroot launch below.
+#PBS -l singularity_fakeroot=true
 #PBS -k doe
 #PBS -N {{ job_name }}
 {% if array_spec %}
@@ -97,6 +99,20 @@ echo "Using input files defined in the config"
 echo
 {% endif %}
 
+{% if nodes|default(1)|int > 1 %}
+# One scheduler task per node; torchrun starts the local GPU workers.
+{% if site == 'anl' %}
+export MASTER_ADDR=$(head -n 1 "$PBS_NODEFILE")
+{% else %}
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+{% endif %}
+if [ -z "$MASTER_ADDR" ]; then
+    echo "ERROR: Cannot determine the distributed rendezvous node" >&2
+    exit 1
+fi
+{% endif %}
+
+
 # Cap the number Numba threads to 64 (what OpenBLAS was compiled with)
 export NUMBA_NUM_THREADS=64
 echo "NUMBA_NUM_THREADS set to $NUMBA_NUM_THREADS"
@@ -136,14 +152,16 @@ APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD export PYTHONNOUSERSITE=1; "
 APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD python3 \"{{ basedir }}/scripts/check_spine_version.py\" {% if continuation_attempt %}--require-continuation {% endif %}{{ spine_cmd|default('spine', true) }} || exit \$?; "
 {% if cache_repository %}
 # Register the shared publication fence after scheduler dependencies clear.
-APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id_shell }}; {{ cache_begin_cmd }} begin {{ cache_repository_shell }} {{ cache_stage_shell }} --publication-id \"\$SPINE_CACHE_PUBLICATION_ID\"; "
+APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD export SPINE_CACHE_PUBLICATION_ID={{ cache_publication_id_shell }}; {{ cache_begin_cmd }} begin {{ cache_repository_shell }} {{ cache_stage_shell }} --publication-id {{ cache_publication_id_shell }} || exit 1; "
 {% endif %}
 {% if custom_command %}
 APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD exec {{ custom_command }}"
 {% else %}
-APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD exec {{ spine_cmd|default('spine', true) }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
+APPTAINER_INNER_CMD="$APPTAINER_INNER_CMD exec {% if nodes|default(1)|int > 1 %}python3 \"{{ basedir }}/scripts/distributed_launch.py\" --nodes {{ nodes }} --gpus-per-node {{ gpus_per_node }} --scheduler pbs -- {% endif %}{{ spine_cmd|default('spine', true) }}{% if file_list_pattern and not named_source_args %} -S $TASK_FILE_LIST{% endif %} {{ output_args }} -c {{ config }} --log-dir {{ spine_log_dir|default(log_dir) }}{% if spine_cli_overrides %} {{ spine_cli_overrides }}{% endif %}"
 {% endif %}
-RUN_CMD="apptainer exec $APPTAINER_BIND_OPTS --fakeroot --nv $SPINE_CONTAINER_PATH bash -c '$APPTAINER_INNER_CMD'"
+# PALS may relocate its immediate executable under /run/palsd. Launch env
+# so Apptainer retains its installation path and can find apptainer.conf.
+RUN_CMD="{% if nodes|default(1)|int > 1 %}mpiexec -n {{ nodes }} --ppn 1 --depth={{ cpus_per_task }} --cpu-bind depth /usr/bin/env {% endif %}apptainer exec $APPTAINER_BIND_OPTS --fakeroot --nv $SPINE_CONTAINER_PATH bash -c '$APPTAINER_INNER_CMD'"
 
 {% if continuation_attempt %}
 # Keep the batch shell responsive and forward only to the supervisor.

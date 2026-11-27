@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepLearnPhysics/spine-prod/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/DeepLearnPhysics/spine-prod/branch/main/graph/badge.svg)](https://codecov.io/gh/DeepLearnPhysics/spine-prod)
-[![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/downloads/)
 
 A production system for running [SPINE](https://github.com/DeepLearnPhysics/SPINE) (Scalable Particle Imaging with Neural Embeddings) reconstruction on HPC clusters with SLURM- and PBS-based batch systems.
 
@@ -26,6 +26,25 @@ cd spine-prod
 # Configure environment
 source configure.sh
 ```
+
+**Python support:** spine-prod supports Python **3.10–3.13**, including helpers
+executed inside the SPINE container (currently Python 3.10). Select a supported
+interpreter on the submission host before installing `requirements.txt` and
+running `submit.py`; `configure.sh` does not activate a Python environment.
+
+Available site options reported in November 2026:
+
+| Site | Supported interpreter options |
+| --- | --- |
+| S3DF | Python 3.12 (also has 3.9, below our minimum) |
+| NERSC | Python 3.11 |
+| Polaris / Aurora | Python 3.11 or 3.13 |
+
+The default login-node Python may still be 3.6. Verify the selected interpreter
+with `python3 --version` after activating your environment. Continuation
+controllers also need access to that environment. For the multi-node smoke
+helper, you can explicitly select it with
+`SPINE_PROD_PYTHON=/path/to/environment/bin/python`.
 
 **SPINE Version Control:** Production jobs now run entirely from a tagged SPINE
 container image. The repository default release is recorded in
@@ -158,7 +177,7 @@ change output routing. If secondary entries run out, the last processed primary
 file may have a partial output and subsequent files produce no output. Use
 `--set base.split_output=false` to combine a task's events into one output instead.
 
-The default runtime is SPINE 1.5.0, which supports training continuation.
+The default runtime is SPINE 1.5.2, which supports training continuation.
 The baseline minimum for other workflows remains SPINE 1.4.4, which includes primary-only
 joint output routing, training-compatible shower-primary reporting, overall
 semantic recall, and initial validation/checkpoint selection before training.
@@ -703,16 +722,32 @@ are rejected; allocation correspondence does not imply identical performance.
 ```bash
 ./submit.py --pipeline pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml \
   --site nersc --account YOUR_PROJECT --workspace /path/to/vd-run \
+  --continuation-dir "$SCRATCH/vd-state" \
+  --cache-dir "$SCRATCH/vd-cache" \
   --source-list /path/to/train_file_list.txt \
   --val-source-list /path/to/test_file_list.txt --dry-run
 ```
 
 Preflight checks every selected stage before submitting any jobs, including in
-`--dry-run`. The VD five-day and three-day training requests exceed NERSC's
-48-hour regular-QOS limit: explicitly choose shorter requests with `--time`
-(which overrides every selected stage), or use allocation continuation when
-that feature is integrated. Site selection never truncates training time or
-resubmits jobs. Selecting only the scan stages allows testing data access first.
+`--dry-run`. With `--site`, training stages automatically use continuation:
+the original YAML `time` (or source profile time) becomes the total runtime budget.
+An explicit `continuation.runtime_budget` takes precedence. Allocation ceilings
+are bounded by the destination queue's hard limit; the total budget is preserved.
+CLI `--time` overrides only the allocation ceiling, not the inherited budget.
+Site-level `continuation_defaults` supply chunk preferences, bounded by each stage's allocation ceiling. Explicit CLI `--time`
+and stage continuation preferences are validated rather than silently shortened.
+NERSC cache stages default to up to 100 tasks with two-hour requests, unless
+explicit file grouping or a launch walltime override is supplied. Other
+non-continuation stages retain their requested time and fail if it exceeds limits.
+
+The HD 261022 and VD 261117 candidates use this default for all six training stages.
+Without `--site`, ordinary submission semantics remain unchanged unless continuation
+is explicitly configured. On NERSC, `--continuation-dir` in the command above must point to Scratch. Its 120-hour and
+72-hour budgets become at most 48-hour allocations, requesting 1–24-hour grants
+by default. Shorter training stages retain their smaller ceilings. This is an
+initial scheduling policy, not a measured optimum. Budget exhaustion blocks
+consumers unless explicitly accepted. S3DF automatically registers its controller
+on `sdfcron001`; Polaris still requires externally hosted periodic advancement. See [training continuation](docs/training-continuation.md).
 
 The central `sites` table records queue/QOS allocation limits and their sources.
 Known limits also apply to ordinary batch, filter, and report submissions.
@@ -720,7 +755,9 @@ S3DF limits are currently unknown (`null`), not unlimited; populate them from
 local scheduler policy. These static checks do not replace live scheduler policy,
 account eligibility, or queue availability. Polaris capacity currently allows
 168 hours but limits each user to two queued/running jobs and one running job;
-site selection does not throttle submissions. Portable jobs use one node each.
+site selection does not throttle submissions. Portable training supports multiple
+nodes with `--nodes`; other stages retain their own allocations. See
+[multi-node training](docs/multi-node-training.md).
 Accounts, data lists, software paths, and workspaces must be valid at the target
 site; no files are transferred. NERSC requires an explicit account; Polaris
 uses its configured project unless overridden. CPU stages on Polaris use its
