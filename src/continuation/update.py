@@ -177,3 +177,75 @@ def update_campaign(
         print("Updated future submissions. Backup: " + str(backup))
         print("Existing scheduler jobs and allocation request history are unchanged.")
         return backup
+
+
+def enable_parallel(path, pipeline_path, workspace, apply=False):
+    """Import only dependencies from the original pipeline, with a verified backup.
+
+    Existing options, allocations, checkpoints and definition identity are kept.
+    Require the full, identically ordered stage list to avoid interpreting a
+    partial or unrelated launch document as this campaign's dependency graph.
+    """
+    from ..pipeline import PipelineDefinition
+    from .controller import dependencies
+
+    definition = PipelineDefinition.load(pipeline_path, workspace_override=workspace)
+    path = Path(path).expanduser().resolve()
+    with locked(path):
+        original = read(path)
+        if original["state"] != "active":
+            raise ValueError("Only active campaigns can be updated")
+        state = copy.deepcopy(original)
+        records = state["records"]
+        names = {r["name"] for r in records}
+        stages = {s["name"]: s for s in definition.stages}
+        expected = []
+        for name in stages:
+            expected.append(name)
+            if name + "__archive" in names:
+                expected.append(name + "__archive")
+        if expected != [r["name"] for r in records]:
+            raise ValueError("Pipeline stages/order do not match the campaign")
+        for record in records:
+            name = record["name"]
+            if name not in stages:
+                if record["kind"] != "archive":
+                    raise ValueError("Unexpected archive record: " + name)
+                record["depends_on"] = [name.removesuffix("__archive")]
+                continue
+            stage = stages[name]
+            if record["kind"] != stage.get("kind", "spine") or (
+                Path(record["options"]["run_dir"]).resolve()
+                != Path(stage["run_dir"]).resolve()
+            ):
+                raise ValueError("Pipeline stage identity mismatch: " + name)
+            record["depends_on"] = [
+                dep + "__archive" if dep + "__archive" in names else dep
+                for dep in stage.get("depends_on", [])
+            ]
+        graph = dependencies(records)
+        for name, deps in graph.items():
+            print(name + " <- " + (", ".join(deps) or "(root)"))
+        if records == original["records"]:
+            print("Dependencies already installed; no changes.")
+            return None
+        if not apply:
+            print("Dry run: use --apply to enable parallel scheduling.")
+            return None
+        backup = path.with_name(
+            path.stem + ".before-parallel-" + uuid.uuid4().hex + ".json"
+        )
+        atomic_json(backup, original)
+        if read(backup) != original:
+            raise ValueError("Backup verification failed")
+        state.setdefault("configuration_updates", []).append(
+            {
+                "timestamp": time.time(),
+                "backup": str(backup),
+                "dependency_source": str(Path(pipeline_path).resolve()),
+            }
+        )
+        state["generation"] = state.get("generation", 0) + 1
+        atomic_json(path, state)
+        print("Parallel scheduling enabled. Backup: " + str(backup))
+        return backup

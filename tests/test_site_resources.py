@@ -162,7 +162,7 @@ def test_dune_nersc_dry_run_preflights_all_training_stages(
         dry_run=True,
     )
     assert result == {}
-    first_stage.assert_called_once()
+    assert first_stage.call_count == 2  # Independent train/validation scans
     assert first_stage.call_args.kwargs["profile"] == "nersc_cpu"
     output = capsys.readouterr().out
     assert (

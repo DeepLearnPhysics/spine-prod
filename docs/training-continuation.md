@@ -305,7 +305,29 @@ and cancel that scheduler job separately.
 
 ## Limits
 
-Continuation pipelines currently serialize all stages. Explicit profiles are
+New continuation pipelines submit independent stages concurrently according to
+`depends_on`. Train/validation caches and shower/track training can overlap;
+consumers wait for every prerequisite to finish logically and be accounted.
+Failures block their descendants while independent branches keep progressing.
+Cache archives remain a completion gate for consumers of the archived producer.
+
+Existing manifests without dependency metadata retain sequential behavior. To
+upgrade an active campaign, use its original, complete pipeline definition:
+
+```bash
+python3 scripts/update_continuation.py "$MANIFEST" \
+  --workspace "$WORKSPACE" --parallel-pipeline "$PIPELINE"
+# Review the dependency graph, then repeat with --apply.
+```
+
+The update takes the controller lock, validates stage names/order and run
+directories, and writes a verified backup before installing dependencies. It
+does not cancel jobs, change allocations, reset progress, or relocate caches.
+The next automatic tick submits any newly eligible siblings. A shower stage
+already running can therefore be joined by track training. Use the same updated
+checkout for the controller; do not downgrade it after enabling concurrency.
+
+Explicit profiles are
 required; stage slicing, automatic cleanup, and changes in GPU world size are
 unsupported. Missing scheduler history blocks advancement. Polaris shrink-to-fit
 and multi-node restart behavior require site validation.

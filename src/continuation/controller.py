@@ -1,7 +1,7 @@
 """Short-lived submission-host controller for continuation pipelines.
 
-Stages are deliberately serialized in this first implementation. No consumer is
-submitted against an intermediate allocation's successful exit code.
+Independent stages may run concurrently. Consumers wait for logical completion,
+never an intermediate allocation's successful exit code.
 """
 
 import hashlib
@@ -31,7 +31,7 @@ def start(
     cache_archives=None,
     audit_dir=None,
 ):
-    """Create a durable controller and submit the first eligible stage.
+    """Create a durable controller and submit all eligible stages.
 
     Parameters
     ----------
@@ -88,6 +88,10 @@ def start(
             {
                 "name": stage["name"],
                 "kind": stage.get("kind", "spine"),
+                "depends_on": [
+                    name + "__archive" if name in (cache_archives or {}) else name
+                    for name in stage.get("depends_on", [])
+                ],
                 "options": options,
                 "status": "waiting",
                 "jobs": [],
@@ -98,6 +102,7 @@ def start(
                 {
                     "name": stage["name"] + "__archive",
                     "kind": "archive",
+                    "depends_on": [stage["name"]],
                     "options": cache_archives[stage["name"]],
                     "status": "waiting",
                     "jobs": [],
@@ -141,11 +146,11 @@ def start(
         print(
             "Continuation strategy: submission-host advance; all consumers deferred until logical completion"
         )
-        for index, record in enumerate(records):
-            print(f"Stage {record['name']}: serialized completion gate")
-            if index:
+        for record in records:
+            print(f"Stage {record['name']}: dependencies {record['depends_on']}")
+            if record["depends_on"]:
                 print(
-                    f"  Deferred until predecessors complete; options: {record['options']}"
+                    f"  Deferred until dependencies complete; options: {record['options']}"
                 )
                 continue
             method = getattr(
@@ -194,8 +199,33 @@ def start(
     return advance(path, context)
 
 
+def dependencies(records):
+    """Validate ordered dependencies; legacy manifests retain serial scheduling."""
+    graph = {}
+    for record in records:
+        name = record["name"]
+        deps = record.get("depends_on", list(graph)[-1:])
+        if (
+            name in graph
+            or not isinstance(deps, list)
+            or any(not isinstance(dep, str) or dep not in graph for dep in deps)
+        ):
+            raise ValueError("Invalid continuation dependencies for " + name)
+        graph[name] = deps
+    return graph
+
+
+def descendants(records, name):
+    graph = dependencies(records)
+    result = {name}
+    for candidate, deps in graph.items():
+        if any(dep in result for dep in deps):
+            result.add(candidate)
+    return result - {name}
+
+
 def advance(path, context=None):
-    """Reconcile a pipeline and submit at most one eligible stage or allocation.
+    """Reconcile and submit all ready stages under a single pipeline lock.
 
     Parameters
     ----------
@@ -224,8 +254,15 @@ def advance(path, context=None):
             archive_audit(path)
             return {}
         context = context or Submitter(basedir=Path(state["basedir"]))
+        graph = dependencies(state["records"])
+        records = {r["name"]: r for r in state["records"]}
+        jobs_by_stage = {}
         for record in state["records"]:
             if record["status"] == "completed":
+                continue
+            if any(
+                records[name]["status"] != "completed" for name in graph[record["name"]]
+            ):
                 continue
             options = dict(record["options"])
             is_continuation = options.get("continuation") is not None
@@ -251,7 +288,8 @@ def advance(path, context=None):
                     atomic_json(path, state)
                     if logical["state"] in ("failed", "cancelled", "budget_exhausted"):
                         archive_audit(path)
-                    return {record["name"]: record["jobs"]}
+                    jobs_by_stage[record["name"]] = record["jobs"]
+                    continue
                 # Resume exactly the verified committed continuation artifact.
                 options.update(resume=True, resume_from=logical["checkpoint"])
             elif record["status"] == "submitted":
@@ -259,19 +297,21 @@ def advance(path, context=None):
                     accounting(record["scheduler"], job) for job in record["jobs"]
                 ]
                 if any(result is None for result in results):
-                    return {record["name"]: record["jobs"]}
+                    jobs_by_stage[record["name"]] = record["jobs"]
+                    continue
                 if not all(result["success"] for result in results):
                     record["status"] = "failed"
                     atomic_json(path, state)
                     archive_audit(path)
-                    return {}
+                    continue
                 record["status"] = "completed"
                 atomic_json(path, state)
                 continue
             elif record["status"] != "waiting":
                 # A controller crash between scheduler submission and recording
                 # its response is uncertain. Never repeat that submission.
-                return {record["name"]: record["jobs"]}
+                jobs_by_stage[record["name"]] = record["jobs"]
+                continue
             profile = context.config_mgr.get_profile(
                 options.get("profile", "auto"), None
             )
@@ -295,7 +335,9 @@ def advance(path, context=None):
             if jobs:
                 record["status"] = "submitted"
             atomic_json(path, state)
-            return {record["name"]: jobs}
+            jobs_by_stage[record["name"]] = jobs
+        if not all(r["status"] == "completed" for r in state["records"]):
+            return jobs_by_stage
         state["state"] = "completed"
         state["generation"] += 1
         atomic_json(path, state)
@@ -341,7 +383,8 @@ def _operate(path, action, stage=None, value=None):
                     )
                 if any(
                     r["status"] != "waiting"
-                    for r in state["records"][state["records"].index(record) + 1 :]
+                    for r in state["records"]
+                    if r["name"] in descendants(state["records"], record["name"])
                 ):
                     raise ValueError(
                         "Retry-cache requires downstream stages to be waiting"

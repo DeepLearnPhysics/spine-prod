@@ -701,8 +701,8 @@ def test_all_training_stages_report_policy_in_dry_run(tmp_path, capsys, monkeypa
     assert output.count("budget=120:00:00") == 2
     assert "preferred=24:00:00" in output
     assert "exhaustion=stop and block consumers" in output
-    context.submit_job.assert_called_once()
-    options = context.submit_job.call_args.kwargs
+    assert context.submit_job.call_count == 2
+    options = context.submit_job.call_args_list[0].kwargs
     assert options["run_dir"] == "/global/cfs/cdirs/project/first"
     assert options["continuation_dir"].startswith(
         "/pscratch/sd/t/test/continuation/runs/"

@@ -99,6 +99,7 @@ def test_archive_stage_serializes_controller(
         ),
         dict(
             name="consumer",
+            depends_on=["cache"],
             config="train.yaml",
             profile="s3df_ampere",
             run_dir=str(tmp_path / "train"),
