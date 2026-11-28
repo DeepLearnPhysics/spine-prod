@@ -1178,3 +1178,57 @@ def test_cache_retry_submits_new_attempt_in_existing_directory(
     record = storage.read(path)["records"][0]
     assert record["status"] == "submitted"
     assert record["retry_history"][0]["jobs"] == ["old-job"]
+
+
+@pytest.mark.parametrize("periodic", [False, True])
+def test_retry_falls_back_to_initial_checkpoint(tmp_path, periodic):
+    import hashlib
+
+    from src.runs import RunManager
+
+    run = tmp_path / "train"
+    weights = run / "weights"
+    weights.mkdir(parents=True)
+    initial = weights / "snapshot-initial.ckpt"
+    initial.write_bytes(b"initial full state")
+    digest = hashlib.sha256(initial.read_bytes()).hexdigest()
+    Path(str(initial) + ".sha256").write_text(f"{digest}  {initial.name}\n")
+    expected = checkpoint(run, 10)[0] if periodic else initial
+    logical_path = storage.manifest_path(run)
+    original = dict(
+        state="failed",
+        generation=0,
+        policy={"max_attempts": 100},
+        used_seconds=3011,
+        attempts=[{"accounted": True, "job_id": "62111799"}],
+    )
+    storage.atomic_json(logical_path, original)
+    path = tmp_path / "pipeline.json"
+    storage.atomic_json(
+        path,
+        dict(
+            state="active",
+            generation=0,
+            records=[
+                dict(
+                    name="train_graph_spice",
+                    options={"run_dir": str(run), "continuation": {}},
+                )
+            ],
+        ),
+    )
+    pipeline._operate(path, "retry", "train_graph_spice")
+    state = storage.read(logical_path)
+    assert state["state"] == "paused"
+    assert state["checkpoint"] == str(expected)
+    assert state["used_seconds"] == 3011
+    assert state["attempts"] == original["attempts"]
+    assert RunManager.resolve_resume_checkpoint(run, str(expected)) == expected
+    # A corrupt initial artifact cannot authorize another retry.
+    if not periodic:
+        state["state"] = "failed"
+        storage.atomic_json(logical_path, state)
+        initial.write_bytes(b"corrupt")
+        with pytest.raises(ValueError, match="No checksum-verified"):
+            pipeline._operate(path, "retry", "train_graph_spice")
+        assert storage.read(logical_path) == state

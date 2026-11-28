@@ -273,6 +273,10 @@ python3 scripts/continue_training.py preflight STATE_DIRECTORY --site nersc
 
 - `extend` sets a larger **total** budget without changing scientific configuration.
 - `retry` requires a confirmed failed allocation and a checksum-valid checkpoint.
+  It prefers the latest valid numbered snapshot, falling back to
+  `snapshot-initial.ckpt` when training failed before any valid periodic snapshot.
+  The fallback restores the initial training state; failed-attempt accounting and
+  completed upstream caches are preserved.
 - `retry-cache` rearms a failed cache stage only after all its scheduler jobs
   have terminal accounting and every downstream stage is still waiting. It
   preserves failed job IDs/accounting in `retry_history`; the next tick creates

@@ -500,9 +500,16 @@ def _operate(path, action, stage=None, value=None):
                     if len(logical["attempts"]) >= logical["policy"]["max_attempts"]:
                         raise ValueError("max_attempts reached")
                     valid = None
-                    for _, candidate in reversed(
-                        RunManager.checkpoints(Path(options["run_dir"]))
-                    ):
+                    run_dir = Path(options["run_dir"])
+                    candidates = [
+                        candidate
+                        for _, candidate in reversed(RunManager.checkpoints(run_dir))
+                    ]
+                    # Initial validation saves full optimizer/RNG/loader state too.
+                    # Prefer periodic progress, but allow recovery before the first
+                    # periodic checkpoint without discarding the campaign history.
+                    candidates.append(run_dir / "weights" / "snapshot-initial.ckpt")
+                    for candidate in candidates:
                         try:
                             digest = RunManager.checkpoint_digest(candidate)
                             if digest:
@@ -512,7 +519,7 @@ def _operate(path, action, stage=None, value=None):
                             continue
                     if valid is None:
                         raise ValueError(
-                            "No valid periodic checkpoint to recover; use a new workspace after fixing the failure"
+                            "No checksum-verified periodic or initial checkpoint to recover; stage restart requires operator recovery"
                         )
                     logical.update(
                         state="paused",
