@@ -1,0 +1,36 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+# Common IO configuration for DUNE-VD 10 kt module 1x8x6
+
+__meta__:
+  kind: fragment
+
+# IO configuration
+io:
+  loader:
+    batch_size: 4
+    shuffle: false
+    num_workers: 8
+    collate_fn: all
+    dataset: !include dataset_common.yaml
+  writer:
+    provider: hdf5
+    file_name:
+    overwrite: true
+    keys:
+      - run_info
+      - meta
+      - points
+      - points_label
+      - points_g4
+      - depositions
+      - depositions_label
+      - depositions_q_label
+      - depositions_g4
+      - sources
+      - sources_label
+      - reco_particles
+      - truth_particles
+      - reco_interactions
+      - truth_interactions
+      - flashes
+      - crthits

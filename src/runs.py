@@ -207,7 +207,10 @@ class RunManager:
                 "--resume-from must name an existing checkpoint in the run's "
                 f"weights directory: {weights_dir}"
             )
-        if cls.CHECKPOINT_RE.match(checkpoint.name) is None:
+        if (
+            cls.CHECKPOINT_RE.match(checkpoint.name) is None
+            and checkpoint.name != "snapshot-initial.ckpt"
+        ):
             raise ValueError(f"Invalid checkpoint name: {checkpoint.name}")
         return checkpoint
 

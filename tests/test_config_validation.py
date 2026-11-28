@@ -89,10 +89,6 @@ def test_config_inheritance_crosses_scopes_only_for_conversion_stopgaps():
     config_domains = {"cache", "convert", "filter", "infer", "model", "test", "train"}
     allowed = {
         (
-            "convert/dune-vd-10kt-1x8x6/truth_260911.yaml",
-            "convert/dune-hd-10kt-1x2x6/truth_260202.yaml",
-        ),
-        (
             "convert/protodune-hd/truth_260911.yaml",
             "convert/protodune-sp/truth_260210.yaml",
         ),
@@ -2339,7 +2335,12 @@ def test_all_training_pipelines_declare_full_chain_warm_start_namespaces():
         for stage in training_stages:
             stage_expected = expected[stage["name"]]
             if stage["name"] == "train_uresnet_ppn" and stage["config"].startswith(
-                ("train/protodune-vd/", "train/dune-hd-10kt-1x2x6/", "train/sbnd/")
+                (
+                    "train/protodune-vd/",
+                    "train/dune-hd-10kt-1x2x6/",
+                    "train/dune-vd-10kt-1x8x6/",
+                    "train/sbnd/",
+                )
             ):
                 # Cached deghosted segmentation owns one UResNet-PPN full-chain module.
                 stage_expected = {"uresnet_ppn": "uresnet_ppn"}

@@ -421,6 +421,15 @@ sites:
         max_time: null
   nersc:
     queue_field: qos
+    cache_ntasks: 100
+    cache_time: "02:00:00"
+    # Starting scheduling policy, not an empirically established optimum.
+    # Slurm may grant 1..24h; shorter stage ceilings bound these defaults.
+    continuation_defaults:
+      preferred_time: "24:00:00"
+      min_time: "01:00:00"
+      checkpoint_margin: "00:02:00"
+      startup_allowance: "00:05:00"
     roles:
       cpu: nersc_cpu
       single_gpu: nersc_gpu

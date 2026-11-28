@@ -608,6 +608,9 @@ class BatchRunner(SubmissionComponent):
         # Detect detector and get profile
         profile_config = self.config_mgr.get_profile(profile, detector)
         site = profile_config.get("site", "s3df")
+        from ..pipeline.storage import validate_cache_storage
+
+        validate_cache_storage({"cache_repository": cache_repository}, site)
         scheduler = profile_config.get("scheduler")
         if scheduler is None:
             scheduler = "pbs" if site in ("anl", "polaris") else "slurm"

@@ -227,6 +227,11 @@ def retire_if_idle(registry):
         for name, entry in data["pipelines"].items():
             if entry.get("enabled") and needs_tick(Path(name)):
                 return False
+        from .audit import archive_audit
+
+        for name, entry in data["pipelines"].items():
+            if entry.get("enabled"):
+                archive_audit(Path(name))
         existing = read_schedule()
         desired = remove_schedule(existing, registry.parent.name)
         if desired != existing:
@@ -264,23 +269,32 @@ def needs_tick(manifest):
     state = read(manifest)
     if state["state"] != "active":
         return False
+    from .controller import dependencies
+
+    graph = dependencies(state["records"])
+    blocked = set()
+    work = False
     for record in state["records"]:
+        name = record["name"]
         if record["status"] == "completed":
             continue
-        if record["status"] == "failed":
-            return False
         options = record["options"]
+        failed = record["status"] == "failed"
         if options.get("continuation") is not None:
             path = manifest_path(options["run_dir"], options.get("continuation_dir"))
-            if path.exists() and read(path)["state"] in (
-                "failed",
-                "cancelled",
-                "budget_exhausted",
-            ):
-                return False
-        return True
-    # One last tick marks the pipeline completed.
-    return True
+            if path.exists():
+                logical = read(path)
+                failed = logical["state"] in (
+                    "failed",
+                    "cancelled",
+                    "budget_exhausted",
+                ) and bool((logical.get("attempts") or [{}])[-1].get("accounted"))
+        if failed or any(dep in blocked for dep in graph[name]):
+            blocked.add(name)
+        else:
+            work = True
+    # One last tick marks a wholly successful pipeline completed.
+    return work or not blocked
 
 
 def tick_registry(registry):

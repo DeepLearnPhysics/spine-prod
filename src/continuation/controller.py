@@ -1,7 +1,7 @@
 """Short-lived submission-host controller for continuation pipelines.
 
-Stages are deliberately serialized in this first implementation. No consumer is
-submitted against an intermediate allocation's successful exit code.
+Independent stages may run concurrently. Consumers wait for logical completion,
+never an intermediate allocation's successful exit code.
 """
 
 import hashlib
@@ -28,8 +28,10 @@ def start(
     preload=False,
     warm_start=None,
     continuation_dir=None,
+    cache_archives=None,
+    audit_dir=None,
 ):
-    """Create a durable controller and submit the first eligible stage.
+    """Create a durable controller and submit all eligible stages.
 
     Parameters
     ----------
@@ -86,11 +88,29 @@ def start(
             {
                 "name": stage["name"],
                 "kind": stage.get("kind", "spine"),
+                "depends_on": [
+                    name + "__archive" if name in (cache_archives or {}) else name
+                    for name in stage.get("depends_on", [])
+                ],
                 "options": options,
                 "status": "waiting",
                 "jobs": [],
             }
         )
+        if stage["name"] in (cache_archives or {}):
+            records.append(
+                {
+                    "name": stage["name"] + "__archive",
+                    "kind": "archive",
+                    "depends_on": [stage["name"]],
+                    "options": cache_archives[stage["name"]],
+                    "status": "waiting",
+                    "jobs": [],
+                }
+            )
+    audit_dir = str(
+        Path(audit_dir or Path(workspace) / "monitoring").expanduser().resolve()
+    )
     automation_accounts = set()
     # Validate every operational policy before the first scheduler interaction.
     for record in records:
@@ -126,11 +146,11 @@ def start(
         print(
             "Continuation strategy: submission-host advance; all consumers deferred until logical completion"
         )
-        for index, record in enumerate(records):
-            print(f"Stage {record['name']}: serialized completion gate")
-            if index:
+        for record in records:
+            print(f"Stage {record['name']}: dependencies {record['depends_on']}")
+            if record["depends_on"]:
                 print(
-                    f"  Deferred until predecessors complete; options: {record['options']}"
+                    f"  Deferred until dependencies complete; options: {record['options']}"
                 )
                 continue
             method = getattr(
@@ -142,6 +162,10 @@ def start(
     with locked(path):
         if path.exists():
             state = read(path)
+            if state.get("audit_dir", audit_dir) != audit_dir:
+                raise ValueError(
+                    "Controller audit directory changed; use the original --audit-dir"
+                )
             if state["definition_sha256"] != digest:
                 raise ValueError("Controller definition changed; use a new workspace")
         else:
@@ -152,6 +176,7 @@ def start(
                     "state": "active",
                     "definition_sha256": digest,
                     "basedir": str(context.basedir),
+                    "audit_dir": audit_dir,
                     "records": records,
                     "preload": preload,
                     "generation": 0,
@@ -174,8 +199,33 @@ def start(
     return advance(path, context)
 
 
+def dependencies(records):
+    """Validate ordered dependencies; legacy manifests retain serial scheduling."""
+    graph = {}
+    for record in records:
+        name = record["name"]
+        deps = record.get("depends_on", list(graph)[-1:])
+        if (
+            name in graph
+            or not isinstance(deps, list)
+            or any(not isinstance(dep, str) or dep not in graph for dep in deps)
+        ):
+            raise ValueError("Invalid continuation dependencies for " + name)
+        graph[name] = deps
+    return graph
+
+
+def descendants(records, name):
+    graph = dependencies(records)
+    result = {name}
+    for candidate, deps in graph.items():
+        if any(dep in result for dep in deps):
+            result.add(candidate)
+    return result - {name}
+
+
 def advance(path, context=None):
-    """Reconcile a pipeline and submit at most one eligible stage or allocation.
+    """Reconcile and submit all ready stages under a single pipeline lock.
 
     Parameters
     ----------
@@ -195,15 +245,24 @@ def advance(path, context=None):
     alone never releases consumers of an incomplete logical training stage.
     """
     from ..submitter import Submitter
+    from .audit import archive_audit
 
     path = Path(path)
     with locked(path):
         state = read(path)
         if state["state"] != "active":
+            archive_audit(path)
             return {}
         context = context or Submitter(basedir=Path(state["basedir"]))
+        graph = dependencies(state["records"])
+        records = {r["name"]: r for r in state["records"]}
+        jobs_by_stage = {}
         for record in state["records"]:
             if record["status"] == "completed":
+                continue
+            if any(
+                records[name]["status"] != "completed" for name in graph[record["name"]]
+            ):
                 continue
             options = dict(record["options"])
             is_continuation = options.get("continuation") is not None
@@ -227,7 +286,10 @@ def advance(path, context=None):
                     continue
                 if logical["state"] != "paused" or not attempt.get("accounted"):
                     atomic_json(path, state)
-                    return {record["name"]: record["jobs"]}
+                    if logical["state"] in ("failed", "cancelled", "budget_exhausted"):
+                        archive_audit(path)
+                    jobs_by_stage[record["name"]] = record["jobs"]
+                    continue
                 # Resume exactly the verified committed continuation artifact.
                 options.update(resume=True, resume_from=logical["checkpoint"])
             elif record["status"] == "submitted":
@@ -235,18 +297,21 @@ def advance(path, context=None):
                     accounting(record["scheduler"], job) for job in record["jobs"]
                 ]
                 if any(result is None for result in results):
-                    return {record["name"]: record["jobs"]}
+                    jobs_by_stage[record["name"]] = record["jobs"]
+                    continue
                 if not all(result["success"] for result in results):
                     record["status"] = "failed"
                     atomic_json(path, state)
-                    return {}
+                    archive_audit(path)
+                    continue
                 record["status"] = "completed"
                 atomic_json(path, state)
                 continue
             elif record["status"] != "waiting":
                 # A controller crash between scheduler submission and recording
                 # its response is uncertain. Never repeat that submission.
-                return {record["name"]: record["jobs"]}
+                jobs_by_stage[record["name"]] = record["jobs"]
+                continue
             profile = context.config_mgr.get_profile(
                 options.get("profile", "auto"), None
             )
@@ -270,16 +335,19 @@ def advance(path, context=None):
             if jobs:
                 record["status"] = "submitted"
             atomic_json(path, state)
-            return {record["name"]: jobs}
+            jobs_by_stage[record["name"]] = jobs
+        if not all(r["status"] == "completed" for r in state["records"]):
+            return jobs_by_stage
         state["state"] = "completed"
         state["generation"] += 1
         atomic_json(path, state)
+        archive_audit(path)
         return {}
 
 
 def operate(path, action, stage=None, value=None):
     """Rearm automatic hosting before changing a blocked pipeline's state."""
-    if action in ("extend", "retry", "accept", "adopt"):
+    if action in ("extend", "retry", "retry-cache", "accept", "accept-best", "adopt"):
         from .service import reactivating
 
         with reactivating(read(path)):
@@ -302,6 +370,53 @@ def _operate(path, action, stage=None, value=None):
             atomic_json(path, state)  # Inhibit submissions even if qdel fails.
         for record in records:
             options = record["options"]
+            if action == "retry-cache":
+                if (
+                    state["state"] != "active"
+                    or not options.get("cache_repository")
+                    or options.get("continuation") is not None
+                    or record["status"] not in ("submitted", "failed")
+                    or not record.get("jobs")
+                ):
+                    raise ValueError(
+                        "Retry-cache requires a failed cache stage in an active pipeline"
+                    )
+                if any(
+                    r["status"] != "waiting"
+                    for r in state["records"]
+                    if r["name"] in descendants(state["records"], record["name"])
+                ):
+                    raise ValueError(
+                        "Retry-cache requires downstream stages to be waiting"
+                    )
+                results = [
+                    accounting(record["scheduler"], job) for job in record["jobs"]
+                ]
+                if any(result is None for result in results) or all(
+                    result["success"] for result in results
+                ):
+                    raise ValueError(
+                        "Retry-cache requires confirmed terminal failure accounting"
+                    )
+                requested_time = (
+                    duration(seconds(value))
+                    if value is not None
+                    else options.get("time")
+                )
+                record.setdefault("retry_history", []).append(
+                    {
+                        "jobs": list(record["jobs"]),
+                        "accounting": results,
+                        "previous_status": record["status"],
+                        "previous_time": options.get("time"),
+                        "requested_at": time.time(),
+                    }
+                )
+                if requested_time is not None:
+                    options["time"] = requested_time
+                options["retry"] = True
+                record.update(status="waiting", jobs=[])
+                continue
             run_path = (
                 manifest_path(options["run_dir"], options.get("continuation_dir"))
                 if options.get("continuation") is not None
@@ -342,6 +457,39 @@ def _operate(path, action, stage=None, value=None):
                     ):
                         raise ValueError("Checkpoint changed")
                     logical.update(state="completed", reason="user_accepted")
+                elif action == "accept-best":
+                    if logical["state"] not in (
+                        "failed",
+                        "paused",
+                        "budget_exhausted",
+                    ) or not attempt.get("accounted"):
+                        raise ValueError(
+                            "Accept-best requires an accounted, inactive stage"
+                        )
+                    weights = (Path(options["run_dir"]) / "weights").resolve()
+                    best = weights / "snapshot-best.ckpt"
+                    if best.resolve().parent != weights:
+                        raise ValueError(
+                            "Best checkpoint is outside the weights directory"
+                        )
+                    digest = RunManager.checkpoint_digest(best)
+                    if not digest:
+                        raise ValueError(
+                            "Accept-best requires a checksum-verified best checkpoint"
+                        )
+                    # Keep the failed attempt and last resume cursor as history.
+                    # Consumers use their configured best weights, never this
+                    # checkpoint's potentially damaged training sampler state.
+                    logical.update(
+                        state="completed",
+                        reason="user_accepted_best",
+                        accepted_result={
+                            "checkpoint": str(best),
+                            "sha256": digest,
+                            "previous_state": logical["state"],
+                            "accepted_at": time.time(),
+                        },
+                    )
                 elif action == "cancel":
                     logical.update(state="cancelled", reason="user_cancelled")
                 elif action == "retry":
@@ -352,9 +500,16 @@ def _operate(path, action, stage=None, value=None):
                     if len(logical["attempts"]) >= logical["policy"]["max_attempts"]:
                         raise ValueError("max_attempts reached")
                     valid = None
-                    for _, candidate in reversed(
-                        RunManager.checkpoints(Path(options["run_dir"]))
-                    ):
+                    run_dir = Path(options["run_dir"])
+                    candidates = [
+                        candidate
+                        for _, candidate in reversed(RunManager.checkpoints(run_dir))
+                    ]
+                    # Initial validation saves full optimizer/RNG/loader state too.
+                    # Prefer periodic progress, but allow recovery before the first
+                    # periodic checkpoint without discarding the campaign history.
+                    candidates.append(run_dir / "weights" / "snapshot-initial.ckpt")
+                    for candidate in candidates:
                         try:
                             digest = RunManager.checkpoint_digest(candidate)
                             if digest:
@@ -364,7 +519,7 @@ def _operate(path, action, stage=None, value=None):
                             continue
                     if valid is None:
                         raise ValueError(
-                            "No valid periodic checkpoint to recover; use a new workspace after fixing the failure"
+                            "No checksum-verified periodic or initial checkpoint to recover; stage restart requires operator recovery"
                         )
                     logical.update(
                         state="paused",

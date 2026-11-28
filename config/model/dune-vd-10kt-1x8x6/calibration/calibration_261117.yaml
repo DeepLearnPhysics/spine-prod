@@ -1,0 +1,35 @@
+__meta__:
+  kind: fragment
+  version: "261117"
+  date: "2026-11-17"
+  description: DUNE-VD collection-charge calibration from DUNE reconstruction defaults
+
+# Audited against current DUNE defaults on 2026-11-17.
+# Invert dunevd10kt_calorimetryalgmc.CalAreaConstants[2]:
+# 1 / 5.292e-3 ADC/electron = 188.9644746787604 electrons/ADC.
+# Gain: detector-specific collection CalAreaConstants[2], inverted for SPINE.
+# https://github.com/DUNE/dunesw/blob/80dcb3ac044d4a0097864ce858b2e05807cba17c/fcl/common/calorimetry_dune10kt.fcl
+# Modified-box alpha/beta: LArSoft reconstruction constants (not SPINE defaults).
+# https://github.com/LArSoft/larcoreobj/blob/f88ccd1f95d8ce528f2fff8a97f030041d942022/larcoreobj/SimpleTypesAndConstants/PhysicalConstants.h
+# FD field = 0.5 kV/cm and lifetime = 10400 us; adopt latest nominal settings.
+# https://github.com/DUNE/dunecore/blob/1861034bf807a2f556a476615c0a0f212dc43a0e/dunecore/Utilities/detectorproperties_dune.fcl
+# Fixed MIP dE/dx and density remain SPINE approximations, not fitted DUNE values.
+# Lifetime and recombination commute only for this fixed-MIP conversion.
+stages:
+  - name: gain
+    gain: 188.9644746787604
+  - name: recombination
+    # Standard DUNE reconstruction; VD simulation additionally enables LArQL.
+    # Its relative MIP correction at 0.5 kV/cm is about 0.00015%; SPINE has no
+    # LArQL option. Do not absorb this model difference into gain or alpha/beta.
+    # https://github.com/DUNE/dunesim/blob/6487dcc56869a2ecffe6b8096a15278c0feb2d55/dunesim/Simulation/simulationservices_dune.fcl
+    model: mbox
+    mbox_alpha: 0.930
+    mbox_beta: 0.212
+    efield: 0.5
+    mip_dedx: 2.105168
+  - name: lifetime
+    lifetime: 10400
+    # WireCell driftSpeed = 1.60563 mm/us, converted to cm/us.
+    # https://github.com/DUNE/dunereco/blob/403e8b9afab7c0c26c9d63d76198872340a144d3/dunereco/DUNEWireCell/dune-vd/wcls-sim-drift-simchannel-nf-sp.fcl
+    driftv: 0.160563

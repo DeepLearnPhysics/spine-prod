@@ -703,16 +703,32 @@ are rejected; allocation correspondence does not imply identical performance.
 ```bash
 ./submit.py --pipeline pipelines/dune-vd-10kt-1x8x6/full_chain_261117.yaml \
   --site nersc --account YOUR_PROJECT --workspace /path/to/vd-run \
+  --continuation-dir "$SCRATCH/vd-state" \
+  --cache-dir "$SCRATCH/vd-cache" \
   --source-list /path/to/train_file_list.txt \
   --val-source-list /path/to/test_file_list.txt --dry-run
 ```
 
 Preflight checks every selected stage before submitting any jobs, including in
-`--dry-run`. The VD five-day and three-day training requests exceed NERSC's
-48-hour regular-QOS limit: explicitly choose shorter requests with `--time`
-(which overrides every selected stage), or use allocation continuation when
-that feature is integrated. Site selection never truncates training time or
-resubmits jobs. Selecting only the scan stages allows testing data access first.
+`--dry-run`. With `--site`, training stages automatically use continuation:
+the original YAML `time` (or source profile time) becomes the total runtime budget.
+An explicit `continuation.runtime_budget` takes precedence. Allocation ceilings
+are bounded by the destination queue's hard limit; the total budget is preserved.
+CLI `--time` overrides only the allocation ceiling, not the inherited budget.
+Site-level `continuation_defaults` supply chunk preferences, bounded by each stage's allocation ceiling. Explicit CLI `--time`
+and stage continuation preferences are validated rather than silently shortened.
+NERSC cache stages default to up to 100 tasks with two-hour requests, unless
+explicit file grouping or a launch walltime override is supplied. Other
+non-continuation stages retain their requested time and fail if it exceeds limits.
+
+The HD 261022 and VD 261117 candidates use this default for all six training stages.
+Without `--site`, ordinary submission semantics remain unchanged unless continuation
+is explicitly configured. On NERSC, `--continuation-dir` in the command above must point to Scratch. Its 120-hour and
+72-hour budgets become at most 48-hour allocations, requesting 1–24-hour grants
+by default. Shorter training stages retain their smaller ceilings. This is an
+initial scheduling policy, not a measured optimum. Budget exhaustion blocks
+consumers unless explicitly accepted. S3DF/Polaris require periodic controller
+advancement; see [training continuation](docs/training-continuation.md).
 
 The central `sites` table records queue/QOS allocation limits and their sources.
 Known limits also apply to ordinary batch, filter, and report submissions.

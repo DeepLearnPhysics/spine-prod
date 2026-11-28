@@ -1,0 +1,12 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+# Base configuration for DUNE-VD 10 kt module 1x8x6
+# Revision date: February 2, 2026
+
+__meta__:
+  kind: bundle
+  version: "260202"
+  date: "2026-02-02"
+  description: "Base DUNE-VD 10 kt module 1x8x6 configuration for February 2026 weights"
+  tags: []
+
+include: base_common.yaml

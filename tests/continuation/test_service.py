@@ -151,13 +151,17 @@ def test_tick_error_does_not_disable_other_pipelines(service_environment):
 def test_blocked_training_is_not_advanced(service_environment, logical_state):
     _, _, manifest = service_environment
     run = manifest.parent / "train"
-    storage.atomic_json(storage.manifest_path(run), {"state": logical_state})
+    storage.atomic_json(
+        storage.manifest_path(run),
+        {"state": logical_state, "attempts": [{"accounted": True}]},
+    )
     storage.atomic_json(
         manifest,
         {
             "state": "active",
             "records": [
                 {
+                    "name": "train",
                     "status": "submitted",
                     "options": {"run_dir": str(run), "continuation": {}},
                 }
@@ -570,11 +574,18 @@ def test_needs_tick_handles_completed_and_failed_records(tmp_path):
     manifest = tmp_path / "pipeline.json"
     storage.atomic_json(
         manifest,
-        {"state": "active", "records": [{"status": "completed"}, {"status": "failed"}]},
+        {
+            "state": "active",
+            "records": [
+                {"name": "done", "status": "completed"},
+                {"name": "failed", "status": "failed", "options": {}},
+            ],
+        },
     )
     assert not service.needs_tick(manifest)
     storage.atomic_json(
-        manifest, {"state": "active", "records": [{"status": "completed"}]}
+        manifest,
+        {"state": "active", "records": [{"name": "done", "status": "completed"}]},
     )
     assert service.needs_tick(manifest)
 

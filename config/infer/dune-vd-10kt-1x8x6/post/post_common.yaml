@@ -1,0 +1,62 @@
+# HD-derived recipe snapshot for the VD 261117 candidate; not a released VD model.
+# Common post-processing configuration for DUNE-VD 10 kt module 1x8x6
+
+__meta__:
+  kind: fragment
+
+# Post-processors
+post:
+  # apply_calibrations varies by config - override in specific configs
+  # trigger varies by config - override in specific configs
+  stages:
+    - name: calo_ke
+      run_mode: both
+      scaling: 1.0
+    - name: shape_logic
+      enforce_pid: true
+      enforce_primary: true
+    - name: direction
+      run_mode: reco
+      obj_type: particle
+      optimize: true
+    - name: csda_ke
+      run_mode: reco
+      tracking_mode: step_next
+      segment_length: 5.0
+      fill_per_pid: true
+    - name: vertex
+      run_mode: reco
+      use_primaries: true
+      update_orientations: true
+      update_primaries: false
+    - name: mcs_ke
+      run_mode: reco
+      tracking_mode: bin_pca
+      segment_length: 14.0
+      fill_per_pid: true
+    - name: fiducial
+      run_mode: both
+      mode: module
+      margin:
+        - - 25
+          - 25
+        - - 25
+          - 25
+        - - 30
+          - 50
+    - name: topology_threshold
+      run_mode: both
+      ke_thresholds:
+        1: 50
+        4: 50
+        default: 25
+      truth_ke_mode: energy_deposit
+    - name: children_count
+      mode: shape
+    - name: match
+      match_mode: both
+      ghost: true
+      truth_point_mode: points
+      fragment: false
+      particle: true
+      interaction: true

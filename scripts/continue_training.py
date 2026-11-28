@@ -17,9 +17,11 @@ def main():
             "status",
             "extend",
             "accept",
+            "accept-best",
             "cancel",
             "adopt",
             "retry",
+            "retry-cache",
             "metrics",
             "preflight",
         ],
@@ -30,7 +32,8 @@ def main():
         "--site", choices=["nersc", "s3df", "anl"], help="Site for preflight"
     )
     parser.add_argument(
-        "--value", help="New total budget (extend), or scheduler job ID (adopt)"
+        "--value",
+        help="New total budget (extend), cache walltime (retry-cache), or job ID (adopt)",
     )
     args = parser.parse_args()
     if args.action == "preflight":
